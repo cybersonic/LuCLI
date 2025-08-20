@@ -1,0 +1,9 @@
+{
+  "name": "default",
+  "description": "Default LuCLI prompt",
+  "template": "🔧 lucli:{path}$ ",
+  "showPath": true,
+  "showTime": false,
+  "showGit": false,
+  "useEmoji": true
+}

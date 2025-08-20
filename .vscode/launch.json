@@ -1,0 +1,26 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+      
+        {
+            "type": "java",
+            "name": "💻 LucCLI Terminal",
+            "request": "launch",
+            "mainClass": "org.lucee.lucli.LucCLI",
+            "args": "terminal",
+            "projectName": "LuCLI"
+        },
+        {
+            "type": "java",
+            "name": "📄 LucCLI File",
+            "request": "launch",
+            "mainClass": "org.lucee.lucli.LucCLI",
+            "args": "examples/hello.cfc",
+            "projectName": "LuCLI"
+        }
+       
+    ]
+}

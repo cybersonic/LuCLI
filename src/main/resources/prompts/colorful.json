@@ -1,0 +1,9 @@
+{
+  "name": "colorful",
+  "description": "Colorful prompt with emoji",
+  "template": "🌈 {path} ➤ ",
+  "showPath": true,
+  "showTime": false,
+  "showGit": false,
+  "useEmoji": true
+}

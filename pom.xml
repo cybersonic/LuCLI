@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>org.lucee</groupId>
+  <artifactId>lucli</artifactId>
+  <version>1.0.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+  <name>LuCLI</name>
+  <description>A CLI for Lucee</description>
+  <properties>
+    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.target>17</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <jline.version>3.26.3</jline.version>
+    <lucee.version>7.0.0.242-RC</lucee.version>
+  </properties>
+
+  <repositories>
+    <!-- Lucee official repository -->
+    <repository>
+      <id>oss-sonatype</id>
+      <url>https://oss.sonatype.org/content/repositories/releases/</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+    </repository>
+    <repository>
+      <id>oss-sonatype-snapshots</id>
+      <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+    </repository>
+    <!-- Maven Central fallback -->
+    <repository>
+      <id>central</id>
+      <url>https://repo1.maven.org/maven2</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+    </repository>
+  </repositories>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.jline</groupId>
+      <artifactId>jline-terminal</artifactId>
+      <version>${jline.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.jline</groupId>
+      <artifactId>jline-reader</artifactId>
+      <version>${jline.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.jline</groupId>
+      <artifactId>jline-style</artifactId>
+      <version>${jline.version}</version>
+    </dependency>
+
+    <!-- Lucee CFML Engine for script execution -->
+    <dependency>
+      <groupId>org.lucee</groupId>
+      <artifactId>lucee</artifactId>
+      <version>${lucee.version}</version>
+    </dependency>
+
+    <!-- Servlet API required by Lucee -->
+    <dependency>
+      <groupId>jakarta.servlet</groupId>
+      <artifactId>jakarta.servlet-api</artifactId>
+      <version>5.0.0</version>
+    </dependency>
+    
+    <!-- Jackson JSON library for settings management -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>2.15.2</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.11.0</version>
+        <configuration>
+          <release>17</release>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.3.0</version>
+        <configuration>
+          <archive>
+            <manifest>
+              <addClasspath>true</addClasspath>
+              <mainClass>org.lucee.lucli.LuCLI</mainClass>
+              <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+            </manifest>
+          </archive>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.5.0</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+              <createDependencyReducedPom>false</createDependencyReducedPom>
+              <finalName>lucli</finalName>
+              <filters>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <!-- Exclude Lucee extension files (.lex) -->
+                    <exclude>**/*.lex</exclude>
+                    <!-- Exclude documentation and metadata -->
+                    <exclude>META-INF/maven/**</exclude>
+                    <exclude>META-INF/*.txt</exclude>
+                    <exclude>META-INF/*.md</exclude>
+                    <exclude>META-INF/*.rst</exclude>
+                    <exclude>META-INF/LICENSE*</exclude>
+                    <exclude>META-INF/NOTICE*</exclude>
+                    <!-- Exclude Lucee documentation and examples -->
+                    <exclude>doc/**</exclude>
+                    <exclude>docs/**</exclude>
+                    <exclude>examples/**</exclude>
+                    <exclude>tutorial/**</exclude>
+                    <!-- Exclude Lucee admin interface files -->
+                    <exclude>admin/**</exclude>
+                    <exclude>admin-web/**</exclude>
+                    <exclude>railo-context/**</exclude>
+                    <!-- Exclude Lucee web context files -->
+                    <exclude>context/**</exclude>
+                    <exclude>webroot/**</exclude>
+                    <!-- Exclude native libraries we don't need -->
+                    <exclude>**/*.dll</exclude>
+                    <exclude>**/*.dylib</exclude>
+                    <exclude>**/*.jnilib</exclude>
+                    <!-- Exclude source files -->
+                    <exclude>**/*-sources.jar</exclude>
+                    <!-- Exclude signature files -->
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+              <transformers>
+                <transformer
+                  implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <mainClass>org.lucee.lucli.LuCLI</mainClass>
+                </transformer>
+                <transformer
+                  implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+              </transformers>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+  <profiles>
+    <profile>
+      <id>binary</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-antrun-plugin</artifactId>
+            <version>3.1.0</version>
+            <executions>
+              <execution>
+                <id>create-binary</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <configuration>
+                  <target>
+                    <concat destfile="target/lucli" binary="yes" force="yes">
+                      <fileset file="src/bin/lucli.sh" />
+                      <fileset file="target/lucli.jar" />
+                    </concat>
+                    <chmod file="target/lucli" perm="755" />
+                  </target>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+
+</project>

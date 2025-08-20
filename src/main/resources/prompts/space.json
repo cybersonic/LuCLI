@@ -1,0 +1,9 @@
+{
+  "name": "space",
+  "description": "Space-themed prompt",
+  "template": "🚀 {path} » ",
+  "showPath": true,
+  "showTime": false,
+  "showGit": false,
+  "useEmoji": true
+}

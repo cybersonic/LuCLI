@@ -1,0 +1,9 @@
+{
+  "name": "dev",
+  "description": "Developer prompt with git info",
+  "template": "💻 {path} {git}$ ",
+  "showPath": true,
+  "showTime": false,
+  "showGit": true,
+  "useEmoji": true
+}

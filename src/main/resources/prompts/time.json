@@ -1,0 +1,9 @@
+{
+  "name": "time",
+  "description": "Prompt with time",
+  "template": "[{time}] {path} $ ",
+  "showPath": true,
+  "showTime": true,
+  "showGit": false,
+  "useEmoji": false
+}

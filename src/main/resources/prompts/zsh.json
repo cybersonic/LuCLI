@@ -1,0 +1,9 @@
+{
+  "name": "zsh",
+  "description": "Zsh-style prompt",
+  "template": "{path} ❯ ",
+  "showPath": true,
+  "showTime": false,
+  "showGit": false,
+  "useEmoji": false
+}

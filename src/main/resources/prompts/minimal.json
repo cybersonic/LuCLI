@@ -1,0 +1,9 @@
+{
+  "name": "minimal",
+  "description": "Minimal prompt",
+  "template": "$ ",
+  "showPath": false,
+  "showTime": false,
+  "showGit": false,
+  "useEmoji": false
+}

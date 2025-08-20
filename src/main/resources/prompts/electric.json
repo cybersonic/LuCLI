@@ -1,0 +1,9 @@
+{
+  "name": "electric",
+  "description": "Electric terminal prompt",
+  "template": "⚡ lucli:{path} ⚡ ",
+  "showPath": true,
+  "showTime": false,
+  "showGit": false,
+  "useEmoji": true
+}
