@@ -1,0 +1,24 @@
+{
+  "name": "powerline",
+  "description": "Clean powerline-inspired prompt with angular segments and professional styling",
+  "backgroundColor": "#1E1E1E",
+  "foregroundColor": "#FFFFFF",
+  "style": "bold",
+  "multiline": true,
+  "prompt": " {fa:code} LuCLI  {fa:user} {username}  {fa:server} {hostname} ",
+  "separator": "▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶▶",
+  "rightAlign": " {fa:clock} {time}  {fa:git} {git} ",
+  "promptSymbol": "❯",
+  "padding": 0,
+  "placeholders": {
+    "username": "current_user",
+    "hostname": "current_host", 
+    "time": "current_time",
+    "git": "git_branch",
+    "code": "terminal",
+    "user": "user-circle",
+    "server": "server",
+    "clock": "clock",
+    "git": "code-branch"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "gaming",
+  "description": "Gaming-themed prompt with achievements and level display",
+  "template": "{fa:gamepad} Player {fa:chevron-right} {path} {git}",
+  "showPath": true,
+  "showTime": false,
+  "showGit": true,
+  "useEmoji": true,
+  "backgroundColor": "bright-black",
+  "foregroundColor": "bright-yellow",
+  "style": "bold",
+  "multiline": true,
+  "rightAlign": "{fa:trophy} Level 42 {fa:crown}",
+  "separator": "=",
+  "padding": 1
+}

@@ -1,0 +1,23 @@
+{
+  "name": "powerline-pro",
+  "description": "Professional powerline prompt with segment separators and status indicators",
+  "backgroundColor": "#002B36",
+  "foregroundColor": "#839496",
+  "style": "bold",
+  "multiline": true,
+  "prompt": " {fa:terminal} LuCLI  {fa:user} {username}  {fa:folder} ~/dev ",
+  "separator": "█▓▒░░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░░▒▓█",
+  "rightAlign": " {fa:git} {git}  {fa:clock} {time} ",
+  "promptSymbol": "",
+  "padding": 1,
+  "placeholders": {
+    "username": "current_user",
+    "hostname": "current_host",
+    "time": "current_time", 
+    "git": "git_branch",
+    "terminal": "terminal",
+    "user": "user",
+    "folder": "folder",
+    "clock": "clock"
+  }
+}

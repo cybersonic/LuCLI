@@ -1,9 +1,16 @@
 {
   "name": "space",
-  "description": "Space-themed prompt",
-  "template": "🚀 {path} » ",
+  "description": "Space-themed prompt with cosmic styling",
+  "template": "{fa:rocket} {path} {fa:chevron-right} ",
   "showPath": true,
   "showTime": false,
   "showGit": false,
-  "useEmoji": true
+  "useEmoji": true,
+  "backgroundColor": "black",
+  "foregroundColor": "bright-cyan",
+  "style": "bold",
+  "multiline": true,
+  "rightAlign": "{fa:star} Mission Control {fa:satellite}",
+  "separator": "{fa:star}",
+  "padding": 1
 }

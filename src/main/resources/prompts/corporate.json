@@ -1,0 +1,16 @@
+{
+  "name": "corporate",
+  "description": "Professional corporate prompt with business icons",
+  "template": "{fa:briefcase} {path} {git}{fa:chevron-right} ",
+  "showPath": true,
+  "showTime": true,
+  "showGit": true,
+  "useEmoji": false,
+  "backgroundColor": "blue",
+  "foregroundColor": "white",
+  "style": "bold",
+  "multiline": true,
+  "rightAlign": "{fa:clock} {time} {fa:chart-line}",
+  "separator": "",
+  "padding": 2
+}

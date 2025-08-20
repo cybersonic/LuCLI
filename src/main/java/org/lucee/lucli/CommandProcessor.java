@@ -764,12 +764,23 @@ public class CommandProcessor {
             
             result.append("\n💡 Current prompt: ").append(currentPrompt);
             result.append("\n🔧 Usage: prompt <template-name> to switch prompts");
+            result.append("\n🔄 Usage: prompt refresh to update templates from JAR resources");
             result.append("\n📁 Custom prompts are stored in ~/.lucli/prompts/");
             
             return result.toString();
         } else {
-            String templateName = args[0];
+            String command = args[0];
             
+            // Handle refresh subcommand
+            if ("refresh".equals(command)) {
+                int refreshedCount = promptConfig.refreshPromptFiles();
+                return "🔄 Refreshed " + refreshedCount + " prompt template files from JAR resources\n"
+                     + "✅ Latest prompt templates are now available in ~/.lucli/prompts/\n"
+                     + "💡 Use 'prompt' to see all available templates.";
+            }
+            
+            // Handle template switching
+            String templateName = command;
             if (promptConfig.setCurrentTemplate(templateName)) {
                 PromptConfig.PromptTemplate template = promptConfig.getTemplate(templateName);
                 String emoji = settings.showEmojis() && template.useEmoji ? "✨ " : "";

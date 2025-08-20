@@ -1,9 +1,16 @@
 {
   "name": "dev",
-  "description": "Developer prompt with git info",
-  "template": "💻 {path} {git}$ ",
+  "description": "Developer-focused prompt with Font Awesome icons",
+  "template": "{fa:terminal} {path} {git}{fa:chevron-right} ",
   "showPath": true,
   "showTime": false,
   "showGit": true,
-  "useEmoji": true
+  "useEmoji": true,
+  "backgroundColor": "",
+  "foregroundColor": "bright-blue",
+  "style": "bold",
+  "multiline": false,
+  "rightAlign": "{fa:clock} {time}",
+  "separator": "",
+  "padding": 0
 }

@@ -1,0 +1,21 @@
+{
+  "name": "locomotive", 
+  "description": "All aboard the LuCLI Express! A detailed train locomotive prompt with steam and cars",
+  "backgroundColor": "#0F1419",
+  "foregroundColor": "#BFBAB0",
+  "style": "bold",
+  "multiline": true,
+  "prompt": "🚂💨💨 LuCLI Express 🚃 {fa:user} {username} 🚃 {fa:code} Terminal",
+  "separator": "🛤️ ═══════════════════════════════════════════════════════════════════════════════ 🛤️",
+  "rightAlign": "🕐 {time} ⛽ {git} 🚩",
+  "promptSymbol": "🚃▶",
+  "padding": 1,
+  "placeholders": {
+    "username": "conductor",
+    "hostname": "station",
+    "time": "current_time",
+    "git": "git_branch",
+    "user": "user-tie",
+    "code": "code"
+  }
+}

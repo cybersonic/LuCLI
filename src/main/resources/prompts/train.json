@@ -1,0 +1,20 @@
+{
+  "name": "train",
+  "description": "Choo choo! A playful train-themed prompt that chugs along your terminal",
+  "backgroundColor": "#2E3440",
+  "foregroundColor": "#D8DEE9",
+  "style": "bold",
+  "multiline": true,
+  "prompt": "🚂 {fa:code} LuCLI Station",
+  "separator": "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+  "rightAlign": "🕰️ {time} | ⛽ {git}",
+  "promptSymbol": "🚃➤",
+  "padding": 1,
+  "placeholders": {
+    "username": "conductor",
+    "hostname": "express",
+    "time": "current_time",
+    "git": "git_branch",
+    "code": "terminal"
+  }
+}

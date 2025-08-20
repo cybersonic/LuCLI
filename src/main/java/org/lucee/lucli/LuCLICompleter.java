@@ -18,7 +18,7 @@ public class LuCLICompleter implements Completer {
     private final CommandProcessor commandProcessor;
     private final String[] commands = {
         "ls", "dir", "cd", "pwd", "mkdir", "rmdir", "rm", "cp", "mv", 
-        "cat", "touch", "find", "wc", "head", "tail", "cfml", "help", "exit", "quit"
+        "cat", "touch", "find", "wc", "head", "tail", "cfml", "run", "prompt", "help", "exit", "quit"
     };
     
     public LuCLICompleter(CommandProcessor commandProcessor) {
@@ -38,9 +38,14 @@ public class LuCLICompleter implements Completer {
                 }
             }
         } else {
-            // Complete file paths for commands that take file arguments
             String command = line.words().get(0).toLowerCase();
-            if (isFileCommand(command)) {
+            
+            // Handle CFML function completion
+            if ("cfml".equals(command)) {
+                completeCFMLFunctions(line, candidates);
+            }
+            // Complete file paths for commands that take file arguments
+            else if (isFileCommand(command)) {
                 String partial = line.words().size() > 1 ? line.words().get(line.words().size() - 1) : "";
                 completeFilePaths(partial, candidates);
             }
@@ -152,5 +157,60 @@ public class LuCLICompleter implements Completer {
         } catch (IOException e) {
             // Ignore completion errors
         }
+    }
+    
+    /**
+     * Complete CFML functions for 'cfml' command
+     */
+    private void completeCFMLFunctions(ParsedLine line, List<Candidate> candidates) {
+        // Get the CFML expression being typed
+        String fullLine = line.line();
+        
+        // Extract everything after "cfml "
+        if (fullLine.length() <= 5) { // "cfml " is 5 characters
+            return;
+        }
+        
+        String cfmlExpression = fullLine.substring(5); // Remove "cfml " prefix
+        
+        // Find the current function being typed (look for the last function call)
+        String currentFunction = extractCurrentFunction(cfmlExpression);
+        
+        if (currentFunction != null && !currentFunction.trim().isEmpty()) {
+            // Get CFML function completions
+            List<Candidate> cfmlCandidates = CFMLCompleter.getCompletions(currentFunction);
+            candidates.addAll(cfmlCandidates);
+        }
+    }
+    
+    /**
+     * Extract the current function name being typed from a CFML expression
+     */
+    private String extractCurrentFunction(String cfmlExpression) {
+        if (cfmlExpression == null || cfmlExpression.trim().isEmpty()) {
+            return "";
+        }
+        
+        // Simple approach: find the last word that could be a function name
+        // This handles cases like:
+        // "create" -> "create"
+        // "dateFormat(now(), " -> "" (already complete function)
+        // "listLen(myList) + create" -> "create"
+        
+        String trimmed = cfmlExpression.trim();
+        
+        // Split by common delimiters and operators
+        String[] parts = trimmed.split("[\\s+\\-*/=<>!&|(),;\\[\\]{}.\"']+");
+        
+        if (parts.length > 0) {
+            String lastPart = parts[parts.length - 1].trim();
+            
+            // Only return if it looks like a function name (starts with letter)
+            if (!lastPart.isEmpty() && Character.isLetter(lastPart.charAt(0))) {
+                return lastPart;
+            }
+        }
+        
+        return "";
     }
 }

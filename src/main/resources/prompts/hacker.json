@@ -1,0 +1,16 @@
+{
+  "name": "hacker",
+  "description": "Matrix-style hacker prompt with advanced styling",
+  "template": "{fa:user-secret} root@lucli:{path} {git}{fa:angle-right} ",
+  "showPath": true,
+  "showTime": true,
+  "showGit": true,
+  "useEmoji": false,
+  "backgroundColor": "black",
+  "foregroundColor": "bright-green",
+  "style": "bold",
+  "multiline": true,
+  "rightAlign": "{fa:shield} [{time}] {fa:terminal}",
+  "separator": "-",
+  "padding": 0
+}
