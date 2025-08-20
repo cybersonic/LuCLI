@@ -231,7 +231,7 @@ public class LuceeScriptEngine {
             System.out.println("Engine: " + engine.getClass().getName());
         }
         
-        System.out.println("Executing CFML script: " + scriptContent);
+        // System.out.println("Executing CFML script: " + scriptContent);
         boolean isScript = scriptFile.toLowerCase().endsWith(".cfs") || scriptFile.toLowerCase().endsWith(".cfc");
         try {
 
@@ -476,19 +476,19 @@ public class LuceeScriptEngine {
             // Create component using dotted path
             wrapper.append("  obj = createObject('component', '").append(componentPath).append("');\n");
         }
-        wrapper.append("  // Call init() method to properly initialize component chain\n");
+        wrapper.append("  // Call init() method first to initialize component\n");
         wrapper.append("  if (structKeyExists(obj, 'init')) {\n");
-        wrapper.append("    obj.init();\n");
+        wrapper.append("    initResult = obj.init();\n");
         wrapper.append("  }\n");
         wrapper.append("  \n");
+        wrapper.append("  // Try to call main() method if it exists\n");
         wrapper.append("  if (structKeyExists(obj, 'main')) {\n");
         wrapper.append("    result = obj.main(args);\n");
-        wrapper.append("    if (isDefined('result') && len(result)) {\n");
-        wrapper.append("      writeOutput(result & chr(10));\n");
+        wrapper.append("    if (isDefined('result') \u0026\u0026 len(result)) {\n");
+        wrapper.append("      writeOutput(result \u0026 chr(10));\n");
         wrapper.append("    }\n");
-        wrapper.append("  } else {\n");
-        wrapper.append("    writeOutput('Component does not have main() method' & chr(10));\n");
         wrapper.append("  }\n");
+        wrapper.append("  // No error message if main() doesn't exist - init() might be sufficient\n");
         
         wrapper.append("} catch (any e) {\n");
         wrapper.append("  writeOutput('Component execution error: ' & e.message & chr(10));\n");

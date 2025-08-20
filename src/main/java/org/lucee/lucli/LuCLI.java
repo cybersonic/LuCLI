@@ -40,12 +40,13 @@ public class LuCLI {
                 break;
                 
             default:
-                // CFMLEngineFactory.getInstance().getIOUtil().toString(null, null)
-                // CFMLEngineFactory.getInstance().getResourceUtil().
-
-                System.out.println("RUN: " + command);
+                // Execute CFML script with arguments
+                verbose = parseResult.verbose;
+                debug = parseResult.debug;
+                String[] scriptArgs = parseResult.scriptArgs != null ? parseResult.scriptArgs : new String[0];
+                
                 LuceeScriptEngine.getInstance(verbose, debug)
-                        .executeScript(command, null);
+                        .executeScript(command, scriptArgs);
                 System.exit(EXIT_SUCCESS);
         }
     }
@@ -208,16 +209,14 @@ public class LuCLI {
                 }
             } else {
                 // Regular script/module resolution
-                System.err.println("Error: Only 'terminal' command is currently supported in this version.");
-                // String resolvedScript = resolveScriptOrModule(potentialScript);
-                // result.scriptFile = resolvedScript;
+                result.scriptFile = potentialScript;
                 
-                // // Everything after the script file are script arguments
-                // if (scriptFileIndex + 1 < args.length) {
-                //     result.scriptArgs = Arrays.copyOfRange(args, scriptFileIndex + 1, args.length);
-                // } else {
-                //     result.scriptArgs = new String[0];
-                // }
+                // Everything after the script file are script arguments
+                if (scriptFileIndex + 1 < args.length) {
+                    result.scriptArgs = Arrays.copyOfRange(args, scriptFileIndex + 1, args.length);
+                } else {
+                    result.scriptArgs = new String[0];
+                }
             }
         }
         

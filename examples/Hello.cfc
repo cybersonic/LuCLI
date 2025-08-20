@@ -1,6 +1,6 @@
 component{
     function init(){
-        echo("Hello From a Lucee CFC file");
+        writeOutput("Hello From a Lucee CFC file" & chr(10));
         return "HelloWorld CFC initialized successfully!";
     }
 }
