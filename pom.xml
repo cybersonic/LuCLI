@@ -125,7 +125,7 @@
                   <artifact>*:*</artifact>
                   <excludes>
                     <!-- Exclude Lucee extension files (.lex) -->
-                    <exclude>**/*.lex</exclude>
+                    <!-- <exclude>**/*.lex</exclude> -->
                     <!-- Exclude documentation and metadata -->
                     <exclude>META-INF/maven/**</exclude>
                     <exclude>META-INF/*.txt</exclude>

@@ -1,2 +1,15 @@
-greeting = "Hello, World!";
-echo(greeting)
+#!/usr/bin/env lucli
+// Simple CFML script for performance testing
+
+writeOutput("Hello from LuCLI CFS script!" & chr(10));
+writeOutput("Lucee version: " & server.lucee.version & chr(10));
+
+// Simple computation
+result = 0;
+for (i = 1; i <= 1000; i++) {
+    result += i;
+}
+
+writeOutput("Sum of 1-1000: " & result & chr(10));
+writeOutput("Current time: " & now() & chr(10));
+writeOutput("Script execution completed!" & chr(10));
