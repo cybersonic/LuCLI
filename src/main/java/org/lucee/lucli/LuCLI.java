@@ -9,6 +9,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import lucee.loader.engine.CFMLEngineFactory;
+import org.lucee.lucli.server.LuceeServerManager;
 
 public class LuCLI {
 
@@ -21,45 +22,86 @@ public class LuCLI {
 
     public static void main(String[] args) throws Exception {
         // Parse arguments first to get flags
-        String command = args.length > 0 ? args[0] : "terminal";
         ParseResult parseResult = parseArgs(args);
         verbose = parseResult.verbose;
         debug = parseResult.debug;
         timing = parseResult.timing;
         
-        // Configure Lucee directories BEFORE any Lucee initialization
-        configureLuceeDirectories();
+        // Initialize timing if requested
+        Timer.setEnabled(timing);
+        Timer.start("Total Execution");
+        
+        // Determine the actual command after flag parsing
+        String command = parseResult.scriptFile != null ? parseResult.scriptFile : "terminal";
+        
+        try {
+            // Configure Lucee directories BEFORE any Lucee initialization
+            Timer.start("Configure Lucee Directories");
+            configureLuceeDirectories();
+            Timer.stop("Configure Lucee Directories");
 
-        switch (command) {
-            case "--version":
-                System.out.println(getVersionInfo());
-                break;
-                
-            case "--lucee-version":
-                testLuceeVersion();
-                break;
-                
-            case "terminal":
-                SimpleTerminal.main(new String[0]);
-                System.exit(EXIT_SUCCESS);
-                break;
-                
-            case "help":
-            case "--help":
-            case "-h":
-                showHelp();
-                break;
-                
-            default:
-                // Execute CFML script with arguments
-                verbose = parseResult.verbose;
-                debug = parseResult.debug;
-                String[] scriptArgs = parseResult.scriptArgs != null ? parseResult.scriptArgs : new String[0];
-                
-                LuceeScriptEngine.getInstance(verbose, debug)
-                        .executeScript(command, scriptArgs);
-                System.exit(EXIT_SUCCESS);
+            switch (command) {
+                case "--version":
+                    System.out.println(getVersionInfo());
+                    break;
+                    
+                case "--lucee-version":
+                    Timer.start("Lucee Version Check");
+                    testLuceeVersion();
+                    Timer.stop("Lucee Version Check");
+                    break;
+                    
+                case "terminal":
+                    Timer.start("Terminal Mode");
+                    SimpleTerminal.main(new String[0]);
+                    Timer.stop("Terminal Mode");
+                    System.exit(EXIT_SUCCESS);
+                    break;
+                    
+                case "help":
+                case "--help":
+                case "-h":
+                    showHelp();
+                    break;
+                    
+                case "server":
+                    Timer.start("Server Command");
+                    // Create filtered args array without flags for server command processing
+                    List<String> serverArgs = new ArrayList<>();
+                    serverArgs.add("lucli"); // Program name placeholder
+                    serverArgs.add("server"); // Server command
+                    // Add the server subcommand and its arguments
+                    if (parseResult.scriptArgs != null) {
+                        for (String arg : parseResult.scriptArgs) {
+                            serverArgs.add(arg);
+                        }
+                    }
+                    handleServerCommand(serverArgs.toArray(new String[0]));
+                    Timer.stop("Server Command");
+                    break;
+                    
+                default:
+                    // Execute CFML script with arguments
+                    Timer.start("Script Execution");
+                    verbose = parseResult.verbose;
+                    debug = parseResult.debug;
+                    String[] scriptArgs = parseResult.scriptArgs != null ? parseResult.scriptArgs : new String[0];
+                    
+                    LuceeScriptEngine.getInstance(verbose, debug)
+                            .executeScript(command, scriptArgs);
+                    Timer.stop("Script Execution");
+                    
+                    // Break out of switch to allow finally block to execute
+                    break;
+            }
+        } finally {
+            // Always stop total timer and show results before exit (if timing enabled)
+            Timer.stop("Total Execution");
+            Timer.printResults();
         }
+        
+        // Exit cleanly after all operations are complete
+        System.exit(EXIT_SUCCESS);
     }
     
     private static String getVersionInfo() {
@@ -104,10 +146,12 @@ public class LuCLI {
         System.out.println("Options:");
         System.out.println("  -v, --verbose  Enable verbose output");
         System.out.println("  -d, --debug    Enable debug output");
+        System.out.println("  -t, --timing   Enable timing output for performance analysis");
         System.out.println("  -h, --help     Show this help message");
         System.out.println();
         System.out.println("Commands:");
         System.out.println("  terminal       Start interactive terminal (default if no command given)");
+        System.out.println("  server         Manage Lucee server instances (start, stop, status, list)");
         System.out.println("  --version      Show application version");
         System.out.println("  --lucee-version  Show Lucee version");
         System.out.println("  help, --help, -h  Show this help message");
@@ -120,6 +164,7 @@ public class LuCLI {
         System.out.println("Examples:");
         System.out.println("  java -jar lucli.jar                    # Start interactive terminal");
         System.out.println("  java -jar lucli.jar --verbose --version # Show version with verbose output");
+        System.out.println("  java -jar lucli.jar --timing script.cfs # Execute script with timing analysis");
         System.out.println("  java -jar lucli.jar script.cfs arg1 arg2 # Execute CFML script with arguments");
         System.out.println("  LUCLI_HOME=/tmp/lucli java -jar lucli.jar --lucee-version # Use custom home directory");
     }
@@ -144,6 +189,155 @@ public class LuCLI {
     }
 
 
+    /**
+     * Handle server commands (start, stop, status, list)
+     */
+    private static void handleServerCommand(String[] args) {
+        if (args.length < 3) {
+            showServerHelp();
+            return;
+        }
+        
+        String subCommand = args[2];
+        Path currentDir = Paths.get(System.getProperty("user.dir"));
+        
+        try {
+            LuceeServerManager serverManager = new LuceeServerManager();
+            
+            switch (subCommand) {
+                case "start":
+                    handleServerStart(serverManager, currentDir, args);
+                    break;
+                    
+                case "stop":
+                    handleServerStop(serverManager, currentDir);
+                    break;
+                    
+                case "status":
+                    handleServerStatus(serverManager, currentDir);
+                    break;
+                    
+                case "list":
+                    handleServerList(serverManager);
+                    break;
+                    
+                default:
+                    System.err.println("Unknown server command: " + subCommand);
+                    showServerHelp();
+                    System.exit(EXIT_ERROR);
+            }
+        } catch (Exception e) {
+            System.err.println("Server command failed: " + e.getMessage());
+            if (verbose || debug) {
+                e.printStackTrace();
+            }
+            System.exit(EXIT_ERROR);
+        }
+    }
+    
+    private static void showServerHelp() {
+        System.out.println("LuCLI Server Management");
+        System.out.println();
+        System.out.println("Usage: lucli server [command] [options]");
+        System.out.println();
+        System.out.println("Commands:");
+        System.out.println("  start [--version VERSION]  Start a Lucee server for the current directory");
+        System.out.println("  stop                       Stop the server for the current directory");
+        System.out.println("  status                     Show server status for the current directory");
+        System.out.println("  list                       List all server instances");
+        System.out.println();
+        System.out.println("Configuration:");
+        System.out.println("  Server configuration is read from lucee.json in the current directory.");
+        System.out.println("  If lucee.json doesn't exist, a default one will be created.");
+        System.out.println();
+        System.out.println("Examples:");
+        System.out.println("  lucli server start                   # Start server with default settings");
+        System.out.println("  lucli server start --version 6.1.0.123  # Start server with specific version");
+        System.out.println("  lucli server stop                    # Stop the server");
+        System.out.println("  lucli server status                  # Check server status");
+        System.out.println("  lucli server list                    # List all servers");
+    }
+    
+    private static void handleServerStart(LuceeServerManager serverManager, Path currentDir, String[] args) throws Exception {
+        Timer.start("Server Start Operation");
+        String versionOverride = null;
+        
+        // Parse additional arguments
+        for (int i = 2; i < args.length; i++) {
+            if ((args[i].equals("--version") || args[i].equals("-v")) && i + 1 < args.length) {
+                versionOverride = args[i + 1];
+                i++; // Skip next argument
+            }
+        }
+        
+        System.out.println("Starting Lucee server in: " + currentDir);
+        LuceeServerManager.ServerInstance instance = serverManager.startServer(currentDir, versionOverride);
+        Timer.stop("Server Start Operation");
+        
+        System.out.println("✅ Server started successfully!");
+        System.out.println("   Server Name: " + instance.getServerName());
+        System.out.println("   Process ID:  " + instance.getPid());
+        System.out.println("   Port:        " + instance.getPort());
+        System.out.println("   URL:         http://localhost:" + instance.getPort());
+        System.out.println("   Web Root:    " + currentDir);
+    }
+    
+    private static void handleServerStop(LuceeServerManager serverManager, Path currentDir) throws Exception {
+        Timer.start("Server Stop Operation");
+        System.out.println("Stopping server for: " + currentDir);
+        boolean stopped = serverManager.stopServer(currentDir);
+        Timer.stop("Server Stop Operation");
+        
+        if (stopped) {
+            System.out.println("✅ Server stopped successfully.");
+        } else {
+            System.out.println("ℹ️  No running server found for this directory.");
+        }
+    }
+    
+    private static void handleServerStatus(LuceeServerManager serverManager, Path currentDir) throws Exception {
+        Timer.start("Server Status Operation");
+        LuceeServerManager.ServerStatus status = serverManager.getServerStatus(currentDir);
+        Timer.stop("Server Status Operation");
+        
+        System.out.println("Server status for: " + currentDir);
+        
+        if (status.isRunning()) {
+            System.out.println("✅ Server is RUNNING");
+            System.out.println("   Server Name: " + status.getServerName());
+            System.out.println("   Process ID:  " + status.getPid());
+            System.out.println("   Port:        " + status.getPort());
+            System.out.println("   URL:         http://localhost:" + status.getPort());
+        } else {
+            System.out.println("❌ Server is NOT RUNNING");
+        }
+    }
+    
+    private static void handleServerList(LuceeServerManager serverManager) throws Exception {
+        Timer.start("Server List Operation");
+        List<LuceeServerManager.ServerInfo> servers = serverManager.listServers();
+        Timer.stop("Server List Operation");
+        
+        if (servers.isEmpty()) {
+            System.out.println("No server instances found.");
+            return;
+        }
+        
+        System.out.println("Server instances:");
+        System.out.println();
+        System.out.printf("%-20s %-10s %-8s %-10s %s\n", "NAME", "STATUS", "PID", "PORT", "DIRECTORY");
+        System.out.println("─".repeat(80));
+        
+        for (LuceeServerManager.ServerInfo server : servers) {
+            String status = server.isRunning() ? "RUNNING" : "STOPPED";
+            String pid = server.getPid() > 0 ? String.valueOf(server.getPid()) : "-";
+            String port = server.getPort() > 0 ? String.valueOf(server.getPort()) : "-";
+            
+            System.out.printf("%-20s %-10s %-8s %-10s %s\n", 
+                server.getServerName(), status, pid, port, server.getServerDir());
+        }
+    }
+    
     private static void configureLuceeDirectories() throws IOException {
         // Allow customization of lucli home via environment variable or system property
         String lucliHomeStr = System.getProperty("lucli.home");
@@ -284,6 +478,10 @@ public class LuCLI {
                     result.scriptArgs = new String[0];
                 }
             }
+        } else {
+            // No script file found, but we might have flags only
+            // In this case, default to terminal mode
+            result.scriptFile = null; // Will be set to "terminal" in main()
         }
         
         return result;

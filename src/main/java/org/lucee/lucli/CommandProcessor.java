@@ -9,6 +9,7 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Stream;
+import org.lucee.lucli.server.LuceeServerManager;
 
 /**
  * Processes file system commands for the terminal
@@ -48,8 +49,11 @@ public class CommandProcessor {
             return "";
         }
         
+        Timer.start("Command Execution");
+        
         String[] parts = parseCommand(commandLine.trim());
         if (parts.length == 0) {
+            Timer.stop("Command Execution");
             return "";
         }
         
@@ -57,44 +61,70 @@ public class CommandProcessor {
         String[] args = Arrays.copyOfRange(parts, 1, parts.length);
         
         try {
+            Timer.start(command + " command");
+            String result;
             switch (command) {
                 case "ls":
                 case "dir":
-                    return listFiles(args);
+                    result = listFiles(args);
+                    break;
                 case "cd":
-                    return changeDirectory(args);
+                    result = changeDirectory(args);
+                    break;
                 case "pwd":
-                    return printWorkingDirectory();
+                    result = printWorkingDirectory();
+                    break;
                 case "mkdir":
-                    return makeDirectory(args);
+                    result = makeDirectory(args);
+                    break;
                 case "rmdir":
-                    return removeDirectory(args);
+                    result = removeDirectory(args);
+                    break;
                 case "rm":
-                    return removeFile(args);
+                    result = removeFile(args);
+                    break;
                 case "cp":
-                    return copyFile(args);
+                    result = copyFile(args);
+                    break;
                 case "mv":
-                    return moveFile(args);
+                    result = moveFile(args);
+                    break;
                 case "cat":
-                    return displayFile(args);
+                    result = displayFile(args);
+                    break;
                 case "touch":
-                    return touchFile(args);
+                    result = touchFile(args);
+                    break;
                 case "find":
-                    return findFiles(args);
+                    result = findFiles(args);
+                    break;
                 case "wc":
-                    return wordCount(args);
+                    result = wordCount(args);
+                    break;
                 case "head":
-                    return headFile(args);
+                    result = headFile(args);
+                    break;
                 case "tail":
-                    return tailFile(args);
+                    result = tailFile(args);
+                    break;
                 case "prompt":
-                    return promptCommand(args);
+                    result = promptCommand(args);
+                    break;
                 case "run":
-                    return runScriptCommand(args);
+                    result = runScriptCommand(args);
+                    break;
+                case "server":
+                    result = serverCommand(args);
+                    break;
                 default:
-                    return "❌ Unknown command: " + command + "\n💡 Type 'help' for available commands.";
+                    result = "❌ Unknown command: " + command + "\n💡 Type 'help' for available commands.";
             }
+            Timer.stop(command + " command");
+            Timer.stop("Command Execution");
+            return result;
         } catch (Exception e) {
+            Timer.stop(command + " command");
+            Timer.stop("Command Execution");
             return "Error executing command: " + e.getMessage();
         }
     }
@@ -926,6 +956,134 @@ public class CommandProcessor {
     }
     
     /**
+     * Handle server management commands
+     */
+    private String serverCommand(String[] args) {
+        if (args.length == 0) {
+            return "❌ server: missing subcommand\n💡 Usage: server [start|stop|status|list] [options]";
+        }
+        
+        String subCommand = args[0];
+        Path currentDir = fileSystemState.getCurrentWorkingDirectory();
+        
+        try {
+            LuceeServerManager serverManager = new LuceeServerManager();
+            
+            switch (subCommand) {
+                case "start":
+                    return handleServerStart(serverManager, currentDir, args);
+                    
+                case "stop":
+                    return handleServerStop(serverManager, currentDir);
+                    
+                case "status":
+                    return handleServerStatus(serverManager, currentDir);
+                    
+                case "list":
+                    return handleServerList(serverManager);
+                    
+                default:
+                    return "❌ Unknown server command: " + subCommand + "\n💡 Available commands: start, stop, status, list";
+            }
+        } catch (Exception e) {
+            return "❌ Server command failed: " + e.getMessage();
+        }
+    }
+    
+    private String handleServerStart(LuceeServerManager serverManager, Path currentDir, String[] args) {
+        String versionOverride = null;
+        
+        // Parse additional arguments
+        for (int i = 1; i < args.length; i++) {
+            if ((args[i].equals("--version") || args[i].equals("-v")) && i + 1 < args.length) {
+                versionOverride = args[i + 1];
+                i++; // Skip next argument
+            }
+        }
+        
+        try {
+            LuceeServerManager.ServerInstance instance = serverManager.startServer(currentDir, versionOverride);
+            
+            StringBuilder result = new StringBuilder();
+            result.append("✅ Server started successfully!\n");
+            result.append("   Server Name: ").append(instance.getServerName()).append("\n");
+            result.append("   Process ID:  ").append(instance.getPid()).append("\n");
+            result.append("   Port:        ").append(instance.getPort()).append("\n");
+            result.append("   URL:         http://localhost:").append(instance.getPort()).append("\n");
+            result.append("   Web Root:    ").append(currentDir);
+            
+            return result.toString();
+        } catch (Exception e) {
+            return "❌ Failed to start server: " + e.getMessage();
+        }
+    }
+    
+    private String handleServerStop(LuceeServerManager serverManager, Path currentDir) {
+        try {
+            boolean stopped = serverManager.stopServer(currentDir);
+            
+            if (stopped) {
+                return "✅ Server stopped successfully.";
+            } else {
+                return "ℹ️  No running server found for this directory.";
+            }
+        } catch (Exception e) {
+            return "❌ Failed to stop server: " + e.getMessage();
+        }
+    }
+    
+    private String handleServerStatus(LuceeServerManager serverManager, Path currentDir) {
+        try {
+            LuceeServerManager.ServerStatus status = serverManager.getServerStatus(currentDir);
+            
+            StringBuilder result = new StringBuilder();
+            result.append("Server status for: ").append(currentDir).append("\n");
+            
+            if (status.isRunning()) {
+                result.append("✅ Server is RUNNING\n");
+                result.append("   Server Name: ").append(status.getServerName()).append("\n");
+                result.append("   Process ID:  ").append(status.getPid()).append("\n");
+                result.append("   Port:        ").append(status.getPort()).append("\n");
+                result.append("   URL:         http://localhost:").append(status.getPort());
+            } else {
+                result.append("❌ Server is NOT RUNNING");
+            }
+            
+            return result.toString();
+        } catch (Exception e) {
+            return "❌ Failed to get server status: " + e.getMessage();
+        }
+    }
+    
+    private String handleServerList(LuceeServerManager serverManager) {
+        try {
+            List<LuceeServerManager.ServerInfo> servers = serverManager.listServers();
+            
+            if (servers.isEmpty()) {
+                return "No server instances found.";
+            }
+            
+            StringBuilder result = new StringBuilder();
+            result.append("Server instances:\n\n");
+            result.append(String.format("%-20s %-10s %-8s %-10s %s\n", "NAME", "STATUS", "PID", "PORT", "DIRECTORY"));
+            result.append("─".repeat(80)).append("\n");
+            
+            for (LuceeServerManager.ServerInfo server : servers) {
+                String status = server.isRunning() ? "RUNNING" : "STOPPED";
+                String pid = server.getPid() > 0 ? String.valueOf(server.getPid()) : "-";
+                String port = server.getPort() > 0 ? String.valueOf(server.getPort()) : "-";
+                
+                result.append(String.format("%-20s %-10s %-8s %-10s %s\n", 
+                    server.getServerName(), status, pid, port, server.getServerDir()));
+            }
+            
+            return result.toString().trim();
+        } catch (Exception e) {
+            return "❌ Failed to list servers: " + e.getMessage();
+        }
+    }
+    
+    /**
      * Get available commands for help
      */
     public String getAvailableCommands() {
@@ -948,6 +1106,7 @@ public class CommandProcessor {
                "  head [-n num] file... ⬆️  Show first lines of file\n" +
                "  tail [-n num] file... ⬇️  Show last lines of file\n" +
                "  run file.cf[ms] [...] ⚡ Execute CFML script files\n" +
+               "  server [cmd] [opts]   🖥️  Manage Lucee servers (start, stop, status, list)\n" +
                "  prompt [template]     🎨 Change prompt style";
     }
 }

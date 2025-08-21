@@ -61,6 +61,7 @@ public class LuceeScriptEngine {
      * Get the singleton instance of LuceeScriptEngine
      */
     public static LuceeScriptEngine getInstance(boolean verboseMode, boolean debugMode) {
+        Timer.start("LuceeScriptEngine Initialization");
         if (instance == null) {
             synchronized (lock) {
                 if (instance == null) {
@@ -68,6 +69,7 @@ public class LuceeScriptEngine {
                 }
             }
         }
+        Timer.stop("LuceeScriptEngine Initialization");
 
         // CFMLEngineFactory.getInstance().getClassUtil().loadBIF(null, ENGINE_NAME, ENGINE_NAME, null)
         return instance;
@@ -103,28 +105,40 @@ public class LuceeScriptEngine {
      * Main script execution entry point - determines file type and executes appropriately
      */
     public void executeScript(String scriptFile, String[] scriptArgs) throws Exception {
+        Timer.start("File Validation");
         // Validate script file exists
         Path scriptPath = Paths.get(scriptFile);
         if (!Files.exists(scriptPath)) {
             throw new FileNotFoundException("Script file not found: " + scriptFile);
         }
+        Timer.stop("File Validation");
         
+        Timer.start("File Type Detection");
         // Determine file type: .cfc (component), .cfm (template), .cfs (script)
         String fileName = scriptFile.toLowerCase();
         boolean isCFC = fileName.endsWith(".cfc");
         boolean isCFM = fileName.endsWith(".cfm");
         boolean isCFS = fileName.endsWith(".cfs");
+        Timer.stop("File Type Detection");
         
+        Timer.start("Read Script Content");
         // Read script content
         String scriptContent = Files.readString(scriptPath);
+        Timer.stop("Read Script Content");
         
         if (isCFC) {
+            Timer.start("Component Execution");
             executeComponent(scriptFile, scriptContent, scriptArgs);
+            Timer.stop("Component Execution");
         } else if (isCFM) {
+            Timer.start("Template Execution");
             executeTemplate(scriptFile, scriptContent, scriptArgs);
+            Timer.stop("Template Execution");
         } else {
+            Timer.start("Script Content Execution");
             // Default to script execution (.cfs files or others)
             executeScriptContent(scriptFile, scriptContent, scriptArgs);
+            Timer.stop("Script Content Execution");
         }
     }
 
@@ -234,7 +248,7 @@ public class LuceeScriptEngine {
         // System.out.println("Executing CFML script: " + scriptContent);
         boolean isScript = scriptFile.toLowerCase().endsWith(".cfs") || scriptFile.toLowerCase().endsWith(".cfc");
         try {
-
+            Timer.start("CFML Script Evaluation");
             Object result;
             if(isScript){
                 result = engine.eval(scriptContent);
@@ -243,6 +257,7 @@ public class LuceeScriptEngine {
                 
                 result = engine.eval("```" + scriptContent + "```");
             }
+            Timer.stop("CFML Script Evaluation");
             
             
             // Handle result if any
