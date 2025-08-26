@@ -256,11 +256,11 @@ public class LuCLI {
                     break;
                     
                 case "stop":
-                    handleServerStop(serverManager, currentDir);
+                    handleServerStop(serverManager, currentDir, args);
                     break;
                     
                 case "status":
-                    handleServerStatus(serverManager, currentDir);
+                    handleServerStatus(serverManager, currentDir, args);
                     break;
                     
                 case "list":
@@ -299,8 +299,10 @@ public class LuCLI {
         System.out.println("    --version VERSION        Specify Lucee version");
         System.out.println("    --name NAME              Specify custom server name");
         System.out.println("    --force                  Replace existing server");
-        System.out.println("  stop                       Stop the server for the current directory");
-        System.out.println("  status                     Show server status for the current directory");
+        System.out.println("  stop [options]             Stop the server for the current directory");
+        System.out.println("    --name NAME              Stop a specific server by name");
+        System.out.println("  status [options]           Show server status for the current directory");
+        System.out.println("    --name NAME              Show status for a specific server by name");
         System.out.println("  list                       List all server instances");
         System.out.println("  monitor [options]          Monitor a Lucee server via JMX");
         System.out.println("  log [options]              View server logs (tomcat, server, web)");
@@ -312,8 +314,10 @@ public class LuCLI {
         System.out.println("Examples:");
         System.out.println("  lucli server start                   # Start server with default settings");
         System.out.println("  lucli server start --version 6.1.0.123  # Start server with specific version");
-        System.out.println("  lucli server stop                    # Stop the server");
-        System.out.println("  lucli server status                  # Check server status");
+        System.out.println("  lucli server stop                    # Stop the server for current directory");
+        System.out.println("  lucli server stop --name my_server   # Stop a specific server by name");
+        System.out.println("  lucli server status                  # Check server status for current directory");
+        System.out.println("  lucli server status --name my_server # Check status for a specific server");
         System.out.println("  lucli server list                    # List all servers");
         System.out.println("  lucli server monitor                 # Monitor server via JMX dashboard");
     }
@@ -372,34 +376,102 @@ public class LuCLI {
         }
     }
     
-    private static void handleServerStop(LuceeServerManager serverManager, Path currentDir) throws Exception {
+    private static void handleServerStop(LuceeServerManager serverManager, Path currentDir, String[] args) throws Exception {
         Timer.start("Server Stop Operation");
-        System.out.println("Stopping server for: " + currentDir);
-        boolean stopped = serverManager.stopServer(currentDir);
-        Timer.stop("Server Stop Operation");
         
-        if (stopped) {
-            System.out.println("✅ Server stopped successfully.");
+        String serverName = null;
+        
+        // Parse --name flag
+        for (int i = 2; i < args.length; i++) {
+            if ((args[i].equals("--name") || args[i].equals("-n")) && i + 1 < args.length) {
+                serverName = args[i + 1];
+                break;
+            }
+        }
+        
+        if (serverName != null) {
+            // Stop server by name
+            System.out.println("Stopping server: " + serverName);
+            boolean stopped = serverManager.stopServerByName(serverName);
+            Timer.stop("Server Stop Operation");
+            
+            if (stopped) {
+                System.out.println("✅ Server '" + serverName + "' stopped successfully.");
+            } else {
+                System.out.println("ℹ️  Server '" + serverName + "' not found or not running.");
+            }
         } else {
-            System.out.println("ℹ️  No running server found for this directory.");
+            // Stop server for current directory
+            System.out.println("Stopping server for: " + currentDir);
+            boolean stopped = serverManager.stopServer(currentDir);
+            Timer.stop("Server Stop Operation");
+            
+            if (stopped) {
+                System.out.println("✅ Server stopped successfully.");
+            } else {
+                System.out.println("ℹ️  No running server found for this directory.");
+            }
         }
     }
     
-    private static void handleServerStatus(LuceeServerManager serverManager, Path currentDir) throws Exception {
+    private static void handleServerStatus(LuceeServerManager serverManager, Path currentDir, String[] args) throws Exception {
         Timer.start("Server Status Operation");
-        LuceeServerManager.ServerStatus status = serverManager.getServerStatus(currentDir);
-        Timer.stop("Server Status Operation");
         
-        System.out.println("Server status for: " + currentDir);
+        String serverName = null;
         
-        if (status.isRunning()) {
-            System.out.println("✅ Server is RUNNING");
-            System.out.println("   Server Name: " + status.getServerName());
-            System.out.println("   Process ID:  " + status.getPid());
-            System.out.println("   Port:        " + status.getPort());
-            System.out.println("   URL:         http://localhost:" + status.getPort());
+        // Parse --name flag
+        for (int i = 2; i < args.length; i++) {
+            if ((args[i].equals("--name") || args[i].equals("-n")) && i + 1 < args.length) {
+                serverName = args[i + 1];
+                break;
+            }
+        }
+        
+        if (serverName != null) {
+            // Look up server by name
+            LuceeServerManager.ServerInfo serverInfo = serverManager.getServerInfoByName(serverName);
+            Timer.stop("Server Status Operation");
+            
+            if (serverInfo == null) {
+                System.out.println("❌ Server '" + serverName + "' not found.");
+                return;
+            }
+            
+            System.out.println("Server status for: " + serverName);
+            
+            if (serverInfo.isRunning()) {
+                System.out.println("✅ Server is RUNNING");
+                System.out.println("   Server Name: " + serverInfo.getServerName());
+                System.out.println("   Process ID:  " + serverInfo.getPid());
+                System.out.println("   Port:        " + serverInfo.getPort());
+                System.out.println("   URL:         http://localhost:" + serverInfo.getPort());
+                if (serverInfo.getProjectDir() != null) {
+                    System.out.println("   Web Root:    " + serverInfo.getProjectDir());
+                }
+                System.out.println("   Server Dir:  " + serverInfo.getServerDir());
+            } else {
+                System.out.println("❌ Server is NOT RUNNING");
+                if (serverInfo.getProjectDir() != null) {
+                    System.out.println("   Web Root:    " + serverInfo.getProjectDir());
+                }
+                System.out.println("   Server Dir:  " + serverInfo.getServerDir());
+            }
         } else {
-            System.out.println("❌ Server is NOT RUNNING");
+            // Use current directory approach
+            LuceeServerManager.ServerStatus status = serverManager.getServerStatus(currentDir);
+            Timer.stop("Server Status Operation");
+            
+            System.out.println("Server status for: " + currentDir);
+            
+            if (status.isRunning()) {
+                System.out.println("✅ Server is RUNNING");
+                System.out.println("   Server Name: " + status.getServerName());
+                System.out.println("   Process ID:  " + status.getPid());
+                System.out.println("   Port:        " + status.getPort());
+                System.out.println("   URL:         http://localhost:" + status.getPort());
+            } else {
+                System.out.println("❌ Server is NOT RUNNING");
+            }
         }
     }
     
@@ -415,16 +487,22 @@ public class LuCLI {
         
         System.out.println("Server instances:");
         System.out.println();
-        System.out.printf("%-20s %-10s %-8s %-10s %s\n", "NAME", "STATUS", "PID", "PORT", "DIRECTORY");
-        System.out.println("─".repeat(80));
+        System.out.printf("%-20s %-10s %-8s %-10s %-40s %s\n", "NAME", "STATUS", "PID", "PORT", "WEBROOT", "SERVER DIR");
+        System.out.println("─".repeat(120));
         
         for (LuceeServerManager.ServerInfo server : servers) {
             String status = server.isRunning() ? "RUNNING" : "STOPPED";
             String pid = server.getPid() > 0 ? String.valueOf(server.getPid()) : "-";
             String port = server.getPort() > 0 ? String.valueOf(server.getPort()) : "-";
+            String webroot = server.getProjectDir() != null ? server.getProjectDir().toString() : "<unknown>";
             
-            System.out.printf("%-20s %-10s %-8s %-10s %s\n", 
-                server.getServerName(), status, pid, port, server.getServerDir());
+            // Truncate long paths for better display
+            if (webroot.length() > 38) {
+                webroot = "..." + webroot.substring(webroot.length() - 35);
+            }
+            
+            System.out.printf("%-20s %-10s %-8s %-10s %-40s %s\n", 
+                server.getServerName(), status, pid, port, webroot, server.getServerDir());
         }
     }
     

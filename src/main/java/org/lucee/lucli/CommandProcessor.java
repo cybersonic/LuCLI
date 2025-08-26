@@ -10,6 +10,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Stream;
 import org.lucee.lucli.server.LuceeServerManager;
+import org.lucee.lucli.server.LuceeServerConfig;
 import org.lucee.lucli.server.ServerConflictException;
 import org.lucee.lucli.monitoring.MonitorCommand;
 
@@ -976,10 +977,10 @@ public class CommandProcessor {
                     return handleServerStart(serverManager, currentDir, args);
                     
                 case "stop":
-                    return handleServerStop(serverManager, currentDir);
+                    return handleServerStop(serverManager, currentDir, args);
                     
                 case "status":
-                    return handleServerStatus(serverManager, currentDir);
+                    return handleServerStatus(serverManager, currentDir, args);
                     
                 case "list":
                     return handleServerList(serverManager);
@@ -1050,38 +1051,97 @@ public class CommandProcessor {
         }
     }
     
-    private String handleServerStop(LuceeServerManager serverManager, Path currentDir) {
+    private String handleServerStop(LuceeServerManager serverManager, Path currentDir, String[] args) {
         try {
-            boolean stopped = serverManager.stopServer(currentDir);
+            String serverName = null;
             
-            if (stopped) {
-                return "✅ Server stopped successfully.";
+            // Parse --name flag
+            for (int i = 1; i < args.length; i++) {
+                if ((args[i].equals("--name") || args[i].equals("-n")) && i + 1 < args.length) {
+                    serverName = args[i + 1];
+                    break;
+                }
+            }
+            
+            if (serverName != null) {
+                // Stop server by name
+                boolean stopped = serverManager.stopServerByName(serverName);
+                
+                if (stopped) {
+                    return "✅ Server '" + serverName + "' stopped successfully.";
+                } else {
+                    return "ℹ️  Server '" + serverName + "' not found or not running.";
+                }
             } else {
-                return "ℹ️  No running server found for this directory.";
+                // Stop server for current directory
+                boolean stopped = serverManager.stopServer(currentDir);
+                
+                if (stopped) {
+                    return "✅ Server stopped successfully.";
+                } else {
+                    return "ℹ️  No running server found for this directory.";
+                }
             }
         } catch (Exception e) {
             return "❌ Failed to stop server: " + e.getMessage();
         }
     }
     
-    private String handleServerStatus(LuceeServerManager serverManager, Path currentDir) {
+    private String handleServerStatus(LuceeServerManager serverManager, Path currentDir, String[] args) {
         try {
-            LuceeServerManager.ServerStatus status = serverManager.getServerStatus(currentDir);
+            String serverName = null;
             
-            StringBuilder result = new StringBuilder();
-            result.append("Server status for: ").append(currentDir).append("\n");
-            
-            if (status.isRunning()) {
-                result.append("✅ Server is RUNNING\n");
-                result.append("   Server Name: ").append(status.getServerName()).append("\n");
-                result.append("   Process ID:  ").append(status.getPid()).append("\n");
-                result.append("   Port:        ").append(status.getPort()).append("\n");
-                result.append("   URL:         http://localhost:").append(status.getPort());
-            } else {
-                result.append("❌ Server is NOT RUNNING");
+            // Parse --name flag
+            for (int i = 1; i < args.length; i++) {
+                if ((args[i].equals("--name") || args[i].equals("-n")) && i + 1 < args.length) {
+                    serverName = args[i + 1];
+                    break;
+                }
             }
             
-            return result.toString();
+            if (serverName != null) {
+                // Get status for server by name
+                LuceeServerManager.ServerInfo serverInfo = serverManager.getServerInfoByName(serverName);
+                
+                if (serverInfo == null) {
+                    return "❌ Server '" + serverName + "' not found.";
+                }
+                
+                StringBuilder result = new StringBuilder();
+                result.append("Server status for '" + serverName + "':\n");
+                
+                if (serverInfo.isRunning()) {
+                    result.append("✅ Server is RUNNING\n");
+                    result.append("   Server Name:   ").append(serverInfo.getServerName()).append("\n");
+                    result.append("   Process ID:    ").append(serverInfo.getPid()).append("\n");
+                    result.append("   Port:          ").append(serverInfo.getPort()).append("\n");
+                    result.append("   URL:           http://localhost:").append(serverInfo.getPort()).append("\n");
+                    result.append("   Web Root:      ").append(serverInfo.getServerDir());
+                } else {
+                    result.append("❌ Server is NOT RUNNING\n");
+                    result.append("   Web Root:      ").append(serverInfo.getServerDir());
+                }
+                
+                return result.toString();
+            } else {
+                // Get status for current directory
+                LuceeServerManager.ServerStatus status = serverManager.getServerStatus(currentDir);
+                
+                StringBuilder result = new StringBuilder();
+                result.append("Server status for: ").append(currentDir).append("\n");
+                
+                if (status.isRunning()) {
+                    result.append("✅ Server is RUNNING\n");
+                    result.append("   Server Name: ").append(status.getServerName()).append("\n");
+                    result.append("   Process ID:  ").append(status.getPid()).append("\n");
+                    result.append("   Port:        ").append(status.getPort()).append("\n");
+                    result.append("   URL:         http://localhost:").append(status.getPort());
+                } else {
+                    result.append("❌ Server is NOT RUNNING");
+                }
+                
+                return result.toString();
+            }
         } catch (Exception e) {
             return "❌ Failed to get server status: " + e.getMessage();
         }
@@ -1140,7 +1200,8 @@ public class CommandProcessor {
                "  run file.cf[ms] [...] ⚡ Execute CFML script files\n" +
                "  server [cmd] [opts]   🖥️  Manage Lucee servers\n" +
                "                           start [--force] [--name <name>] [--version <ver>]\n" +
-               "                           stop | status | list | monitor\n" +
+               "                           stop [--name <name>] | status [--name <name>]\n" +
+               "                           list | monitor\n" +
                "  prompt [template]     🎨 Change prompt style";
     }
     

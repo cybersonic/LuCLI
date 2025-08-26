@@ -290,7 +290,19 @@ public class LuceeServerManager {
                     }
                 }
                 
-                servers.add(new ServerInfo(serverName, pid, port, isRunning, serverDir));
+                // Try to read project directory from .project-path marker file
+                Path projectPathFile = serverDir.resolve(".project-path");
+                Path projectDir = null;
+                if (Files.exists(projectPathFile)) {
+                    try {
+                        String projectPathStr = Files.readString(projectPathFile).trim();
+                        projectDir = Paths.get(projectPathStr);
+                    } catch (Exception e) {
+                        // Ignore invalid project path file
+                    }
+                }
+                
+                servers.add(new ServerInfo(serverName, pid, port, isRunning, serverDir, projectDir));
             }
         }
         
@@ -411,7 +423,7 @@ public class LuceeServerManager {
                         }
                     }
                     
-                    return new ServerInfo(serverName, pid, port, isRunning, serverDir);
+                    return new ServerInfo(serverName, pid, port, isRunning, serverDir, storedPath);
                 }
             } catch (Exception e) {
                 // Ignore invalid project path file
@@ -419,6 +431,77 @@ public class LuceeServerManager {
         }
         
         return null;
+    }
+    
+    /**
+     * Get server information by server name
+     */
+    public ServerInfo getServerInfoByName(String serverName) throws IOException {
+        if (!Files.exists(serversDir)) {
+            return null;
+        }
+        
+        Path serverDir = serversDir.resolve(serverName);
+        if (!Files.exists(serverDir)) {
+            return null;
+        }
+        
+        // Try to read PID file
+        Path pidFile = serverDir.resolve("server.pid");
+        long pid = -1;
+        int port = -1;
+        boolean isRunning = false;
+        
+        if (Files.exists(pidFile)) {
+            try {
+                String pidContent = Files.readString(pidFile).trim();
+                String[] parts = pidContent.split(":");
+                if (parts.length >= 2) {
+                    pid = Long.parseLong(parts[0]);
+                    port = Integer.parseInt(parts[1]);
+                    isRunning = isProcessRunning(pid);
+                }
+            } catch (Exception e) {
+                // Invalid PID file, server is not running
+            }
+        }
+        
+        // Try to read project directory from .project-path marker file
+        Path projectPathFile = serverDir.resolve(".project-path");
+        Path projectDir = null;
+        if (Files.exists(projectPathFile)) {
+            try {
+                String projectPathStr = Files.readString(projectPathFile).trim();
+                projectDir = Paths.get(projectPathStr);
+            } catch (Exception e) {
+                // Ignore invalid project path file
+            }
+        }
+        
+        return new ServerInfo(serverName, pid, port, isRunning, serverDir, projectDir);
+    }
+    
+    /**
+     * Stop a server by name
+     */
+    public boolean stopServerByName(String serverName) throws IOException {
+        ServerInfo serverInfo = getServerInfoByName(serverName);
+        if (serverInfo == null) {
+            return false; // Server not found
+        }
+        
+        if (!serverInfo.isRunning()) {
+            return false; // Server not running
+        }
+        
+        // Create a ServerInstance for the stopServer method
+        ServerInstance instance = new ServerInstance(serverInfo.getServerName(), 
+                                                   serverInfo.getPid(), 
+                                                   serverInfo.getPort(), 
+                                                   serverInfo.getServerDir(), 
+                                                   serverInfo.getProjectDir());
+        
+        return stopServer(instance);
     }
     
     /**
@@ -747,13 +830,15 @@ public class LuceeServerManager {
         private final int port;
         private final boolean running;
         private final Path serverDir;
+        private final Path projectDir;
         
-        public ServerInfo(String serverName, long pid, int port, boolean running, Path serverDir) {
+        public ServerInfo(String serverName, long pid, int port, boolean running, Path serverDir, Path projectDir) {
             this.serverName = serverName;
             this.pid = pid;
             this.port = port;
             this.running = running;
             this.serverDir = serverDir;
+            this.projectDir = projectDir;
         }
         
         public String getServerName() { return serverName; }
@@ -761,5 +846,6 @@ public class LuceeServerManager {
         public int getPort() { return port; }
         public boolean isRunning() { return running; }
         public Path getServerDir() { return serverDir; }
+        public Path getProjectDir() { return projectDir; }
     }
 }
