@@ -10,6 +10,8 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Stream;
 import org.lucee.lucli.server.LuceeServerManager;
+import org.lucee.lucli.server.ServerConflictException;
+import org.lucee.lucli.monitoring.MonitorCommand;
 
 /**
  * Processes file system commands for the terminal
@@ -982,8 +984,11 @@ public class CommandProcessor {
                 case "list":
                     return handleServerList(serverManager);
                     
+                case "monitor":
+                    return handleServerMonitor(Arrays.copyOfRange(args, 1, args.length));
+                    
                 default:
-                    return "❌ Unknown server command: " + subCommand + "\n💡 Available commands: start, stop, status, list";
+                    return "❌ Unknown server command: " + subCommand + "\n💡 Available commands: start, stop, status, list, monitor";
             }
         } catch (Exception e) {
             return "❌ Server command failed: " + e.getMessage();
@@ -992,25 +997,52 @@ public class CommandProcessor {
     
     private String handleServerStart(LuceeServerManager serverManager, Path currentDir, String[] args) {
         String versionOverride = null;
+        boolean forceReplace = false;
+        String customName = null;
         
         // Parse additional arguments
         for (int i = 1; i < args.length; i++) {
             if ((args[i].equals("--version") || args[i].equals("-v")) && i + 1 < args.length) {
                 versionOverride = args[i + 1];
                 i++; // Skip next argument
+            } else if (args[i].equals("--force") || args[i].equals("-f")) {
+                forceReplace = true;
+            } else if ((args[i].equals("--name") || args[i].equals("-n")) && i + 1 < args.length) {
+                customName = args[i + 1];
+                i++; // Skip next argument
             }
         }
         
         try {
-            LuceeServerManager.ServerInstance instance = serverManager.startServer(currentDir, versionOverride);
+            LuceeServerManager.ServerInstance instance = serverManager.startServer(currentDir, versionOverride, forceReplace, customName);
+            
+            // Load configuration to get monitoring/JMX port info
+            LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(currentDir);
             
             StringBuilder result = new StringBuilder();
             result.append("✅ Server started successfully!\n");
-            result.append("   Server Name: ").append(instance.getServerName()).append("\n");
-            result.append("   Process ID:  ").append(instance.getPid()).append("\n");
-            result.append("   Port:        ").append(instance.getPort()).append("\n");
-            result.append("   URL:         http://localhost:").append(instance.getPort()).append("\n");
-            result.append("   Web Root:    ").append(currentDir);
+            result.append("   Server Name:   ").append(instance.getServerName()).append("\n");
+            result.append("   Process ID:    ").append(instance.getPid()).append("\n");
+            result.append("   HTTP Port:     ").append(instance.getPort()).append("\n");
+            result.append("   Shutdown Port: ").append(LuceeServerConfig.getShutdownPort(instance.getPort())).append("\n");
+            if (config.monitoring != null && config.monitoring.enabled && config.monitoring.jmx != null) {
+                result.append("   JMX Port:      ").append(config.monitoring.jmx.port).append("\n");
+            }
+            result.append("   URL:           http://localhost:").append(instance.getPort()).append("\n");
+            result.append("   Web Root:      ").append(currentDir);
+            
+            return result.toString();
+        } catch (ServerConflictException e) {
+            StringBuilder result = new StringBuilder();
+            result.append("⚠️  ").append(e.getMessage()).append("\n\n");
+            result.append("Choose an option:\n");
+            result.append("  1. Replace the existing server (delete and recreate):\n");
+            result.append("     server start --force\n\n");
+            result.append("  2. Create server with suggested name '" + e.getSuggestedName() + "':\n");
+            result.append("     server start --name " + e.getSuggestedName() + "\n\n");
+            result.append("  3. Create server with custom name:\n");
+            result.append("     server start --name <your-name>\n\n");
+            result.append("💡 Use --force to replace existing servers, or --name to specify a different name.");
             
             return result.toString();
         } catch (Exception e) {
@@ -1106,7 +1138,20 @@ public class CommandProcessor {
                "  head [-n num] file... ⬆️  Show first lines of file\n" +
                "  tail [-n num] file... ⬇️  Show last lines of file\n" +
                "  run file.cf[ms] [...] ⚡ Execute CFML script files\n" +
-               "  server [cmd] [opts]   🖥️  Manage Lucee servers (start, stop, status, list)\n" +
+               "  server [cmd] [opts]   🖥️  Manage Lucee servers\n" +
+               "                           start [--force] [--name <name>] [--version <ver>]\n" +
+               "                           stop | status | list | monitor\n" +
                "  prompt [template]     🎨 Change prompt style";
+    }
+    
+    /**
+     * Handle server monitor command - note this will exit the terminal session
+     */
+    private String handleServerMonitor(String[] args) {
+        // Show a warning that this will exit the terminal
+        return "🖥️  Starting JMX monitoring dashboard...\n" +
+               "⚠️  Note: This will exit the terminal session and start the interactive monitor.\n" +
+               "💡 To start monitoring, use: java -jar lucli.jar server monitor\n" +
+               "❌ Direct monitor command from terminal not yet supported.";
     }
 }

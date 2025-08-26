@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="http://java.sun.com/xml/ns/javaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://java.sun.com/xml/ns/javaee 
+         http://java.sun.com/xml/ns/javaee/web-app_3_0.xsd"
+         version="3.0">
+
+    <display-name>Lucee CFML Application</display-name>
+    <description>Lucee CFML Server Application</description>
+
+    <!-- Lucee Configuration -->
+    <context-param>
+        <param-name>lucee-server-directory</param-name>
+        <param-value>${luceeServerPath}</param-value>
+    </context-param>
+    
+    <context-param>
+        <param-name>lucee-web-directory</param-name>
+        <param-value>${luceeWebPath}</param-value>
+    </context-param>
+
+    <!-- Lucee CFML Servlet -->
+    <servlet>
+        <servlet-name>CFMLServlet</servlet-name>
+        <servlet-class>lucee.loader.servlet.jakarta.CFMLServlet</servlet-class>
+        <init-param>
+            <param-name>lucee-server-root</param-name>
+            <param-value>${luceeServerPath}</param-value>
+        </init-param>
+        <init-param>
+            <param-name>lucee-web-root</param-name>
+            <param-value>${luceeWebPath}</param-value>
+        </init-param>
+        <load-on-startup>1</load-on-startup>
+    </servlet>
+
+    <!-- Lucee REST Servlet -->
+    <servlet>
+        <servlet-name>RESTServlet</servlet-name>
+        <servlet-class>lucee.loader.servlet.jakarta.RestServlet</servlet-class>
+        <load-on-startup>2</load-on-startup>
+    </servlet>
+
+    <!-- CFML Servlet Mappings -->
+    <servlet-mapping>
+        <servlet-name>CFMLServlet</servlet-name>
+        <url-pattern>*.cfm</url-pattern>
+    </servlet-mapping>
+    
+    <servlet-mapping>
+        <servlet-name>CFMLServlet</servlet-name>
+        <url-pattern>*.cfml</url-pattern>
+    </servlet-mapping>
+    
+    <servlet-mapping>
+        <servlet-name>CFMLServlet</servlet-name>
+        <url-pattern>*.cfc</url-pattern>
+    </servlet-mapping>
+    
+    <servlet-mapping>
+        <servlet-name>CFMLServlet</servlet-name>
+        <url-pattern>/index.cfm/*</url-pattern>
+    </servlet-mapping>
+
+    <!-- REST Servlet Mappings -->
+    <servlet-mapping>
+        <servlet-name>RESTServlet</servlet-name>
+        <url-pattern>/rest/*</url-pattern>
+    </servlet-mapping>
+
+    <!-- Default CFML Page -->
+    <welcome-file-list>
+        <welcome-file>index.cfm</welcome-file>
+        <welcome-file>index.cfml</welcome-file>
+        <welcome-file>index.html</welcome-file>
+        <welcome-file>index.htm</welcome-file>
+    </welcome-file-list>
+
+    <!-- Session Configuration -->
+    <session-config>
+        <session-timeout>30</session-timeout>
+        <cookie-config>
+            <http-only>true</http-only>
+        </cookie-config>
+    </session-config>
+
+</web-app>
