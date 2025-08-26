@@ -2,8 +2,12 @@ package org.lucee.lucli.monitoring;
 
 import org.lucee.lucli.monitoring.CliDashboard.ServerMetrics;
 import org.lucee.lucli.monitoring.JmxConnection.*;
+import org.lucee.lucli.server.LuceeServerConfig;
+import org.lucee.lucli.server.LuceeServerManager;
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Scanner;
 import java.util.concurrent.Executors;
@@ -191,11 +195,14 @@ public class MonitorCommand {
     
     /**
      * Command line entry point for monitoring
+     * Returns null on success (monitoring started) or error message on failure
      */
-    public static void executeMonitor(String[] args) {
-        String host = "localhost";
-        int port = 8999;
+    public static String executeMonitor(String[] args) {
+        String host = null;
+        Integer port = null;
+        String serverName = null;
         int refreshInterval = 3;
+        boolean useCurrentDirectory = false;
         
         // Parse command line arguments
         for (int i = 0; i < args.length; i++) {
@@ -212,9 +219,14 @@ public class MonitorCommand {
                         try {
                             port = Integer.parseInt(args[++i]);
                         } catch (NumberFormatException e) {
-                            System.err.println("Invalid port number: " + args[i]);
-                            return;
+                            return "❌ Invalid port number: " + args[i];
                         }
+                    }
+                    break;
+                case "--name":
+                case "-n":
+                    if (i + 1 < args.length) {
+                        serverName = args[++i];
                     }
                     break;
                 case "--refresh":
@@ -223,26 +235,34 @@ public class MonitorCommand {
                         try {
                             refreshInterval = Integer.parseInt(args[++i]);
                             if (refreshInterval < 1) {
-                                System.err.println("Refresh interval must be at least 1 second");
-                                return;
+                                return "❌ Refresh interval must be at least 1 second";
                             }
                         } catch (NumberFormatException e) {
-                            System.err.println("Invalid refresh interval: " + args[i]);
-                            return;
+                            return "❌ Invalid refresh interval: " + args[i];
                         }
                     }
                     break;
                 case "--help":
                     showUsage();
-                    return;
+                    return null; // Help shown, normal exit
                 default:
                     if (args[i].startsWith("-")) {
-                        System.err.println("Unknown option: " + args[i]);
-                        showUsage();
-                        return;
+                        return "❌ Unknown option: " + args[i] + "\n\n" + getUsageString();
                     }
                     break;
             }
+        }
+        
+        // If no specific server or host/port specified, try current directory
+        if (serverName == null && host == null && port == null) {
+            useCurrentDirectory = true;
+        }
+        
+        // Resolve connection details
+        ConnectionDetails connectionDetails = resolveConnectionDetails(serverName, host, port, useCurrentDirectory);
+        if (connectionDetails == null) {
+            // Error message already set in resolveConnectionDetails
+            return lastErrorMessage;
         }
         
         // Start monitoring
@@ -254,7 +274,136 @@ public class MonitorCommand {
             System.out.println("\nMonitoring stopped.");
         }));
         
-        monitor.startMonitoring(host, port, refreshInterval);
+        monitor.startMonitoring(connectionDetails.host, connectionDetails.port, refreshInterval);
+        
+        // If we reach here, monitoring completed normally
+        return null;
+    }
+    
+    // Thread-local storage for error messages to be returned to terminal
+    private static String lastErrorMessage = null;
+    
+    /**
+     * Connection details for JMX monitoring
+     */
+    private static class ConnectionDetails {
+        public final String host;
+        public final int port;
+        public final String serverDisplayName;
+        
+        public ConnectionDetails(String host, int port, String serverDisplayName) {
+            this.host = host;
+            this.port = port;
+            this.serverDisplayName = serverDisplayName;
+        }
+    }
+    
+    /**
+     * Resolve JMX connection details based on arguments
+     */
+    private static ConnectionDetails resolveConnectionDetails(String serverName, String host, Integer port, boolean useCurrentDirectory) {
+        try {
+            LuceeServerManager serverManager = new LuceeServerManager();
+            
+            // Case 1: Named server specified
+            if (serverName != null) {
+                LuceeServerManager.ServerInfo serverInfo = serverManager.getServerInfoByName(serverName);
+                if (serverInfo == null) {
+                    lastErrorMessage = "❌ Server '" + serverName + "' not found.\n💡 Use 'lucli server list' to see available servers.";
+                    return null;
+                }
+                
+                if (!serverInfo.isRunning()) {
+                    lastErrorMessage = "❌ Server '" + serverName + "' is not running.\n💡 Start the server with: lucli server start --name " + serverName;
+                    return null;
+                }
+                
+                // Get JMX port from server config
+                JmxDetails jmxDetails = getJmxDetailsForServer(serverInfo, serverManager);
+                if (jmxDetails == null) {
+                    return null; // Error already set in getJmxDetailsForServer
+                }
+                
+                System.out.println("🔍 Monitoring server: " + serverName);
+                return new ConnectionDetails(jmxDetails.host, jmxDetails.port, serverName);
+            }
+            
+            // Case 2: Current directory server
+            if (useCurrentDirectory) {
+                Path currentDir = Paths.get(System.getProperty("user.dir"));
+                LuceeServerManager.ServerInstance runningServer = serverManager.getRunningServer(currentDir);
+                
+                if (runningServer == null) {
+                    lastErrorMessage = "❌ No running server found in current directory.\n💡 Start a server with: lucli server start";
+                    return null;
+                }
+                
+                // Get JMX port from server config
+                LuceeServerManager.ServerInfo serverInfo = serverManager.getServerInfoByName(runningServer.getServerName());
+                if (serverInfo == null) {
+                    lastErrorMessage = "❌ Could not get server information for: " + runningServer.getServerName();
+                    return null;
+                }
+                
+                JmxDetails jmxDetails = getJmxDetailsForServer(serverInfo, serverManager);
+                if (jmxDetails == null) {
+                    return null; // Error already set in getJmxDetailsForServer
+                }
+                
+                System.out.println("🔍 Monitoring current directory server: " + runningServer.getServerName());
+                return new ConnectionDetails(jmxDetails.host, jmxDetails.port, runningServer.getServerName());
+            }
+            
+            // Case 3: Explicit host/port
+            String resolvedHost = host != null ? host : "localhost";
+            int resolvedPort = port != null ? port : 8999;
+            
+            System.out.println("🔍 Monitoring JMX endpoint: " + resolvedHost + ":" + resolvedPort);
+            return new ConnectionDetails(resolvedHost, resolvedPort, resolvedHost + ":" + resolvedPort);
+            
+        } catch (Exception e) {
+            lastErrorMessage = "❌ Failed to resolve server details: " + e.getMessage();
+            return null;
+        }
+    }
+    
+    /**
+     * JMX connection details
+     */
+    private static class JmxDetails {
+        public final String host;
+        public final int port;
+        
+        public JmxDetails(String host, int port) {
+            this.host = host;
+            this.port = port;
+        }
+    }
+    
+    /**
+     * Get JMX connection details for a server
+     */
+    private static JmxDetails getJmxDetailsForServer(LuceeServerManager.ServerInfo serverInfo, LuceeServerManager serverManager) {
+        try {
+            // Try to load the server's configuration to get JMX port
+            if (serverInfo.getProjectDir() != null) {
+                LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(serverInfo.getProjectDir());
+                
+                if (config.monitoring != null && config.monitoring.enabled && config.monitoring.jmx != null) {
+                    return new JmxDetails("localhost", config.monitoring.jmx.port);
+                } else {
+                    lastErrorMessage = "❌ JMX monitoring is not enabled for server '" + serverInfo.getServerName() + "'.\n💡 Enable JMX in lucee.json: \"monitoring\": { \"enabled\": true, \"jmx\": { \"port\": 8999 } }";
+                    return null;
+                }
+            } else {
+                // Fallback: use default JMX port (this shouldn't normally happen)
+                System.out.println("⚠️  Using default JMX port 8999 for server '" + serverInfo.getServerName() + "'");
+                return new JmxDetails("localhost", 8999);
+            }
+        } catch (Exception e) {
+            lastErrorMessage = "❌ Failed to get JMX configuration for server '" + serverInfo.getServerName() + "': " + e.getMessage();
+            return null;
+        }
     }
     
     /**
@@ -263,17 +412,51 @@ public class MonitorCommand {
     private static void showUsage() {
         System.out.println("Usage: lucli server monitor [options]");
         System.out.println();
+        System.out.println("Monitor Lucee servers via JMX in three different ways:");
+        System.out.println("  1. Auto-detect server in current directory (default)");
+        System.out.println("  2. Monitor a named server instance");
+        System.out.println("  3. Connect to arbitrary JMX endpoint");
+        System.out.println();
         System.out.println("Options:");
-        System.out.println("  --host, -h     JMX host (default: localhost)");
-        System.out.println("  --port, -p     JMX port (default: 8999)"); 
+        System.out.println("  --name, -n     Monitor a named server instance");
+        System.out.println("  --host, -h     JMX host (for arbitrary endpoints)");
+        System.out.println("  --port, -p     JMX port (for arbitrary endpoints)");
         System.out.println("  --refresh, -r  Refresh interval in seconds (default: 3)");
         System.out.println("  --help         Show this help message");
         System.out.println();
         System.out.println("Examples:");
+        System.out.println("  # Monitor server in current directory (auto-detected)");
         System.out.println("  lucli server monitor");
+        System.out.println();
+        System.out.println("  # Monitor a specific named server");
+        System.out.println("  lucli server monitor --name my-app");
+        System.out.println();
+        System.out.println("  # Monitor arbitrary JMX endpoint");
         System.out.println("  lucli server monitor --host myserver --port 9999");
+        System.out.println();
+        System.out.println("  # Customize refresh interval");
         System.out.println("  lucli server monitor --refresh 5");
         System.out.println();
-        System.out.println("Note: The target Lucee server must have JMX enabled.");
+        System.out.println("Note: JMX monitoring must be enabled in the target server's lucee.json.");
+        System.out.println("      Use 'lucli server list' to see available managed servers.");
+    }
+    
+    /**
+     * Get usage string for error messages
+     */
+    private static String getUsageString() {
+        return "Usage: lucli server monitor [options]\n" +
+               "\n" +
+               "Monitor Lucee servers via JMX in three different ways:\n" +
+               "  1. Auto-detect server in current directory (default)\n" +
+               "  2. Monitor a named server instance\n" +
+               "  3. Connect to arbitrary JMX endpoint\n" +
+               "\n" +
+               "Options:\n" +
+               "  --name, -n     Monitor a named server instance\n" +
+               "  --host, -h     JMX host (for arbitrary endpoints)\n" +
+               "  --port, -p     JMX port (for arbitrary endpoints)\n" +
+               "  --refresh, -r  Refresh interval in seconds (default: 3)\n" +
+               "  --help         Show this help message";
     }
 }

@@ -74,7 +74,7 @@ public class SimpleTerminal {
                 } else {
                     // Try to execute command using ExternalCommandProcessor (handles both internal and external)
                     String result = externalCommandProcessor.executeCommand(trimmed);
-                    if (!result.isEmpty()) {
+                    if (result != null && !result.isEmpty()) {
                         terminal.writer().println(result);
                     }
                 }
