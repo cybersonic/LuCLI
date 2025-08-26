@@ -46,61 +46,62 @@ public class CliDashboard {
      * Render dashboard header with server info
      */
     private void renderHeader(String serverName, RuntimeMetrics runtime) {
-        System.out.println("┌─────────────────── Lucee Server Monitor ───────────────────┐");
-        System.out.printf("│ Server: %-20s Status: %s●RUNNING%s         │%n", 
+        System.out.println(BOLD + "LUCEE SERVER MONITOR" + RESET);
+        System.out.println("═".repeat(60));
+        System.out.printf("Server: %-20s Status: %s●RUNNING%s%n", 
             serverName, GREEN, RESET);
-        System.out.printf("│ Uptime: %-20s JVM: %-25s │%n", 
+        System.out.printf("Uptime: %-20s JVM: %s%n", 
             runtime.getFormattedUptime(), 
-            truncate(runtime.vmName + " " + runtime.vmVersion, 25));
-        System.out.println("├─────────────────────────────────────────────────────────────┤");
+            truncate(runtime.vmName + " " + runtime.vmVersion, 35));
+        System.out.println();
     }
     
     /**
      * Render memory usage section
      */
     private void renderMemorySection(MemoryMetrics memory) {
-        System.out.println("│ Memory Usage                                                │");
+        System.out.println(BOLD + "Memory Usage" + RESET);
         
         double heapPercent = memory.getHeapUsagePercent();
-        String heapBar = renderProgressBar(heapPercent, 40);
+        String heapBar = renderProgressBar(heapPercent, 30);
         String heapColor = getColorForPercentage(heapPercent);
         
-        System.out.printf("│ Heap:     %s%s%s %s%3.0f%%%s (%s/%s) │%n",
+        System.out.printf("Heap:     %s%s%s %s%3.0f%%%s (%s/%s)%n",
             heapColor, heapBar, RESET,
             heapColor, heapPercent, RESET,
             formatBytes(memory.heapUsed), formatBytes(memory.heapMax));
         
         double nonHeapPercent = memory.getNonHeapUsagePercent();
-        String nonHeapBar = renderProgressBar(nonHeapPercent, 40);
+        String nonHeapBar = renderProgressBar(nonHeapPercent, 30);
         String nonHeapColor = getColorForPercentage(nonHeapPercent);
         
-        System.out.printf("│ Non-Heap: %s%s%s %s%3.0f%%%s (%s/%s) │%n",
+        System.out.printf("Non-Heap: %s%s%s %s%3.0f%%%s (%s/%s)%n",
             nonHeapColor, nonHeapBar, RESET,
             nonHeapColor, nonHeapPercent, RESET,
             formatBytes(memory.nonHeapUsed), formatBytes(memory.nonHeapMax));
         
-        System.out.println("│                                                             │");
+        System.out.println();
     }
     
     /**
      * Render threading information
      */
     private void renderThreadingSection(ThreadingMetrics threading) {
-        System.out.println("│ Threading                          System Load              │");
-        System.out.printf("│ Active:  %s%-3d%s threads             Load: %-15s │%n",
-            BLUE, threading.threadCount, RESET, "N/A");
-        System.out.printf("│ Peak:    %s%-3d%s threads             Cores: %-14d │%n",
-            BLUE, threading.peakThreadCount, RESET, Runtime.getRuntime().availableProcessors());
-        System.out.printf("│ Daemon:  %s%-3d%s threads                                    │%n",
+        System.out.println(BOLD + "Threading" + RESET);
+        System.out.printf("Active:  %s%-3d%s threads%n",
+            BLUE, threading.threadCount, RESET);
+        System.out.printf("Peak:    %s%-3d%s threads%n",
+            BLUE, threading.peakThreadCount, RESET);
+        System.out.printf("Daemon:  %s%-3d%s threads%n",
             BLUE, threading.daemonThreadCount, RESET);
-        System.out.println("│                                                             │");
+        System.out.println();
     }
     
     /**
      * Render garbage collection section
      */
     private void renderGcSection(List<GcMetrics> gcMetrics) {
-        System.out.println("│ Garbage Collection                                          │");
+        System.out.println(BOLD + "Garbage Collection" + RESET);
         
         long totalCollections = 0;
         long totalTime = 0;
@@ -110,54 +111,53 @@ public class CliDashboard {
             totalTime += gc.collectionTime;
             
             String gcName = truncate(gc.name, 15);
-            System.out.printf("│ %-15s: %s%,d%s collections (%s%,d%sms)               │%n",
+            System.out.printf("%-15s: %s%,d%s collections (%s%,d%sms)%n",
                 gcName, GREEN, gc.collectionCount, RESET, 
                 YELLOW, gc.collectionTime, RESET);
         }
         
         if (!gcMetrics.isEmpty()) {
-            System.out.printf("│ Total GC:         %s%,d%s collections (%s%,d%sms)               │%n",
+            System.out.printf("Total GC:       %s%,d%s collections (%s%,d%sms)%n",
                 GREEN, totalCollections, RESET, YELLOW, totalTime, RESET);
         }
         
-        System.out.println("│                                                             │");
+        System.out.println();
     }
     
     /**
      * Render system metrics section
      */
     private void renderSystemSection(OsMetrics os) {
-        System.out.println("│ System Resources                                            │");
+        System.out.println(BOLD + "System Resources" + RESET);
         
         if (os.processCpuLoad != null && os.processCpuLoad >= 0) {
             double cpuPercent = os.processCpuLoad * 100;
-            String cpuBar = renderProgressBar(cpuPercent, 40);
+            String cpuBar = renderProgressBar(cpuPercent, 30);
             String cpuColor = getColorForPercentage(cpuPercent);
             
-            System.out.printf("│ CPU:      %s%s%s %s%3.0f%%%s                              │%n",
+            System.out.printf("CPU:      %s%s%s %s%3.0f%%%s%n",
                 cpuColor, cpuBar, RESET, cpuColor, cpuPercent, RESET);
         } else {
-            System.out.println("│ CPU:      N/A                                               │");
+            System.out.println("CPU:      N/A");
         }
         
         if (os.systemLoadAverage >= 0) {
-            System.out.printf("│ Load:     %s%.2f%s/%d cores                                     │%n",
+            System.out.printf("Load:     %s%.2f%s/%d cores%n",
                 BLUE, os.systemLoadAverage, RESET, os.availableProcessors);
         } else {
-            System.out.printf("│ Load:     N/A/%d cores                                       │%n",
+            System.out.printf("Load:     N/A/%d cores%n",
                 os.availableProcessors);
         }
         
-        System.out.println("│                                                             │");
+        System.out.println();
     }
     
     /**
      * Render footer with controls
      */
     private void renderFooter() {
-        System.out.println("├─────────────────────────────────────────────────────────────┤");
-        System.out.println("│ Press 'q' to quit, 'r' to refresh, 'h' for help           │");
-        System.out.println("└─────────────────────────────────────────────────────────────┘");
+        System.out.println("─".repeat(60));
+        System.out.println("Commands: 'q' + Enter to quit, 'r' + Enter to refresh, 'h' + Enter for help");
     }
     
     /**
@@ -214,9 +214,10 @@ public class CliDashboard {
      */
     public void renderError(String message) {
         clearScreen();
-        System.out.println("┌─────────────────── ERROR ───────────────────┐");
-        System.out.printf("│ %s%-41s%s │%n", RED, truncate(message, 41), RESET);
-        System.out.println("└─────────────────────────────────────────────┘");
+        System.out.println(BOLD + RED + "ERROR" + RESET);
+        System.out.println("─".repeat(40));
+        System.out.printf("%s%s%s%n", RED, message, RESET);
+        System.out.println();
         System.out.println("Press any key to exit...");
     }
     
@@ -225,11 +226,11 @@ public class CliDashboard {
      */
     public void renderConnecting(String host, int port) {
         clearScreen();
-        System.out.println("┌─────────────────── Connecting ───────────────────┐");
-        System.out.printf("│ Connecting to JMX server at %s%s:%d%s...           │%n", 
+        System.out.println(BOLD + "CONNECTING" + RESET);
+        System.out.println("─".repeat(40));
+        System.out.printf("Connecting to JMX server at %s%s:%d%s...%n", 
             BLUE, host, port, RESET);
-        System.out.println("│ Please wait...                                    │");
-        System.out.println("└───────────────────────────────────────────────────┘");
+        System.out.println("Please wait...");
     }
     
     /**

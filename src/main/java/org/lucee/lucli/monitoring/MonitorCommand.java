@@ -148,17 +148,19 @@ public class MonitorCommand {
      */
     private void showHelp() {
         dashboard.clearScreen();
-        System.out.println("┌─────────────────── HELP ───────────────────┐");
-        System.out.println("│ Available Commands:                         │");
-        System.out.println("│                                             │");
-        System.out.println("│ q, quit, exit - Quit monitoring            │");
-        System.out.println("│ r, refresh    - Force refresh              │");
-        System.out.println("│ h, help       - Show this help             │");
-        System.out.println("│ c, clear      - Clear screen               │");
-        System.out.println("│                                             │");
-        System.out.println("│ The dashboard auto-refreshes every few     │");
-        System.out.println("│ seconds. Use 'q' to quit safely.           │");
-        System.out.println("└─────────────────────────────────────────────┘");
+        System.out.println("\033[1mHELP\033[0m");
+        System.out.println("─".repeat(40));
+        System.out.println("Available Commands:");
+        System.out.println();
+        System.out.println("q, quit, exit - Quit monitoring");
+        System.out.println("r, refresh    - Force refresh");
+        System.out.println("h, help       - Show this help");
+        System.out.println("c, clear      - Clear screen");
+        System.out.println();
+        System.out.println("\033[33mNote:\033[0m Type the command and press Enter.");
+        System.out.println("The dashboard auto-refreshes every few seconds.");
+        System.out.println("Use 'q' + Enter to quit safely.");
+        System.out.println();
         System.out.println("Press Enter to return to dashboard...");
         
         try {
