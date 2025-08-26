@@ -384,26 +384,26 @@ public class LuceeScriptEngine {
      */
     private boolean isExtractedModule(String scriptFile) {
         
-        // Path scriptPath = Paths.get(scriptFile);
+        Path scriptPath = Paths.get(scriptFile);
         
-        // if (scriptPath.getFileName() != null && 
-        //     scriptPath.getFileName().toString().equals("Module.cfc")) {
+        if (scriptPath.getFileName() != null && 
+            scriptPath.getFileName().toString().equals("Module.cfc")) {
             
-        //     Path parent = scriptPath.getParent();
-        //     if (parent != null) {
-        //         Path grandParent = parent.getParent();
+            Path parent = scriptPath.getParent();
+            if (parent != null) {
+                Path grandParent = parent.getParent();
                 
-        //         if (grandParent != null && 
-        //             grandParent.getFileName().toString().equals("modules")) {
+                if (grandParent != null && 
+                    grandParent.getFileName().toString().equals("modules")) {
                     
-        //             Path greatGrandParent = grandParent.getParent();
-        //             if (greatGrandParent != null && 
-        //                 greatGrandParent.getFileName().toString().equals(".lucli")) {
-        //                 return true;
-        //             }
-        //         }
-        //     }
-        // }
+                    Path greatGrandParent = grandParent.getParent();
+                    if (greatGrandParent != null && 
+                        greatGrandParent.getFileName().toString().equals(".lucli")) {
+                        return true;
+                    }
+                }
+            }
+        }
         
         return false;
     }

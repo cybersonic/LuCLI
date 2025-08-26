@@ -8,3 +8,5 @@ target/
 TODO.md
 POTENTIALS.md
 docs/
+LuCLI.code-workspace
+demo_servers/

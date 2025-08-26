@@ -6,7 +6,7 @@
 
   <groupId>org.lucee</groupId>
   <artifactId>lucli</artifactId>
-  <version>1.0.0-SNAPSHOT</version>
+  <version>1.0.25-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>LuCLI</name>
   <description>A CLI for Lucee</description>
@@ -178,6 +178,38 @@
       <build>
         <plugins>
           <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>build-helper-maven-plugin</artifactId>
+            <version>3.4.0</version>
+            <executions>
+              <execution>
+                <id>parse-version</id>
+                <phase>validate</phase>
+                <goals>
+                  <goal>parse-version</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>versions-maven-plugin</artifactId>
+            <version>2.16.2</version>
+            <executions>
+              <execution>
+                <id>bump-patch-version</id>
+                <phase>initialize</phase>
+                <goals>
+                  <goal>set</goal>
+                </goals>
+                <configuration>
+                  <newVersion>${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.nextIncrementalVersion}-SNAPSHOT</newVersion>
+                  <generateBackupPoms>false</generateBackupPoms>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-antrun-plugin</artifactId>
             <version>3.1.0</version>
@@ -195,6 +227,33 @@
                       <fileset file="target/lucli.jar" />
                     </concat>
                     <chmod file="target/lucli" perm="755" />
+                  </target>
+                </configuration>
+              </execution>
+              <execution>
+                <id>show-version-bump</id>
+                <phase>generate-sources</phase>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <configuration>
+                  <target>
+                    <echo message="📦 Building LuCLI version ${project.version}" />
+                  </target>
+                </configuration>
+              </execution>
+              <execution>
+                <id>copy-to-bin</id>
+                <phase>install</phase>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <configuration>
+                  <target>
+                    <mkdir dir="${user.home}/bin" />
+                    <copy file="target/lucli" tofile="${user.home}/bin/lucli" overwrite="true" />
+                    <chmod file="${user.home}/bin/lucli" perm="755" />
+                    <echo message="✅ Copied lucli binary v${project.version} to ${user.home}/bin/lucli" />
                   </target>
                 </configuration>
               </execution>

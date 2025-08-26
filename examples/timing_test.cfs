@@ -1,0 +1,12 @@
+#!/usr/bin/env lucli
+
+// Simple test script to demonstrate timing functionality
+writeOutput("Starting timing test script..." & chr(10));
+
+// Simulate some work
+for (i = 1; i <= 5; i++) {
+    writeOutput("Processing item " & i & chr(10));
+    sleep(100); // Sleep for 100ms to simulate work
+}
+
+writeOutput("Timing test completed!" & chr(10));

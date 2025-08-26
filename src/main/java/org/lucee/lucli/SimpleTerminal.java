@@ -64,6 +64,10 @@ public class SimpleTerminal {
                     executeCFML(cfmlCode);
                 } else if (trimmed.equalsIgnoreCase("help")) {
                     showHelp();
+                } else if (trimmed.equalsIgnoreCase("--version") || trimmed.equalsIgnoreCase("version")) {
+                    terminal.writer().println(LuCLI.getVersionInfo());
+                } else if (trimmed.equalsIgnoreCase("--lucee-version") || trimmed.equalsIgnoreCase("lucee-version")) {
+                    showLuceeVersion();
                 } else if (trimmed.isEmpty()) {
                     // Do nothing for empty lines
                     continue;
@@ -156,10 +160,33 @@ public class SimpleTerminal {
         return script.toString();
     }
     
+    private static void showLuceeVersion() {
+        try {
+            // Initialize Lucee engine if not already done
+            if (luceeEngine == null) {
+                terminal.writer().println("🔧 Initializing Lucee CFML engine...");
+                terminal.writer().flush();
+                
+                luceeEngine = LuceeScriptEngine.getInstance(true, false);
+                terminal.writer().println("✅ Lucee engine ready.");
+            }
+            
+            luceeEngine.eval("version = SERVER.LUCEE.version");
+            Object version = luceeEngine.getEngine().get("version");
+            terminal.writer().println("Lucee Version: " + version);
+            
+        } catch (Exception e) {
+            terminal.writer().println("❌ Error getting Lucee version: " + e.getMessage());
+        }
+        terminal.writer().flush();
+    }
+    
     private static void showHelp() {
         terminal.writer().println("\nLuCLI Terminal Commands:");
         terminal.writer().println("  cfml <expression>   Execute CFML expression (e.g., cfml now())");
         terminal.writer().println("  help                Show this help message");
+        terminal.writer().println("  version             Show LuCLI version");
+        terminal.writer().println("  lucee-version       Show Lucee version");
         terminal.writer().println("  exit, quit          Exit the terminal");
         terminal.writer().println("  Ctrl-C              Interrupt current command");
         terminal.writer().println("  Ctrl-D              Exit the terminal");
