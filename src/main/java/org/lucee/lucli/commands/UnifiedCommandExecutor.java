@@ -282,7 +282,7 @@ public class UnifiedCommandExecutor {
         
         if (isTerminalMode) {
             // Condensed format for terminal
-            result.append(String.format("%-20s %-10s %-8s %-10s %s\n", "NAME", "STATUS", "PID", "PORT", "DIRECTORY"));
+            result.append(String.format("%-20s %-10s %-8s %-10s %s\n", "NAME", "STATUS", "PID", "PORT", "WEBROOT"));
             result.append("─".repeat(80)).append("\n");
         } else {
             // Full format for CLI  
@@ -295,13 +295,13 @@ public class UnifiedCommandExecutor {
             String pid = server.getPid() > 0 ? String.valueOf(server.getPid()) : "-";
             String port = server.getPort() > 0 ? String.valueOf(server.getPort()) : "-";
             
+            String webroot = server.getProjectDir() != null ? server.getProjectDir().toString() : "<unknown>";
             if (isTerminalMode) {
                 // Condensed format
                 result.append(String.format("%-20s %-10s %-8s %-10s %s\n", 
-                    server.getServerName(), status, pid, port, server.getServerDir()));
+                    server.getServerName(), status, pid, port, webroot));
             } else {
                 // Full format
-                String webroot = server.getProjectDir() != null ? server.getProjectDir().toString() : "<unknown>";
                 
                 // Truncate long paths for better display
                 if (webroot.length() > 38) {
@@ -318,15 +318,23 @@ public class UnifiedCommandExecutor {
     
     private String handleServerMonitor(String[] args) {
         if (isTerminalMode) {
-            // In terminal mode, we can't start the interactive monitor, so show instructions
-            return formatOutput("🖥️  Starting JMX monitoring dashboard...\n" +
-                   "⚠️  Note: This will exit the terminal session and start the interactive monitor.\n" +
-                   "💡 To start monitoring, use: java -jar lucli.jar server monitor\n" +
-                   "❌ Direct monitor command from terminal not yet supported.", false);
+            // In terminal mode, MonitorCommand returns error messages or null for success
+            String result = MonitorCommand.executeMonitor(args);
+            if (result != null) {
+                // Error occurred, return error message for terminal display
+                return formatOutput(result, true);
+            } else {
+                // Monitor started successfully (this won't usually return in terminal mode)
+                return formatOutput("Monitor started successfully", false);
+            }
         } else {
             // In CLI mode, start the monitor directly
-            MonitorCommand.executeMonitor(args);
-            return null; // MonitorCommand handles its own output and doesn't return
+            String result = MonitorCommand.executeMonitor(args);
+            if (result != null) {
+                // Error occurred
+                return formatOutput(result, true);
+            }
+            return null; // MonitorCommand handles its own output for success case
         }
     }
     
