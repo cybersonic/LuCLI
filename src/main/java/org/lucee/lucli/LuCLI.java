@@ -13,6 +13,7 @@ import org.lucee.lucli.server.LuceeServerManager;
 import org.lucee.lucli.server.LogCommand;
 import org.lucee.lucli.monitoring.MonitorCommand;
 import org.lucee.lucli.modules.ModuleCommand;
+import org.lucee.lucli.commands.UnifiedCommandExecutor;
 
 public class LuCLI {
 
@@ -236,57 +237,24 @@ public class LuCLI {
 
 
     /**
-     * Handle server commands (start, stop, status, list)
+     * Handle server commands using UnifiedCommandExecutor
      */
     private static void handleServerCommand(String[] args) {
-        if (args.length < 3) {
-            showServerHelp();
-            return;
+        // Extract server subcommand and arguments
+        String[] serverArgs;
+        if (args.length >= 3) {
+            // Remove "lucli" and "server" from args, keep the rest
+            serverArgs = Arrays.copyOfRange(args, 2, args.length);
+        } else {
+            // No subcommand provided
+            serverArgs = new String[0];
         }
         
-        String subCommand = args[2];
         Path currentDir = Paths.get(System.getProperty("user.dir"));
+        UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, currentDir);
         
-        try {
-            LuceeServerManager serverManager = new LuceeServerManager();
-            
-            switch (subCommand) {
-                case "start":
-                    handleServerStart(serverManager, currentDir, args);
-                    break;
-                    
-                case "stop":
-                    handleServerStop(serverManager, currentDir, args);
-                    break;
-                    
-                case "status":
-                    handleServerStatus(serverManager, currentDir, args);
-                    break;
-                    
-                case "list":
-                    handleServerList(serverManager);
-                    break;
-                    
-                case "monitor":
-                    handleServerMonitor(args);
-                    break;
-                    
-                case "log":
-                    handleServerLog(args);
-                    break;
-                    
-                default:
-                    System.err.println("Unknown server command: " + subCommand);
-                    showServerHelp();
-                    System.exit(EXIT_ERROR);
-            }
-        } catch (Exception e) {
-            System.err.println("Server command failed: " + e.getMessage());
-            if (verbose || debug) {
-                e.printStackTrace();
-            }
-            System.exit(EXIT_ERROR);
-        }
+        // Execute server command - this will handle output directly and exit if needed
+        executor.executeCommand("server", serverArgs);
     }
     
     private static void showServerHelp() {

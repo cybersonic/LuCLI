@@ -9,10 +9,7 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Stream;
-import org.lucee.lucli.server.LuceeServerManager;
-import org.lucee.lucli.server.LuceeServerConfig;
-import org.lucee.lucli.server.ServerConflictException;
-import org.lucee.lucli.monitoring.MonitorCommand;
+import org.lucee.lucli.commands.UnifiedCommandExecutor;
 
 /**
  * Processes file system commands for the terminal
@@ -959,221 +956,16 @@ public class CommandProcessor {
     }
     
     /**
-     * Handle server management commands
+     * Handle server management commands using UnifiedCommandExecutor
      */
     private String serverCommand(String[] args) {
-        if (args.length == 0) {
-            return "❌ server: missing subcommand\n💡 Usage: server [start|stop|status|list] [options]";
-        }
-        
-        String subCommand = args[0];
         Path currentDir = fileSystemState.getCurrentWorkingDirectory();
+        UnifiedCommandExecutor executor = new UnifiedCommandExecutor(true, currentDir);
         
-        try {
-            LuceeServerManager serverManager = new LuceeServerManager();
-            
-            switch (subCommand) {
-                case "start":
-                    return handleServerStart(serverManager, currentDir, args);
-                    
-                case "stop":
-                    return handleServerStop(serverManager, currentDir, args);
-                    
-                case "status":
-                    return handleServerStatus(serverManager, currentDir, args);
-                    
-                case "list":
-                    return handleServerList(serverManager);
-                    
-                case "monitor":
-                    return handleServerMonitor(Arrays.copyOfRange(args, 1, args.length));
-                    
-                default:
-                    return "❌ Unknown server command: " + subCommand + "\n💡 Available commands: start, stop, status, list, monitor";
-            }
-        } catch (Exception e) {
-            return "❌ Server command failed: " + e.getMessage();
-        }
+        // Execute server command and return result for terminal display
+        return executor.executeCommand("server", args);
     }
     
-    private String handleServerStart(LuceeServerManager serverManager, Path currentDir, String[] args) {
-        String versionOverride = null;
-        boolean forceReplace = false;
-        String customName = null;
-        
-        // Parse additional arguments
-        for (int i = 1; i < args.length; i++) {
-            if ((args[i].equals("--version") || args[i].equals("-v")) && i + 1 < args.length) {
-                versionOverride = args[i + 1];
-                i++; // Skip next argument
-            } else if (args[i].equals("--force") || args[i].equals("-f")) {
-                forceReplace = true;
-            } else if ((args[i].equals("--name") || args[i].equals("-n")) && i + 1 < args.length) {
-                customName = args[i + 1];
-                i++; // Skip next argument
-            }
-        }
-        
-        try {
-            LuceeServerManager.ServerInstance instance = serverManager.startServer(currentDir, versionOverride, forceReplace, customName);
-            
-            // Load configuration to get monitoring/JMX port info
-            LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(currentDir);
-            
-            StringBuilder result = new StringBuilder();
-            result.append("✅ Server started successfully!\n");
-            result.append("   Server Name:   ").append(instance.getServerName()).append("\n");
-            result.append("   Process ID:    ").append(instance.getPid()).append("\n");
-            result.append("   HTTP Port:     ").append(instance.getPort()).append("\n");
-            result.append("   Shutdown Port: ").append(LuceeServerConfig.getShutdownPort(instance.getPort())).append("\n");
-            if (config.monitoring != null && config.monitoring.enabled && config.monitoring.jmx != null) {
-                result.append("   JMX Port:      ").append(config.monitoring.jmx.port).append("\n");
-            }
-            result.append("   URL:           http://localhost:").append(instance.getPort()).append("\n");
-            result.append("   Web Root:      ").append(currentDir);
-            
-            return result.toString();
-        } catch (ServerConflictException e) {
-            StringBuilder result = new StringBuilder();
-            result.append("⚠️  ").append(e.getMessage()).append("\n\n");
-            result.append("Choose an option:\n");
-            result.append("  1. Replace the existing server (delete and recreate):\n");
-            result.append("     server start --force\n\n");
-            result.append("  2. Create server with suggested name '" + e.getSuggestedName() + "':\n");
-            result.append("     server start --name " + e.getSuggestedName() + "\n\n");
-            result.append("  3. Create server with custom name:\n");
-            result.append("     server start --name <your-name>\n\n");
-            result.append("💡 Use --force to replace existing servers, or --name to specify a different name.");
-            
-            return result.toString();
-        } catch (Exception e) {
-            return "❌ Failed to start server: " + e.getMessage();
-        }
-    }
-    
-    private String handleServerStop(LuceeServerManager serverManager, Path currentDir, String[] args) {
-        try {
-            String serverName = null;
-            
-            // Parse --name flag
-            for (int i = 1; i < args.length; i++) {
-                if ((args[i].equals("--name") || args[i].equals("-n")) && i + 1 < args.length) {
-                    serverName = args[i + 1];
-                    break;
-                }
-            }
-            
-            if (serverName != null) {
-                // Stop server by name
-                boolean stopped = serverManager.stopServerByName(serverName);
-                
-                if (stopped) {
-                    return "✅ Server '" + serverName + "' stopped successfully.";
-                } else {
-                    return "ℹ️  Server '" + serverName + "' not found or not running.";
-                }
-            } else {
-                // Stop server for current directory
-                boolean stopped = serverManager.stopServer(currentDir);
-                
-                if (stopped) {
-                    return "✅ Server stopped successfully.";
-                } else {
-                    return "ℹ️  No running server found for this directory.";
-                }
-            }
-        } catch (Exception e) {
-            return "❌ Failed to stop server: " + e.getMessage();
-        }
-    }
-    
-    private String handleServerStatus(LuceeServerManager serverManager, Path currentDir, String[] args) {
-        try {
-            String serverName = null;
-            
-            // Parse --name flag
-            for (int i = 1; i < args.length; i++) {
-                if ((args[i].equals("--name") || args[i].equals("-n")) && i + 1 < args.length) {
-                    serverName = args[i + 1];
-                    break;
-                }
-            }
-            
-            if (serverName != null) {
-                // Get status for server by name
-                LuceeServerManager.ServerInfo serverInfo = serverManager.getServerInfoByName(serverName);
-                
-                if (serverInfo == null) {
-                    return "❌ Server '" + serverName + "' not found.";
-                }
-                
-                StringBuilder result = new StringBuilder();
-                result.append("Server status for '" + serverName + "':\n");
-                
-                if (serverInfo.isRunning()) {
-                    result.append("✅ Server is RUNNING\n");
-                    result.append("   Server Name:   ").append(serverInfo.getServerName()).append("\n");
-                    result.append("   Process ID:    ").append(serverInfo.getPid()).append("\n");
-                    result.append("   Port:          ").append(serverInfo.getPort()).append("\n");
-                    result.append("   URL:           http://localhost:").append(serverInfo.getPort()).append("\n");
-                    result.append("   Web Root:      ").append(serverInfo.getServerDir());
-                } else {
-                    result.append("❌ Server is NOT RUNNING\n");
-                    result.append("   Web Root:      ").append(serverInfo.getServerDir());
-                }
-                
-                return result.toString();
-            } else {
-                // Get status for current directory
-                LuceeServerManager.ServerStatus status = serverManager.getServerStatus(currentDir);
-                
-                StringBuilder result = new StringBuilder();
-                result.append("Server status for: ").append(currentDir).append("\n");
-                
-                if (status.isRunning()) {
-                    result.append("✅ Server is RUNNING\n");
-                    result.append("   Server Name: ").append(status.getServerName()).append("\n");
-                    result.append("   Process ID:  ").append(status.getPid()).append("\n");
-                    result.append("   Port:        ").append(status.getPort()).append("\n");
-                    result.append("   URL:         http://localhost:").append(status.getPort());
-                } else {
-                    result.append("❌ Server is NOT RUNNING");
-                }
-                
-                return result.toString();
-            }
-        } catch (Exception e) {
-            return "❌ Failed to get server status: " + e.getMessage();
-        }
-    }
-    
-    private String handleServerList(LuceeServerManager serverManager) {
-        try {
-            List<LuceeServerManager.ServerInfo> servers = serverManager.listServers();
-            
-            if (servers.isEmpty()) {
-                return "No server instances found.";
-            }
-            
-            StringBuilder result = new StringBuilder();
-            result.append("Server instances:\n\n");
-            result.append(String.format("%-20s %-10s %-8s %-10s %s\n", "NAME", "STATUS", "PID", "PORT", "DIRECTORY"));
-            result.append("─".repeat(80)).append("\n");
-            
-            for (LuceeServerManager.ServerInfo server : servers) {
-                String status = server.isRunning() ? "RUNNING" : "STOPPED";
-                String pid = server.getPid() > 0 ? String.valueOf(server.getPid()) : "-";
-                String port = server.getPort() > 0 ? String.valueOf(server.getPort()) : "-";
-                
-                result.append(String.format("%-20s %-10s %-8s %-10s %s\n", 
-                    server.getServerName(), status, pid, port, server.getServerDir()));
-            }
-            
-            return result.toString().trim();
-        } catch (Exception e) {
-            return "❌ Failed to list servers: " + e.getMessage();
-        }
-    }
     
     /**
      * Get available commands for help
