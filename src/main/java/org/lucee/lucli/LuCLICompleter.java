@@ -18,7 +18,8 @@ public class LuCLICompleter implements Completer {
     private final CommandProcessor commandProcessor;
     private final String[] commands = {
         "ls", "dir", "cd", "pwd", "mkdir", "rmdir", "rm", "cp", "mv", 
-        "cat", "touch", "find", "wc", "head", "tail", "cfml", "run", "prompt", "help", "exit", "quit"
+        "cat", "touch", "find", "wc", "head", "tail", "cfml", "run", "prompt", 
+        "help", "exit", "quit", "clear", "history", "env", "echo", "server"
     };
     
     public LuCLICompleter(CommandProcessor commandProcessor) {
@@ -47,7 +48,7 @@ public class LuCLICompleter implements Completer {
             // Complete file paths for commands that take file arguments
             else if (isFileCommand(command)) {
                 String partial = line.words().size() > 1 ? line.words().get(line.words().size() - 1) : "";
-                completeFilePaths(partial, candidates);
+                completeFilePaths(partial, candidates, command);
             }
         }
     }
@@ -68,13 +69,17 @@ public class LuCLICompleter implements Completer {
             case "wc":
             case "head":
             case "tail":
+            case "run":
                 return true;
             default:
                 return false;
         }
     }
     
-    private void completeFilePaths(String partial, List<Candidate> candidates) {
+    /**
+     * Context-aware file path completion based on the command being used
+     */
+    private void completeFilePaths(String partial, List<Candidate> candidates, String command) {
         try {
             Path currentDir = commandProcessor.getFileSystemState().getCurrentWorkingDirectory();
             Path basePath;
@@ -85,17 +90,17 @@ public class LuCLICompleter implements Completer {
                 basePath = currentDir;
             } else if (partial.equals("~")) {
                 basePath = commandProcessor.getFileSystemState().getHomeDirectory();
-                prefix = "~/";
+                prefix = commandProcessor.getFileSystemState().getHomeDirectory().toString() + "/";
             } else if (partial.startsWith("~/")) {
                 Path homePath = commandProcessor.getFileSystemState().getHomeDirectory();
                 String relativePart = partial.substring(2);
                 int lastSlash = relativePart.lastIndexOf('/');
                 if (lastSlash >= 0) {
                     basePath = homePath.resolve(relativePart.substring(0, lastSlash));
-                    prefix = "~/" + relativePart.substring(0, lastSlash + 1);
+                    prefix = homePath.toString() + "/" + relativePart.substring(0, lastSlash + 1);
                 } else {
                     basePath = homePath;
-                    prefix = "~/";
+                    prefix = homePath.toString() + "/";
                 }
             } else if (partial.startsWith("/")) {
                 // Absolute path
@@ -132,6 +137,10 @@ public class LuCLICompleter implements Completer {
                 }
             }
             
+            // Determine what types of files to show based on command
+            boolean showDirectoriesOnly = "cd".equals(command) || "mkdir".equals(command) || "rmdir".equals(command);
+            boolean showCFMLFilesOnly = "run".equals(command);
+            
             // List files and directories
             final String finalFilenamePartial = filenamePartial;
             final String finalPrefix = prefix;
@@ -139,17 +148,75 @@ public class LuCLICompleter implements Completer {
             try (Stream<Path> files = Files.list(basePath)) {
                 files.filter(path -> {
                     String filename = path.getFileName().toString();
-                    return filename.startsWith(finalFilenamePartial) && 
+                    boolean nameMatches = filename.startsWith(finalFilenamePartial) && 
                            (finalFilenamePartial.startsWith(".") || !filename.startsWith("."));
+                    
+                    if (!nameMatches) return false;
+                    
+                    // Apply command-specific filters
+                    if (showDirectoriesOnly) {
+                        return Files.isDirectory(path);
+                    }
+                    
+                    if (showCFMLFilesOnly) {
+                        return Files.isDirectory(path) || 
+                               filename.toLowerCase().endsWith(".cfm") ||
+                               filename.toLowerCase().endsWith(".cfc") ||
+                               filename.toLowerCase().endsWith(".cfs");
+                    }
+                    
+                    return true;
+                })
+                .sorted((p1, p2) -> {
+                    // Sort directories first, then files
+                    boolean isDir1 = Files.isDirectory(p1);
+                    boolean isDir2 = Files.isDirectory(p2);
+                    
+                    if (isDir1 && !isDir2) return -1;
+                    if (!isDir1 && isDir2) return 1;
+                    
+                    return p1.getFileName().toString().compareToIgnoreCase(p2.getFileName().toString());
                 })
                 .forEach(path -> {
                     String filename = path.getFileName().toString();
                     String completion = finalPrefix + filename;
+                    
                     if (Files.isDirectory(path)) {
                         completion += "/";
-                        candidates.add(new Candidate(completion, completion, null, null, null, null, false));
+                        String displayValue = completion;
+                        
+                        // Add emoji for better visibility
+                        if (commandProcessor.getSettings().showEmojis()) {
+                            displayValue = "📁 " + completion;
+                        }
+                        
+                        candidates.add(new Candidate(completion, displayValue, "directories", "Directory", null, null, false));
                     } else {
-                        candidates.add(new Candidate(completion, completion, null, null, null, null, true));
+                        String displayValue = completion;
+                        String description = "File";
+                        
+                        // Add emoji and description based on file type
+                        if (commandProcessor.getSettings().showEmojis()) {
+                            if (filename.toLowerCase().endsWith(".cfm") || 
+                                filename.toLowerCase().endsWith(".cfc") ||
+                                filename.toLowerCase().endsWith(".cfs")) {
+                                displayValue = "⚡ " + completion;
+                                description = "CFML File";
+                            } else if (filename.toLowerCase().endsWith(".java")) {
+                                displayValue = "☕ " + completion;
+                                description = "Java File";
+                            } else if (filename.toLowerCase().endsWith(".js")) {
+                                displayValue = "🟨 " + completion;
+                                description = "JavaScript File";
+                            } else if (filename.toLowerCase().endsWith(".md")) {
+                                displayValue = "📝 " + completion;
+                                description = "Markdown File";
+                            } else {
+                                displayValue = "📄 " + completion;
+                            }
+                        }
+                        
+                        candidates.add(new Candidate(completion, displayValue, "files", description, null, null, true));
                     }
                 });
             }
