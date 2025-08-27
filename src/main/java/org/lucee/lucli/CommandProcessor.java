@@ -116,6 +116,9 @@ public class CommandProcessor {
                 case "server":
                     result = serverCommand(args);
                     break;
+                case "edit":
+                    result = editFile(args);
+                    break;
                 default:
                     result = "❌ Unknown command: " + command + "\n💡 Type 'help' for available commands.";
             }
@@ -956,6 +959,118 @@ public class CommandProcessor {
     }
     
     /**
+     * Handle edit command to open files in system editor
+     */
+    private String editFile(String[] args) {
+        if (args.length == 0) {
+            return "❌ edit: missing file operand\n💡 Usage: edit <file>";
+        }
+        
+        String fileName = args[0];
+        Path filePath = fileSystemState.resolvePath(fileName);
+        
+        // Create file if it doesn't exist
+        if (!Files.exists(filePath)) {
+            try {
+                // Ensure parent directories exist
+                Files.createDirectories(filePath.getParent());
+                // Create empty file
+                Files.createFile(filePath);
+                System.out.println("📝 Created new file: " + fileName);
+            } catch (IOException e) {
+                return "❌ edit: cannot create file '" + fileName + "': " + e.getMessage();
+            }
+        }
+        
+        // Check if it's a directory
+        if (Files.isDirectory(filePath)) {
+            return "❌ edit: '" + fileName + "' is a directory";
+        }
+        
+        // Get the system editor
+        String editor = getSystemEditor();
+        
+        try {
+            // Build the command to run the editor
+            ProcessBuilder pb = new ProcessBuilder(editor, filePath.toAbsolutePath().toString());
+            pb.inheritIO(); // This makes the editor use the same terminal I/O
+            
+            System.out.println("📝 Opening " + fileName + " in " + editor + "...");
+            
+            Process process = pb.start();
+            int exitCode = process.waitFor();
+            
+            if (exitCode == 0) {
+                return "✅ File saved successfully";
+            } else {
+                return "⚠️ Editor exited with code: " + exitCode;
+            }
+            
+        } catch (IOException | InterruptedException e) {
+            return "❌ edit: failed to open editor '" + editor + "': " + e.getMessage() + 
+                   "\n💡 Try setting EDITOR environment variable or ensuring editor is in PATH";
+        }
+    }
+    
+    /**
+     * Detect the best available system editor
+     */
+    private String getSystemEditor() {
+        // Check EDITOR environment variable first
+        String editor = System.getenv("EDITOR");
+        if (editor != null && !editor.trim().isEmpty()) {
+            return editor.trim();
+        }
+        
+        // Check for common editors in order of preference
+        String[] editors = {
+            "code",      // VS Code
+            "nano",      // nano (most user-friendly for beginners)
+            "vim",       // vim
+            "vi",        // vi (fallback)
+            "emacs",     // emacs
+            "gedit",     // GNOME Text Editor
+            "notepad",   // Windows Notepad
+        };
+        
+        for (String editorCmd : editors) {
+            if (isCommandAvailable(editorCmd)) {
+                return editorCmd;
+            }
+        }
+        
+        // If nothing else works, try nano as final fallback
+        return "nano";
+    }
+    
+    /**
+     * Check if a command is available in the system PATH
+     */
+    private boolean isCommandAvailable(String command) {
+        try {
+            ProcessBuilder pb = new ProcessBuilder();
+            
+            // Use different commands based on OS to check if command exists
+            String os = System.getProperty("os.name").toLowerCase();
+            if (os.contains("win")) {
+                pb.command("where", command);
+            } else {
+                pb.command("which", command);
+            }
+            
+            pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+            pb.redirectError(ProcessBuilder.Redirect.DISCARD);
+            
+            Process process = pb.start();
+            int exitCode = process.waitFor();
+            
+            return exitCode == 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    /**
      * Handle server management commands using UnifiedCommandExecutor
      */
     private String serverCommand(String[] args) {
@@ -984,6 +1099,7 @@ public class CommandProcessor {
                "  cp src dest           📄 Copy files\n" +
                "  mv src dest           🚚 Move/rename files\n" +
                "  cat file...           👀 Display file contents\n" +
+               "  edit file             📝 Edit files with system editor\n" +
                "  touch file...         ✨ Create/update file timestamps\n" +
                "  find [dir] [pattern]  🔍 Find files\n" +
                "  wc file...            📊 Count lines, words, characters\n" +

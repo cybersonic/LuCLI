@@ -18,7 +18,7 @@ public class LuCLICompleter implements Completer {
     private final CommandProcessor commandProcessor;
     private final String[] commands = {
         "ls", "dir", "cd", "pwd", "mkdir", "rmdir", "rm", "cp", "mv", 
-        "cat", "touch", "find", "wc", "head", "tail", "cfml", "run", "prompt", 
+        "cat", "edit", "touch", "find", "wc", "head", "tail", "cfml", "run", "prompt", 
         "help", "exit", "quit", "clear", "history", "env", "echo", "server"
     };
     
@@ -59,6 +59,7 @@ public class LuCLICompleter implements Completer {
             case "dir":
             case "cd":
             case "cat":
+            case "edit":
             case "cp":
             case "mv":
             case "rm":
