@@ -7,6 +7,8 @@ import java.net.ServerSocket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Handles Lucee server configuration from lucee.json files
@@ -74,14 +76,108 @@ public class LuceeServerConfig {
     }
     
     /**
-     * Create default configuration for a project
+     * Create default configuration for a project, avoiding ports used by existing servers
      */
-    private static ServerConfig createDefaultConfig(Path projectDir) {
+    public static ServerConfig createDefaultConfig(Path projectDir) {
         ServerConfig config = new ServerConfig();
         config.name = projectDir.getFileName().toString();
-        config.port = findAvailablePort(8080, 8000, 8999);
-        config.monitoring.jmx.port = findAvailablePort(8999, 8000, 8999);
+        
+        // Try to find the LuCLI home directory to check existing servers
+        Path lucliHome = getLucliHome();
+        Path serversDir = lucliHome.resolve("servers");
+        
+        // Get all existing server ports to avoid conflicts
+        Set<Integer> existingPorts = getExistingServerPorts(serversDir);
+        
+        // Find available HTTP port, avoiding existing server definitions
+        config.port = findAvailablePortAvoidingExisting(8080, 8000, 8999, existingPorts);
+        
+        // Find available JMX port, avoiding existing server definitions and the chosen HTTP port
+        Set<Integer> portsToAvoid = new HashSet<>(existingPorts);
+        portsToAvoid.add(config.port);  // Don't use same as HTTP port
+        portsToAvoid.add(getShutdownPort(config.port));  // Don't use same as shutdown port
+        config.monitoring.jmx.port = findAvailablePortAvoidingExisting(8999, 8000, 8999, portsToAvoid);
+        
         return config;
+    }
+    
+    /**
+     * Get LuCLI home directory
+     */
+    private static Path getLucliHome() {
+        String lucliHomeStr = System.getProperty("lucli.home");
+        if (lucliHomeStr == null) {
+            lucliHomeStr = System.getenv("LUCLI_HOME");
+        }
+        if (lucliHomeStr == null) {
+            String userHome = System.getProperty("user.home");
+            lucliHomeStr = Paths.get(userHome, ".lucli").toString();
+        }
+        return Paths.get(lucliHomeStr);
+    }
+    
+    /**
+     * Get all ports currently defined in existing server configurations
+     */
+    private static Set<Integer> getExistingServerPorts(Path serversDir) {
+        Set<Integer> ports = new HashSet<>();
+        
+        if (!Files.exists(serversDir)) {
+            return ports;
+        }
+        
+        try (var stream = Files.list(serversDir)) {
+            for (Path serverDir : stream.filter(Files::isDirectory).toList()) {
+                try {
+                    // Look for lucee.json in each server directory
+                    Path configFile = serverDir.resolve("lucee.json");
+                    if (Files.exists(configFile)) {
+                        ServerConfig existingConfig = objectMapper.readValue(configFile.toFile(), ServerConfig.class);
+                        
+                        // Add HTTP port
+                        ports.add(existingConfig.port);
+                        
+                        // Add shutdown port (HTTP + 1000)
+                        ports.add(getShutdownPort(existingConfig.port));
+                        
+                        // Add JMX port if configured
+                        if (existingConfig.monitoring != null && existingConfig.monitoring.jmx != null) {
+                            ports.add(existingConfig.monitoring.jmx.port);
+                        }
+                    }
+                } catch (Exception e) {
+                    // Skip servers with invalid configurations
+                }
+            }
+        } catch (IOException e) {
+            // If we can't read the servers directory, just return empty set
+        }
+        
+        return ports;
+    }
+    
+    /**
+     * Find an available port starting from the preferred port, avoiding specific ports
+     */
+    private static int findAvailablePortAvoidingExisting(int preferredPort, int rangeStart, int rangeEnd, Set<Integer> portsToAvoid) {
+        // First try the preferred port if it's not in the avoid list
+        if (!portsToAvoid.contains(preferredPort) && isPortAvailable(preferredPort)) {
+            return preferredPort;
+        }
+        
+        // Then search in the range
+        for (int port = rangeStart; port <= rangeEnd; port++) {
+            if (!portsToAvoid.contains(port) && isPortAvailable(port)) {
+                return port;
+            }
+        }
+        
+        // If no port in range is available, try system-assigned port
+        try (ServerSocket socket = new ServerSocket(0)) {
+            return socket.getLocalPort();
+        } catch (IOException e) {
+            throw new RuntimeException("Unable to find available port", e);
+        }
     }
     
     /**

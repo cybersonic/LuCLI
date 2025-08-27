@@ -59,7 +59,7 @@ public class UnifiedCommandExecutor {
      */
     private String executeServerCommand(String[] args) throws Exception {
         if (args.length == 0) {
-            return formatOutput("❌ server: missing subcommand\n💡 Usage: server [start|stop|status|list|monitor|log] [options]", true);
+        return formatOutput("❌ server: missing subcommand\n💡 Usage: server [start|stop|status|list|monitor|log|debug] [options]", true);
         }
         
         String subCommand = args[0];
@@ -81,9 +81,11 @@ public class UnifiedCommandExecutor {
                     return handleServerMonitor(Arrays.copyOfRange(args, 1, args.length));
                 case "log":
                     return handleServerLog(Arrays.copyOfRange(args, 1, args.length));
+                case "debug":
+                    return handleServerDebug(Arrays.copyOfRange(args, 1, args.length));
                 default:
                     return formatOutput("❌ Unknown server command: " + subCommand + 
-                        "\n💡 Available commands: start, stop, status, list, monitor, log", true);
+                        "\n💡 Available commands: start, stop, status, list, monitor, log, debug", true);
             }
         } finally {
             Timer.stop("Server " + subCommand + " Command");
@@ -348,6 +350,17 @@ public class UnifiedCommandExecutor {
             // In CLI mode, start the log command directly
             LogCommand.executeLog(args);
             return null; // LogCommand handles its own output and doesn't return
+        }
+    }
+    
+    private String handleServerDebug(String[] args) throws Exception {
+        // Execute debug command using Java implementation
+        try {
+            String result = org.lucee.lucli.debug.DebugCommand.executeDebug(args);
+            return formatOutput(result, false);
+        } catch (Exception e) {
+            return formatOutput("❌ Debug command failed: " + e.getMessage() + 
+                "\n💡 Make sure JMX is enabled on the target Lucee server", true);
         }
     }
     

@@ -28,7 +28,7 @@ public class SimpleTerminal {
 
         LineReader reader = LineReaderBuilder.builder()
                 .terminal(terminal)
-                // .completer(new LuCLICompleter(commandProcessor))
+                .completer(new LuCLICompleter(commandProcessor))
                 .variable(LineReader.HISTORY_FILE, Paths.get("~/.lucli/history"))
                 .variable(LineReader.HISTORY_SIZE, 1000) // Maximum entries in memory
                 .variable(LineReader.HISTORY_FILE_SIZE, 2000) // Maximum entries in file
