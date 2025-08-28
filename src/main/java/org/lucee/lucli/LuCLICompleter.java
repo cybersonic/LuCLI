@@ -19,7 +19,7 @@ public class LuCLICompleter implements Completer {
     private final String[] commands = {
         "ls", "dir", "cd", "pwd", "mkdir", "rmdir", "rm", "cp", "mv", 
         "cat", "edit", "touch", "find", "wc", "head", "tail", "cfml", "run", "prompt", 
-        "help", "exit", "quit", "clear", "history", "env", "echo", "server"
+        "help", "exit", "quit", "clear", "history", "env", "echo", "server", "lint"
     };
     
     public LuCLICompleter(CommandProcessor commandProcessor) {
@@ -44,6 +44,10 @@ public class LuCLICompleter implements Completer {
             // Handle CFML function completion
             if ("cfml".equals(command)) {
                 completeCFMLFunctions(line, candidates);
+            }
+            // Handle lint command completion
+            else if ("lint".equals(command)) {
+                completeLintCommand(line, candidates);
             }
             // Complete file paths for commands that take file arguments
             else if (isFileCommand(command)) {
@@ -71,6 +75,7 @@ public class LuCLICompleter implements Completer {
             case "head":
             case "tail":
             case "run":
+            case "lint":
                 return true;
             default:
                 return false;
@@ -218,6 +223,206 @@ public class LuCLICompleter implements Completer {
                         }
                         
                         candidates.add(new Candidate(completion, displayValue, "files", description, null, null, true));
+                    }
+                });
+            }
+            
+        } catch (IOException e) {
+            // Ignore completion errors
+        }
+    }
+    
+    /**
+     * Complete lint command and subcommands
+     */
+    private void completeLintCommand(ParsedLine line, List<Candidate> candidates) {
+        List<String> words = line.words();
+        
+        if (words.size() == 2) {
+            // Complete lint subcommands
+            String[] lintSubcommands = {"check", "analyze", "rules", "list-rules", "config", "help"};
+            String partial = words.get(1);
+            
+            for (String subcommand : lintSubcommands) {
+                if (subcommand.startsWith(partial.toLowerCase())) {
+                    String displayValue = subcommand;
+                    String description = getLintSubcommandDescription(subcommand);
+                    
+                    if (commandProcessor.getSettings().showEmojis()) {
+                        displayValue = getLintSubcommandEmoji(subcommand) + " " + subcommand;
+                    }
+                    
+                    candidates.add(new Candidate(subcommand, displayValue, "lint-commands", description, null, null, true));
+                }
+            }
+        } else if (words.size() >= 3) {
+            // Complete files/directories for lint check commands
+            String subcommand = words.get(1).toLowerCase();
+            if ("check".equals(subcommand) || "analyze".equals(subcommand) || 
+                (words.size() == 3 && !isLintSubcommand(words.get(1)))) {
+                // Complete CFML files and directories for linting
+                String partial = words.get(words.size() - 1);
+                completeCFMLFilePaths(partial, candidates);
+            } else if ("config".equals(subcommand) && words.size() == 3) {
+                // Complete config subcommands
+                String[] configSubcommands = {"init"};
+                String partial = words.get(2);
+                
+                for (String configCmd : configSubcommands) {
+                    if (configCmd.startsWith(partial.toLowerCase())) {
+                        String displayValue = configCmd;
+                        if (commandProcessor.getSettings().showEmojis()) {
+                            displayValue = "🔧 " + configCmd;
+                        }
+                        candidates.add(new Candidate(configCmd, displayValue, "config-commands", "Initialize config file", null, null, true));
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * Check if a word is a lint subcommand
+     */
+    private boolean isLintSubcommand(String word) {
+        String[] subcommands = {"check", "analyze", "rules", "list-rules", "config", "help"};
+        for (String sub : subcommands) {
+            if (sub.equals(word.toLowerCase())) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * Get description for lint subcommands
+     */
+    private String getLintSubcommandDescription(String subcommand) {
+        switch (subcommand.toLowerCase()) {
+            case "check":
+            case "analyze":
+                return "Lint CFML files or directories";
+            case "rules":
+            case "list-rules":
+                return "List available linting rules";
+            case "config":
+                return "Show configuration help";
+            case "help":
+                return "Show lint command help";
+            default:
+                return "Lint subcommand";
+        }
+    }
+    
+    /**
+     * Get emoji for lint subcommands
+     */
+    private String getLintSubcommandEmoji(String subcommand) {
+        switch (subcommand.toLowerCase()) {
+            case "check":
+            case "analyze":
+                return "🔍";
+            case "rules":
+            case "list-rules":
+                return "📋";
+            case "config":
+                return "⚙️";
+            case "help":
+                return "❓";
+            default:
+                return "📝";
+        }
+    }
+    
+    /**
+     * Complete CFML file paths for linting
+     */
+    private void completeCFMLFilePaths(String partial, List<Candidate> candidates) {
+        try {
+            Path currentDir = commandProcessor.getFileSystemState().getCurrentWorkingDirectory();
+            Path basePath;
+            String prefix = "";
+            
+            // Handle path parsing (similar to regular file completion)
+            if (partial.isEmpty()) {
+                basePath = currentDir;
+            } else if (partial.startsWith("/")) {
+                int lastSlash = partial.lastIndexOf('/');
+                if (lastSlash > 0) {
+                    basePath = Path.of(partial.substring(0, lastSlash));
+                    prefix = partial.substring(0, lastSlash + 1);
+                } else {
+                    basePath = Path.of("/");
+                    prefix = "/";
+                }
+            } else {
+                int lastSlash = partial.lastIndexOf('/');
+                if (lastSlash >= 0) {
+                    basePath = currentDir.resolve(partial.substring(0, lastSlash));
+                    prefix = partial.substring(0, lastSlash + 1);
+                } else {
+                    basePath = currentDir;
+                }
+            }
+            
+            if (!Files.exists(basePath) || !Files.isDirectory(basePath)) {
+                return;
+            }
+            
+            String filenamePartial = "";
+            if (!partial.isEmpty()) {
+                int lastSlash = partial.lastIndexOf('/');
+                filenamePartial = lastSlash >= 0 ? partial.substring(lastSlash + 1) : partial;
+            }
+            
+            final String finalFilenamePartial = filenamePartial;
+            final String finalPrefix = prefix;
+            
+            try (Stream<Path> files = Files.list(basePath)) {
+                files.filter(path -> {
+                    String filename = path.getFileName().toString();
+                    boolean nameMatches = filename.startsWith(finalFilenamePartial) && 
+                           (finalFilenamePartial.startsWith(".") || !filename.startsWith("."));
+                    
+                    if (!nameMatches) return false;
+                    
+                    // Show directories and CFML files only
+                    return Files.isDirectory(path) || 
+                           filename.toLowerCase().endsWith(".cfm") ||
+                           filename.toLowerCase().endsWith(".cfc") ||
+                           filename.toLowerCase().endsWith(".cfs") ||
+                           filename.toLowerCase().endsWith(".cfml");
+                })
+                .sorted((p1, p2) -> {
+                    boolean isDir1 = Files.isDirectory(p1);
+                    boolean isDir2 = Files.isDirectory(p2);
+                    
+                    if (isDir1 && !isDir2) return -1;
+                    if (!isDir1 && isDir2) return 1;
+                    
+                    return p1.getFileName().toString().compareToIgnoreCase(p2.getFileName().toString());
+                })
+                .forEach(path -> {
+                    String filename = path.getFileName().toString();
+                    String completion = finalPrefix + filename;
+                    
+                    if (Files.isDirectory(path)) {
+                        completion += "/";
+                        String displayValue = completion;
+                        
+                        if (commandProcessor.getSettings().showEmojis()) {
+                            displayValue = "📁 " + completion;
+                        }
+                        
+                        candidates.add(new Candidate(completion, displayValue, "directories", "Directory", null, null, false));
+                    } else {
+                        String displayValue = completion;
+                        
+                        if (commandProcessor.getSettings().showEmojis()) {
+                            displayValue = "⚡ " + completion;
+                        }
+                        
+                        candidates.add(new Candidate(completion, displayValue, "cfml-files", "CFML File", null, null, true));
                     }
                 });
             }

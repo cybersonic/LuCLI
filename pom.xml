@@ -6,7 +6,7 @@
 
   <groupId>org.lucee</groupId>
   <artifactId>lucli</artifactId>
-  <version>1.0.43-SNAPSHOT</version>
+  <version>1.0.52-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>LuCLI</name>
   <description>A CLI for Lucee</description>
@@ -15,7 +15,7 @@
     <maven.compiler.target>17</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <jline.version>3.26.3</jline.version>
-    <lucee.version>7.0.0.242-RC</lucee.version>
+    <lucee.version>7.0.0.346-RC</lucee.version>
   </properties>
 
   <repositories>
@@ -81,6 +81,9 @@
       <artifactId>jackson-databind</artifactId>
       <version>2.15.2</version>
     </dependency>
+    
+    <!-- Note: CFLint is loaded dynamically when needed -->
+    <!-- No dependency required - CFLint JAR is downloaded automatically -->
   </dependencies>
 
   <build>
