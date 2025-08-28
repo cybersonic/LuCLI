@@ -1,5 +1,6 @@
 package org.lucee.lucli;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import org.jline.reader.EndOfFileException;
@@ -26,10 +27,14 @@ public class SimpleTerminal {
         // Initialize external command processor with enhanced features
         externalCommandProcessor = new ExternalCommandProcessor(commandProcessor, commandProcessor.getSettings());
 
+        // Properly resolve history file path (expand ~ to user home directory)
+        Path homeDir = Paths.get(System.getProperty("user.home"));
+        Path historyFile = homeDir.resolve(".lucli").resolve("history");
+        
         LineReader reader = LineReaderBuilder.builder()
                 .terminal(terminal)
                 .completer(new LuCLICompleter(commandProcessor))
-                .variable(LineReader.HISTORY_FILE, Paths.get("~/.lucli/history"))
+                .variable(LineReader.HISTORY_FILE, historyFile)
                 .variable(LineReader.HISTORY_SIZE, 1000) // Maximum entries in memory
                 .variable(LineReader.HISTORY_FILE_SIZE, 2000) // Maximum entries in file
                 .build();
