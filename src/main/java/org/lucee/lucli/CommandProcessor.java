@@ -10,6 +10,8 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Stream;
 import org.lucee.lucli.commands.UnifiedCommandExecutor;
+import org.lucee.lucli.interactive.InteractiveTestCommand;
+import org.lucee.lucli.cflint.CFLintCommand;
 
 /**
  * Processes file system commands for the terminal
@@ -19,11 +21,13 @@ public class CommandProcessor {
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd HH:mm");
     private final Settings settings;
     private final PromptConfig promptConfig;
+    private final CFLintCommand cfLintCommand;
     
     public CommandProcessor() {
         this.fileSystemState = new FileSystemState();
         this.settings = new Settings();
         this.promptConfig = new PromptConfig(settings);
+        this.cfLintCommand = new CFLintCommand();
     }
     
     public FileSystemState getFileSystemState() {
@@ -118,6 +122,12 @@ public class CommandProcessor {
                     break;
                 case "edit":
                     result = editFile(args);
+                    break;
+                case "interactive":
+                    result = interactiveCommand(args);
+                    break;
+                case "lint":
+                    result = lintCommand(commandLine);
                     break;
                 default:
                     result = "❌ Unknown command: " + command + "\n💡 Type 'help' for available commands.";
@@ -1081,6 +1091,13 @@ public class CommandProcessor {
         return executor.executeCommand("server", args);
     }
     
+    /**
+     * Handle interactive table commands
+     */
+    private String interactiveCommand(String[] args) {
+        return InteractiveTestCommand.execute(args);
+    }
+    
     
     /**
      * Get available commands for help
@@ -1106,10 +1123,14 @@ public class CommandProcessor {
                "  head [-n num] file... ⬆️  Show first lines of file\n" +
                "  tail [-n num] file... ⬇️  Show last lines of file\n" +
                "  run file.cf[ms] [...] ⚡ Execute CFML script files\n" +
+               "  lint [cmd] [files...] 🔍 CFML code linting and analysis\n" +
+               "                           check <files/dirs> | rules | config [init]\n" +
+               "                           --format <text|json|xml> --verbose --config <file>\n" +
                "  server [cmd] [opts]   🖥️  Manage Lucee servers\n" +
                "                           start [--force] [--name <name>] [--version <ver>]\n" +
                "                           stop [--name <name>] | status [--name <name>]\n" +
                "                           list | monitor\n" +
+               "  interactive [cmd]     🔧 Interactive table demos (servers|logs|files)\n" +
                "  prompt [template]     🎨 Change prompt style";
     }
     
@@ -1122,5 +1143,33 @@ public class CommandProcessor {
                "⚠️  Note: This will exit the terminal session and start the interactive monitor.\n" +
                "💡 To start monitoring, use: java -jar lucli.jar server monitor\n" +
                "❌ Direct monitor command from terminal not yet supported.";
+    }
+    
+    /**
+     * Handle lint command - CFML code linting using CFLint
+     */
+    private String lintCommand(String commandLine) {
+        try {
+            // Capture output from CFLint command
+            java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+            java.io.PrintStream originalOut = System.out;
+            java.io.PrintStream originalErr = System.err;
+            
+            System.setOut(new java.io.PrintStream(baos));
+            System.setErr(new java.io.PrintStream(baos));
+            
+            boolean result = cfLintCommand.handleLintCommand(commandLine);
+            
+            // Restore original streams
+            System.setOut(originalOut);
+            System.setErr(originalErr);
+            
+            // Return captured output
+            String output = baos.toString().trim();
+            return output.isEmpty() ? "✅ Lint command completed" : output;
+            
+        } catch (Exception e) {
+            return "❌ Error executing lint command: " + e.getMessage();
+        }
     }
 }

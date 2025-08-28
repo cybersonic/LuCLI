@@ -14,6 +14,7 @@ import org.lucee.lucli.server.LogCommand;
 import org.lucee.lucli.monitoring.MonitorCommand;
 import org.lucee.lucli.modules.ModuleCommand;
 import org.lucee.lucli.commands.UnifiedCommandExecutor;
+import org.lucee.lucli.cflint.CFLintCommand;
 
 public class LuCLI {
 
@@ -100,6 +101,19 @@ public class LuCLI {
                     String[] moduleArgs = parseResult.scriptArgs != null ? parseResult.scriptArgs : new String[0];
                     ModuleCommand.executeModule(moduleArgs);
                     Timer.stop("Module Command");
+                    break;
+                    
+                case "lint":
+                    Timer.start("Lint Command");
+                    // Create command line for CFLint processing
+                    StringBuilder lintCommandLine = new StringBuilder("lint");
+                    if (parseResult.scriptArgs != null) {
+                        for (String arg : parseResult.scriptArgs) {
+                            lintCommandLine.append(" ").append(arg);
+                        }
+                    }
+                    handleLintCommand(lintCommandLine.toString());
+                    Timer.stop("Lint Command");
                     break;
                     
                 default:
@@ -196,6 +210,7 @@ public class LuCLI {
         System.out.println("  terminal       Start interactive terminal (default if no command given)");
         System.out.println("  server         Manage Lucee server instances (start, stop, status, list)");
         System.out.println("  modules        Manage LuCLI modules (list, init, run)");
+        System.out.println("  lint           CFML code linting and analysis (analyze, rules, config)");
         System.out.println("  --version      Show application version");
         System.out.println("  --lucee-version  Show Lucee version");
         System.out.println("  help, --help, -h  Show this help message");
@@ -236,6 +251,18 @@ public class LuCLI {
     }
 
 
+    /**
+     * Handle lint commands using CFLintCommand
+     */
+    private static void handleLintCommand(String commandLine) throws Exception {
+        CFLintCommand cfLintCommand = new CFLintCommand();
+        boolean result = cfLintCommand.handleLintCommand(commandLine);
+        // CFLint output is handled directly by the command, we just need to ensure completion
+        if (!result) {
+            System.exit(EXIT_ERROR);
+        }
+    }
+    
     /**
      * Handle server commands using UnifiedCommandExecutor
      */
