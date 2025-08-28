@@ -2,6 +2,8 @@ package org.lucee.lucli;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.jline.reader.EndOfFileException;
 import org.jline.reader.LineReader;
@@ -9,6 +11,8 @@ import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.UserInterruptException;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
+import org.lucee.lucli.commands.UnifiedCommandExecutor;
+import org.lucee.lucli.modules.ModuleCommand;
 
 public class SimpleTerminal {
     private static LuceeScriptEngine luceeEngine;
@@ -77,10 +81,38 @@ public class SimpleTerminal {
                     // Do nothing for empty lines
                     continue;
                 } else {
-                    // Try to execute command using ExternalCommandProcessor (handles both internal and external)
-                    String result = externalCommandProcessor.executeCommand(trimmed);
-                    if (result != null && !result.isEmpty()) {
-                        terminal.writer().println(result);
+                    // Parse command and arguments
+                    String[] parts = trimmed.split("\\s+", 2);
+                    String command = parts[0].toLowerCase();
+                    String[] cmdArgs = new String[0];
+                    
+                    if (parts.length > 1) {
+                        // Split arguments properly handling quoted strings
+                        cmdArgs = parseArguments(parts[1]);
+                    }
+                    
+                    // Try UnifiedCommandExecutor first for unified commands (server, modules, etc.)
+                    if (isUnifiedCommand(command)) {
+                        Path currentDir = commandProcessor.getFileSystemState().getCurrentWorkingDirectory();
+                        UnifiedCommandExecutor executor = new UnifiedCommandExecutor(true, currentDir);
+                        String result = executor.executeCommand(command, cmdArgs);
+                        if (result != null && !result.isEmpty()) {
+                            terminal.writer().println(result);
+                        }
+                    } 
+                    // Check if command is a module name (same as CLI mode logic)
+                    else if (ModuleCommand.moduleExists(command)) {
+                        try {
+                            executeModule(command, cmdArgs);
+                        } catch (Exception e) {
+                            terminal.writer().println("❌ Error executing module '" + command + "': " + e.getMessage());
+                        }
+                    } else {
+                        // Fall back to ExternalCommandProcessor for file system commands and external commands
+                        String result = externalCommandProcessor.executeCommand(trimmed);
+                        if (result != null && !result.isEmpty()) {
+                            terminal.writer().println(result);
+                        }
                     }
                 }
                 terminal.writer().flush();
@@ -213,6 +245,111 @@ public class SimpleTerminal {
         terminal.writer().println("  cp file1.txt file2.txt");
         terminal.writer().println("  cat README.md");
         terminal.writer().println();
+        
+        terminal.writer().println("\nUnified Command Examples (CLI-Compatible):");
+        terminal.writer().println("  server start --name myapp --version 7.0.0.123");
+        terminal.writer().println("  server stop --name myapp");
+        terminal.writer().println("  server status --name myapp");
+        terminal.writer().println("  server list");
+        terminal.writer().println("  modules list");
+        terminal.writer().println("  modules init mymodule");
+        terminal.writer().println();
+        
+        terminal.writer().println("\nModule Execution Examples:");
+        terminal.writer().println("  cfml_parser           Execute module by name");
+        terminal.writer().println("  test-module arg1 arg2 Execute module with arguments");
+        terminal.writer().println("  utility-functions     Run utility functions module");
+        terminal.writer().println();
+    }
+    
+    /**
+     * Execute a module in terminal mode (similar to CLI mode logic)
+     */
+    private static void executeModule(String moduleName, String[] moduleArgs) throws Exception {
+        // Capture output from module execution and display in terminal
+        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+        java.io.PrintStream originalOut = System.out;
+        java.io.PrintStream originalErr = System.err;
+        
+        try {
+            // Redirect System.out/err to capture module output
+            System.setOut(new java.io.PrintStream(baos));
+            System.setErr(new java.io.PrintStream(baos));
+            
+            // Execute module using ModuleCommand (same as CLI mode)
+            ModuleCommand.executeModuleByName(moduleName, moduleArgs);
+            
+            // Get captured output and display in terminal
+            String output = baos.toString().trim();
+            if (!output.isEmpty()) {
+                terminal.writer().println(output);
+            }
+            
+        } finally {
+            // Always restore original streams
+            System.setOut(originalOut);
+            System.setErr(originalErr);
+        }
+    }
+    
+    /**
+     * Check if a command should be handled by the UnifiedCommandExecutor
+     */
+    private static boolean isUnifiedCommand(String command) {
+        // List of commands handled by UnifiedCommandExecutor
+        String[] unifiedCommands = {"server", "modules", "monitor", "lint"};
+        
+        for (String unifiedCommand : unifiedCommands) {
+            if (command.equalsIgnoreCase(unifiedCommand)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Parse command arguments respecting quotes
+     */
+    private static String[] parseArguments(String argsString) {
+        List<String> args = new ArrayList<>();
+        StringBuilder currentArg = new StringBuilder();
+        boolean inQuotes = false;
+        char quoteChar = '"';
+        
+        for (int i = 0; i < argsString.length(); i++) {
+            char c = argsString.charAt(i);
+            
+            // Handle quotes
+            if ((c == '"' || c == '\'') && (i == 0 || argsString.charAt(i-1) != '\\')) {
+                if (!inQuotes) {
+                    inQuotes = true;
+                    quoteChar = c;
+                } else if (c == quoteChar) {
+                    inQuotes = false;
+                } else {
+                    currentArg.append(c);
+                }
+            }
+            // Handle spaces (argument delimiter unless in quotes)
+            else if (Character.isWhitespace(c) && !inQuotes) {
+                if (currentArg.length() > 0) {
+                    args.add(currentArg.toString());
+                    currentArg.setLength(0); // Clear builder
+                }
+            }
+            // All other characters are part of the argument
+            else {
+                currentArg.append(c);
+            }
+        }
+        
+        // Add the last argument if any
+        if (currentArg.length() > 0) {
+            args.add(currentArg.toString());
+        }
+        
+        return args.toArray(new String[0]);
     }
 }
 

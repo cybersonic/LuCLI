@@ -365,18 +365,35 @@ public class UnifiedCommandExecutor {
     }
     
     /**
-     * Execute modules commands
+     * Execute modules commands - Full feature parity between CLI and terminal modes
      */
     private String executeModulesCommand(String[] args) throws Exception {
         if (isTerminalMode) {
-            // In terminal mode, provide basic module info
-            StringBuilder result = new StringBuilder();
-            result.append("📦 LuCLI Modules\n");
-            result.append("💡 For full module management, use: java -jar lucli.jar modules [command]\n");
-            result.append("❌ Full module management from terminal not yet supported.");
-            return formatOutput(result.toString(), false);
+            // In terminal mode, capture output from ModuleCommand and return it
+            // This provides full feature parity with CLI mode
+            java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+            java.io.PrintStream originalOut = System.out;
+            java.io.PrintStream originalErr = System.err;
+            
+            try {
+                // Redirect System.out/err to capture ModuleCommand output
+                System.setOut(new java.io.PrintStream(baos));
+                System.setErr(new java.io.PrintStream(baos));
+                
+                // Execute the full module command
+                ModuleCommand.executeModule(args);
+                
+                // Get captured output
+                String output = baos.toString().trim();
+                return formatOutput(output.isEmpty() ? "✅ Module command completed" : output, false);
+                
+            } finally {
+                // Always restore original streams
+                System.setOut(originalOut);
+                System.setErr(originalErr);
+            }
         } else {
-            // In CLI mode, execute the full module command
+            // In CLI mode, execute the full module command directly
             ModuleCommand.executeModule(args);
             return null; // ModuleCommand handles its own output and doesn't return
         }
