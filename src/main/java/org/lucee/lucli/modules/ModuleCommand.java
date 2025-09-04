@@ -8,6 +8,7 @@ import java.util.Arrays;
 import java.util.Scanner;
 
 import org.lucee.lucli.LuceeScriptEngine;
+import org.lucee.lucli.StringOutput;
 
 /**
  * Handles module operations - listing, initializing, and managing CFML modules
@@ -57,8 +58,8 @@ public class ModuleCommand {
         Path modulesDir = getModulesDirectory();
         
         if (!Files.exists(modulesDir)) {
-            System.out.println("No modules directory found at: " + modulesDir);
-            System.out.println("Use 'lucli modules init <module-name>' to create your first module.");
+            StringOutput.getInstance().println("${EMOJI_INFO} No modules directory found at: " + modulesDir);
+            StringOutput.getInstance().println("${EMOJI_BULB} Use 'lucli modules init <module-name>' to create your first module.");
             return;
         }
         
@@ -131,8 +132,8 @@ public class ModuleCommand {
         // Create README.md
         createModuleReadme(moduleDir, moduleName);
         
-        System.out.println("✅ Successfully created module: " + moduleName);
-        System.out.println("📁 Module directory: " + moduleDir);
+        StringOutput.Quick.success("Successfully created module: " + moduleName);
+        StringOutput.getInstance().println("${EMOJI_FOLDER} Module directory: " + moduleDir);
         System.out.println();
         System.out.println("Next steps:");
         System.out.println("  1. Edit " + moduleDir.resolve("Module.cfc") + " to implement your module");

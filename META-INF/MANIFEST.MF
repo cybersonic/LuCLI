@@ -1,0 +1,32 @@
+Manifest-Version: 1.0
+Created-By: Maven JAR Plugin 3.3.0
+Build-Jdk-Spec: 17
+Class-Path: jline-terminal-3.26.3.jar jline-native-3.26.3.jar jline-read
+ er-3.26.3.jar jline-style-3.26.3.jar lucee-7.0.0.346-RC.jar org.apache.
+ felix.framework-7.0.5.jar animal-sniffer-annotations-1.9.jar javax.serv
+ let-api-4.0.1.jar javax.servlet.jsp-api-2.3.3.jar javax.el-api-3.0.0.ja
+ r ant-1.10.13.jar ant-launcher-1.10.13.jar commons-compress-1.26.1.jar 
+ commons-codec-1.16.1.jar commons-fileupload2-core-2.0.0-M4.jar commons-
+ io-2.19.0.jar commons-lang3-3.12.0.jar commons-lang-2.6.jar commons-tex
+ t-1.10.0.jar commons-pool2-2.12.1.jar log4j-core-2.20.0.jar log4j-api-2
+ .20.0.jar asm-analysis-9.8.jar asm-tree-9.8.jar asm-9.8.jar janino-3.1.
+ 9.jar janino-commons-compiler-3.1.9.jar tomcat-embed-core-9.0.106.jar t
+ omcat-annotations-api-9.0.106.jar jakarta.jakartaee-api-10.0.0.jar jaka
+ rta.jakartaee-web-api-10.0.0.jar jakarta.servlet.jsp-api-3.1.0.jar jaka
+ rta.el-api-5.0.1.jar jakarta.servlet.jsp.jstl-api-3.0.0.jar jakarta.fac
+ es-api-4.0.1.jar jakarta.ws.rs-api-3.1.0.jar jakarta.websocket-api-2.1.
+ 0.jar jakarta.websocket-client-api-2.1.0.jar jakarta.json-api-2.1.0.jar
+  jakarta.json.bind-api-3.0.0.jar jakarta.annotation-api-2.1.1.jar jakar
+ ta.ejb-api-4.0.1.jar jakarta.transaction-api-2.0.1.jar jakarta.persiste
+ nce-api-3.1.0.jar jakarta.validation-api-3.0.2.jar jakarta.interceptor-
+ api-2.1.0.jar jakarta.enterprise.cdi-api-4.0.1.jar jakarta.enterprise.l
+ ang-model-4.0.1.jar jakarta.inject-api-2.0.1.jar jakarta.authentication
+ -api-3.0.0.jar jakarta.security.enterprise-api-3.0.0.jar jakarta.jms-ap
+ i-3.1.0.jar jakarta.activation-api-2.1.0.jar jakarta.mail-api-2.1.0.jar
+  jakarta.resource-api-2.1.0.jar jakarta.authorization-api-2.1.0.jar jak
+ arta.batch-api-2.1.1.jar jakarta.servlet-api-5.0.0.jar jackson-databind
+ -2.15.2.jar jackson-annotations-2.15.2.jar jackson-core-2.15.2.jar
+Implementation-Title: LuCLI
+Implementation-Version: 0.0.1-SNAPSHOT
+Main-Class: org.lucee.lucli.LuCLI
+

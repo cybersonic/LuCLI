@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import lucee.loader.engine.CFMLEngineFactory;
 import org.lucee.lucli.server.LuceeServerManager;
 import org.lucee.lucli.server.LogCommand;
 import org.lucee.lucli.monitoring.MonitorCommand;
@@ -57,7 +56,7 @@ public class LuCLI {
 
             switch (command) {
                 case "--version":
-                    System.out.println(getVersionInfo());
+                    StringOutput.getInstance().println(getVersionInfo());
                     break;
                     
                 case "--lucee-version":
@@ -144,7 +143,7 @@ public class LuCLI {
             }
         } 
         catch(Exception e) {
-            System.err.println("Error: " + e.getMessage());
+            StringOutput.Quick.error("Error: " + e.getMessage());
             if (verbose || debug) {
                 e.printStackTrace();
             }
@@ -196,26 +195,27 @@ public class LuCLI {
     }
     
     private static void showHelp() {
-        System.out.println("LuCLI - A terminal application with Lucee CFML integration");
-        System.out.println();
-        System.out.println("Usage: java -jar lucli.jar [options] [command] [arguments...]");
-        System.out.println();
-        System.out.println("Options:");
-        System.out.println("  -v, --verbose  Enable verbose output");
-        System.out.println("  -d, --debug    Enable debug output");
-        System.out.println("  -t, --timing   Enable timing output for performance analysis");
-        System.out.println("  -h, --help     Show this help message");
-        System.out.println();
-        System.out.println("Commands:");
-        System.out.println("  terminal       Start interactive terminal (default if no command given)");
-        System.out.println("  server         Manage Lucee server instances (start, stop, status, list)");
-        System.out.println("  modules        Manage LuCLI modules (list, init, run)");
-        System.out.println("  lint           CFML code linting and analysis (analyze, rules, config)");
-        System.out.println("  --version      Show application version");
-        System.out.println("  --lucee-version  Show Lucee version");
-        System.out.println("  help, --help, -h  Show this help message");
-        System.out.println("  <module-name>  Execute a LuCLI module directly");
-        System.out.println("  script.cfs     Execute a CFML script file");
+        StringOutput out = StringOutput.getInstance();
+        out.println("${EMOJI_ROCKET} LuCLI - A terminal application with Lucee CFML integration");
+        out.println();
+        out.println("Usage: java -jar lucli.jar [options] [command] [arguments...]");
+        out.println();
+        out.println("${EMOJI_GEAR} Options:");
+        out.println("  -v, --verbose  Enable verbose output");
+        out.println("  -d, --debug    Enable debug output");
+        out.println("  -t, --timing   Enable timing output for performance analysis");
+        out.println("  -h, --help     Show this help message");
+        out.println();
+        out.println("${EMOJI_COMPUTER} Commands:");
+        out.println("  terminal       Start interactive terminal (default if no command given)");
+        out.println("  server         Manage Lucee server instances (start, stop, status, list)");
+        out.println("  modules        Manage LuCLI modules (list, init, run)");
+        out.println("  lint           CFML code linting and analysis (analyze, rules, config)");
+        out.println("  --version      Show application version");
+        out.println("  --lucee-version  Show Lucee version");
+        out.println("  help, --help, -h  Show this help message");
+        out.println("  <module-name>  Execute a LuCLI module directly");
+        out.println("  script.cfs     Execute a CFML script file");
         System.out.println();
         System.out.println("Configuration:");
         System.out.println("  Lucee server files are stored in ~/.lucli/lucee-server by default");
@@ -350,7 +350,7 @@ public class LuCLI {
             LuceeServerManager.ServerInstance instance = serverManager.startServer(projectDir, versionOverride, forceReplace, customName);
             Timer.stop("Server Start Operation");
             
-            System.out.println("✅ Server started successfully!");
+            System.out.println(WindowsCompatibility.Symbols.SUCCESS + " Server started successfully!");
             System.out.println("   Server Name: " + instance.getServerName());
             System.out.println("   Process ID:  " + instance.getPid());
             System.out.println("   Port:        " + instance.getPort());
@@ -359,7 +359,7 @@ public class LuCLI {
         } catch (org.lucee.lucli.server.ServerConflictException e) {
             Timer.stop("Server Start Operation");
             System.out.println();
-            System.out.println("⚠️  " + e.getMessage());
+            System.out.println(WindowsCompatibility.Symbols.WARNING + "  " + e.getMessage());
             System.out.println();
             System.out.println("Choose an option:");
             System.out.println("  1. Replace the existing server (delete and recreate):");
@@ -371,7 +371,7 @@ public class LuCLI {
             System.out.println("  3. Create server with custom name:");
             System.out.println("     lucli server start --name <your-name>");
             System.out.println();
-            System.out.println("💡 Use --force to replace existing servers, or --name to specify a different name.");
+            System.out.println(WindowsCompatibility.Symbols.BULB + " Use --force to replace existing servers, or --name to specify a different name.");
             System.exit(EXIT_ERROR);
         }
     }
@@ -396,9 +396,9 @@ public class LuCLI {
             Timer.stop("Server Stop Operation");
             
             if (stopped) {
-                System.out.println("✅ Server '" + serverName + "' stopped successfully.");
+                System.out.println(WindowsCompatibility.Symbols.SUCCESS + " Server '" + serverName + "' stopped successfully.");
             } else {
-                System.out.println("ℹ️  Server '" + serverName + "' not found or not running.");
+                System.out.println(WindowsCompatibility.Symbols.INFO + "  Server '" + serverName + "' not found or not running.");
             }
         } else {
             // Stop server for current directory
@@ -407,9 +407,9 @@ public class LuCLI {
             Timer.stop("Server Stop Operation");
             
             if (stopped) {
-                System.out.println("✅ Server stopped successfully.");
+                System.out.println(WindowsCompatibility.Symbols.SUCCESS + " Server stopped successfully.");
             } else {
-                System.out.println("ℹ️  No running server found for this directory.");
+                System.out.println(WindowsCompatibility.Symbols.INFO + "  No running server found for this directory.");
             }
         }
     }
@@ -433,14 +433,14 @@ public class LuCLI {
             Timer.stop("Server Status Operation");
             
             if (serverInfo == null) {
-                System.out.println("❌ Server '" + serverName + "' not found.");
+                System.out.println(WindowsCompatibility.Symbols.ERROR + " Server '" + serverName + "' not found.");
                 return;
             }
             
             System.out.println("Server status for: " + serverName);
             
             if (serverInfo.isRunning()) {
-                System.out.println("✅ Server is RUNNING");
+                System.out.println(WindowsCompatibility.Symbols.SUCCESS + " Server is RUNNING");
                 System.out.println("   Server Name: " + serverInfo.getServerName());
                 System.out.println("   Process ID:  " + serverInfo.getPid());
                 System.out.println("   Port:        " + serverInfo.getPort());
@@ -450,7 +450,7 @@ public class LuCLI {
                 }
                 System.out.println("   Server Dir:  " + serverInfo.getServerDir());
             } else {
-                System.out.println("❌ Server is NOT RUNNING");
+                System.out.println(WindowsCompatibility.Symbols.ERROR + " Server is NOT RUNNING");
                 if (serverInfo.getProjectDir() != null) {
                     System.out.println("   Web Root:    " + serverInfo.getProjectDir());
                 }
@@ -464,13 +464,13 @@ public class LuCLI {
             System.out.println("Server status for: " + currentDir);
             
             if (status.isRunning()) {
-                System.out.println("✅ Server is RUNNING");
+                System.out.println(WindowsCompatibility.Symbols.SUCCESS + " Server is RUNNING");
                 System.out.println("   Server Name: " + status.getServerName());
                 System.out.println("   Process ID:  " + status.getPid());
                 System.out.println("   Port:        " + status.getPort());
                 System.out.println("   URL:         http://localhost:" + status.getPort());
             } else {
-                System.out.println("❌ Server is NOT RUNNING");
+                System.out.println(WindowsCompatibility.Symbols.ERROR + " Server is NOT RUNNING");
             }
         }
     }
