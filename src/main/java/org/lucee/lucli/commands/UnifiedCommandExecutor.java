@@ -59,7 +59,7 @@ public class UnifiedCommandExecutor {
      */
     private String executeServerCommand(String[] args) throws Exception {
         if (args.length == 0) {
-        return formatOutput("❌ server: missing subcommand\n💡 Usage: server [start|stop|status|list|monitor|log|debug] [options]", true);
+        return formatOutput("❌ server: missing subcommand\n💡 Usage: server [start|stop|status|list|prune|monitor|log|debug] [options]", true);
         }
         
         String subCommand = args[0];
@@ -77,6 +77,10 @@ public class UnifiedCommandExecutor {
                     return handleServerStatus(serverManager, args);
                 case "list":
                     return handleServerList(serverManager, args);
+                case "prune":
+                    return handleServerPrune(serverManager, args);
+                case "config":
+                    return handleServerConfig(serverManager, args);
                 case "monitor":
                     return handleServerMonitor(Arrays.copyOfRange(args, 1, args.length));
                 case "log":
@@ -85,7 +89,7 @@ public class UnifiedCommandExecutor {
                     return handleServerDebug(Arrays.copyOfRange(args, 1, args.length));
                 default:
                     return formatOutput("❌ Unknown server command: " + subCommand + 
-                        "\n💡 Available commands: start, stop, status, list, monitor, log, debug", true);
+                        "\n💡 Available commands: start, stop, status, list, prune, config, monitor, log, debug", true);
             }
         } finally {
             Timer.stop("Server " + subCommand + " Command");
@@ -316,6 +320,174 @@ public class UnifiedCommandExecutor {
         }
         
         return formatOutput(result.toString().trim(), false);
+    }
+    
+    private String handleServerPrune(LuceeServerManager serverManager, String[] args) throws Exception {
+        boolean pruneAll = false;
+        String serverName = null;
+        
+        // Parse arguments (skip "prune")
+        for (int i = 1; i < args.length; i++) {
+            if (args[i].equals("--all") || args[i].equals("-a")) {
+                pruneAll = true;
+            } else if ((args[i].equals("--name") || args[i].equals("-n")) && i + 1 < args.length) {
+                serverName = args[i + 1];
+                i++; // Skip next argument
+            } else if (!args[i].startsWith("-")) {
+                // Treat non-option argument as server name
+                serverName = args[i];
+            }
+        }
+        
+        StringBuilder result = new StringBuilder();
+        
+        if (pruneAll) {
+            // Prune all stopped servers
+            LuceeServerManager.PruneAllResult pruneResult = serverManager.pruneAllStoppedServers();
+            
+            if (pruneResult.getPruned().isEmpty() && pruneResult.getSkipped().isEmpty()) {
+                result.append("ℹ️  No servers found to prune.");
+            } else {
+                if (!pruneResult.getPruned().isEmpty()) {
+                    result.append("✅ Pruned servers:\n");
+                    for (LuceeServerManager.PruneResult pr : pruneResult.getPruned()) {
+                        result.append("   • ").append(pr.getServerName()).append(" - ").append(pr.getMessage()).append("\n");
+                    }
+                }
+                
+                if (!pruneResult.getSkipped().isEmpty()) {
+                    if (!pruneResult.getPruned().isEmpty()) {
+                        result.append("\n");
+                    }
+                    result.append("⚠️  Skipped servers:\n");
+                    for (LuceeServerManager.PruneResult pr : pruneResult.getSkipped()) {
+                        result.append("   • ").append(pr.getServerName()).append(" - ").append(pr.getMessage()).append("\n");
+                    }
+                }
+                
+                int prunedCount = pruneResult.getPruned().size();
+                int skippedCount = pruneResult.getSkipped().size();
+                result.append("\n📊 Summary: ").append(prunedCount).append(" pruned, ").append(skippedCount).append(" skipped");
+            }
+        } else if (serverName != null) {
+            // Prune specific server by name
+            LuceeServerManager.PruneResult pruneResult = serverManager.pruneServerByName(serverName);
+            
+            if (pruneResult.isSuccess()) {
+                result.append("✅ Server '").append(serverName).append("' pruned successfully.");
+            } else {
+                result.append("❌ Failed to prune server '").append(serverName).append("': ").append(pruneResult.getMessage());
+                return formatOutput(result.toString(), true);
+            }
+        } else {
+            // Prune server for current directory
+            LuceeServerManager.PruneResult pruneResult = serverManager.pruneServer(currentWorkingDirectory);
+            
+            if (pruneResult.isSuccess()) {
+                result.append("✅ Server '").append(pruneResult.getServerName()).append("' pruned successfully.");
+            } else {
+                result.append("❌ Failed to prune server: ").append(pruneResult.getMessage());
+                return formatOutput(result.toString(), true);
+            }
+        }
+        
+        return formatOutput(result.toString(), false);
+    }
+    
+    private String handleServerConfig(LuceeServerManager serverManager, String[] args) throws Exception {
+        if (args.length < 2) {
+            StringBuilder result = new StringBuilder();
+            result.append("❌ config: missing subcommand\n");
+            result.append("💡 Usage: server config [get|set] [options]\n\n");
+            result.append("Commands:\n");
+            result.append("  get <key>              Get configuration value\n");
+            result.append("  set <key=value>        Set configuration value\n");
+            result.append("  set --no-cache         Clear Lucee version cache\n\n");
+            result.append("Examples:\n");
+            result.append("  server config get version\n");
+            result.append("  server config set version=6.2.2.91\n");
+            result.append("  server config set jvm.maxMemory=512m\n");
+            result.append("  server config set port=8080\n");
+            return formatOutput(result.toString(), true);
+        }
+        
+        String configCommand = args[1];
+        SimpleServerConfigHelper configHelper = new SimpleServerConfigHelper();
+        
+        switch (configCommand.toLowerCase()) {
+            case "get":
+                return handleConfigGet(configHelper, args);
+            case "set":
+                return handleConfigSet(configHelper, args);
+            default:
+                return formatOutput("❌ Unknown config command: " + configCommand + 
+                    "\n💡 Available commands: get, set", true);
+        }
+    }
+    
+    private String handleConfigGet(SimpleServerConfigHelper configHelper, String[] args) throws Exception {
+        if (args.length < 3) {
+            return formatOutput("❌ config get: missing key\n💡 Usage: server config get <key>", true);
+        }
+        
+        String key = args[2];
+        try {
+            LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(currentWorkingDirectory);
+            String value = configHelper.getConfigValue(config, key);
+            
+            if (value != null) {
+                return formatOutput(key + "=" + value, false);
+            } else {
+                return formatOutput("❌ Configuration key '" + key + "' not found\n" +
+                    "💡 Available keys: " + String.join(", ", configHelper.getAvailableKeys()), true);
+            }
+        } catch (Exception e) {
+            return formatOutput("❌ Error reading configuration: " + e.getMessage(), true);
+        }
+    }
+    
+    private String handleConfigSet(SimpleServerConfigHelper configHelper, String[] args) throws Exception {
+        if (args.length < 3) {
+            return formatOutput("❌ config set: missing key=value\n" +
+                "💡 Usage: server config set <key=value>\n" +
+                "💡 Example: server config set version=6.2.2.91", true);
+        }
+        
+        // Handle --no-cache flag
+        boolean clearCache = false;
+        for (String arg : args) {
+            if ("--no-cache".equals(arg)) {
+                clearCache = true;
+                configHelper.clearVersionCache();
+                break;
+            }
+        }
+        
+        if (clearCache && args.length == 3) {
+            // Only clearing cache, not setting a value
+            return formatOutput("✅ Lucee version cache cleared", false);
+        }
+        
+        String keyValue = args[2];
+        if (!keyValue.contains("=")) {
+            return formatOutput("❌ Invalid format. Use key=value\n" +
+                "💡 Example: server config set version=6.2.2.91", true);
+        }
+        
+        String[] parts = keyValue.split("=", 2);
+        String key = parts[0].trim();
+        String value = parts[1].trim();
+        
+        try {
+            LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(currentWorkingDirectory);
+            configHelper.setConfigValue(config, key, value);
+            Path configFile = currentWorkingDirectory.resolve("lucee.json");
+            LuceeServerConfig.saveConfig(config, configFile);
+            
+            return formatOutput("✅ Configuration updated: " + key + "=" + value, false);
+        } catch (Exception e) {
+            return formatOutput("❌ Error setting configuration: " + e.getMessage(), true);
+        }
     }
     
     private String handleServerMonitor(String[] args) {

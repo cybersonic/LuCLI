@@ -45,6 +45,10 @@ public class LuCLICompleter implements Completer {
             if ("cfml".equals(command)) {
                 completeCFMLFunctions(line, candidates);
             }
+            // Handle server command completion
+            else if ("server".equals(command)) {
+                completeServerCommand(line, candidates);
+            }
             // Handle lint command completion
             else if ("lint".equals(command)) {
                 completeLintCommand(line, candidates);
@@ -335,6 +339,244 @@ public class LuCLICompleter implements Completer {
     }
     
     /**
+     * Complete server command and subcommands
+     */
+    private void completeServerCommand(ParsedLine line, List<Candidate> candidates) {
+        List<String> words = line.words();
+        
+        if (words.size() == 2) {
+            // Complete server subcommands
+            String[] serverSubcommands = {"start", "stop", "status", "list", "prune", "config", "monitor", "log", "debug"};
+            String partial = words.get(1);
+            
+            for (String subcommand : serverSubcommands) {
+                if (subcommand.startsWith(partial.toLowerCase())) {
+                    String displayValue = subcommand;
+                    String description = getServerSubcommandDescription(subcommand);
+                    
+                    if (commandProcessor.getSettings().showEmojis()) {
+                        displayValue = getServerSubcommandEmoji(subcommand) + " " + subcommand;
+                    }
+                    
+                    candidates.add(new Candidate(subcommand, displayValue, "server-commands", description, null, null, true));
+                }
+            }
+        } else if (words.size() >= 3) {
+            // Complete server command options and server names
+            String subcommand = words.get(1).toLowerCase();
+            
+            // For commands that support --name, complete with server names
+            if (("stop".equals(subcommand) || "status".equals(subcommand) || "prune".equals(subcommand)) && 
+                words.size() >= 3) {
+                
+                String lastWord = words.get(words.size() - 1);
+                String prevWord = words.size() > 3 ? words.get(words.size() - 2) : "";
+                
+                // If previous word was --name, complete with server names
+                if ("--name".equals(prevWord) || "-n".equals(prevWord)) {
+                    completeServerNames(lastWord, candidates);
+                } else if (!lastWord.startsWith("-")) {
+                    // Complete with common flags for these commands
+                    completeServerFlags(subcommand, lastWord, candidates);
+                }
+            }
+            // For start command, complete with version and option flags
+            else if ("start".equals(subcommand) && words.size() >= 3) {
+                String lastWord = words.get(words.size() - 1);
+                String prevWord = words.size() > 3 ? words.get(words.size() - 2) : "";
+                
+                // Complete version numbers after --version
+                if ("--version".equals(prevWord) || "-v".equals(prevWord)) {
+                    completeServerVersions(lastWord, candidates);
+                }
+                // Complete server names after --name
+                else if ("--name".equals(prevWord) || "-n".equals(prevWord)) {
+                    // For start command, suggest unique names rather than existing ones
+                    String suggestion = "my_server";
+                    candidates.add(new Candidate(suggestion, suggestion, "suggested-names", "Suggested server name", null, null, true));
+                }
+                else if (!lastWord.startsWith("-")) {
+                    // Complete with start command flags
+                    completeServerFlags(subcommand, lastWord, candidates);
+                }
+            }
+            // For prune command, handle --all flag
+            else if ("prune".equals(subcommand) && words.size() == 3) {
+                String partial = words.get(2);
+                if ("--all".startsWith(partial.toLowerCase())) {
+                    String displayValue = "--all";
+                    if (commandProcessor.getSettings().showEmojis()) {
+                        displayValue = "🗑️ --all";
+                    }
+                    candidates.add(new Candidate("--all", displayValue, "server-flags", "Remove all stopped servers", null, null, true));
+                }
+            }
+            // For config command, handle get/set subcommands and config keys
+            else if ("config".equals(subcommand)) {
+                completeServerConfigCommand(words, candidates);
+            }
+        }
+    }
+    
+    /**
+     * Get description for server subcommands
+     */
+    private String getServerSubcommandDescription(String subcommand) {
+        switch (subcommand.toLowerCase()) {
+            case "start":
+                return "Start a Lucee server";
+            case "stop":
+                return "Stop a running server";
+            case "status":
+                return "Show server status";
+            case "list":
+                return "List all server instances";
+            case "prune":
+                return "Remove stopped server instances";
+            case "config":
+                return "Get or set server configuration";
+            case "monitor":
+                return "Monitor server via JMX";
+            case "log":
+                return "View server logs";
+            case "debug":
+                return "Debug server configuration";
+            default:
+                return "Server subcommand";
+        }
+    }
+    
+    /**
+     * Get emoji for server subcommands
+     */
+    private String getServerSubcommandEmoji(String subcommand) {
+        switch (subcommand.toLowerCase()) {
+            case "start":
+                return "🚀";
+            case "stop":
+                return "🛑";
+            case "status":
+                return "📊";
+            case "list":
+                return "📋";
+            case "prune":
+                return "🗑️";
+            case "config":
+                return "⚙️";
+            case "monitor":
+                return "📈";
+            case "log":
+                return "📄";
+            case "debug":
+                return "🔧";
+            default:
+                return "⚙️";
+        }
+    }
+    
+    /**
+     * Complete server names for --name flag
+     */
+    private void completeServerNames(String partial, List<Candidate> candidates) {
+        try {
+            // We'd need to integrate with LuceeServerManager to get actual server names
+            // For now, we'll add a simple implementation that could be enhanced later
+            
+            // You could integrate with the actual LuceeServerManager like this:
+            // org.lucee.lucli.server.LuceeServerManager serverManager = new org.lucee.lucli.server.LuceeServerManager();
+            // List<org.lucee.lucli.server.LuceeServerManager.ServerInfo> servers = serverManager.listServers();
+            
+            // For now, we'll suggest common server name patterns
+            String[] commonNames = {"my_server", "dev_server", "test_server", "local_server"};
+            
+            for (String name : commonNames) {
+                if (name.startsWith(partial.toLowerCase())) {
+                    String displayValue = name;
+                    if (commandProcessor.getSettings().showEmojis()) {
+                        displayValue = "🖥️ " + name;
+                    }
+                    candidates.add(new Candidate(name, displayValue, "server-names", "Server instance", null, null, true));
+                }
+            }
+        } catch (Exception e) {
+            // Ignore errors in completion
+        }
+    }
+    
+    /**
+     * Complete server command flags based on subcommand
+     */
+    private void completeServerFlags(String subcommand, String partial, List<Candidate> candidates) {
+        String[] flags = {};
+        
+        switch (subcommand.toLowerCase()) {
+            case "start":
+                flags = new String[]{"--version", "--name", "--force", "-v", "-n", "-f"};
+                break;
+            case "stop":
+            case "status":
+                flags = new String[]{"--name", "-n"};
+                break;
+            case "prune":
+                flags = new String[]{"--name", "--all", "-n", "-a"};
+                break;
+        }
+        
+        for (String flag : flags) {
+            if (flag.startsWith(partial.toLowerCase())) {
+                String description = getServerFlagDescription(flag);
+                String displayValue = flag;
+                
+                if (commandProcessor.getSettings().showEmojis()) {
+                    displayValue = "🏃 " + flag;
+                }
+                
+                candidates.add(new Candidate(flag, displayValue, "server-flags", description, null, null, true));
+            }
+        }
+    }
+    
+    /**
+     * Complete Lucee version numbers
+     */
+    private void completeServerVersions(String partial, List<Candidate> candidates) {
+        // Common Lucee versions
+        String[] versions = {"6.2.2.91", "6.1.0.243", "6.0.3.1", "5.4.6.9"};
+        
+        for (String version : versions) {
+            if (version.startsWith(partial)) {
+                String displayValue = version;
+                if (commandProcessor.getSettings().showEmojis()) {
+                    displayValue = "⚡ " + version;
+                }
+                candidates.add(new Candidate(version, displayValue, "lucee-versions", "Lucee version", null, null, true));
+            }
+        }
+    }
+    
+    /**
+     * Get description for server command flags
+     */
+    private String getServerFlagDescription(String flag) {
+        switch (flag) {
+            case "--version":
+            case "-v":
+                return "Specify Lucee version";
+            case "--name":
+            case "-n":
+                return "Specify server name";
+            case "--force":
+            case "-f":
+                return "Force replace existing server";
+            case "--all":
+            case "-a":
+                return "Apply to all servers";
+            default:
+                return "Server option";
+        }
+    }
+    
+    /**
      * Complete CFML file paths for linting
      */
     private void completeCFMLFilePaths(String partial, List<Candidate> candidates) {
@@ -485,5 +727,393 @@ public class LuCLICompleter implements Completer {
         }
         
         return "";
+    }
+    
+    /**
+     * Complete server config command with get/set subcommands and configuration keys
+     */
+    private void completeServerConfigCommand(List<String> words, List<Candidate> candidates) {
+        if (words.size() == 3) {
+            // Complete config subcommands: get, set
+            String[] configSubcommands = {"get", "set"};
+            String partial = words.get(2);
+            
+            for (String configCmd : configSubcommands) {
+                if (configCmd.startsWith(partial.toLowerCase())) {
+                    String displayValue = configCmd;
+                    String description = getConfigSubcommandDescription(configCmd);
+                    
+                    if (commandProcessor.getSettings().showEmojis()) {
+                        displayValue = getConfigSubcommandEmoji(configCmd) + " " + configCmd;
+                    }
+                    
+                    candidates.add(new Candidate(configCmd, displayValue, "config-commands", description, null, null, true));
+                }
+            }
+            
+            // Also complete --no-cache flag
+            if ("--no-cache".startsWith(partial.toLowerCase())) {
+                String displayValue = "--no-cache";
+                if (commandProcessor.getSettings().showEmojis()) {
+                    displayValue = "🗑️ --no-cache";
+                }
+                candidates.add(new Candidate("--no-cache", displayValue, "config-flags", "Clear Lucee version cache", null, null, true));
+            }
+        } else if (words.size() == 4) {
+            String configCmd = words.get(2).toLowerCase();
+            String partial = words.get(3);
+            
+            if ("get".equals(configCmd)) {
+                // Complete configuration keys for get command, or handle key=value syntax
+                if (partial.contains("=")) {
+                    // Handle key=value completion for get command too
+                    String[] parts = partial.split("=", 2);
+                    String key = parts[0];
+                    String valuePartial = parts[1];
+                    
+                    completeConfigValues(key, valuePartial, partial, candidates);
+                } else {
+                    // Complete configuration keys normally
+                    completeConfigKeys(partial, candidates);
+                }
+            } else if ("set".equals(configCmd)) {
+                // For set command, complete key= patterns and --no-cache
+                if ("--no-cache".startsWith(partial.toLowerCase())) {
+                    String displayValue = "--no-cache";
+                    if (commandProcessor.getSettings().showEmojis()) {
+                        displayValue = "🗑️ --no-cache";
+                    }
+                    candidates.add(new Candidate("--no-cache", displayValue, "config-flags", "Clear version cache and refresh", null, null, true));
+                } else {
+                    // Complete key= patterns for set command
+                    completeConfigKeyValuePairs(partial, candidates);
+                }
+            }
+        } else if (words.size() > 4) {
+            String configCmd = words.get(2).toLowerCase();
+            
+            // For set command, handle additional --no-cache flag
+            if ("set".equals(configCmd)) {
+                String lastWord = words.get(words.size() - 1);
+                if ("--no-cache".startsWith(lastWord.toLowerCase())) {
+                    String displayValue = "--no-cache";
+                    if (commandProcessor.getSettings().showEmojis()) {
+                        displayValue = "🗑️ --no-cache";
+                    }
+                    candidates.add(new Candidate("--no-cache", displayValue, "config-flags", "Clear version cache and refresh", null, null, true));
+                }
+            }
+        }
+    }
+    
+    /**
+     * Get description for config subcommands
+     */
+    private String getConfigSubcommandDescription(String subcommand) {
+        switch (subcommand.toLowerCase()) {
+            case "get":
+                return "Get configuration value";
+            case "set":
+                return "Set configuration value";
+            default:
+                return "Config subcommand";
+        }
+    }
+    
+    /**
+     * Get emoji for config subcommands
+     */
+    private String getConfigSubcommandEmoji(String subcommand) {
+        switch (subcommand.toLowerCase()) {
+            case "get":
+                return "📖";
+            case "set":
+                return "✏️";
+            default:
+                return "⚙️";
+        }
+    }
+    
+    /**
+     * Complete configuration keys
+     */
+    private void completeConfigKeys(String partial, List<Candidate> candidates) {
+        try {
+            // Use SimpleServerConfigHelper to get available keys
+            org.lucee.lucli.commands.SimpleServerConfigHelper configHelper = new org.lucee.lucli.commands.SimpleServerConfigHelper();
+            List<String> availableKeys = configHelper.getAvailableKeys();
+            
+            for (String key : availableKeys) {
+                if (key.startsWith(partial.toLowerCase())) {
+                    String displayValue = key;
+                    String description = getConfigKeyDescription(key);
+                    
+                    if (commandProcessor.getSettings().showEmojis()) {
+                        displayValue = getConfigKeyEmoji(key) + " " + key;
+                    }
+                    
+                    candidates.add(new Candidate(key, displayValue, "config-keys", description, null, null, true));
+                }
+            }
+        } catch (Exception e) {
+            // Fallback to static list if ServerConfigHelper fails
+            String[] keys = {
+                "version", "port", "name", "jvm.maxMemory", "jvm.minMemory", "jvm.args",
+                "lucee.adminPassword", "lucee.preserveCase", "lucee.suppressWhitespace",
+                "monitoring.enabled", "monitoring.jmx.enabled", "monitoring.jmx.port", "monitoring.jmx.host",
+                "ssl.enabled", "ssl.port", "ssl.keystore", "ssl.keystorePassword"
+            };
+            
+            for (String key : keys) {
+                if (key.startsWith(partial.toLowerCase())) {
+                    String displayValue = key;
+                    String description = getConfigKeyDescription(key);
+                    
+                    if (commandProcessor.getSettings().showEmojis()) {
+                        displayValue = getConfigKeyEmoji(key) + " " + key;
+                    }
+                    
+                    candidates.add(new Candidate(key, displayValue, "config-keys", description, null, null, true));
+                }
+            }
+        }
+    }
+    
+    /**
+     * Complete configuration key=value pairs for set command
+     */
+    private void completeConfigKeyValuePairs(String partial, List<Candidate> candidates) {
+        // Check if partial already contains '='
+        if (partial.contains("=")) {
+            // Complete values for specific keys
+            String[] parts = partial.split("=", 2);
+            String key = parts[0];
+            String valuePartial = parts[1];
+            
+            completeConfigValues(key, valuePartial, partial, candidates);
+        } else {
+            // Complete keys with '=' suffix
+            try {
+                org.lucee.lucli.commands.SimpleServerConfigHelper configHelper = new org.lucee.lucli.commands.SimpleServerConfigHelper();
+                List<String> availableKeys = configHelper.getAvailableKeys();
+                
+                for (String key : availableKeys) {
+                    if (key.startsWith(partial.toLowerCase())) {
+                        String completion = key + "=";
+                        String displayValue = completion;
+                        String description = getConfigKeyDescription(key);
+                        
+                        if (commandProcessor.getSettings().showEmojis()) {
+                            displayValue = getConfigKeyEmoji(key) + " " + completion;
+                        }
+                        
+                        candidates.add(new Candidate(completion, displayValue, "config-key-equals", description, null, null, false));
+                    }
+                }
+            } catch (Exception e) {
+                // Fallback to static list
+                String[] keys = {
+                    "version", "port", "name", "jvm.maxMemory", "jvm.minMemory", "jvm.args",
+                    "lucee.adminPassword", "lucee.preserveCase", "lucee.suppressWhitespace",
+                    "monitoring.enabled", "monitoring.jmx.enabled", "monitoring.jmx.port", "monitoring.jmx.host",
+                    "ssl.enabled", "ssl.port", "ssl.keystore", "ssl.keystorePassword"
+                };
+                
+                for (String key : keys) {
+                    if (key.startsWith(partial.toLowerCase())) {
+                        String completion = key + "=";
+                        String displayValue = completion;
+                        String description = getConfigKeyDescription(key);
+                        
+                        if (commandProcessor.getSettings().showEmojis()) {
+                            displayValue = getConfigKeyEmoji(key) + " " + completion;
+                        }
+                        
+                        candidates.add(new Candidate(completion, displayValue, "config-key-equals", description, null, null, false));
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * Complete configuration values for specific keys
+     */
+    private void completeConfigValues(String key, String valuePartial, String fullPartial, List<Candidate> candidates) {
+        switch (key.toLowerCase()) {
+            case "version":
+                // Complete Lucee versions
+                try {
+                    org.lucee.lucli.commands.SimpleServerConfigHelper configHelper = new org.lucee.lucli.commands.SimpleServerConfigHelper();
+                    List<String> versions = configHelper.getAvailableVersions();
+                    
+                    for (String version : versions) {
+                        if (version.startsWith(valuePartial)) {
+                            String completion = version;  // Just complete the version part
+                            String displayValue = version;
+                            
+                            if (commandProcessor.getSettings().showEmojis()) {
+                                displayValue = "⚡ " + version;
+                            }
+                            
+                            candidates.add(new Candidate(completion, displayValue, "version-values", "Lucee version " + version, null, null, true));
+                        }
+                    }
+                } catch (Exception e) {
+                    // Fallback to common versions (including 7.x versions)
+                    String[] versions = {"7.0.0.346", "7.0.0.145", "7.0.0.090", "6.2.2.91", "6.2.1.75", "6.2.0.66", "6.1.8.29", "6.1.7.25", "6.0.4.10"};
+                    for (String version : versions) {
+                        if (version.startsWith(valuePartial)) {
+                            String completion = version;  // Just complete the version part
+                            String displayValue = version;
+                            
+                            if (commandProcessor.getSettings().showEmojis()) {
+                                displayValue = "⚡ " + version;
+                            }
+                            
+                            candidates.add(new Candidate(completion, displayValue, "version-values", "Lucee version " + version, null, null, true));
+                        }
+                    }
+                }
+                break;
+                
+            case "port":
+            case "monitoring.jmx.port":
+            case "ssl.port":
+                // Complete common port numbers
+                String[] ports = {"8080", "8888", "9080", "8443", "443", "80"};
+                for (String port : ports) {
+                    if (port.startsWith(valuePartial)) {
+                        String completion = port;  // Just complete the port part
+                        String displayValue = port;
+                        
+                        if (commandProcessor.getSettings().showEmojis()) {
+                            displayValue = "🔌 " + port;
+                        }
+                        
+                        candidates.add(new Candidate(completion, displayValue, "port-values", "Port " + port, null, null, true));
+                    }
+                }
+                break;
+                
+            case "jvm.maxmemory":
+            case "jvm.minmemory":
+                // Complete common memory values
+                String[] memoryValues = {"512m", "1g", "2g", "4g", "8g", "256m", "128m"};
+                for (String memory : memoryValues) {
+                    if (memory.startsWith(valuePartial.toLowerCase())) {
+                        String completion = memory;  // Just complete the memory part
+                        String displayValue = memory;
+                        
+                        if (commandProcessor.getSettings().showEmojis()) {
+                            displayValue = "💾 " + memory;
+                        }
+                        
+                        candidates.add(new Candidate(completion, displayValue, "memory-values", "Memory " + memory, null, null, true));
+                    }
+                }
+                break;
+                
+            case "lucee.preservecase":
+            case "lucee.suppresswhitespace":
+            case "monitoring.enabled":
+            case "monitoring.jmx.enabled":
+            case "ssl.enabled":
+                // Complete boolean values
+                String[] booleans = {"true", "false"};
+                for (String bool : booleans) {
+                    if (bool.startsWith(valuePartial.toLowerCase())) {
+                        String completion = bool;  // Just complete the boolean part
+                        String displayValue = bool;
+                        
+                        if (commandProcessor.getSettings().showEmojis()) {
+                            displayValue = ("true".equals(bool) ? "✅ " : "❌ ") + bool;
+                        }
+                        
+                        candidates.add(new Candidate(completion, displayValue, "boolean-values", "Boolean " + bool, null, null, true));
+                    }
+                }
+                break;
+        }
+    }
+    
+    /**
+     * Get description for configuration keys
+     */
+    private String getConfigKeyDescription(String key) {
+        switch (key.toLowerCase()) {
+            case "version":
+                return "Lucee version";
+            case "port":
+                return "Server HTTP port";
+            case "name":
+                return "Server instance name";
+            case "jvm.maxmemory":
+                return "JVM maximum memory";
+            case "jvm.minmemory":
+                return "JVM minimum memory";
+            case "jvm.args":
+                return "Additional JVM arguments";
+            case "lucee.adminpassword":
+                return "Lucee admin password";
+            case "lucee.preservecase":
+                return "Preserve variable case";
+            case "lucee.suppresswhitespace":
+                return "Suppress whitespace output";
+            case "monitoring.enabled":
+                return "Enable monitoring";
+            case "monitoring.jmx.enabled":
+                return "Enable JMX monitoring";
+            case "monitoring.jmx.port":
+                return "JMX monitoring port";
+            case "monitoring.jmx.host":
+                return "JMX monitoring host";
+            case "ssl.enabled":
+                return "Enable SSL";
+            case "ssl.port":
+                return "SSL port";
+            case "ssl.keystore":
+                return "SSL keystore path";
+            case "ssl.keystorepassword":
+                return "SSL keystore password";
+            default:
+                return "Configuration key";
+        }
+    }
+    
+    /**
+     * Get emoji for configuration keys
+     */
+    private String getConfigKeyEmoji(String key) {
+        switch (key.toLowerCase()) {
+            case "version":
+                return "⚡";
+            case "port":
+            case "monitoring.jmx.port":
+            case "ssl.port":
+                return "🔌";
+            case "name":
+                return "🏷️";
+            case "jvm.maxmemory":
+            case "jvm.minmemory":
+                return "💾";
+            case "jvm.args":
+                return "⚙️";
+            case "lucee.adminpassword":
+            case "ssl.keystorepassword":
+                return "🔐";
+            case "lucee.preservecase":
+            case "lucee.suppresswhitespace":
+            case "monitoring.enabled":
+            case "monitoring.jmx.enabled":
+            case "ssl.enabled":
+                return "✅";
+            case "monitoring.jmx.host":
+                return "🖥️";
+            case "ssl.keystore":
+                return "🔑";
+            default:
+                return "🔧";
+        }
     }
 }
