@@ -93,7 +93,8 @@
         <artifactId>maven-compiler-plugin</artifactId>
         <version>3.11.0</version>
         <configuration>
-          <release>17</release>
+          <source>17</source>
+          <target>17</target>
         </configuration>
       </plugin>
       <plugin>
@@ -165,6 +166,10 @@
                 <transformer
                   implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                   <mainClass>org.lucee.lucli.LuCLI</mainClass>
+                  <manifestEntries>
+                    <Implementation-Title>LuCLI</Implementation-Title>
+                    <Implementation-Version>${project.version}</Implementation-Version>
+                  </manifestEntries>
                 </transformer>
                 <transformer
                   implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
@@ -257,6 +262,136 @@
                     <copy file="target/lucli" tofile="${user.home}/bin/lucli" overwrite="true" />
                     <chmod file="${user.home}/bin/lucli" perm="755" />
                     <echo message="✅ Copied lucli binary v${project.version} to ${user.home}/bin/lucli" />
+                  </target>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    
+    <!-- Windows Executable Profile using Launch4j -->
+    <profile>
+      <id>windows-exe</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>com.akathist.maven.plugins.launch4j</groupId>
+            <artifactId>launch4j-maven-plugin</artifactId>
+            <version>2.4.1</version>
+            <executions>
+              <execution>
+                <id>l4j-clui</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>launch4j</goal>
+                </goals>
+                <configuration>
+                  <headerType>console</headerType>
+                  <outfile>target/lucli.exe</outfile>
+                  <jar>lucli.jar</jar>
+                  <errTitle>LuCLI Error</errTitle>
+                  <classPath>
+                    <mainClass>org.lucee.lucli.LuCLI</mainClass>
+                  </classPath>
+                  <jre>
+                    <path></path>
+                    <bundledJre64Bit>false</bundledJre64Bit>
+                    <bundledJreAsFallback>false</bundledJreAsFallback>
+                    <minVersion>17.0.0</minVersion>
+                    <jdkPreference>preferJre</jdkPreference>
+                    <runtimeBits>64/32</runtimeBits>
+                  </jre>
+                  <versionInfo>
+                    <fileVersion>1.0.52.0</fileVersion>
+                    <txtFileVersion>${project.version}</txtFileVersion>
+                    <fileDescription>LuCLI - A terminal application with Lucee CFML integration</fileDescription>
+                    <copyright>2024</copyright>
+                    <productVersion>1.0.52.0</productVersion>
+                    <txtProductVersion>${project.version}</txtProductVersion>
+                    <productName>LuCLI</productName>
+                    <internalName>lucli</internalName>
+                    <originalFilename>lucli.exe</originalFilename>
+                  </versionInfo>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    
+    <!-- Windows Batch + JAR Single File (Alternative approach) -->
+    <profile>
+      <id>windows-binary</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>build-helper-maven-plugin</artifactId>
+            <version>3.4.0</version>
+            <executions>
+              <execution>
+                <id>parse-version</id>
+                <phase>validate</phase>
+                <goals>
+                  <goal>parse-version</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>versions-maven-plugin</artifactId>
+            <version>2.16.2</version>
+            <executions>
+              <execution>
+                <id>bump-patch-version</id>
+                <phase>initialize</phase>
+                <goals>
+                  <goal>set</goal>
+                </goals>
+                <configuration>
+                  <newVersion>${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.nextIncrementalVersion}-SNAPSHOT</newVersion>
+                  <generateBackupPoms>false</generateBackupPoms>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-antrun-plugin</artifactId>
+            <version>3.1.0</version>
+            <executions>
+              <execution>
+                <id>create-windows-binary</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <configuration>
+                  <target>
+                    <!-- Create Windows batch + JAR concatenation -->
+                    <concat destfile="target/lucli.cmd" binary="yes" force="yes">
+                      <fileset file="src/bin/lucli.bat" />
+                      <fileset file="target/lucli.jar" />
+                    </concat>
+                    <echo message="${WindowsCompatibility.Symbols.SUCCESS} Created Windows binary: target/lucli.cmd" />
+                  </target>
+                </configuration>
+              </execution>
+              <execution>
+                <id>copy-windows-to-bin</id>
+                <phase>install</phase>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <configuration>
+                  <target>
+                    <mkdir dir="${user.home}/bin" />
+                    <copy file="target/lucli.cmd" tofile="${user.home}/bin/lucli.cmd" overwrite="true" />
+                    <echo message="${WindowsCompatibility.Symbols.SUCCESS} Copied Windows binary to ${user.home}/bin/lucli.cmd" />
                   </target>
                 </configuration>
               </execution>

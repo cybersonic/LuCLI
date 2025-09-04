@@ -25,7 +25,7 @@
       "name": "🔌 LucCLI Module",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LucCLI",
-      "args": ["test-module", "arg1", "arg2", "arg3"],
+      "args": ["install", "lucee_lint", "arg2", "arg3"],
       "projectName": "LuCLI"
     }
   ]
