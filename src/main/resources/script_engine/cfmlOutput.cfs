@@ -1,0 +1,29 @@
+// CFML Expression Output Script
+// This script evaluates a CFML expression and outputs the result
+// Replaces: SimpleTerminal.createOutputScript()
+//
+// Parameters:
+// - cfmlExpression: The CFML expression to evaluate
+
+// The expression will be injected here by the Java code
+// ${cfmlExpression} placeholder will be replaced
+
+try {
+    result = ${cfmlExpression};
+    if (isDefined('result')) {
+        if (isSimpleValue(result)) {
+            writeOutput(result);
+        } else if (isArray(result)) {
+            writeOutput('[' & arrayToList(result, ', ') & ']');
+        } else if (isStruct(result)) {
+            writeOutput(serializeJSON(result));
+        } else {
+            writeOutput(toString(result));
+        }
+    }
+} catch (any e) {
+    writeOutput('${EMOJI_ERROR} CFML Error: ' & e.message);
+    if (len(e.detail)) {
+        writeOutput(' - ' & e.detail);
+    }
+}

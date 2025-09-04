@@ -1,0 +1,18 @@
+// Component to Script Conversion Template
+// This script converts CFC component content to script format
+// Replaces: LuceeScriptEngine.convertComponentToScript()
+//
+// Parameters that will be injected:
+// - processedComponentContent: The component content with outer wrapper removed
+// - scriptArgs: Array of arguments passed to the script
+
+// Component converted to script format - functions available directly
+
+${processedComponentContent}
+
+// Call the main function
+if (isDefined('main')) {
+    main(args);
+} else {
+    writeOutput('${EMOJI_WARNING} Main function not found in component' & chr(10));
+}

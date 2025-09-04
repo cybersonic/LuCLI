@@ -1,0 +1,11 @@
+// Component Execution Script
+// This is a basic template for component execution
+// This can be extended as needed for specific component execution scenarios
+//
+// Parameters that will be injected:
+// - componentPath: The path to the component
+// - componentArgs: Array of arguments
+
+// Basic component execution template
+// Additional content will be injected here based on execution type
+${componentExecutionContent}

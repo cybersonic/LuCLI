@@ -1,0 +1,18 @@
+// Module Direct Execution Script
+// This script executes extracted modules directly without component instantiation
+// Replaces: LuceeScriptEngine.createModuleDirectScript()
+//
+// Parameters that will be injected:
+// - moduleContent: The content of the module component
+// - scriptArgs: Array of arguments passed to the module
+
+// Direct module execution - converted from component to script
+
+// Set up args parameter for function
+args = [];
+${argumentSetup}
+
+// Set up arguments.args for legacy compatibility
+arguments.args = args;
+
+${moduleExecutionContent}

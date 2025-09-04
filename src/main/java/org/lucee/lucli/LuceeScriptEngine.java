@@ -47,13 +47,13 @@ public class LuceeScriptEngine {
         this.debug = debugMode;
         
         if (verbose) {
-            System.out.println("Initializing LuceeScriptEngine singleton...");
+            StringOutput.getInstance().println("${EMOJI_TOOL} Initializing LuceeScriptEngine singleton...");
         }
         
         this.engine = initializeEngine();
         
         if (verbose) {
-            System.out.println("✅ LuceeScriptEngine initialized successfully");
+            StringOutput.Quick.success("LuceeScriptEngine initialized successfully");
         }
     }
     
@@ -147,8 +147,8 @@ public class LuceeScriptEngine {
      */
     private void executeScriptContent(String scriptFile, String scriptContent, String[] scriptArgs) throws Exception {
         if (verbose) {
-            System.out.println("Executing CFS script: " + scriptFile);
-            System.out.println("Arguments: " + Arrays.toString(scriptArgs));
+            StringOutput.getInstance().println("${EMOJI_GEAR} Executing CFS script: " + scriptFile);
+            StringOutput.getInstance().println("${EMOJI_INFO} Arguments: " + Arrays.toString(scriptArgs));
         }
         
         // Process shebang if present
@@ -162,8 +162,8 @@ public class LuceeScriptEngine {
      */
     private void executeComponent(String scriptFile, String scriptContent, String[] scriptArgs) throws Exception {
         if (isVerboseMode()) {
-            System.out.println("Executing CFC component: " + scriptFile);
-            System.out.println("Arguments: " + Arrays.toString(scriptArgs));
+            StringOutput.getInstance().println("${EMOJI_GEAR} Executing CFC component: " + scriptFile);
+            StringOutput.getInstance().println("${EMOJI_INFO} Arguments: " + Arrays.toString(scriptArgs));
         }
         
         // Check if this is an extracted module from ~/.lucli
@@ -194,8 +194,8 @@ public class LuceeScriptEngine {
     
     private void executeTemplate(String scriptFile, String scriptContent, String[] scriptArgs) throws Exception {
         if (isVerboseMode()) {
-            System.out.println("Executing CFM template: " + scriptFile);
-            System.out.println("Arguments: " + Arrays.toString(scriptArgs));
+            StringOutput.getInstance().println("${EMOJI_GEAR} Executing CFS script: " + scriptFile);
+            StringOutput.getInstance().println("${EMOJI_INFO} Arguments: " + Arrays.toString(scriptArgs));
         }
         
         // CFM files can contain CFML tags and need to be processed as templates
@@ -412,105 +412,106 @@ public class LuceeScriptEngine {
      * Create a direct execution script for extracted modules
      */
     private String createModuleDirectScript(String moduleContent, String[] scriptArgs) {
-        StringBuilder script = new StringBuilder();
-        
-        script.append("// Direct module execution - converted from component to script\n");
-        
-        // Set up arguments in multiple ways to ensure compatibility
-        script.append("// Set up args parameter for function\n");
-        script.append("args = [];\n");
-        for (int i = 0; i < scriptArgs.length; i++) {
-            script.append("arrayAppend(args, '").append(scriptArgs[i].replace("'", "''")).append("');\n");
-        }
-        
-        script.append("\n// Set up arguments.args for legacy compatibility\n");
-        script.append("arguments.args = args;\n");
-        script.append("\n");
-        
-        // Check if the component has helper functions by looking for private function declarations
-        boolean hasHelperFunctions = hasHelperFunctions(moduleContent);
-        
-        if (hasHelperFunctions) {
-            // For modules with helper functions, convert the entire component to script format
-            script.append("// Module has helper functions - converting entire component to script\n");
-            String componentAsScript = convertComponentToScript(moduleContent, scriptArgs);
-            script.append(componentAsScript);
-        } else {
-            // For simple modules, try to extract just the main function
-            String mainFunctionContent = extractMainFunction(moduleContent);
-            if (mainFunctionContent != null && !mainFunctionContent.trim().isEmpty()) {
-                script.append("// Extracted main function content:\n");
-                script.append(mainFunctionContent);
-            } else {
-                // Fallback: wrap the entire component in a script block
-                script.append("// Fallback: execute entire module content\n");
-                script.append("// Note: Component syntax may cause issues\n");
-                script.append(moduleContent);
+        try {
+            // Read the external script template
+            String scriptTemplate = readScriptTemplate("/script_engine/moduleDirectExecution.cfs");
+            
+            // Build argument setup code
+            StringBuilder argSetup = new StringBuilder();
+            for (int i = 0; i < scriptArgs.length; i++) {
+                argSetup.append("arrayAppend(args, '").append(scriptArgs[i].replace("'", "''")).append("');\n");
             }
+            
+            // Determine execution content based on component structure
+            String executionContent;
+            boolean hasHelperFunctions = hasHelperFunctions(moduleContent);
+            
+            if (hasHelperFunctions) {
+                // For modules with helper functions, convert the entire component to script format
+                executionContent = "// Module has helper functions - converting entire component to script\n" +
+                                 convertComponentToScript(moduleContent, scriptArgs);
+            } else {
+                // For simple modules, try to extract just the main function
+                String mainFunctionContent = extractMainFunction(moduleContent);
+                if (mainFunctionContent != null && !mainFunctionContent.trim().isEmpty()) {
+                    executionContent = "// Extracted main function content:\n" + mainFunctionContent;
+                } else {
+                    // Fallback: wrap the entire component in a script block
+                    executionContent = "// Fallback: execute entire module content\n" +
+                                     "// Note: Component syntax may cause issues\n" +
+                                     moduleContent;
+                }
+            }
+            
+            // Replace placeholders and post-process
+            String result = scriptTemplate
+                .replace("${argumentSetup}", argSetup.toString())
+                .replace("${moduleExecutionContent}", executionContent);
+                
+            // Post-process through StringOutput for emoji and placeholder handling
+            return StringOutput.getInstance().process(result);
+                
+        } catch (Exception e) {
+            // Fallback to inline generation if reading external script fails
+            if (isDebugMode()) {
+                StringOutput.Quick.warning("Failed to read external script template, using fallback: " + e.getMessage());
+            }
+            return createModuleDirectScriptFallback(moduleContent, scriptArgs);
         }
-        
-        return script.toString();
     }
     
     /**
      * Create component wrapper for CFC execution
      */
     private String createComponentWrapper(String componentContent, String scriptFile, String[] scriptArgs) {
-        StringBuilder wrapper = new StringBuilder();
-        
-        // Convert file path to component dotted path
-        String componentPath = getComponentPath(scriptFile);
-        
-        if(scriptArgs == null) {
-            scriptArgs = new String[0]; // Ensure we have an empty array if no args provided
+        try {
+            // Read the external script template
+            String scriptTemplate = readScriptTemplate("/script_engine/componentWrapper.cfs");
+            
+            // Convert file path to component dotted path
+            String componentPath = getComponentPath(scriptFile);
+            
+            if(scriptArgs == null) {
+                scriptArgs = new String[0]; // Ensure we have an empty array if no args provided
+            }
+            if (isVerboseMode()) {
+                System.out.println("Component path: " + componentPath);
+            }
+            
+            // Build argument setup code
+            StringBuilder argSetup = new StringBuilder();
+            for (int i = 0; i < scriptArgs.length; i++) {
+                argSetup.append("arrayAppend(args, '").append(scriptArgs[i].replace("'", "''")).append("');\n");
+            }
+            
+            // Build component instantiation code
+            String componentInstantiation;
+            if (componentPath.startsWith("FILE:")) {
+                // For extracted modules, we'll directly execute the component content
+                componentInstantiation = "  // Module content will be executed directly\n" +
+                                       "  // Component instantiation happens inline\n";
+            } else {
+                // Create component using dotted path
+                componentInstantiation = "  obj = createObject('component', '" + componentPath + "');\n";
+            }
+            
+            // Replace placeholders and post-process
+            String result = scriptTemplate
+                .replace("${scriptFile}", scriptFile)
+                .replace("${componentPath}", componentPath)
+                .replace("${argumentSetup}", argSetup.toString())
+                .replace("${componentInstantiation}", componentInstantiation);
+                
+            // Post-process through StringOutput for emoji and placeholder handling
+            return StringOutput.getInstance().process(result);
+                
+        } catch (Exception e) {
+            // Fallback to inline generation if reading external script fails
+            if (isDebugMode()) {
+                System.err.println("Warning: Failed to read external script template, using fallback: " + e.getMessage());
+            }
+            return createComponentWrapperFallback(componentContent, scriptFile, scriptArgs);
         }
-        if (isVerboseMode()) {
-            System.out.println("Component path: " + componentPath);
-        }
-        
-        // Use pure CFML script syntax without cfscript tags
-        wrapper.append("// Auto-generated wrapper for CFC: ").append(scriptFile).append("\n");
-        wrapper.append("// Component path: ").append(componentPath).append("\n\n");
-        
-        // Prepare arguments array
-        wrapper.append("// Prepare arguments for main() method\n");
-        wrapper.append("args = [];\n");
-        for (int i = 0; i < scriptArgs.length; i++) {
-            wrapper.append("arrayAppend(args, '").append(scriptArgs[i].replace("'", "''")).append("');\n");
-        }
-        
-        wrapper.append("\n// Create component instance and call main()\n");
-        wrapper.append("try {\n");
-        
-        // Handle different component path types
-        if (componentPath.startsWith("FILE:")) {
-            // For extracted modules, we'll directly execute the component content
-            wrapper.append("  // Module content will be executed directly\n");
-            wrapper.append("  // Component instantiation happens inline\n");
-        } else {
-            // Create component using dotted path
-            wrapper.append("  obj = createObject('component', '").append(componentPath).append("');\n");
-        }
-        wrapper.append("  // Call init() method first to initialize component\n");
-        wrapper.append("  if (structKeyExists(obj, 'init')) {\n");
-        wrapper.append("    initResult = obj.init();\n");
-        wrapper.append("  }\n");
-        wrapper.append("  \n");
-        wrapper.append("  // Try to call main() method if it exists\n");
-        wrapper.append("  if (structKeyExists(obj, 'main')) {\n");
-        wrapper.append("    result = obj.main(args);\n");
-        wrapper.append("    if (isDefined('result') \u0026\u0026 len(result)) {\n");
-        wrapper.append("      writeOutput(result \u0026 chr(10));\n");
-        wrapper.append("    }\n");
-        wrapper.append("  }\n");
-        wrapper.append("  // No error message if main() doesn't exist - init() might be sufficient\n");
-        
-        wrapper.append("} catch (any e) {\n");
-        wrapper.append("  writeOutput('Component execution error: ' & e.message & chr(10));\n");
-        wrapper.append("  writeOutput('Detail: ' & e.detail & chr(10));\n");
-        wrapper.append("}\n");
-        
-        return wrapper.toString();
     }
     
     /**
@@ -562,24 +563,24 @@ public class LuceeScriptEngine {
      * Create CFML script to set up component mappings for lucli home directory
      */
     private String createLucliMappingScript(Path lucliHome) {
-        StringBuilder script = new StringBuilder();
-        script.append("// Set up lucli component mappings\n");
-        
-        // Try to set application mapping if we have access to application scope
-        script.append("try {\n");
-        script.append("  // Try to set up application mapping\n");
-        script.append("  if (isDefined('application') && isStruct(application)) {\n");
-        script.append("    if (!structKeyExists(application, 'mappings')) {\n");
-        script.append("      application.mappings = {};\n");
-        script.append("    }\n");
-        script.append("    application.mappings['/modules'] = '").append(lucliHome.toString().replace("\\", "/")).append("/modules';\n");
-        script.append("    application.mappings['/builtin'] = '").append(lucliHome.toString().replace("\\", "/")).append("/builtin';\n");
-        script.append("  }\n");
-        script.append("} catch (any e) {\n");
-        script.append("  // Ignore mapping errors\n");
-        script.append("}\n");
-        
-        return script.toString();
+        try {
+            // Read the external script template
+            String scriptTemplate = readScriptTemplate("/script_engine/lucliMappings.cfs");
+            
+            // Replace the placeholder with the actual lucli home path
+            String normalizedPath = lucliHome.toString().replace("\\", "/");
+            String result = scriptTemplate.replace("${lucliHome}", normalizedPath);
+            
+            // Post-process through StringOutput for emoji and placeholder handling
+            return StringOutput.getInstance().process(result);
+            
+        } catch (Exception e) {
+            // Fallback to inline generation if reading external script fails
+            if (isDebugMode()) {
+                System.err.println("Warning: Failed to read external script template, using fallback: " + e.getMessage());
+            }
+            return createLucliMappingScriptFallback(lucliHome);
+        }
     }
     
     /**
@@ -731,8 +732,178 @@ public class LuceeScriptEngine {
      * Convert an entire CFC component to script format
      */
     private String convertComponentToScript(String componentContent, String[] scriptArgs) {
+        try {
+            // Read the external script template
+            String scriptTemplate = readScriptTemplate("/script_engine/componentToScript.cfs");
+            
+            // Process component content - remove wrapper and fix scoping
+            String processedContent = processComponentContent(componentContent);
+            
+            // Replace the placeholder with the processed content
+            String result = scriptTemplate.replace("${processedComponentContent}", processedContent);
+            
+            // Post-process through StringOutput for emoji and placeholder handling
+            return StringOutput.getInstance().process(result);
+            
+        } catch (Exception e) {
+            // Fallback to inline generation if reading external script fails
+            if (isDebugMode()) {
+                System.err.println("Warning: Failed to read external script template, using fallback: " + e.getMessage());
+            }
+            return convertComponentToScriptFallback(componentContent, scriptArgs);
+        }
+    }
+
+    public void evalFile(String command, String[] scriptArgs) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'evalFile'");
+    }
+    
+    /**
+     * Read a script template from resources
+     */
+    private String readScriptTemplate(String templatePath) throws Exception {
+        try (java.io.InputStream is = LuceeScriptEngine.class.getResourceAsStream(templatePath)) {
+            if (is == null) {
+                throw new java.io.FileNotFoundException("Script template not found: " + templatePath);
+            }
+            return new String(is.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        }
+    }
+    
+    /**
+     * Fallback method for createModuleDirectScript when external template fails
+     */
+    private String createModuleDirectScriptFallback(String moduleContent, String[] scriptArgs) {
         StringBuilder script = new StringBuilder();
         
+        script.append("// Direct module execution - converted from component to script\n");
+        
+        // Set up arguments in multiple ways to ensure compatibility
+        script.append("// Set up args parameter for function\n");
+        script.append("args = [];\n");
+        for (int i = 0; i < scriptArgs.length; i++) {
+            script.append("arrayAppend(args, '").append(scriptArgs[i].replace("'", "''")).append("');\n");
+        }
+        
+        script.append("\n// Set up arguments.args for legacy compatibility\n");
+        script.append("arguments.args = args;\n");
+        script.append("\n");
+        
+        // Check if the component has helper functions by looking for private function declarations
+        boolean hasHelperFunctions = hasHelperFunctions(moduleContent);
+        
+        if (hasHelperFunctions) {
+            // For modules with helper functions, convert the entire component to script format
+            script.append("// Module has helper functions - converting entire component to script\n");
+            String componentAsScript = convertComponentToScript(moduleContent, scriptArgs);
+            script.append(componentAsScript);
+        } else {
+            // For simple modules, try to extract just the main function
+            String mainFunctionContent = extractMainFunction(moduleContent);
+            if (mainFunctionContent != null && !mainFunctionContent.trim().isEmpty()) {
+                script.append("// Extracted main function content:\n");
+                script.append(mainFunctionContent);
+            } else {
+                // Fallback: wrap the entire component in a script block
+                script.append("// Fallback: execute entire module content\n");
+                script.append("// Note: Component syntax may cause issues\n");
+                script.append(moduleContent);
+            }
+        }
+        
+        return script.toString();
+    }
+    
+    /**
+     * Fallback method for createComponentWrapper when external template fails
+     */
+    private String createComponentWrapperFallback(String componentContent, String scriptFile, String[] scriptArgs) {
+        StringBuilder wrapper = new StringBuilder();
+        
+        // Convert file path to component dotted path
+        String componentPath = getComponentPath(scriptFile);
+        
+        if(scriptArgs == null) {
+            scriptArgs = new String[0]; // Ensure we have an empty array if no args provided
+        }
+        if (isVerboseMode()) {
+            System.out.println("Component path: " + componentPath);
+        }
+        
+        // Use pure CFML script syntax without cfscript tags
+        wrapper.append("// Auto-generated wrapper for CFC: ").append(scriptFile).append("\n");
+        wrapper.append("// Component path: ").append(componentPath).append("\n\n");
+        
+        // Prepare arguments array
+        wrapper.append("// Prepare arguments for main() method\n");
+        wrapper.append("args = [];\n");
+        for (int i = 0; i < scriptArgs.length; i++) {
+            wrapper.append("arrayAppend(args, '").append(scriptArgs[i].replace("'", "''")).append("');\n");
+        }
+        
+        wrapper.append("\n// Create component instance and call main()\n");
+        wrapper.append("try {\n");
+        
+        // Handle different component path types
+        if (componentPath.startsWith("FILE:")) {
+            // For extracted modules, we'll directly execute the component content
+            wrapper.append("  // Module content will be executed directly\n");
+            wrapper.append("  // Component instantiation happens inline\n");
+        } else {
+            // Create component using dotted path
+            wrapper.append("  obj = createObject('component', '").append(componentPath).append("');\n");
+        }
+        wrapper.append("  // Call init() method first to initialize component\n");
+        wrapper.append("  if (structKeyExists(obj, 'init')) {\n");
+        wrapper.append("    initResult = obj.init();\n");
+        wrapper.append("  }\n");
+        wrapper.append("  \n");
+        wrapper.append("  // Try to call main() method if it exists\n");
+        wrapper.append("  if (structKeyExists(obj, 'main')) {\n");
+        wrapper.append("    result = obj.main(args);\n");
+        wrapper.append("    if (isDefined('result') \u0026\u0026 len(result)) {\n");
+            wrapper.append("      writeOutput(result \u0026 chr(10));\n");
+        wrapper.append("    }\n");
+        wrapper.append("  }\n");
+        wrapper.append("  // No error message if main() doesn't exist - init() might be sufficient\n");
+        
+        wrapper.append("} catch (any e) {\n");
+        wrapper.append("  writeOutput('Component execution error: ' & e.message & chr(10));\n");
+        wrapper.append("  writeOutput('Detail: ' & e.detail & chr(10));\n");
+        wrapper.append("}\n");
+        
+        return wrapper.toString();
+    }
+    
+    /**
+     * Fallback method for createLucliMappingScript when external template fails
+     */
+    private String createLucliMappingScriptFallback(Path lucliHome) {
+        StringBuilder script = new StringBuilder();
+        script.append("// Set up lucli component mappings\n");
+        
+        // Try to set application mapping if we have access to application scope
+        script.append("try {\n");
+        script.append("  // Try to set up application mapping\n");
+        script.append("  if (isDefined('application') && isStruct(application)) {\n");
+        script.append("    if (!structKeyExists(application, 'mappings')) {\n");
+        script.append("      application.mappings = {};\n");
+        script.append("    }\n");
+        script.append("    application.mappings['/modules'] = '").append(lucliHome.toString().replace("\\", "/")).append("/modules';\n");
+        script.append("    application.mappings['/builtin'] = '").append(lucliHome.toString().replace("\\", "/")).append("/builtin';\n");
+        script.append("  }\n");
+        script.append("} catch (any e) {\n");
+        script.append("  // Ignore mapping errors\n");
+        script.append("}\n");
+        
+        return script.toString();
+    }
+    
+    /**
+     * Process component content by removing wrapper and fixing scoping
+     */
+    private String processComponentContent(String componentContent) {
         // Remove the component wrapper and convert functions to script format
         String content = componentContent.trim();
         
@@ -773,6 +944,18 @@ public class LuceeScriptEngine {
         // Fix variable scoping issues
         content = fixVariableScoping(content);
         
+        return content;
+    }
+    
+    /**
+     * Fallback method for convertComponentToScript when external template fails
+     */
+    private String convertComponentToScriptFallback(String componentContent, String[] scriptArgs) {
+        StringBuilder script = new StringBuilder();
+        
+        // Process component content
+        String content = processComponentContent(componentContent);
+        
         // Add the function content directly to script
         script.append(content);
         script.append("\n\n");
@@ -786,10 +969,5 @@ public class LuceeScriptEngine {
         script.append("}\n");
         
         return script.toString();
-    }
-
-    public void evalFile(String command, String[] scriptArgs) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'evalFile'");
     }
 }

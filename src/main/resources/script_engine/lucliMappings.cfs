@@ -1,0 +1,20 @@
+// LuCLI Component Mappings Script
+// This script sets up component mappings for lucli home directory
+// Replaces: LuceeScriptEngine.createLucliMappingScript()
+//
+// Parameters that will be injected:
+// - lucliHome: The path to the lucli home directory
+
+// Set up lucli component mappings
+try {
+    // Try to set up application mapping
+    if (isDefined('application') && isStruct(application)) {
+        if (!structKeyExists(application, 'mappings')) {
+            application.mappings = {};
+        }
+        application.mappings['/modules'] = '${lucliHome}/modules';
+        application.mappings['/builtin'] = '${lucliHome}/builtin';
+    }
+} catch (any e) {
+    // Ignore mapping errors
+}
