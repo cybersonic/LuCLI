@@ -72,8 +72,15 @@ public class Settings {
     private JsonNode createDefaultSettings() {
         ObjectNode defaultSettings = objectMapper.createObjectNode();
         defaultSettings.put("currentPrompt", "default");
-        defaultSettings.put("showEmojis", true);
-        defaultSettings.put("colorSupport", true);
+        
+        // Auto-detect emoji support based on terminal capabilities
+        boolean emojiSupport = WindowsCompatibility.supportsEmojis();
+        defaultSettings.put("showEmojis", emojiSupport);
+        
+        // Auto-detect color support
+        boolean colorSupport = WindowsCompatibility.supportsColors();
+        defaultSettings.put("colorSupport", colorSupport);
+        
         defaultSettings.put("historySize", 1000);
         
         ObjectNode promptSettings = objectMapper.createObjectNode();
@@ -204,6 +211,20 @@ public class Settings {
      */
     public boolean showEmojis() {
         return getBoolean("showEmojis", true);
+    }
+    
+    /**
+     * Set emoji display setting
+     */
+    public void setShowEmojis(boolean showEmojis) {
+        setBoolean("showEmojis", showEmojis);
+    }
+    
+    /**
+     * Check if colors are supported/enabled
+     */
+    public boolean supportsColors() {
+        return getBoolean("colorSupport", true);
     }
     
     /**

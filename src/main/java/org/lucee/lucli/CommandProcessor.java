@@ -791,7 +791,7 @@ public class CommandProcessor {
         if (args.length == 0) {
             // List available prompts and show current prompt
             StringBuilder result = new StringBuilder();
-            result.append("🎨 Available prompt templates:\n\n");
+            result.append(WindowsCompatibility.getEmoji("🎨", "[PROMPTS]") + " Available prompt templates:\n\n");
             
             String currentPrompt = settings.getCurrentPrompt();
             List<String> templates = promptConfig.getAvailableTemplateNames();
@@ -799,16 +799,18 @@ public class CommandProcessor {
             for (String templateName : templates) {
                 PromptConfig.PromptTemplate template = promptConfig.getTemplate(templateName);
                 if (template != null) {
-                    String marker = templateName.equals(currentPrompt) ? "➤ " : "  ";
-                    String emoji = template.useEmoji ? "✨ " : "";
+                    String marker = templateName.equals(currentPrompt) ? WindowsCompatibility.getEmoji("➤ ", "> ") : "  ";
+                    String emoji = template.useEmoji ? WindowsCompatibility.getEmoji("✨ ", "[*] ") : "";
                     result.append(String.format("%s%s%s - %s\n", marker, emoji, templateName, template.description));
                 }
             }
             
-            result.append("\n💡 Current prompt: ").append(currentPrompt);
-            result.append("\n🔧 Usage: prompt <template-name> to switch prompts");
-            result.append("\n🔄 Usage: prompt refresh to update templates from JAR resources");
-            result.append("\n📁 Custom prompts are stored in ~/.lucli/prompts/");
+            result.append("\n" + WindowsCompatibility.getEmoji("💡", "[TIP]") + " Current prompt: ").append(currentPrompt);
+            result.append("\n" + WindowsCompatibility.getEmoji("🔧", "[CMD]") + " Usage: prompt <template-name> to switch prompts");
+            result.append("\n" + WindowsCompatibility.getEmoji("🔄", "[REFRESH]") + " Usage: prompt refresh to update templates from JAR resources");
+            result.append("\n" + WindowsCompatibility.getEmoji("😀", "[EMOJI]") + " Usage: prompt emoji [on|off|status] to manage emoji display");
+            result.append("\n" + WindowsCompatibility.getEmoji("🔍", "[DIAG]") + " Usage: prompt terminal to check terminal capabilities");
+            result.append("\n" + WindowsCompatibility.getEmoji("📁", "[DIR]") + " Custom prompts are stored in ~/.lucli/prompts/");
             
             return result.toString();
         } else {
@@ -817,19 +819,71 @@ public class CommandProcessor {
             // Handle refresh subcommand
             if ("refresh".equals(command)) {
                 int refreshedCount = promptConfig.refreshPromptFiles();
-                return "🔄 Refreshed " + refreshedCount + " prompt template files from JAR resources\n"
-                     + "✅ Latest prompt templates are now available in ~/.lucli/prompts/\n"
-                     + "💡 Use 'prompt' to see all available templates.";
+                return WindowsCompatibility.getEmoji("🔄", "[REFRESH]") + " Refreshed " + refreshedCount + " prompt template files from JAR resources\n"
+                     + WindowsCompatibility.getEmoji("✅", "[OK]") + " Latest prompt templates are now available in ~/.lucli/prompts/\n"
+                     + WindowsCompatibility.getEmoji("💡", "[TIP]") + " Use 'prompt' to see all available templates.";
+            }
+            
+            // Handle emoji management subcommand
+            if ("emoji".equals(command)) {
+                if (args.length == 1) {
+                    // Show current emoji status
+                    boolean emojiEnabled = settings.showEmojis();
+                    boolean emojiSupported = WindowsCompatibility.supportsEmojis();
+                    
+                    StringBuilder result = new StringBuilder();
+                    result.append("Emoji Status:\n");
+                    result.append("  Enabled in settings: ").append(emojiEnabled ? "Yes" : "No").append("\n");
+                    result.append("  Terminal support: ").append(emojiSupported ? "Yes" : "No").append("\n");
+                    result.append("  Effective display: ").append(emojiEnabled && emojiSupported ? "Yes" : "No").append("\n\n");
+                    
+                    if (!emojiSupported) {
+                        result.append("[WARNING] Your terminal may not support emojis properly.\n");
+                        result.append("Consider using Windows Terminal, VS Code, or another modern terminal.\n\n");
+                    }
+                    
+                    result.append("Usage:\n");
+                    result.append("  prompt emoji on   - Enable emoji display\n");
+                    result.append("  prompt emoji off  - Disable emoji display\n");
+                    result.append("  prompt emoji test - Show emoji test characters\n");
+                    
+                    return result.toString();
+                } else {
+                    String subCommand = args[1];
+                    switch (subCommand) {
+                        case "on":
+                            settings.setBoolean("showEmojis", true);
+                            return WindowsCompatibility.getEmoji("✅", "[OK]") + " Emojis enabled! " + 
+                                   WindowsCompatibility.getEmoji("😀🎉", "[TEST]");
+                        
+                        case "off":
+                            settings.setBoolean("showEmojis", false);
+                            return "[OK] Emojis disabled. Prompts will show text-only symbols.";
+                        
+                        case "test":
+                            return "Emoji test: " + WindowsCompatibility.getEmoji("🎨🚀⚡🔧💻📁🌈", "[NO-EMOJI-SUPPORT]") + 
+                                   "\nIf you see question marks or boxes, your terminal doesn't support emojis.";
+                        
+                        default:
+                            return "❌ Unknown emoji command: " + subCommand + "\n💡 Use: prompt emoji [on|off|test]";
+                    }
+                }
+            }
+            
+            // Handle terminal capabilities diagnostic
+            if ("terminal".equals(command)) {
+                return "Terminal Capabilities Report:\n\n" + WindowsCompatibility.TerminalCapabilities.getCapabilityReport();
             }
             
             // Handle template switching
             String templateName = command;
             if (promptConfig.setCurrentTemplate(templateName)) {
                 PromptConfig.PromptTemplate template = promptConfig.getTemplate(templateName);
-                String emoji = settings.showEmojis() && template.useEmoji ? "✨ " : "";
-                return "✅ Prompt changed to: " + emoji + templateName + " - " + template.description;
+                String emoji = settings.showEmojis() && template.useEmoji ? WindowsCompatibility.getEmoji("✨ ", "[*] ") : "";
+                return WindowsCompatibility.getEmoji("✅", "[OK]") + " Prompt changed to: " + emoji + templateName + " - " + template.description;
             } else {
-                return "❌ Unknown prompt template: " + templateName + "\n💡 Use 'prompt' to see available templates.";
+                return WindowsCompatibility.getEmoji("❌", "[ERROR]") + " Unknown prompt template: " + templateName + 
+                       "\n" + WindowsCompatibility.getEmoji("💡", "[TIP]") + " Use 'prompt' to see available templates.";
             }
         }
     }
@@ -877,27 +931,25 @@ public class CommandProcessor {
     }
     
     /**
-     * Get the appropriate emoji for a file based on its type and extension
+     * Get the appropriate emoji or text prefix for a file based on its type and extension
      */
     private String getFileEmoji(Path file) {
-        if (!settings.showEmojis()) {
-            return "";
-        }
+        boolean emojiSupported = settings.showEmojis() && WindowsCompatibility.supportsEmojis();
         
         try {
             if (Files.isDirectory(file)) {
-                return "📁";
+                return emojiSupported ? "📁" : "d:";
             }
             
             if (Files.isSymbolicLink(file)) {
-                return "🔗";
+                return emojiSupported ? "🔗" : "l:";
             }
             
             String fileName = file.getFileName().toString().toLowerCase();
             
             // Hidden files
             if (fileName.startsWith(".")) {
-                return "👻";
+                return emojiSupported ? "👻" : "h:";
             }
             
             // Get file extension
@@ -907,64 +959,119 @@ public class CommandProcessor {
                 extension = fileName.substring(lastDot + 1);
             }
             
-            // Programming files
-            switch (extension) {
-                case "java": return "☕";
-                case "js": case "javascript": return "🟨";
-                case "py": case "python": return "🐍";
-                case "html": case "htm": return "🌐";
-                case "css": return "🎨";
-                case "json": return "📋";
-                case "xml": return "📄";
-                case "yml": case "yaml": return "⚙️";
-                case "md": case "markdown": return "📝";
-                case "txt": return "📄";
-                case "log": return "📊";
-                case "sql": return "🗃️";
-                case "sh": case "bash": return "⚡";
-                case "bat": case "cmd": return "⚡";
-                case "ps1": return "💙";
-                case "cfm": case "cfml": case "cfc": case "cfs": return "⚡";
-                
-                // Image files
-                case "jpg": case "jpeg": case "png": case "gif": case "bmp": case "svg": case "webp":
-                    return "🖼️";
+            if (!emojiSupported) {
+                // Use text-based prefixes for Windows compatibility
+                switch (extension) {
+                    case "java": return "J:";
+                    case "js": case "javascript": return "j:";
+                    case "py": case "python": return "p:";
+                    case "html": case "htm": return "h:";
+                    case "css": return "c:";
+                    case "json": return "j:";
+                    case "xml": return "x:";
+                    case "yml": case "yaml": return "y:";
+                    case "md": case "markdown": return "m:";
+                    case "txt": return "t:";
+                    case "log": return "L:";
+                    case "sql": return "s:";
+                    case "sh": case "bash": return "s:";
+                    case "bat": case "cmd": return "b:";
+                    case "ps1": return "P:";
+                    case "cfm": case "cfml": case "cfc": case "cfs": return "C:";
                     
-                // Video files
-                case "mp4": case "avi": case "mkv": case "mov": case "wmv": case "flv": case "webm":
-                    return "🎬";
+                    // Media files
+                    case "jpg": case "jpeg": case "png": case "gif": case "bmp": case "svg": case "webp":
+                        return "i:";
+                    case "mp4": case "avi": case "mkv": case "mov": case "wmv": case "flv": case "webm":
+                        return "v:";
+                    case "mp3": case "wav": case "flac": case "aac": case "ogg": case "m4a":
+                        return "a:";
                     
-                // Audio files
-                case "mp3": case "wav": case "flac": case "aac": case "ogg": case "m4a":
-                    return "🎵";
+                    // Archive files
+                    case "zip": case "rar": case "tar": case "gz": case "7z": case "bz2":
+                        return "z:";
                     
-                // Archive files
-                case "zip": case "rar": case "tar": case "gz": case "7z": case "bz2":
-                    return "📦";
+                    // Document files
+                    case "pdf": return "P:";
+                    case "doc": case "docx": return "W:";
+                    case "xls": case "xlsx": return "E:";
+                    case "ppt": case "pptx": return "p:";
                     
-                // Document files
-                case "pdf": return "📕";
-                case "doc": case "docx": return "📄";
-                case "xls": case "xlsx": return "📊";
-                case "ppt": case "pptx": return "📊";
-                
-                // Configuration files
-                case "conf": case "config": case "ini": case "properties":
-                    return "⚙️";
+                    // Configuration files
+                    case "conf": case "config": case "ini": case "properties":
+                        return "c:";
                     
-                // Database files
-                case "db": case "sqlite": case "mdb":
-                    return "🗃️";
+                    // Database files
+                    case "db": case "sqlite": case "mdb":
+                        return "D:";
                     
-                default:
-                    // Check if file is executable
-                    if (Files.isExecutable(file)) {
-                        return "⚡";
-                    }
-                    return "📄";
+                    default:
+                        // Check if file is executable
+                        if (Files.isExecutable(file)) {
+                            return "e:";
+                        }
+                        return "f:";
+                }
+            } else {
+                // Use emoji icons when supported
+                switch (extension) {
+                    case "java": return "☕";
+                    case "js": case "javascript": return "🟨";
+                    case "py": case "python": return "🐍";
+                    case "html": case "htm": return "🌐";
+                    case "css": return "🎨";
+                    case "json": return "📋";
+                    case "xml": return "📄";
+                    case "yml": case "yaml": return "⚙️";
+                    case "md": case "markdown": return "📝";
+                    case "txt": return "📄";
+                    case "log": return "📊";
+                    case "sql": return "🗃️";
+                    case "sh": case "bash": return "⚡";
+                    case "bat": case "cmd": return "⚡";
+                    case "ps1": return "💙";
+                    case "cfm": case "cfml": case "cfc": case "cfs": return "⚡";
+                    
+                    // Image files
+                    case "jpg": case "jpeg": case "png": case "gif": case "bmp": case "svg": case "webp":
+                        return "🖼️";
+                        
+                    // Video files
+                    case "mp4": case "avi": case "mkv": case "mov": case "wmv": case "flv": case "webm":
+                        return "🎬";
+                        
+                    // Audio files
+                    case "mp3": case "wav": case "flac": case "aac": case "ogg": case "m4a":
+                        return "🎵";
+                        
+                    // Archive files
+                    case "zip": case "rar": case "tar": case "gz": case "7z": case "bz2":
+                        return "📦";
+                        
+                    // Document files
+                    case "pdf": return "📕";
+                    case "doc": case "docx": return "📄";
+                    case "xls": case "xlsx": return "📊";
+                    case "ppt": case "pptx": return "📊";
+                    
+                    // Configuration files
+                    case "conf": case "config": case "ini": case "properties":
+                        return "⚙️";
+                        
+                    // Database files
+                    case "db": case "sqlite": case "mdb":
+                        return "🗃️";
+                        
+                    default:
+                        // Check if file is executable
+                        if (Files.isExecutable(file)) {
+                            return "⚡";
+                        }
+                        return "📄";
+                }
             }
         } catch (Exception e) {
-            return "📄"; // Default file emoji on error
+            return emojiSupported ? "📄" : "f:"; // Default file emoji/prefix on error
         }
     }
     

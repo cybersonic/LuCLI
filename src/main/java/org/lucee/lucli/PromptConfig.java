@@ -461,6 +461,11 @@ public class PromptConfig {
             // Replace Unicode icons in right content
             processedRight = UnicodeIcons.replaceIcons(processedRight);
             
+            // Remove emojis from right content if not supported
+            if (!settings.showEmojis()) {
+                processedRight = removeEmojis(processedRight);
+            }
+            
             // Calculate spacing
             int leftLength = getDisplayLength(leftPrompt);
             int rightLength = getDisplayLength(processedRight);
@@ -470,6 +475,17 @@ public class PromptConfig {
             String separatorLine = "";
             if (!separator.isEmpty()) {
                 String separatorChar = UnicodeIcons.replaceIcons(separator);
+                
+                // Remove emojis from separator if not supported
+                if (!settings.showEmojis()) {
+                    separatorChar = removeEmojis(separatorChar);
+                }
+                
+                // If separator is now empty or just whitespace, use a simple line
+                if (separatorChar.trim().isEmpty()) {
+                    separatorChar = "-";
+                }
+                
                 separatorLine = "\n" + separatorChar.repeat(Math.max(1, terminalWidth / separatorChar.length())) + "\n";
             }
             
@@ -595,13 +611,105 @@ public class PromptConfig {
     }
     
     /**
-     * Remove emojis from prompt (simple implementation)
+     * Replace emojis with Windows-compatible symbols using WindowsCompatibility.getEmoji()
      */
     private String removeEmojis(String text) {
-        return text.replaceAll("[\\p{So}\\p{Sc}\\p{Sk}\\p{Sm}]", "")
-                   .replaceAll("🔧|🌈|🚀|⚡|💻|❯|➤|»", "")
-                   .replaceAll("\\s+", " ")
-                   .trim() + " ";
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        
+        // Replace common prompt emojis with Windows-compatible alternatives
+        String result = text
+                // Tool/wrench emoji (common in prompts)
+                .replace("🔧", WindowsCompatibility.Symbols.TOOL)
+                .replace("⚙️", WindowsCompatibility.Symbols.TOOL)
+                .replace("🛠️", WindowsCompatibility.Symbols.TOOL)
+                
+                // Folder/directory emojis
+                .replace("📁", WindowsCompatibility.Symbols.FOLDER)
+                .replace("📂", WindowsCompatibility.Symbols.FOLDER)
+                
+                // Computer/terminal emojis
+                .replace("💻", WindowsCompatibility.Symbols.COMPUTER)
+                .replace("🖥️", WindowsCompatibility.Symbols.COMPUTER)
+                
+                // Success/check emojis
+                .replace("✅", WindowsCompatibility.Symbols.SUCCESS)
+                .replace("✔️", WindowsCompatibility.Symbols.SUCCESS)
+                .replace("✓", WindowsCompatibility.Symbols.SUCCESS)
+                
+                // Error/warning emojis
+                .replace("❌", WindowsCompatibility.Symbols.ERROR)
+                .replace("❗", WindowsCompatibility.Symbols.ERROR)
+                .replace("⚠️", WindowsCompatibility.Symbols.WARNING)
+                
+                // Arrow emojis (commonly used in prompts)
+                .replace("➤", ">")
+                .replace("→", ">")
+                .replace("▶", ">")
+                .replace("►", ">")
+                
+                // Rocket/lightning emojis
+                .replace("🚀", WindowsCompatibility.Symbols.ROCKET)
+                .replace("⚡", "[ZAP]")
+                
+                // Art/design emojis
+                .replace("🎨", WindowsCompatibility.Symbols.ART)
+                .replace("✨", "*")
+                
+                // Time emojis
+                .replace("🕐", "[TIME]")
+                .replace("⏰", "[TIME]")
+                
+                // Wave/goodbye emoji
+                .replace("👋", WindowsCompatibility.Symbols.WAVE)
+                
+                // Information emojis
+                .replace("ℹ️", WindowsCompatibility.Symbols.INFO)
+                .replace("💡", "[TIP]")
+                
+                // Train/locomotive emojis (for train prompt)
+                .replace("🚂", "[TRAIN]")
+                .replace("🚆", "[TRAIN]")
+                .replace("🚊", "[TRAIN]")
+                
+                // Gaming emojis
+                .replace("🎮", "[GAME]")
+                .replace("🕹️", "[GAME]")
+                
+                // Corporate/business emojis
+                .replace("💼", "[BIZ]")
+                .replace("🏢", "[CORP]")
+                
+                // Electric/power emojis
+                .replace("🔋", "[PWR]")
+                .replace("⚡", "[ZAP]")
+                
+                // Hacker/security emojis
+                .replace("👨‍💻", "[HACK]")
+                .replace("🔒", "[SEC]")
+                .replace("🔓", "[OPEN]")
+                
+                // Generic emoji removal for anything else
+                .replaceAll("[\\u2600-\\u26FF\\u2700-\\u27BF]", "")  // Miscellaneous Symbols and Dingbats
+                .replaceAll("[\\u1F300-\\u1F5FF]", "")              // Miscellaneous Symbols and Pictographs
+                .replaceAll("[\\u1F600-\\u1F64F]", "")              // Emoticons
+                .replaceAll("[\\u1F680-\\u1F6FF]", "")              // Transport and Map Symbols
+                .replaceAll("[\\u1F900-\\u1F9FF]", "")              // Supplemental Symbols and Pictographs
+                .replaceAll("[\\u1FA70-\\u1FAFF]", "")              // Symbols and Pictographs Extended-A
+                .replaceAll("[\\uFE00-\\uFE0F]", "")               // Variation selectors
+                .replaceAll("[\\u200D]", "")                      // Zero-width joiner
+                
+                // Clean up multiple spaces
+                .replaceAll("\\s+", " ")
+                .trim();
+        
+        // Ensure there's a trailing space for prompt if the result is not empty
+        if (!result.isEmpty() && !result.endsWith(" ") && !result.endsWith("$")) {
+            result += " ";
+        }
+        
+        return result;
     }
     
     /**
