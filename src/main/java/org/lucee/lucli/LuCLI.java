@@ -299,6 +299,9 @@ public class LuCLI {
         System.out.println("  status [options]           Show server status for the current directory");
         System.out.println("    --name NAME              Show status for a specific server by name");
         System.out.println("  list                       List all server instances");
+        System.out.println("  prune [options]            Remove stopped server instances");
+        System.out.println("    --all                    Remove all stopped servers");
+        System.out.println("    --name NAME              Remove a specific stopped server by name");
         System.out.println("  monitor [options]          Monitor a Lucee server via JMX");
         System.out.println("  log [options]              View server logs (tomcat, server, web)");
         System.out.println();
@@ -314,6 +317,8 @@ public class LuCLI {
         System.out.println("  lucli server status                  # Check server status for current directory");
         System.out.println("  lucli server status --name my_server # Check status for a specific server");
         System.out.println("  lucli server list                    # List all servers");
+        System.out.println("  lucli server prune                   # Remove stopped server for current directory");
+        System.out.println("  lucli server prune --all             # Remove all stopped servers");
         System.out.println("  lucli server monitor                 # Monitor server via JMX dashboard");
     }
     

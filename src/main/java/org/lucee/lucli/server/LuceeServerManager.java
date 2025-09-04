@@ -505,6 +505,80 @@ public class LuceeServerManager {
     }
     
     /**
+     * Prune (remove) the server for the current project directory
+     * Only removes stopped servers
+     */
+    public PruneResult pruneServer(Path projectDir) throws IOException {
+        ServerInstance instance = getRunningServer(projectDir);
+        if (instance != null) {
+            // Server is still running, cannot prune
+            return new PruneResult(instance.getServerName(), false, "Server is still running");
+        }
+        
+        // Load config to get server name
+        try {
+            LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(projectDir);
+            Path serverDir = serversDir.resolve(config.name);
+            
+            if (!Files.exists(serverDir)) {
+                return new PruneResult(config.name, false, "Server directory not found");
+            }
+            
+            // Delete server directory
+            deleteServerDirectory(serverDir);
+            return new PruneResult(config.name, true, "Server pruned successfully");
+            
+        } catch (Exception e) {
+            return new PruneResult("unknown", false, "Failed to load server config: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Prune (remove) a specific server by name
+     * Only removes stopped servers
+     */
+    public PruneResult pruneServerByName(String serverName) throws IOException {
+        ServerInfo serverInfo = getServerInfoByName(serverName);
+        
+        if (serverInfo == null) {
+            return new PruneResult(serverName, false, "Server not found");
+        }
+        
+        if (serverInfo.isRunning()) {
+            return new PruneResult(serverName, false, "Server is still running");
+        }
+        
+        // Delete server directory
+        deleteServerDirectory(serverInfo.getServerDir());
+        return new PruneResult(serverName, true, "Server pruned successfully");
+    }
+    
+    /**
+     * Prune (remove) all stopped servers
+     * Returns a summary of what was pruned and what wasn't
+     */
+    public PruneAllResult pruneAllStoppedServers() throws IOException {
+        List<ServerInfo> servers = listServers();
+        List<PruneResult> pruned = new ArrayList<>();
+        List<PruneResult> skipped = new ArrayList<>();
+        
+        for (ServerInfo server : servers) {
+            if (server.isRunning()) {
+                skipped.add(new PruneResult(server.getServerName(), false, "Server is running"));
+            } else {
+                try {
+                    deleteServerDirectory(server.getServerDir());
+                    pruned.add(new PruneResult(server.getServerName(), true, "Pruned successfully"));
+                } catch (Exception e) {
+                    skipped.add(new PruneResult(server.getServerName(), false, "Failed to delete: " + e.getMessage()));
+                }
+            }
+        }
+        
+        return new PruneAllResult(pruned, skipped);
+    }
+    
+    /**
      * Check if any of our managed servers is using a specific port
      * Returns the server name if found, null if no managed server is using the port
      */
@@ -587,21 +661,79 @@ public class LuceeServerManager {
     }
     
     /**
-     * Download a file from URL
+     * Download a file from URL with progress bar
      */
     private void downloadFile(String urlString, Path destinationFile) throws IOException {
         Files.createDirectories(destinationFile.getParent());
         
         URL url = new URL(urlString);
-        try (InputStream in = url.openStream();
-             OutputStream out = Files.newOutputStream(destinationFile)) {
+        try {
+            var connection = url.openConnection();
+            long contentLength = connection.getContentLengthLong();
             
-            byte[] buffer = new byte[8192];
-            int bytesRead;
-            while ((bytesRead = in.read(buffer)) != -1) {
-                out.write(buffer, 0, bytesRead);
+            try (InputStream in = connection.getInputStream();
+                 OutputStream out = Files.newOutputStream(destinationFile)) {
+                
+                byte[] buffer = new byte[8192];
+                long totalBytesRead = 0;
+                int bytesRead;
+                long lastProgressUpdate = 0;
+                
+                // Show initial progress
+                if (contentLength > 0) {
+                    System.out.print("\r[" + " ".repeat(50) + "] 0% (0 MB / " + formatMB(contentLength) + " MB)");
+                    System.out.flush();
+                }
+                
+                while ((bytesRead = in.read(buffer)) != -1) {
+                    out.write(buffer, 0, bytesRead);
+                    totalBytesRead += bytesRead;
+                    
+                    // Update progress every 100ms or when download completes
+                    long currentTime = System.currentTimeMillis();
+                    if (contentLength > 0 && (currentTime - lastProgressUpdate > 100 || bytesRead < buffer.length)) {
+                        double progress = (double) totalBytesRead / contentLength;
+                        int progressChars = (int) (progress * 50);
+                        
+                        String progressBar = "█".repeat(progressChars) + " ".repeat(50 - progressChars);
+                        String percentage = String.format("%.1f", progress * 100);
+                        
+                        System.out.print("\r[" + progressBar + "] " + percentage + "% (" + 
+                                       formatMB(totalBytesRead) + " MB / " + formatMB(contentLength) + " MB)");
+                        System.out.flush();
+                        lastProgressUpdate = currentTime;
+                    }
+                }
+                
+                // Show completion
+                if (contentLength > 0) {
+                    System.out.println("\r[" + "█".repeat(50) + "] 100.0% (" + 
+                                     formatMB(totalBytesRead) + " MB / " + formatMB(contentLength) + " MB) - Download complete!");
+                } else {
+                    // If content length was unknown, just show total downloaded
+                    System.out.println("Download complete! (" + formatMB(totalBytesRead) + " MB)");
+                }
+            }
+        } catch (IOException e) {
+            // Fallback to simple download if progress fails
+            System.out.println("\nProgress display failed, continuing with simple download...");
+            try (InputStream in = url.openStream();
+                 OutputStream out = Files.newOutputStream(destinationFile)) {
+                
+                byte[] buffer = new byte[8192];
+                int bytesRead;
+                while ((bytesRead = in.read(buffer)) != -1) {
+                    out.write(buffer, 0, bytesRead);
+                }
             }
         }
+    }
+    
+    /**
+     * Format bytes as MB with 1 decimal place
+     */
+    private String formatMB(long bytes) {
+        return String.format("%.1f", bytes / 1024.0 / 1024.0);
     }
     
     /**
@@ -847,5 +979,40 @@ public class LuceeServerManager {
         public boolean isRunning() { return running; }
         public Path getServerDir() { return serverDir; }
         public Path getProjectDir() { return projectDir; }
+    }
+    
+    /**
+     * Result of a server prune operation
+     */
+    public static class PruneResult {
+        private final String serverName;
+        private final boolean success;
+        private final String message;
+        
+        public PruneResult(String serverName, boolean success, String message) {
+            this.serverName = serverName;
+            this.success = success;
+            this.message = message;
+        }
+        
+        public String getServerName() { return serverName; }
+        public boolean isSuccess() { return success; }
+        public String getMessage() { return message; }
+    }
+    
+    /**
+     * Result of a prune all operation
+     */
+    public static class PruneAllResult {
+        private final List<PruneResult> pruned;
+        private final List<PruneResult> skipped;
+        
+        public PruneAllResult(List<PruneResult> pruned, List<PruneResult> skipped) {
+            this.pruned = pruned;
+            this.skipped = skipped;
+        }
+        
+        public List<PruneResult> getPruned() { return pruned; }
+        public List<PruneResult> getSkipped() { return skipped; }
     }
 }
