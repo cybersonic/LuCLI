@@ -101,7 +101,8 @@ This helps keep test server instances organized and separate from production env
 
 - **LuCLI.java**: Main entry point handling command-line argument parsing and dispatching
 - **SimpleTerminal.java**: Interactive terminal mode with JLine integration
-- **LuceeScriptEngine.java**: Lucee CFML engine integration wrapper
+- **LuceeScriptEngine.java**: Lucee CFML engine integration wrapper with externalized script templates
+- **StringOutput.java**: Centralized output post-processor with emoji handling and placeholder substitution
 - **CommandProcessor.java**: Internal command processing (file operations, system commands)
 - **ExternalCommandProcessor.java**: External command execution with enhanced features
 
@@ -122,6 +123,8 @@ This helps keep test server instances organized and separate from production env
 
 - **PromptConfig.java**: Configurable prompt styles (14 different themes)
 - **Settings.java**: User settings persistence
+- **StringOutput.java**: Centralized output post-processing with emoji/placeholder support
+- **WindowsCompatibility.java**: Smart emoji detection and terminal capability analysis
 - **CFMLCompleter.java & LuCLICompleter.java**: Command auto-completion
 - **CFMLSyntaxHighlighter.java**: Syntax highlighting for CFML
 - **FileSystemState.java**: Working directory tracking
@@ -138,6 +141,18 @@ Both CLI mode (`java -jar lucli.jar [command]`) and terminal mode (`lucli termin
 ### Template-Based Configuration
 
 Server configurations use templates in `src/main/resources/tomcat_template/` which are dynamically populated with project-specific settings.
+
+### Template-Based Script Processing
+
+Lucee script generation has been externalized to template files in `src/main/resources/script_engine/`:
+- **cfmlOutput.cfs**: CFML expression evaluation template
+- **componentWrapper.cfs**: CFC component execution wrapper
+- **moduleDirectExecution.cfs**: Direct module execution template
+- **componentToScript.cfs**: Component-to-script conversion template
+- **lucliMappings.cfs**: LuCLI component mapping setup
+- **executeComponent.cfs**: General component execution template
+
+These templates use placeholder substitution and are post-processed through StringOutput for consistent emoji and variable handling.
 
 ### Dual Execution Modes
 
@@ -172,6 +187,16 @@ Each project can have a `lucee.json` file defining server settings:
 - Server instances: `~/.lucli/servers/`
 - Lucee Express downloads: `~/.lucli/express/`
 - Command history: `~/.lucli/history`
+- Prompt templates: `~/.lucli/prompts/`
+
+### Output Processing System
+
+StringOutput provides centralized output handling with:
+- **Emoji Processing**: Smart emoji handling based on terminal capabilities
+- **Placeholder Substitution**: Dynamic variables like `${EMOJI_SUCCESS}`, `${NOW}`, `${LUCLI_VERSION}`
+- **Environment Integration**: Access environment variables via `${ENV_PATH}` syntax
+- **Terminal Detection**: Automatic fallback to text symbols on unsupported terminals
+- **Custom Placeholders**: Extensible system for adding new placeholder types
 
 ## Testing Strategy
 

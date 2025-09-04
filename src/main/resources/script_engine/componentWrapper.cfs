@@ -1,0 +1,37 @@
+// Component Wrapper Script
+// This script creates a wrapper for CFC component execution
+// Replaces: LuceeScriptEngine.createComponentWrapper()
+//
+// Parameters that will be injected:
+// - componentPath: The dotted path or file path to the component
+// - scriptFile: The path to the script file being executed
+// - scriptArgs: Array of arguments passed to the component
+
+// Auto-generated wrapper for CFC: ${scriptFile}
+// Component path: ${componentPath}
+
+// Prepare arguments for main() method
+args = [];
+${argumentSetup}
+
+// Create component instance and call main()
+try {
+    ${componentInstantiation}
+    // Call init() method first to initialize component
+    if (structKeyExists(obj, 'init')) {
+        initResult = obj.init();
+    }
+    
+    // Try to call main() method if it exists
+    if (structKeyExists(obj, 'main')) {
+        result = obj.main(args);
+        if (isDefined('result') && len(result)) {
+            writeOutput(result & chr(10));
+        }
+    }
+    // No error message if main() doesn't exist - init() might be sufficient
+    
+} catch (any e) {
+    writeOutput('${EMOJI_ERROR} Component execution error: ' & e.message & chr(10));
+    writeOutput('${EMOJI_INFO} Detail: ' & e.detail & chr(10));
+}
