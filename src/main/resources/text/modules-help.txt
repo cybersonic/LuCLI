@@ -1,0 +1,23 @@
+LuCLI Module Management
+
+Usage: lucli modules [command] [options]
+
+Commands:
+  list                       List all installed modules (default)
+  init [module-name]         Initialize a new module
+  run <module-name> [args]   Run a specific module with arguments
+
+Options:
+  -v, --verbose              Enable verbose output
+  -h, --help                 Show this help message
+
+Examples:
+  lucli modules                          # List all modules
+  lucli modules list                     # List all modules
+  lucli modules init                     # Initialize module (interactive)
+  lucli modules init my-awesome-module   # Initialize named module
+  lucli modules run my-module arg1 arg2  # Run a module with arguments
+
+Module Directory:
+  Modules are stored in ~/.lucli/modules/
+  Each module should have a Module.cfc file as the entry point.

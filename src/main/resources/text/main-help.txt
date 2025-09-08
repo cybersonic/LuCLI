@@ -1,0 +1,33 @@
+${EMOJI_ROCKET} LuCLI - A terminal application with Lucee CFML integration
+
+Usage: java -jar lucli.jar [options] [command] [arguments...]
+
+${EMOJI_GEAR} Options:
+  -v, --verbose  Enable verbose output
+  -d, --debug    Enable debug output
+  -t, --timing   Enable timing output for performance analysis
+  -h, --help     Show this help message
+
+${EMOJI_COMPUTER} Commands:
+  terminal       Start interactive terminal (default if no command given)
+  server         Manage Lucee server instances (start, stop, status, list)
+  modules        Manage LuCLI modules (list, init, run)
+  lint           CFML code linting and analysis (analyze, rules, config)
+  --version      Show application version
+  --lucee-version  Show Lucee version
+  help, --help, -h  Show this help message
+  <module-name>  Execute a LuCLI module directly
+  script.cfs     Execute a CFML script file
+
+Configuration:
+  Lucee server files are stored in ~/.lucli/lucee-server by default
+  Override with LUCLI_HOME environment variable or -Dlucli.home system property
+
+Examples:
+  java -jar lucli.jar                    # Start interactive terminal
+  java -jar lucli.jar --verbose --version # Show version with verbose output
+  java -jar lucli.jar --timing script.cfs # Execute script with timing analysis
+  java -jar lucli.jar script.cfs arg1 arg2 # Execute CFML script with arguments
+  java -jar lucli.jar my-module arg1 arg2 # Execute module 'my-module' with arguments
+  java -jar lucli.jar modules run my-module arg1 # Alternative module execution
+  LUCLI_HOME=/tmp/lucli java -jar lucli.jar --lucee-version # Use custom home directory

@@ -1,0 +1,2 @@
+Error retrieving rules from CFLint: ${ERROR_MESSAGE}
+Use the documentation link for rule information.

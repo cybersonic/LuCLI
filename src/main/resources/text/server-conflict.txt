@@ -1,0 +1,13 @@
+${EMOJI_WARNING}  ${ERROR_MESSAGE}
+
+Choose an option:
+  1. Replace the existing server (delete and recreate):
+     lucli server start --force
+
+  2. Create server with suggested name '${SUGGESTED_NAME}':
+     lucli server start --name ${SUGGESTED_NAME}
+
+  3. Create server with custom name:
+     lucli server start --name <your-name>
+
+${EMOJI_BULB} Use --force to replace existing servers, or --name to specify a different name.

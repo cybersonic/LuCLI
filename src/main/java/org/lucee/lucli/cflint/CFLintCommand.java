@@ -12,7 +12,10 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.stream.Stream;
+
+import org.lucee.lucli.StringOutput;
 
 /**
  * CFLint command integration for LuCLI
@@ -24,7 +27,7 @@ import java.util.stream.Stream;
  */
 public class CFLintCommand {
     
-    private static final String COMMAND_NAME = "lint";
+    private static final String COMMAND_NAME = "cflint";
     
     /**
      * Main entry point for lint commands
@@ -559,26 +562,17 @@ public class CFLintCommand {
         try {
             // Try to ensure CFLint is available
             if (!ensureCFLintAvailable()) {
-                System.out.println("📋 Available CFLint Rules:");
-                System.out.println("═".repeat(50));
-                System.out.println("CFLint not available. Rules cannot be displayed.");
-                System.out.println("Use CFLint documentation to see available rules:");
-                System.out.println("https://github.com/cfmleditor/CFLint/wiki/Rules");
+                System.out.println(StringOutput.loadText("/text/cflint-rules-unavailable.txt"));
                 return true;
             }
             
-            System.out.println("📋 Available CFLint Rules:");
-            System.out.println("═".repeat(50));
-            
             try {
                 // This is a placeholder - the actual rule listing would depend on CFLint's API
-                System.out.println("Rules from CFLint " + CFLintDownloader.getCFLintStatus() + ":");
-                System.out.println();
-                System.out.println("Use CFLint documentation for detailed rule descriptions:");
-                System.out.println("https://github.com/cfmleditor/CFLint/wiki/Rules");
+                System.out.println(StringOutput.loadText("/text/cflint-rules-available.txt"));
             } catch (Exception e) {
-                System.out.println("Error retrieving rules from CFLint: " + e.getMessage());
-                System.out.println("Use the documentation link for rule information.");
+                java.util.Map<String, String> placeholders = new java.util.HashMap<>();
+                placeholders.put("ERROR_MESSAGE", e.getMessage());
+                System.out.println(StringOutput.loadTextWithPlaceholders("/text/cflint-rules-error.txt", placeholders));
             }
             
             return true;
@@ -593,17 +587,7 @@ public class CFLintCommand {
      */
     private boolean handleConfig(String[] args) {
         if (args.length == 0) {
-            System.out.println("📋 CFLint Configuration Help:");
-            System.out.println("═".repeat(50));
-            System.out.println("Create a .cflintrc file in your project root with configuration options.");
-            System.out.println("See: https://github.com/cfmleditor/CFLint/wiki/Configuration");
-            System.out.println();
-            System.out.println("Example .cflintrc:");
-            System.out.println("{");
-            System.out.println("  \"rule\": [],");
-            System.out.println("  \"excludes\": [],");
-            System.out.println("  \"includes\": []");
-            System.out.println("}");
+            System.out.println(StringOutput.loadText("/text/cflint-config-help.txt"));
         } else if ("init".equals(args[0])) {
             // Create a basic .cflintrc file
             return createDefaultConfig();
@@ -624,16 +608,7 @@ public class CFLintCommand {
                 return true;
             }
             
-            String defaultConfig = "{\n" +
-                    "  \"rule\": [\n" +
-                    "    {\n" +
-                    "      \"name\": \"CFLint\",\n" +
-                    "      \"className\": \"com.cflint.plugins.core.*\"\n" +
-                    "    }\n" +
-                    "  ],\n" +
-                    "  \"excludes\": [],\n" +
-                    "  \"includes\": []\n" +
-                    "}";
+            String defaultConfig = StringOutput.loadText("/text/cflint-default-config.json");
             
             Files.write(configPath, defaultConfig.getBytes());
             System.out.println("✅ Created .cflintrc configuration file");
@@ -680,61 +655,21 @@ public class CFLintCommand {
      * Print lint help
      */
     private void printLintHelp() {
-        System.out.println("LuCLI Lint Commands:");
-        System.out.println("═".repeat(50));
-        System.out.println("  lucli lint <files/dirs>           - Lint CFML files or directories");
-        System.out.println("  lucli lint check <files/dirs>     - Same as above (explicit)");
-        System.out.println("  lucli lint rules                  - List available linting rules");
-        System.out.println("  lucli lint config                 - Show configuration help");
-        System.out.println("  lucli lint config init            - Create default .cflintrc file");
-        System.out.println("  lucli lint status                 - Show CFLint installation status");
-        System.out.println();
-        System.out.println("Options:");
-        System.out.println("  --format, -f <format>             - Output format: text, json, xml (default: text)");
-        System.out.println("  --config, -c <file>               - Use specific configuration file");
-        System.out.println("  --verbose, -v                     - Verbose output");
-        System.out.println("  --show-rule, -r                   - Show rule names in output");
-        System.out.println("  --quiet, -q                       - Minimal output");
-        System.out.println();
-        System.out.println("Examples:");
-        System.out.println("  lucli lint .                      - Lint current directory");
-        System.out.println("  lucli lint src/                   - Lint src directory");
-        System.out.println("  lucli lint Application.cfc        - Lint specific file");
-        System.out.println("  lucli lint --format json src/     - Output results as JSON");
-        System.out.println("  lucli lint --config .cflintrc .   - Use custom config file");
-        System.out.println();
-        System.out.println("📋 Note: CFLint will be downloaded automatically on first use.");
+        System.out.println(StringOutput.loadText("/text/cflint-help.txt"));
     }
     
     /**
      * Print lint usage
      */
     private void printLintUsage() {
-        System.out.println("Usage: lucli lint [options] <files/directories>");
-        System.out.println("Use 'lucli lint help' for more information.");
+        System.out.println(StringOutput.loadText("/text/cflint-usage.txt"));
     }
     
     /**
      * Print CFLint unavailable message
      */
     private void printCFLintUnavailableMessage() {
-        System.out.println("🔍 CFLint Integration for LuCLI");
-        System.out.println("═".repeat(50));
-        System.out.println("❌ CFLint could not be downloaded or loaded.");
-        System.out.println();
-        System.out.println("This could be due to:");
-        System.out.println("• No internet connection");
-        System.out.println("• GitHub releases not accessible");
-        System.out.println("• Local file permissions");
-        System.out.println();
-        System.out.println("To manually install CFLint:");
-        System.out.println("1. Download from: https://github.com/cfmleditor/CFLint/releases");
-        System.out.println("2. Save the JAR to: " + CFLintDownloader.getCFLintJarPath());
-        System.out.println();
-        System.out.println("Use 'lucli lint status' to check CFLint availability.");
-        System.out.println();
-        System.out.println("📚 For more information about CFLint:");
-        System.out.println("   https://github.com/cfmleditor/CFLint");
+        System.out.println(StringOutput.loadText("/text/cflint-unavailable.txt"));
     }
     
     /**

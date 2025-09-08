@@ -388,29 +388,7 @@ public class ModuleCommand {
      * Show help information for the modules command
      */
     private static void showHelp() {
-        System.out.println("LuCLI Module Management");
-        System.out.println();
-        System.out.println("Usage: lucli modules [command] [options]");
-        System.out.println();
-        System.out.println("Commands:");
-        System.out.println("  list                       List all installed modules (default)");
-        System.out.println("  init [module-name]         Initialize a new module");
-        System.out.println("  run <module-name> [args]   Run a specific module with arguments");
-        System.out.println();
-        System.out.println("Options:");
-        System.out.println("  -v, --verbose              Enable verbose output");
-        System.out.println("  -h, --help                 Show this help message");
-        System.out.println();
-        System.out.println("Examples:");
-        System.out.println("  lucli modules                          # List all modules");
-        System.out.println("  lucli modules list                     # List all modules");
-        System.out.println("  lucli modules init                     # Initialize module (interactive)");
-        System.out.println("  lucli modules init my-awesome-module   # Initialize named module");
-        System.out.println("  lucli modules run my-module arg1 arg2  # Run a module with arguments");
-        System.out.println();
-        System.out.println("Module Directory:");
-        System.out.println("  Modules are stored in ~/.lucli/modules/");
-        System.out.println("  Each module should have a Module.cfc file as the entry point.");
+        System.out.println(StringOutput.loadText("/text/modules-help.txt"));
     }
     
     /**

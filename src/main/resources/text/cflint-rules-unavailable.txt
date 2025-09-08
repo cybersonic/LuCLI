@@ -1,0 +1,5 @@
+📋 Available CFLint Rules:
+══════════════════════════════════════════════════
+CFLint not available. Rules cannot be displayed.
+Use CFLint documentation to see available rules:
+https://github.com/cfmleditor/CFLint/wiki/Rules

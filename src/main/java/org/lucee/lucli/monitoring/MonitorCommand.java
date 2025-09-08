@@ -4,6 +4,7 @@ import org.lucee.lucli.monitoring.CliDashboard.ServerMetrics;
 import org.lucee.lucli.monitoring.JmxConnection.*;
 import org.lucee.lucli.server.LuceeServerConfig;
 import org.lucee.lucli.server.LuceeServerManager;
+import org.lucee.lucli.StringOutput;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -410,53 +411,13 @@ public class MonitorCommand {
      * Show command usage
      */
     private static void showUsage() {
-        System.out.println("Usage: lucli server monitor [options]");
-        System.out.println();
-        System.out.println("Monitor Lucee servers via JMX in three different ways:");
-        System.out.println("  1. Auto-detect server in current directory (default)");
-        System.out.println("  2. Monitor a named server instance");
-        System.out.println("  3. Connect to arbitrary JMX endpoint");
-        System.out.println();
-        System.out.println("Options:");
-        System.out.println("  --name, -n     Monitor a named server instance");
-        System.out.println("  --host, -h     JMX host (for arbitrary endpoints)");
-        System.out.println("  --port, -p     JMX port (for arbitrary endpoints)");
-        System.out.println("  --refresh, -r  Refresh interval in seconds (default: 3)");
-        System.out.println("  --help         Show this help message");
-        System.out.println();
-        System.out.println("Examples:");
-        System.out.println("  # Monitor server in current directory (auto-detected)");
-        System.out.println("  lucli server monitor");
-        System.out.println();
-        System.out.println("  # Monitor a specific named server");
-        System.out.println("  lucli server monitor --name my-app");
-        System.out.println();
-        System.out.println("  # Monitor arbitrary JMX endpoint");
-        System.out.println("  lucli server monitor --host myserver --port 9999");
-        System.out.println();
-        System.out.println("  # Customize refresh interval");
-        System.out.println("  lucli server monitor --refresh 5");
-        System.out.println();
-        System.out.println("Note: JMX monitoring must be enabled in the target server's lucee.json.");
-        System.out.println("      Use 'lucli server list' to see available managed servers.");
+        System.out.println(StringOutput.loadText("/text/monitor-help.txt"));
     }
     
     /**
      * Get usage string for error messages
      */
     private static String getUsageString() {
-        return "Usage: lucli server monitor [options]\n" +
-               "\n" +
-               "Monitor Lucee servers via JMX in three different ways:\n" +
-               "  1. Auto-detect server in current directory (default)\n" +
-               "  2. Monitor a named server instance\n" +
-               "  3. Connect to arbitrary JMX endpoint\n" +
-               "\n" +
-               "Options:\n" +
-               "  --name, -n     Monitor a named server instance\n" +
-               "  --host, -h     JMX host (for arbitrary endpoints)\n" +
-               "  --port, -p     JMX port (for arbitrary endpoints)\n" +
-               "  --refresh, -r  Refresh interval in seconds (default: 3)\n" +
-               "  --help         Show this help message";
+        return StringOutput.loadText("/text/monitor-help.txt");
     }
 }

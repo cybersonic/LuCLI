@@ -1,0 +1,17 @@
+🔍 CFLint Integration for LuCLI
+══════════════════════════════════════════════════
+❌ CFLint could not be downloaded or loaded.
+
+This could be due to:
+• No internet connection
+• GitHub releases not accessible
+• Local file permissions
+
+To manually install CFLint:
+1. Download from: https://github.com/cfmleditor/CFLint/releases
+2. Save the JAR to: ${CFLINT_JAR_PATH}
+
+Use 'lucli lint status' to check CFLint availability.
+
+📚 For more information about CFLint:
+   https://github.com/cfmleditor/CFLint

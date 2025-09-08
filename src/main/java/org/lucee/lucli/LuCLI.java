@@ -102,16 +102,16 @@ public class LuCLI {
                     Timer.stop("Module Command");
                     break;
                     
-                case "lint":
+                case "cflint":
                     Timer.start("Lint Command");
                     // Create command line for CFLint processing
-                    StringBuilder lintCommandLine = new StringBuilder("lint");
+                    StringBuilder lintCommandLine = new StringBuilder("cflint");
                     if (parseResult.scriptArgs != null) {
                         for (String arg : parseResult.scriptArgs) {
                             lintCommandLine.append(" ").append(arg);
                         }
                     }
-                    handleLintCommand(lintCommandLine.toString());
+                    handleCFLintCommand(lintCommandLine.toString());
                     Timer.stop("Lint Command");
                     break;
                     
@@ -195,40 +195,7 @@ public class LuCLI {
     }
     
     private static void showHelp() {
-        StringOutput out = StringOutput.getInstance();
-        out.println("${EMOJI_ROCKET} LuCLI - A terminal application with Lucee CFML integration");
-        out.println();
-        out.println("Usage: java -jar lucli.jar [options] [command] [arguments...]");
-        out.println();
-        out.println("${EMOJI_GEAR} Options:");
-        out.println("  -v, --verbose  Enable verbose output");
-        out.println("  -d, --debug    Enable debug output");
-        out.println("  -t, --timing   Enable timing output for performance analysis");
-        out.println("  -h, --help     Show this help message");
-        out.println();
-        out.println("${EMOJI_COMPUTER} Commands:");
-        out.println("  terminal       Start interactive terminal (default if no command given)");
-        out.println("  server         Manage Lucee server instances (start, stop, status, list)");
-        out.println("  modules        Manage LuCLI modules (list, init, run)");
-        out.println("  lint           CFML code linting and analysis (analyze, rules, config)");
-        out.println("  --version      Show application version");
-        out.println("  --lucee-version  Show Lucee version");
-        out.println("  help, --help, -h  Show this help message");
-        out.println("  <module-name>  Execute a LuCLI module directly");
-        out.println("  script.cfs     Execute a CFML script file");
-        System.out.println();
-        System.out.println("Configuration:");
-        System.out.println("  Lucee server files are stored in ~/.lucli/lucee-server by default");
-        System.out.println("  Override with LUCLI_HOME environment variable or -Dlucli.home system property");
-        System.out.println();
-        System.out.println("Examples:");
-        System.out.println("  java -jar lucli.jar                    # Start interactive terminal");
-        System.out.println("  java -jar lucli.jar --verbose --version # Show version with verbose output");
-        System.out.println("  java -jar lucli.jar --timing script.cfs # Execute script with timing analysis");
-        System.out.println("  java -jar lucli.jar script.cfs arg1 arg2 # Execute CFML script with arguments");
-        System.out.println("  java -jar lucli.jar my-module arg1 arg2 # Execute module 'my-module' with arguments");
-        System.out.println("  java -jar lucli.jar modules run my-module arg1 # Alternative module execution");
-        System.out.println("  LUCLI_HOME=/tmp/lucli java -jar lucli.jar --lucee-version # Use custom home directory");
+        System.out.println(StringOutput.loadText("/text/main-help.txt"));
     }
     
     // TODO move this to the LuceeScriptEngine class
@@ -254,7 +221,7 @@ public class LuCLI {
     /**
      * Handle lint commands using CFLintCommand
      */
-    private static void handleLintCommand(String commandLine) throws Exception {
+    private static void handleCFLintCommand(String commandLine) throws Exception {
         CFLintCommand cfLintCommand = new CFLintCommand();
         boolean result = cfLintCommand.handleLintCommand(commandLine);
         // CFLint output is handled directly by the command, we just need to ensure completion
@@ -285,41 +252,7 @@ public class LuCLI {
     }
     
     private static void showServerHelp() {
-        System.out.println("LuCLI Server Management");
-        System.out.println();
-        System.out.println("Usage: lucli server [command] [options]");
-        System.out.println();
-        System.out.println("Commands:");
-        System.out.println("  start [options]            Start a Lucee server for the current directory");
-        System.out.println("    --version VERSION        Specify Lucee version");
-        System.out.println("    --name NAME              Specify custom server name");
-        System.out.println("    --force                  Replace existing server");
-        System.out.println("  stop [options]             Stop the server for the current directory");
-        System.out.println("    --name NAME              Stop a specific server by name");
-        System.out.println("  status [options]           Show server status for the current directory");
-        System.out.println("    --name NAME              Show status for a specific server by name");
-        System.out.println("  list                       List all server instances");
-        System.out.println("  prune [options]            Remove stopped server instances");
-        System.out.println("    --all                    Remove all stopped servers");
-        System.out.println("    --name NAME              Remove a specific stopped server by name");
-        System.out.println("  monitor [options]          Monitor a Lucee server via JMX");
-        System.out.println("  log [options]              View server logs (tomcat, server, web)");
-        System.out.println();
-        System.out.println("Configuration:");
-        System.out.println("  Server configuration is read from lucee.json in the current directory.");
-        System.out.println("  If lucee.json doesn't exist, a default one will be created.");
-        System.out.println();
-        System.out.println("Examples:");
-        System.out.println("  lucli server start                   # Start server with default settings");
-        System.out.println("  lucli server start --version 6.1.0.123  # Start server with specific version");
-        System.out.println("  lucli server stop                    # Stop the server for current directory");
-        System.out.println("  lucli server stop --name my_server   # Stop a specific server by name");
-        System.out.println("  lucli server status                  # Check server status for current directory");
-        System.out.println("  lucli server status --name my_server # Check status for a specific server");
-        System.out.println("  lucli server list                    # List all servers");
-        System.out.println("  lucli server prune                   # Remove stopped server for current directory");
-        System.out.println("  lucli server prune --all             # Remove all stopped servers");
-        System.out.println("  lucli server monitor                 # Monitor server via JMX dashboard");
+        System.out.println(StringOutput.loadText("/text/server-help.txt"));
     }
     
     private static void handleServerStart(LuceeServerManager serverManager, Path currentDir, String[] args) throws Exception {
@@ -346,32 +279,25 @@ public class LuCLI {
         }
         
         try {
-            System.out.println("Starting Lucee server in: " + projectDir);
+            System.out.println(StringOutput.msg("server.starting", projectDir));
             LuceeServerManager.ServerInstance instance = serverManager.startServer(projectDir, versionOverride, forceReplace, customName);
             Timer.stop("Server Start Operation");
             
-            System.out.println(WindowsCompatibility.Symbols.SUCCESS + " Server started successfully!");
-            System.out.println("   Server Name: " + instance.getServerName());
-            System.out.println("   Process ID:  " + instance.getPid());
-            System.out.println("   Port:        " + instance.getPort());
-            System.out.println("   URL:         http://localhost:" + instance.getPort());
-            System.out.println("   Web Root:    " + projectDir);
+            System.out.println(WindowsCompatibility.Symbols.SUCCESS + " " + StringOutput.msg("server.started"));
+            System.out.println("   " + StringOutput.msg("server.name", instance.getServerName()));
+            System.out.println("   " + StringOutput.msg("server.process.id", instance.getPid()));
+            System.out.println("   " + StringOutput.msg("server.port", instance.getPort()));
+            System.out.println("   " + StringOutput.msg("server.url", instance.getPort()));
+            System.out.println("   " + StringOutput.msg("server.webroot", projectDir));
         } catch (org.lucee.lucli.server.ServerConflictException e) {
             Timer.stop("Server Start Operation");
             System.out.println();
-            System.out.println(WindowsCompatibility.Symbols.WARNING + "  " + e.getMessage());
-            System.out.println();
-            System.out.println("Choose an option:");
-            System.out.println("  1. Replace the existing server (delete and recreate):");
-            System.out.println("     lucli server start --force");
-            System.out.println();
-            System.out.println("  2. Create server with suggested name '" + e.getSuggestedName() + "':");
-            System.out.println("     lucli server start --name " + e.getSuggestedName());
-            System.out.println();
-            System.out.println("  3. Create server with custom name:");
-            System.out.println("     lucli server start --name <your-name>");
-            System.out.println();
-            System.out.println(WindowsCompatibility.Symbols.BULB + " Use --force to replace existing servers, or --name to specify a different name.");
+            
+            java.util.Map<String, String> placeholders = new java.util.HashMap<>();
+            placeholders.put("ERROR_MESSAGE", e.getMessage());
+            placeholders.put("SUGGESTED_NAME", e.getSuggestedName());
+            
+            System.out.println(StringOutput.loadTextWithPlaceholders("/text/server-conflict.txt", placeholders));
             System.exit(EXIT_ERROR);
         }
     }
@@ -391,25 +317,25 @@ public class LuCLI {
         
         if (serverName != null) {
             // Stop server by name
-            System.out.println("Stopping server: " + serverName);
+            System.out.println(StringOutput.msg("server.stopping", serverName));
             boolean stopped = serverManager.stopServerByName(serverName);
             Timer.stop("Server Stop Operation");
             
             if (stopped) {
-                System.out.println(WindowsCompatibility.Symbols.SUCCESS + " Server '" + serverName + "' stopped successfully.");
+                System.out.println(WindowsCompatibility.Symbols.SUCCESS + " " + StringOutput.msg("server.stopped", serverName));
             } else {
-                System.out.println(WindowsCompatibility.Symbols.INFO + "  Server '" + serverName + "' not found or not running.");
+                System.out.println(WindowsCompatibility.Symbols.INFO + "  " + StringOutput.msg("server.not.found", serverName));
             }
         } else {
             // Stop server for current directory
-            System.out.println("Stopping server for: " + currentDir);
+            System.out.println(StringOutput.msg("server.status.for", currentDir));
             boolean stopped = serverManager.stopServer(currentDir);
             Timer.stop("Server Stop Operation");
             
             if (stopped) {
-                System.out.println(WindowsCompatibility.Symbols.SUCCESS + " Server stopped successfully.");
+                System.out.println(WindowsCompatibility.Symbols.SUCCESS + " " + StringOutput.msg("server.started"));
             } else {
-                System.out.println(WindowsCompatibility.Symbols.INFO + "  No running server found for this directory.");
+                System.out.println(WindowsCompatibility.Symbols.INFO + "  " + StringOutput.msg("server.not.running.current"));
             }
         }
     }
@@ -562,10 +488,10 @@ public class LuCLI {
         Files.createDirectories(patchesDir);
         
         if (verbose || debug) {
-            System.out.println("Configured Lucee directories:");
-            System.out.println("  LuCLI Home: " + lucliHome.toString());
-            System.out.println("  Lucee Server: " + luceeServerDir.toString());
-            System.out.println("  Patches: " + patchesDir.toString());
+            System.out.println(StringOutput.msg("config.lucee.directories"));
+            System.out.println("  " + StringOutput.msg("config.lucli.home", lucliHome.toString()));
+            System.out.println("  " + StringOutput.msg("config.lucee.server", luceeServerDir.toString()));
+            System.out.println("  " + StringOutput.msg("config.patches", patchesDir.toString()));
         }
 
         // Set Lucee system properties

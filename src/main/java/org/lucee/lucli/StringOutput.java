@@ -1,10 +1,14 @@
 package org.lucee.lucli;
 
 import java.io.PrintStream;
+import java.text.MessageFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.MissingResourceException;
+import java.util.ResourceBundle;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -26,6 +30,11 @@ public class StringOutput {
     private boolean enablePostProcessing = true;
     private final Object lock = new Object();
     
+    // Internationalization support
+    private Locale currentLocale;
+    private ResourceBundle messages;
+    private static final String MESSAGES_BUNDLE = "messages.messages";
+    
     // Placeholder patterns
     private static final String EMOJI_PREFIX = "EMOJI_";
     private static final String TIME_PREFIX = "TIME_";
@@ -38,6 +47,9 @@ public class StringOutput {
         this.settings = null; // Settings not used currently, can be added later if needed
         this.placeholderReplacements = new HashMap<>();
         this.placeholderPattern = Pattern.compile("\\$\\{([^}]+)\\}");
+        
+        // Initialize internationalization
+        initializeLocale();
         
         // Initialize default placeholder replacements
         initializeDefaultReplacements();
@@ -81,6 +93,26 @@ public class StringOutput {
             if (home == null) home = System.getenv("LUCLI_HOME");
             if (home == null) home = System.getProperty("user.home") + "/.lucli";
             return home;
+        });
+        placeholderReplacements.put("CFLINT_JAR_PATH", () -> {
+            try {
+                // Use reflection to get CFLintDownloader.getCFLintJarPath() to avoid tight coupling
+                Class<?> downloaderClass = Class.forName("org.lucee.lucli.cflint.CFLintDownloader");
+                java.lang.reflect.Method method = downloaderClass.getDeclaredMethod("getCFLintJarPath");
+                return method.invoke(null).toString();
+            } catch (Exception e) {
+                return "~/.lucli/cflint.jar";
+            }
+        });
+        placeholderReplacements.put("CFLINT_STATUS", () -> {
+            try {
+                // Use reflection to get CFLintDownloader.getCFLintStatus() to avoid tight coupling
+                Class<?> downloaderClass = Class.forName("org.lucee.lucli.cflint.CFLintDownloader");
+                java.lang.reflect.Method method = downloaderClass.getDeclaredMethod("getCFLintStatus");
+                return method.invoke(null).toString();
+            } catch (Exception e) {
+                return "unknown version";
+            }
         });
         
         // Emoji placeholders - delegate to WindowsCompatibility
@@ -355,6 +387,234 @@ public class StringOutput {
     @FunctionalInterface
     public interface PlaceholderSupplier {
         String get() throws Exception;
+    }
+    
+    /**
+     * Initialize the locale from system properties, environment variables, or user settings
+     * Priority order:
+     * 1. System property: -Dlucli.locale=xx
+     * 2. Environment variable: LUCLI_LOCALE=xx
+     * 3. User settings file: ~/.lucli/settings.json
+     * 4. Environment variable: LANG=xx
+     * 5. System default
+     */
+    private void initializeLocale() {
+        // Check for explicit locale setting
+        String localeStr = System.getProperty("lucli.locale");
+        if (localeStr == null) {
+            localeStr = System.getenv("LUCLI_LOCALE");
+        }
+        
+        // Check user settings file if no override specified
+        if (localeStr == null) {
+            try {
+                Settings settings = new Settings();
+                localeStr = settings.getLanguage();
+            } catch (Exception e) {
+                // Ignore settings loading errors, continue with other fallbacks
+            }
+        }
+        
+        if (localeStr == null) {
+            localeStr = System.getenv("LANG");
+        }
+        
+        if (localeStr != null) {
+            try {
+                // Parse locale string (e.g., "en_US", "es", "fr_FR")
+                if (localeStr.contains("_")) {
+                    String[] parts = localeStr.split("_");
+                    currentLocale = new Locale(parts[0], parts[1]);
+                } else {
+                    currentLocale = new Locale(localeStr);
+                }
+            } catch (Exception e) {
+                currentLocale = Locale.getDefault();
+            }
+        } else {
+            currentLocale = Locale.getDefault();
+        }
+        
+        // Load the resource bundle
+        loadMessages();
+    }
+    
+    /**
+     * Load the messages resource bundle for the current locale
+     */
+    private void loadMessages() {
+        try {
+            messages = ResourceBundle.getBundle(MESSAGES_BUNDLE, currentLocale);
+        } catch (MissingResourceException e) {
+            // Fallback to default locale
+            try {
+                messages = ResourceBundle.getBundle(MESSAGES_BUNDLE, Locale.ENGLISH);
+            } catch (MissingResourceException e2) {
+                // Create empty bundle if none found
+                messages = null;
+            }
+        }
+    }
+    
+    /**
+     * Get a localized message by key
+     * @param key The message key
+     * @return The localized message, or the key itself if not found
+     */
+    public String getMessage(String key) {
+        return getMessage(key, (Object[]) null);
+    }
+    
+    /**
+     * Get a localized message by key with arguments
+     * @param key The message key
+     * @param args Arguments to substitute in the message
+     * @return The localized message with arguments substituted, or the key itself if not found
+     */
+    public String getMessage(String key, Object... args) {
+        if (messages == null) {
+            // Fallback: return key with args if no bundle available
+            return args != null && args.length > 0 ? 
+                key + " [" + String.join(", ", java.util.Arrays.stream(args).map(String::valueOf).toArray(String[]::new)) + "]"
+                : key;
+        }
+        
+        try {
+            String message = messages.getString(key);
+            if (args != null && args.length > 0) {
+                return MessageFormat.format(message, args);
+            } else {
+                return message;
+            }
+        } catch (MissingResourceException e) {
+            // Return key as fallback
+            return args != null && args.length > 0 ? 
+                key + " [" + String.join(", ", java.util.Arrays.stream(args).map(String::valueOf).toArray(String[]::new)) + "]"
+                : key;
+        }
+    }
+    
+    /**
+     * Print a localized message by key
+     * @param key The message key
+     */
+    public void printlnMessage(String key) {
+        println(process(getMessage(key)));
+    }
+    
+    /**
+     * Print a localized message by key with arguments
+     * @param key The message key
+     * @param args Arguments to substitute in the message
+     */
+    public void printlnMessage(String key, Object... args) {
+        println(process(getMessage(key, args)));
+    }
+    
+    /**
+     * Get the current locale
+     * @return The current locale
+     */
+    public Locale getCurrentLocale() {
+        return currentLocale;
+    }
+    
+    /**
+     * Set the locale and reload messages
+     * @param locale The new locale
+     */
+    public void setLocale(Locale locale) {
+        this.currentLocale = locale;
+        loadMessages();
+    }
+    
+    /**
+     * Set the language preference in user settings and reload messages
+     * @param languageCode Language code (e.g., "es", "fr"), null or empty string for system default
+     */
+    public void setLanguagePreference(String languageCode) {
+        try {
+            Settings settings = new Settings();
+            // Treat empty string as null for clearing preference
+            String lang = (languageCode != null && languageCode.trim().isEmpty()) ? null : languageCode;
+            settings.setLanguage(lang);
+            
+            // Reinitialize locale to pick up the new setting
+            initializeLocale();
+        } catch (Exception e) {
+            // If settings update fails, continue without error
+            System.err.println("Warning: Could not update language preference: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Load text content from a resource file and process it through StringOutput
+     * @param resourcePath Path to the resource file (e.g., "/text/cflint-help.txt")
+     * @return Processed text content
+     * @throws Exception if the resource cannot be found or loaded
+     */
+    public String loadTextFromFile(String resourcePath) throws Exception {
+        try (java.io.InputStream is = StringOutput.class.getResourceAsStream(resourcePath)) {
+            if (is == null) {
+                throw new java.io.FileNotFoundException("Text resource not found: " + resourcePath);
+            }
+            String content = new String(is.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            return process(content);
+        }
+    }
+    
+    /**
+     * Static convenience method to load and process text from a resource file
+     * @param resourcePath Path to the resource file (e.g., "/text/cflint-help.txt")
+     * @return Processed text content, or an error message if loading fails
+     */
+    public static String loadText(String resourcePath) {
+        try {
+            return getInstance().loadTextFromFile(resourcePath);
+        } catch (Exception e) {
+            return "[ERROR: Could not load text from " + resourcePath + ": " + e.getMessage() + "]";
+        }
+    }
+    
+    /**
+     * Static convenience method to get a localized message
+     * @param key The message key
+     * @return The localized message
+     */
+    public static String msg(String key) {
+        return getInstance().getMessage(key);
+    }
+    
+    /**
+     * Static convenience method to get a localized message with arguments
+     * @param key The message key
+     * @param args Arguments to substitute in the message
+     * @return The localized message with arguments substituted
+     */
+    public static String msg(String key, Object... args) {
+        return getInstance().getMessage(key, args);
+    }
+    
+    /**
+     * Load text from a resource file and apply custom placeholder values
+     * @param resourcePath Path to the resource file
+     * @param customPlaceholders Map of custom placeholder key-value pairs
+     * @return Processed text content with custom placeholders applied
+     */
+    public static String loadTextWithPlaceholders(String resourcePath, java.util.Map<String, String> customPlaceholders) {
+        try {
+            String content = getInstance().loadTextFromFile(resourcePath);
+            
+            // Apply custom placeholders after standard processing
+            for (java.util.Map.Entry<String, String> entry : customPlaceholders.entrySet()) {
+                String placeholder = "${" + entry.getKey() + "}";
+                content = content.replace(placeholder, entry.getValue());
+            }
+            
+            return content;
+        } catch (Exception e) {
+            return "[ERROR: Could not load text from " + resourcePath + ": " + e.getMessage() + "]";
+        }
     }
     
     /**

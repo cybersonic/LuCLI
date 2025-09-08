@@ -12,6 +12,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.lucee.lucli.StringOutput;
+
 /**
  * Handles server log operations - viewing different types of logs with optional follow functionality
  */
@@ -328,35 +330,7 @@ public class LogCommand {
      * Show help for the log command
      */
     private static void showHelp() {
-        System.out.println("LuCLI Server Log Viewer");
-        System.out.println();
-        System.out.println("Usage: lucli server log [options] [log-name]");
-        System.out.println();
-        System.out.println("Options:");
-        System.out.println("  -t, --type TYPE          Log type: tomcat, server, web (default: tomcat)");
-        System.out.println("  -l, --log-name NAME      Specific log file name");
-        System.out.println("  -f, --follow             Follow log output (like tail -f)");
-        System.out.println("  -n, --lines NUMBER       Number of lines to display (default: 50)");
-        System.out.println("  -h, --help               Show this help message");
-        System.out.println();
-        System.out.println("Log Types:");
-        for (LogType type : LogType.values()) {
-            System.out.println("  " + type.getName() + " - " + type.getDescription());
-        }
-        System.out.println();
-        System.out.println("Examples:");
-        System.out.println("  lucli server log                           # Show recent Tomcat logs");
-        System.out.println("  lucli server log --type server             # Show Lucee server logs (application.log)");
-        System.out.println("  lucli server log --type server --log-name out.log  # Show specific server log");
-        System.out.println("  lucli server log --type web                # Show web application logs");
-        System.out.println("  lucli server log --follow                  # Follow Tomcat logs in real-time");
-        System.out.println("  lucli server log -t server -f -n 100       # Follow server logs, show last 100 lines first");
-        System.out.println();
-        System.out.println("Available Server Log Files:");
-        System.out.println("  application.log, datasource.log, deploy.log, exception.log,");
-        System.out.println("  execute.log, gateway.log, http.log, mail.log, mapping.log,");
-        System.out.println("  memory.log, orm.log, out.log, rest.log, scheduler.log,");
-        System.out.println("  scope.log, search.log, thread.log");
+        System.out.println(StringOutput.loadText("/text/log-help.txt"));
     }
     
     /**

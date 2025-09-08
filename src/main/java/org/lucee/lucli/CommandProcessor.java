@@ -126,8 +126,8 @@ public class CommandProcessor {
                 case "interactive":
                     result = interactiveCommand(args);
                     break;
-                case "lint":
-                    result = lintCommand(commandLine);
+                case "cflint":
+                    result = cflintCommand(commandLine);
                     break;
                 default:
                     result = "❌ Unknown command: " + command + "\n💡 Type 'help' for available commands.";
@@ -1255,7 +1255,7 @@ public class CommandProcessor {
     /**
      * Handle lint command - CFML code linting using CFLint
      */
-    private String lintCommand(String commandLine) {
+    private String cflintCommand(String commandLine) {
         try {
             // Capture output from CFLint command
             java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();

@@ -1,0 +1,11 @@
+📋 CFLint Configuration Help:
+══════════════════════════════════════════════════
+Create a .cflintrc file in your project root with configuration options.
+See: https://github.com/cfmleditor/CFLint/wiki/Configuration
+
+Example .cflintrc:
+{
+  "rule": [],
+  "excludes": [],
+  "includes": []
+}

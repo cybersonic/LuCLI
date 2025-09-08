@@ -1,0 +1,2 @@
+Usage: lucli lint [options] <files/directories>
+Use 'lucli lint help' for more information.
