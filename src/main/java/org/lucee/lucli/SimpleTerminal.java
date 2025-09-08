@@ -338,7 +338,7 @@ public class SimpleTerminal {
      */
     private static boolean isUnifiedCommand(String command) {
         // List of commands handled by UnifiedCommandExecutor
-        String[] unifiedCommands = {"server", "modules", "monitor", "lint"};
+        String[] unifiedCommands = {"server", "modules", "monitor", "cflint"};
         
         for (String unifiedCommand : unifiedCommands) {
             if (command.equalsIgnoreCase(unifiedCommand)) {

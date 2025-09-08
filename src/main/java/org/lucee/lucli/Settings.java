@@ -83,6 +83,9 @@ public class Settings {
         
         defaultSettings.put("historySize", 1000);
         
+        // Default language preference (null means system default)
+        defaultSettings.putNull("language");
+        
         ObjectNode promptSettings = objectMapper.createObjectNode();
         promptSettings.put("showPath", true);
         promptSettings.put("showTime", false);
@@ -239,6 +242,30 @@ public class Settings {
      */
     public Path getSettingsDir() {
         return settingsDir;
+    }
+    
+    /**
+     * Get current language preference
+     * @return Language code (e.g., "es", "fr") or null for system default
+     */
+    public String getLanguage() {
+        JsonNode node = settings.path("language");
+        return node.isMissingNode() || node.isNull() ? null : node.asText();
+    }
+    
+    /**
+     * Set language preference
+     * @param languageCode Language code (e.g., "es", "fr") or null for system default
+     */
+    public void setLanguage(String languageCode) {
+        if (settings instanceof ObjectNode) {
+            if (languageCode == null) {
+                ((ObjectNode) settings).putNull("language");
+            } else {
+                ((ObjectNode) settings).put("language", languageCode);
+            }
+            saveSettings();
+        }
     }
     
     /**

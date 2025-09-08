@@ -1,0 +1,29 @@
+Usage: lucli server monitor [options]
+
+Monitor Lucee servers via JMX in three different ways:
+  1. Auto-detect server in current directory (default)
+  2. Monitor a named server instance
+  3. Connect to arbitrary JMX endpoint
+
+Options:
+  --name, -n     Monitor a named server instance
+  --host, -h     JMX host (for arbitrary endpoints)
+  --port, -p     JMX port (for arbitrary endpoints)
+  --refresh, -r  Refresh interval in seconds (default: 3)
+  --help         Show this help message
+
+Examples:
+  # Monitor server in current directory (auto-detected)
+  lucli server monitor
+
+  # Monitor a specific named server
+  lucli server monitor --name my-app
+
+  # Monitor arbitrary JMX endpoint
+  lucli server monitor --host myserver --port 9999
+
+  # Customize refresh interval
+  lucli server monitor --refresh 5
+
+Note: JMX monitoring must be enabled in the target server's lucee.json.
+      Use 'lucli server list' to see available managed servers.

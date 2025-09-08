@@ -1,0 +1,10 @@
+{
+  "rule": [
+    {
+      "name": "CFLint",
+      "className": "com.cflint.plugins.core.*"
+    }
+  ],
+  "excludes": [],
+  "includes": []
+}

@@ -1,0 +1,29 @@
+LuCLI Server Log Viewer
+
+Usage: lucli server log [options] [log-name]
+
+Options:
+  -t, --type TYPE          Log type: tomcat, server, web (default: tomcat)
+  -l, --log-name NAME      Specific log file name
+  -f, --follow             Follow log output (like tail -f)
+  -n, --lines NUMBER       Number of lines to display (default: 50)
+  -h, --help               Show this help message
+
+Log Types:
+  tomcat - Tomcat server logs (catalina.out, access logs)
+  server - Lucee server logs (application.log, datasource.log, etc.)
+  web - Web application logs
+
+Examples:
+  lucli server log                           # Show recent Tomcat logs
+  lucli server log --type server             # Show Lucee server logs (application.log)
+  lucli server log --type server --log-name out.log  # Show specific server log
+  lucli server log --type web                # Show web application logs
+  lucli server log --follow                  # Follow Tomcat logs in real-time
+  lucli server log -t server -f -n 100       # Follow server logs, show last 100 lines first
+
+Available Server Log Files:
+  application.log, datasource.log, deploy.log, exception.log,
+  execute.log, gateway.log, http.log, mail.log, mapping.log,
+  memory.log, orm.log, out.log, rest.log, scheduler.log,
+  scope.log, search.log, thread.log

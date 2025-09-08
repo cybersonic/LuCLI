@@ -1,0 +1,42 @@
+{
+  "name": "lang",
+  "version": "1.0.0",
+  "description": "Language and locale management for LuCLI - switch between supported languages",
+  "author": "LuCLI Team",
+  "keywords": ["language", "locale", "i18n", "internationalization", "translation"],
+  "category": "utility",
+  "license": "MIT",
+  "created": "2025-01-05",
+  "main": "Module.cfc",
+  "dependencies": {},
+  "lucli": {
+    "version": ">=1.0.0"
+  },
+  "commands": [
+    {
+      "name": "lang",
+      "description": "Manage language and locale settings",
+      "usage": "lucli lang [command] [options]",
+      "examples": [
+        "lucli lang",
+        "lucli lang list",
+        "lucli lang current", 
+        "lucli lang set es",
+        "lucli lang help"
+      ]
+    }
+  ],
+  "features": [
+    "List available languages (English, Spanish, French)",
+    "Show current locale and language settings",
+    "Provide instructions to switch languages",
+    "Display language-specific information with flags and native names",
+    "Support for LUCLI_LOCALE environment variable",
+    "Integration with Java Locale system"
+  ],
+  "supported_languages": [
+    {"code": "en", "name": "English", "native": "English", "flag": "🇺🇸"},
+    {"code": "es", "name": "Spanish", "native": "Español", "flag": "🇪🇸"}, 
+    {"code": "fr", "name": "French", "native": "Français", "flag": "🇫🇷"}
+  ]
+}

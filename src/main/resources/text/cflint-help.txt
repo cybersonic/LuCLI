@@ -1,0 +1,24 @@
+LuCLI Lint Commands:
+══════════════════════════════════════════════════
+  lucli lint <files/dirs>           - Lint CFML files or directories
+  lucli lint check <files/dirs>     - Same as above (explicit)
+  lucli lint rules                  - List available linting rules
+  lucli lint config                 - Show configuration help
+  lucli lint config init            - Create default .cflintrc file
+  lucli lint status                 - Show CFLint installation status
+
+Options:
+  --format, -f <format>             - Output format: text, json, xml (default: text)
+  --config, -c <file>               - Use specific configuration file
+  --verbose, -v                     - Verbose output
+  --show-rule, -r                   - Show rule names in output
+  --quiet, -q                       - Minimal output
+
+Examples:
+  lucli lint .                      - Lint current directory
+  lucli lint src/                   - Lint src directory
+  lucli lint Application.cfc        - Lint specific file
+  lucli lint --format json src/     - Output results as JSON
+  lucli lint --config .cflintrc .   - Use custom config file
+
+📋 Note: CFLint will be downloaded automatically on first use.
