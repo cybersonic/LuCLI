@@ -40,7 +40,7 @@ mvn clean package -Pbinary
 ./dev-lucli.sh
 
 # Run simple tests
-./test-simple.sh
+./test/test-simple.sh
 ```
 
 ### Running the Application
