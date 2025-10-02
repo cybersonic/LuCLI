@@ -125,8 +125,8 @@ This helps keep test server instances organized and separate from production env
 - **Settings.java**: User settings persistence
 - **StringOutput.java**: Centralized output post-processing with emoji/placeholder support
 - **WindowsCompatibility.java**: Smart emoji detection and terminal capability analysis
-- **CFMLCompleter.java & LuCLICompleter.java**: Command auto-completion
-- **CFMLSyntaxHighlighter.java**: Syntax highlighting for CFML
+- **CfmlCompleter.java & LucliCompleter.java**: Command auto-completion
+- **CfmlSyntaxHighlighter.java**: Syntax highlighting for CFML
 - **FileSystemState.java**: Working directory tracking
 
 ## Key Design Patterns
