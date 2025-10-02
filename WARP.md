@@ -100,7 +100,7 @@ This helps keep test server instances organized and separate from production env
 ### Core Components
 
 - **LuCLI.java**: Main entry point handling command-line argument parsing and dispatching
-- **SimpleTerminal.java**: Interactive terminal mode with JLine integration
+- **InteractiveTerminal.java**: Interactive terminal mode with JLine integration
 - **LuceeScriptEngine.java**: Lucee CFML engine integration wrapper with externalized script templates
 - **StringOutput.java**: Centralized output post-processor with emoji handling and placeholder substitution
 - **CommandProcessor.java**: Internal command processing (file operations, system commands)

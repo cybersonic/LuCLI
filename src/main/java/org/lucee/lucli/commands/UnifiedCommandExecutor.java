@@ -412,7 +412,7 @@ public class UnifiedCommandExecutor {
         }
         
         String configCommand = args[1];
-        SimpleServerConfigHelper configHelper = new SimpleServerConfigHelper();
+        ServerConfigHelper configHelper = new ServerConfigHelper();
         
         switch (configCommand.toLowerCase()) {
             case "get":
@@ -425,7 +425,7 @@ public class UnifiedCommandExecutor {
         }
     }
     
-    private String handleConfigGet(SimpleServerConfigHelper configHelper, String[] args) throws Exception {
+    private String handleConfigGet(ServerConfigHelper configHelper, String[] args) throws Exception {
         if (args.length < 3) {
             return formatOutput("❌ config get: missing key\n💡 Usage: server config get <key>", true);
         }
@@ -446,7 +446,7 @@ public class UnifiedCommandExecutor {
         }
     }
     
-    private String handleConfigSet(SimpleServerConfigHelper configHelper, String[] args) throws Exception {
+    private String handleConfigSet(ServerConfigHelper configHelper, String[] args) throws Exception {
         if (args.length < 3) {
             return formatOutput("❌ config set: missing key=value\n" +
                 "💡 Usage: server config set <key=value>\n" +

@@ -839,8 +839,8 @@ public class LuCLICompleter implements Completer {
      */
     private void completeConfigKeys(String partial, List<Candidate> candidates) {
         try {
-            // Use SimpleServerConfigHelper to get available keys
-            org.lucee.lucli.commands.SimpleServerConfigHelper configHelper = new org.lucee.lucli.commands.SimpleServerConfigHelper();
+            // Use ServerConfigHelper to get available keys
+            org.lucee.lucli.commands.ServerConfigHelper configHelper = new org.lucee.lucli.commands.ServerConfigHelper();
             List<String> availableKeys = configHelper.getAvailableKeys();
             
             for (String key : availableKeys) {
@@ -894,7 +894,7 @@ public class LuCLICompleter implements Completer {
         } else {
             // Complete keys with '=' suffix
             try {
-                org.lucee.lucli.commands.SimpleServerConfigHelper configHelper = new org.lucee.lucli.commands.SimpleServerConfigHelper();
+                org.lucee.lucli.commands.ServerConfigHelper configHelper = new org.lucee.lucli.commands.ServerConfigHelper();
                 List<String> availableKeys = configHelper.getAvailableKeys();
                 
                 for (String key : availableKeys) {
@@ -944,7 +944,7 @@ public class LuCLICompleter implements Completer {
             case "version":
                 // Complete Lucee versions
                 try {
-                    org.lucee.lucli.commands.SimpleServerConfigHelper configHelper = new org.lucee.lucli.commands.SimpleServerConfigHelper();
+                    org.lucee.lucli.commands.ServerConfigHelper configHelper = new org.lucee.lucli.commands.ServerConfigHelper();
                     List<String> versions = configHelper.getAvailableVersions();
                     
                     for (String version : versions) {

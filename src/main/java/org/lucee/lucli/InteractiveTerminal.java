@@ -16,9 +16,9 @@ import org.jline.terminal.TerminalBuilder;
 import org.lucee.lucli.commands.UnifiedCommandExecutor;
 import org.lucee.lucli.modules.ModuleCommand;
 
-public class SimpleTerminal {
+public class InteractiveTerminal {
     private static LuceeScriptEngine luceeEngine;
-    private static Terminal terminal;
+    private static org.jline.terminal.Terminal terminal;
     private static CommandProcessor commandProcessor;
     private static ExternalCommandProcessor externalCommandProcessor;
     private static UnifiedCommandExecutor unifiedExecutor;
@@ -294,7 +294,7 @@ public class SimpleTerminal {
      * Read a script template from resources
      */
     private static String readScriptTemplate(String templatePath) throws Exception {
-        try (java.io.InputStream is = SimpleTerminal.class.getResourceAsStream(templatePath)) {
+        try (java.io.InputStream is = InteractiveTerminal.class.getResourceAsStream(templatePath)) {
             if (is == null) {
                 throw new java.io.FileNotFoundException("Script template not found: " + templatePath);
             }

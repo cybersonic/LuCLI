@@ -205,13 +205,13 @@ public class CompletionIntegrationTest {
     }
 
     /**
-     * Integration test that verifies the SimpleServerConfigHelper works
+     * Integration test that verifies the ServerConfigHelper works
      */
     @Test
     void testVersionHelperIntegration() {
         try {
-            org.lucee.lucli.commands.SimpleServerConfigHelper helper = 
-                new org.lucee.lucli.commands.SimpleServerConfigHelper();
+            org.lucee.lucli.commands.ServerConfigHelper helper = 
+                new org.lucee.lucli.commands.ServerConfigHelper();
             
             List<String> versions = helper.getAvailableVersions();
             
@@ -224,7 +224,7 @@ public class CompletionIntegrationTest {
             
             assertTrue(has7xVersions, "Should have 7.x versions available");
             
-            System.out.println("Available versions from SimpleServerConfigHelper:");
+            System.out.println("Available versions from ServerConfigHelper:");
             versions.forEach(version -> {
                 if (version.startsWith("7")) {
                     System.out.println("  " + version + " (7.x version)");
@@ -234,7 +234,7 @@ public class CompletionIntegrationTest {
             });
             
         } catch (Exception e) {
-            fail("SimpleServerConfigHelper integration test failed: " + e.getMessage());
+            fail("ServerConfigHelper integration test failed: " + e.getMessage());
         }
     }
 }
