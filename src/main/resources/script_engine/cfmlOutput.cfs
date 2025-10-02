@@ -1,6 +1,6 @@
 // CFML Expression Output Script
 // This script evaluates a CFML expression and outputs the result
-// Replaces: SimpleTerminal.createOutputScript()
+// Replaces: InteractiveTerminal.createOutputScript()
 //
 // Parameters:
 // - cfmlExpression: The CFML expression to evaluate

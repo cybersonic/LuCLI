@@ -42,7 +42,7 @@ public class LuCLI {
 
             // Determine if we're running in terminal mode or one-shot command mode
             if (parseResult.scriptFile != null) {
-                // One-shot command mode - pass command and args to SimpleTerminal
+                // One-shot command mode - pass command and args to InteractiveTerminal
                 Timer.start("One-Shot Command Mode");
                 
                 List<String> terminalArgs = new ArrayList<>();
@@ -51,12 +51,12 @@ public class LuCLI {
                     terminalArgs.addAll(Arrays.asList(parseResult.scriptArgs));
                 }
                 
-                SimpleTerminal.main(terminalArgs.toArray(new String[0]));
+                InteractiveTerminal.main(terminalArgs.toArray(new String[0]));
                 Timer.stop("One-Shot Command Mode");
             } else {
                 // Interactive terminal mode
                 Timer.start("Terminal Mode");
-                SimpleTerminal.main(new String[0]);
+                InteractiveTerminal.main(new String[0]);
                 Timer.stop("Terminal Mode");
             }
         } catch(Exception e) {

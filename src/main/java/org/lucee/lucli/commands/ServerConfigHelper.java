@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
  * Simplified helper class for server configuration operations
  * Handles basic configuration get/set operations and provides version caching placeholder
  */
-public class SimpleServerConfigHelper {
+public class ServerConfigHelper {
     
     private static final String CACHE_DIR = System.getProperty("user.home") + "/.lucli";
     private static final String VERSION_CACHE_FILE = "lucee-versions.json";

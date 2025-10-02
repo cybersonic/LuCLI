@@ -137,7 +137,7 @@ run_test "Settings directory can be created" "mkdir -p ~/.lucli && echo 'Setting
 # Test 3: Terminal Commands
 echo -e "${BLUE}=== Terminal Commands Tests ===${NC}"
 run_test "Version command works" "java -jar ../$LUCLI_JAR --version > /dev/null"
-run_test "Terminal classes included" "jar -tf ../$LUCLI_JAR | grep -q 'SimpleTerminal' || echo 'Terminal classes found'"
+run_test "Terminal classes included" "jar -tf ../$LUCLI_JAR | grep -q 'InteractiveTerminal' || echo 'Terminal classes found'"
 run_test "Command processor available" "jar -tf ../$LUCLI_JAR | grep -q 'CommandProcessor' || echo 'Command processing available'"
 
 # Test 4: Directory Operations
