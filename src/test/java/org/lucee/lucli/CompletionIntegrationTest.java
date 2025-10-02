@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
  */
 public class CompletionIntegrationTest {
 
-    private LuCLICompleter completer;
+    private LucliCompleter completer;
     private DefaultParser parser;
     private MockCommandProcessor mockProcessor;
 
@@ -44,7 +44,7 @@ public class CompletionIntegrationTest {
     @BeforeEach
     void setUp() {
         mockProcessor = new MockCommandProcessor();
-        completer = new LuCLICompleter(mockProcessor);
+        completer = new LucliCompleter(mockProcessor);
         parser = new DefaultParser();
     }
 

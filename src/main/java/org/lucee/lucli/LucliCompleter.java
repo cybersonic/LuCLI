@@ -14,7 +14,7 @@ import java.util.stream.Stream;
 /**
  * Tab completion for LuCLI commands and file paths
  */
-public class LuCLICompleter implements Completer {
+public class LucliCompleter implements Completer {
     private final CommandProcessor commandProcessor;
     private final String[] commands = {
         "ls", "dir", "cd", "pwd", "mkdir", "rmdir", "rm", "cp", "mv", 
@@ -22,7 +22,7 @@ public class LuCLICompleter implements Completer {
         "help", "exit", "quit", "clear", "history", "env", "echo", "server", "lint"
     };
     
-    public LuCLICompleter(CommandProcessor commandProcessor) {
+    public LucliCompleter(CommandProcessor commandProcessor) {
         this.commandProcessor = commandProcessor;
     }
     
@@ -693,7 +693,7 @@ public class LuCLICompleter implements Completer {
         
         if (currentFunction != null && !currentFunction.trim().isEmpty()) {
             // Get CFML function completions
-            List<Candidate> cfmlCandidates = CFMLCompleter.getCompletions(currentFunction);
+            List<Candidate> cfmlCandidates = CfmlCompleter.getCompletions(currentFunction);
             candidates.addAll(cfmlCandidates);
         }
     }

@@ -8,7 +8,7 @@ import java.util.regex.Pattern;
  * Basic CFML syntax highlighting for terminal display
  * Provides ANSI color codes for different CFML language elements
  */
-public class CFMLSyntaxHighlighter {
+public class CfmlSyntaxHighlighter {
     
     // ANSI color codes
     public static final String RESET = "\u001B[0m";
@@ -129,7 +129,7 @@ public class CFMLSyntaxHighlighter {
             // Highlight functions
             result = FUNCTION_PATTERN.matcher(result).replaceAll(match -> {
                 String functionName = match.group();
-                if (COMMON_FUNCTIONS.contains(functionName) || CFMLCompleter.hasFunction(functionName)) {
+                if (COMMON_FUNCTIONS.contains(functionName) || CfmlCompleter.hasFunction(functionName)) {
                     return FUNCTION + functionName + RESET;
                 }
                 return functionName;

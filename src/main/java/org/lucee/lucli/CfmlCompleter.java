@@ -9,7 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Provides tab completion for CFML functions using Lucee's built-in function introspection
  */
-public class CFMLCompleter {
+public class CfmlCompleter {
     private static final Map<String, Set<String>> functionCache = new ConcurrentHashMap<>();
     private static final Map<String, FunctionInfo> functionDataCache = new ConcurrentHashMap<>();
     private static boolean cacheInitialized = false;
