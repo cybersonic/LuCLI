@@ -21,7 +21,7 @@ public class SimpleTerminal {
     private static Terminal terminal;
     private static CommandProcessor commandProcessor;
     private static ExternalCommandProcessor externalCommandProcessor;
-    private static CommandDispatcher commandDispatcher;
+    private static UnifiedCommandExecutor unifiedExecutor;
     
     /**
      * Main entry point for terminal mode
@@ -43,19 +43,54 @@ public class SimpleTerminal {
      */
     private static void executeOneShotCommand(String[] args) throws Exception {
         Path currentDir = Paths.get(System.getProperty("user.dir"));
-        commandDispatcher = new CommandDispatcher(false, currentDir);
+        unifiedExecutor = new UnifiedCommandExecutor(false, currentDir);
         
         String command = args[0];
         String[] commandArgs = args.length > 1 ? Arrays.copyOfRange(args, 1, args.length) : new String[0];
         
-        CommandDispatcher.CommandResult result = commandDispatcher.dispatch(command, commandArgs);
-        
-        if (result.output != null && !result.output.isEmpty()) {
-            System.out.println(result.output);
+        // Handle basic commands first
+        switch (command.toLowerCase()) {
+            case "--version":
+            case "version":
+                System.out.println(LuCLI.getVersionInfo());
+                return;
+            case "--lucee-version":
+            case "lucee-version":
+                showLuceeVersionNonInteractive();
+                return;
+            case "help":
+            case "--help":
+            case "-h":
+                showHelpNonInteractive();
+                return;
         }
         
-        if (result.shouldExit) {
-            System.exit(0);
+        // Check if it's a command that UnifiedCommandExecutor handles
+        if (isMainCommand(command)) {
+            String result = unifiedExecutor.executeCommand(command, commandArgs);
+            if (result != null && !result.isEmpty()) {
+                System.out.println(result);
+            }
+        } else {
+            // For other commands like scripts, modules, etc., we need different handling
+            // Check if it's a module
+            if (ModuleCommand.moduleExists(command)) {
+                try {
+                    executeModule(command, commandArgs);
+                } catch (Exception e) {
+                    System.err.println("Error executing module '" + command + "': " + e.getMessage());
+                    System.exit(1);
+                }
+            } else {
+                // Try as CFML script
+                try {
+                    LuceeScriptEngine.getInstance(LuCLI.verbose, LuCLI.debug)
+                            .executeScript(command, commandArgs);
+                } catch (Exception e) {
+                    System.err.println("Error executing script '" + command + "': " + e.getMessage());
+                    System.exit(1);
+                }
+            }
         }
     }
     
@@ -66,9 +101,9 @@ public class SimpleTerminal {
         // Configure Windows-friendly terminal environment
         WindowsCompatibility.configureTerminalEnvironment();
         
-        // Initialize command dispatcher for interactive mode
+        // Initialize unified command executor for interactive mode
         Path currentDir = Paths.get(System.getProperty("user.dir"));
-        commandDispatcher = new CommandDispatcher(true, currentDir);
+        unifiedExecutor = new UnifiedCommandExecutor(true, currentDir);
         
         try {
             terminal = TerminalBuilder.builder()
@@ -144,15 +179,11 @@ public class SimpleTerminal {
                         cmdArgs = parseArguments(parts[1]);
                     }
                     
-                    // Try CommandDispatcher first for main commands (server, modules, help, version, etc.)
+                    // Try UnifiedCommandExecutor first for main commands (server, modules, etc.)
                     if (isMainCommand(command)) {
-                        CommandDispatcher.CommandResult result = commandDispatcher.dispatch(command, cmdArgs);
-                        if (result.output != null && !result.output.isEmpty()) {
-                            terminal.writer().println(result.output);
-                        }
-                        if (result.shouldExit) {
-                            // Some commands like monitor will request exit
-                            break;
+                        String result = unifiedExecutor.executeCommand(command, cmdArgs);
+                        if (result != null && !result.isEmpty()) {
+                            terminal.writer().println(result);
                         }
                     } else {
                         // Fall back to ExternalCommandProcessor for file system commands and external commands
@@ -336,16 +367,43 @@ public class SimpleTerminal {
         terminal.writer().println();
     }
     
-    // Note: executeModule method removed - now handled by CommandDispatcher
+    /**
+     * Execute a module in terminal mode (similar to CLI mode logic)
+     */
+    private static void executeModule(String moduleName, String[] moduleArgs) throws Exception {
+        // Capture output from module execution and display in terminal
+        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+        java.io.PrintStream originalOut = System.out;
+        java.io.PrintStream originalErr = System.err;
+        
+        try {
+            // Redirect System.out/err to capture module output
+            System.setOut(new java.io.PrintStream(baos));
+            System.setErr(new java.io.PrintStream(baos));
+            
+            // Execute module using ModuleCommand (same as CLI mode)
+            ModuleCommand.executeModuleByName(moduleName, moduleArgs);
+            
+            // Get captured output and display in terminal
+            String output = baos.toString().trim();
+            if (!output.isEmpty()) {
+                System.out.println(output);
+            }
+            
+        } finally {
+            // Always restore original streams
+            System.setOut(originalOut);
+            System.setErr(originalErr);
+        }
+    }
     
     /**
-     * Check if a command should be handled by the CommandDispatcher
+     * Check if a command should be handled by the UnifiedCommandExecutor
      */
     private static boolean isMainCommand(String command) {
-        // List of commands handled by CommandDispatcher
+        // List of commands handled by UnifiedCommandExecutor
         String[] mainCommands = {
-            "server", "modules", "cflint", "help", "--help", "-h",
-            "version", "--version", "lucee-version", "--lucee-version"
+            "server", "modules", "monitor"
         };
         
         for (String mainCommand : mainCommands) {
@@ -354,8 +412,7 @@ public class SimpleTerminal {
             }
         }
         
-        // Also check if it's a module name or script file
-        return ModuleCommand.moduleExists(command) || command.endsWith(".cfs") || command.endsWith(".cfm");
+        return false;
     }
     
     /**
@@ -400,6 +457,33 @@ public class SimpleTerminal {
         }
         
         return args.toArray(new String[0]);
+    }
+    
+    /**
+     * Show Lucee version for non-interactive mode
+     */
+    private static void showLuceeVersionNonInteractive() {
+        try {
+            LuceeScriptEngine engine = LuceeScriptEngine.getInstance(true, false);
+            
+            if (engine == null) {
+                System.out.println("LuceeScriptEngine instance is null. Lucee may not be properly initialized.");
+                return;
+            }
+
+            engine.eval("version = SERVER.LUCEE.version");
+            System.out.println("Lucee Version: " + engine.getEngine().get("version"));
+            
+        } catch (Exception e) {
+            System.err.println("Error getting Lucee version: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Show help for non-interactive mode
+     */
+    private static void showHelpNonInteractive() {
+        System.out.println(StringOutput.loadText("/text/main-help.txt"));
     }
 }
 
