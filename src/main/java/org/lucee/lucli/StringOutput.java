@@ -115,7 +115,7 @@ public class StringOutput {
             }
         });
         
-        // Emoji placeholders - delegate to WindowsCompatibility
+        // Emoji placeholders - delegate to WindowsSupport
         initializeEmojiReplacements();
     }
     
@@ -123,29 +123,29 @@ public class StringOutput {
      * Initialize emoji placeholder replacements
      */
     private void initializeEmojiReplacements() {
-        placeholderReplacements.put("EMOJI_SUCCESS", () -> WindowsCompatibility.getEmoji("✅", "[OK]"));
-        placeholderReplacements.put("EMOJI_ERROR", () -> WindowsCompatibility.getEmoji("❌", "[ERROR]"));
-        placeholderReplacements.put("EMOJI_WARNING", () -> WindowsCompatibility.getEmoji("⚠️", "[WARNING]"));
-        placeholderReplacements.put("EMOJI_INFO", () -> WindowsCompatibility.getEmoji("ℹ️", "[INFO]"));
-        placeholderReplacements.put("EMOJI_ROCKET", () -> WindowsCompatibility.getEmoji("🚀", ""));
-        placeholderReplacements.put("EMOJI_FOLDER", () -> WindowsCompatibility.getEmoji("📁", ""));
-        placeholderReplacements.put("EMOJI_COMPUTER", () -> WindowsCompatibility.getEmoji("💻", "[CMD]"));
-        placeholderReplacements.put("EMOJI_TOOL", () -> WindowsCompatibility.getEmoji("🔧", "[TOOL]"));
-        placeholderReplacements.put("EMOJI_ART", () -> WindowsCompatibility.getEmoji("🎨", "[STYLE]"));
-        placeholderReplacements.put("EMOJI_WAVE", () -> WindowsCompatibility.getEmoji("👋", "[BYE]"));
-        placeholderReplacements.put("EMOJI_BULB", () -> WindowsCompatibility.getEmoji("💡", "[TIP]"));
+        placeholderReplacements.put("EMOJI_SUCCESS", () -> WindowsSupport.getEmoji("✅", "[OK]"));
+        placeholderReplacements.put("EMOJI_ERROR", () -> WindowsSupport.getEmoji("❌", "[ERROR]"));
+        placeholderReplacements.put("EMOJI_WARNING", () -> WindowsSupport.getEmoji("⚠️", "[WARNING]"));
+        placeholderReplacements.put("EMOJI_INFO", () -> WindowsSupport.getEmoji("ℹ️", "[INFO]"));
+        placeholderReplacements.put("EMOJI_ROCKET", () -> WindowsSupport.getEmoji("🚀", ""));
+        placeholderReplacements.put("EMOJI_FOLDER", () -> WindowsSupport.getEmoji("📁", ""));
+        placeholderReplacements.put("EMOJI_COMPUTER", () -> WindowsSupport.getEmoji("💻", "[CMD]"));
+        placeholderReplacements.put("EMOJI_TOOL", () -> WindowsSupport.getEmoji("🔧", "[TOOL]"));
+        placeholderReplacements.put("EMOJI_ART", () -> WindowsSupport.getEmoji("🎨", "[STYLE]"));
+        placeholderReplacements.put("EMOJI_WAVE", () -> WindowsSupport.getEmoji("👋", "[BYE]"));
+        placeholderReplacements.put("EMOJI_BULB", () -> WindowsSupport.getEmoji("💡", "[TIP]"));
         
         // Additional emoji placeholders
-        placeholderReplacements.put("EMOJI_FIRE", () -> WindowsCompatibility.getEmoji("🔥", "[HOT]"));
-        placeholderReplacements.put("EMOJI_STAR", () -> WindowsCompatibility.getEmoji("⭐", "[*]"));
-        placeholderReplacements.put("EMOJI_HEART", () -> WindowsCompatibility.getEmoji("❤️", "<3"));
-        placeholderReplacements.put("EMOJI_THUMBS_UP", () -> WindowsCompatibility.getEmoji("👍", "[+]"));
-        placeholderReplacements.put("EMOJI_CLOCK", () -> WindowsCompatibility.getEmoji("🕐", "[TIME]"));
-        placeholderReplacements.put("EMOJI_GEAR", () -> WindowsCompatibility.getEmoji("⚙️", "[CONFIG]"));
-        placeholderReplacements.put("EMOJI_LIGHTNING", () -> WindowsCompatibility.getEmoji("⚡", "[FAST]"));
-        placeholderReplacements.put("EMOJI_SHIELD", () -> WindowsCompatibility.getEmoji("🛡️", "[SECURE]"));
-        placeholderReplacements.put("EMOJI_MAGNIFYING_GLASS", () -> WindowsCompatibility.getEmoji("🔍", "[SEARCH]"));
-        placeholderReplacements.put("EMOJI_PACKAGE", () -> WindowsCompatibility.getEmoji("📦", "[PKG]"));
+        placeholderReplacements.put("EMOJI_FIRE", () -> WindowsSupport.getEmoji("🔥", "[HOT]"));
+        placeholderReplacements.put("EMOJI_STAR", () -> WindowsSupport.getEmoji("⭐", "[*]"));
+        placeholderReplacements.put("EMOJI_HEART", () -> WindowsSupport.getEmoji("❤️", "<3"));
+        placeholderReplacements.put("EMOJI_THUMBS_UP", () -> WindowsSupport.getEmoji("👍", "[+]"));
+        placeholderReplacements.put("EMOJI_CLOCK", () -> WindowsSupport.getEmoji("🕐", "[TIME]"));
+        placeholderReplacements.put("EMOJI_GEAR", () -> WindowsSupport.getEmoji("⚙️", "[CONFIG]"));
+        placeholderReplacements.put("EMOJI_LIGHTNING", () -> WindowsSupport.getEmoji("⚡", "[FAST]"));
+        placeholderReplacements.put("EMOJI_SHIELD", () -> WindowsSupport.getEmoji("🛡️", "[SECURE]"));
+        placeholderReplacements.put("EMOJI_MAGNIFYING_GLASS", () -> WindowsSupport.getEmoji("🔍", "[SEARCH]"));
+        placeholderReplacements.put("EMOJI_PACKAGE", () -> WindowsSupport.getEmoji("📦", "[PKG]"));
     }
     
     /**
@@ -237,17 +237,17 @@ public class StringOutput {
     private String getDynamicEmoji(String emojiName) {
         switch (emojiName.toUpperCase()) {
             case "SUCCESS": case "OK": case "CHECK":
-                return WindowsCompatibility.getEmoji("✅", "[OK]");
+                return WindowsSupport.getEmoji("✅", "[OK]");
             case "ERROR": case "FAIL": case "X":
-                return WindowsCompatibility.getEmoji("❌", "[ERROR]");
+                return WindowsSupport.getEmoji("❌", "[ERROR]");
             case "WARNING": case "WARN":
-                return WindowsCompatibility.getEmoji("⚠️", "[WARNING]");
+                return WindowsSupport.getEmoji("⚠️", "[WARNING]");
             case "INFO": case "INFORMATION":
-                return WindowsCompatibility.getEmoji("ℹ️", "[INFO]");
+                return WindowsSupport.getEmoji("ℹ️", "[INFO]");
             case "QUESTION": case "HELP":
-                return WindowsCompatibility.getEmoji("❓", "[?]");
+                return WindowsSupport.getEmoji("❓", "[?]");
             default:
-                return WindowsCompatibility.getEmoji("❔", "[" + emojiName + "]");
+                return WindowsSupport.getEmoji("❔", "[" + emojiName + "]");
         }
     }
     
@@ -257,11 +257,11 @@ public class StringOutput {
     private String processLegacyEmojis(String input) {
         String result = input;
         
-        // Replace WindowsCompatibility.Symbols references if they appear in strings
-        result = result.replace("${SUCCESS_EMOJI}", WindowsCompatibility.getEmoji("✅", "[OK]"));
-        result = result.replace("${ERROR_EMOJI}", WindowsCompatibility.getEmoji("❌", "[ERROR]"));
-        result = result.replace("${WARNING_EMOJI}", WindowsCompatibility.getEmoji("⚠️", "[WARNING]"));
-        result = result.replace("${INFO_EMOJI}", WindowsCompatibility.getEmoji("ℹ️", "[INFO]"));
+        // Replace WindowsSupport.Symbols references if they appear in strings
+        result = result.replace("${SUCCESS_EMOJI}", WindowsSupport.getEmoji("✅", "[OK]"));
+        result = result.replace("${ERROR_EMOJI}", WindowsSupport.getEmoji("❌", "[ERROR]"));
+        result = result.replace("${WARNING_EMOJI}", WindowsSupport.getEmoji("⚠️", "[WARNING]"));
+        result = result.replace("${INFO_EMOJI}", WindowsSupport.getEmoji("ℹ️", "[INFO]"));
         
         return result;
     }

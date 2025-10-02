@@ -124,7 +124,7 @@ This helps keep test server instances organized and separate from production env
 - **PromptConfig.java**: Configurable prompt styles (14 different themes)
 - **Settings.java**: User settings persistence
 - **StringOutput.java**: Centralized output post-processing with emoji/placeholder support
-- **WindowsCompatibility.java**: Smart emoji detection and terminal capability analysis
+- **WindowsSupport.java**: Smart emoji detection and terminal capability analysis
 - **CfmlCompleter.java & LucliCompleter.java**: Command auto-completion
 - **CfmlSyntaxHighlighter.java**: Syntax highlighting for CFML
 - **FileSystemState.java**: Working directory tracking
