@@ -99,7 +99,7 @@ public class InteractiveTerminal {
      */
     private static void startInteractiveMode() throws Exception {
         // Configure Windows-friendly terminal environment
-        WindowsCompatibility.configureTerminalEnvironment();
+        WindowsSupport.configureTerminalEnvironment();
         
         // Initialize unified command executor for interactive mode
         Path currentDir = Paths.get(System.getProperty("user.dir"));
@@ -137,13 +137,13 @@ public class InteractiveTerminal {
                 .variable(LineReader.HISTORY_FILE_SIZE, 2000) // Maximum entries in file
                 .build();
 
-        terminal.writer().println(WindowsCompatibility.Symbols.ROCKET + " LuCLI Terminal " + LuCLI.getVersion() +"  Type 'exit' or 'quit' to leave.");
-        terminal.writer().println(WindowsCompatibility.Symbols.FOLDER + " Working Directory: " + commandProcessor.getFileSystemState().getCurrentWorkingDirectory());
+        terminal.writer().println(WindowsSupport.Symbols.ROCKET + " LuCLI Terminal " + LuCLI.getVersion() +"  Type 'exit' or 'quit' to leave.");
+        terminal.writer().println(WindowsSupport.Symbols.FOLDER + " Working Directory: " + commandProcessor.getFileSystemState().getCurrentWorkingDirectory());
         if(LuCLI.verbose) {
-            terminal.writer().println(WindowsCompatibility.Symbols.COMPUTER + " Use 'cfml <expression>' to execute CFML code, e.g., 'cfml now()')");
-            terminal.writer().println(WindowsCompatibility.Symbols.FOLDER + " File system commands available: ls, cd, pwd, mkdir, cp, mv, rm, cat, etc.");
-            terminal.writer().println(WindowsCompatibility.Symbols.TOOL + " External commands supported: git, npm, docker, grep, and more!");
-            terminal.writer().println(WindowsCompatibility.Symbols.ART + " Type 'prompt' to change your prompt style!");
+            terminal.writer().println(WindowsSupport.Symbols.COMPUTER + " Use 'cfml <expression>' to execute CFML code, e.g., 'cfml now()')");
+            terminal.writer().println(WindowsSupport.Symbols.FOLDER + " File system commands available: ls, cd, pwd, mkdir, cp, mv, rm, cat, etc.");
+            terminal.writer().println(WindowsSupport.Symbols.TOOL + " External commands supported: git, npm, docker, grep, and more!");
+            terminal.writer().println(WindowsSupport.Symbols.ART + " Type 'prompt' to change your prompt style!");
         }
         terminal.writer().flush();
 
@@ -205,7 +205,7 @@ public class InteractiveTerminal {
             }
         }
 
-        terminal.writer().println(WindowsCompatibility.Symbols.WAVE + " Goodbye!");
+        terminal.writer().println(WindowsSupport.Symbols.WAVE + " Goodbye!");
         terminal.writer().flush();
 
         terminal.close();
@@ -216,13 +216,13 @@ public class InteractiveTerminal {
             // Initialize Lucee engine if not already done
             if (luceeEngine == null) {
                 if(LuCLI.verbose) {
-                    terminal.writer().println(WindowsCompatibility.Symbols.TOOL + " Initializing Lucee CFML engine...");
+                    terminal.writer().println(WindowsSupport.Symbols.TOOL + " Initializing Lucee CFML engine...");
                     terminal.writer().flush();
                 }
                 
                 luceeEngine = LuceeScriptEngine.getInstance(LuCLI.verbose, LuCLI.debug); // non-verbose for cleaner output
                 if(LuCLI.verbose) {
-                    terminal.writer().println(WindowsCompatibility.Symbols.SUCCESS + " Lucee engine ready.");
+                    terminal.writer().println(WindowsSupport.Symbols.SUCCESS + " Lucee engine ready.");
                 }
             }
             
@@ -241,7 +241,7 @@ public class InteractiveTerminal {
             terminal.writer().println("");
 
         } catch (Exception e) {
-            terminal.writer().println(WindowsCompatibility.Symbols.ERROR + " Error executing CFML: " + e.getMessage());
+            terminal.writer().println(WindowsSupport.Symbols.ERROR + " Error executing CFML: " + e.getMessage());
             if (e.getCause() != null) {
                 terminal.writer().println("Cause: " + e.getCause().getMessage());
             }
@@ -306,11 +306,11 @@ public class InteractiveTerminal {
         try {
             // Initialize Lucee engine if not already done
             if (luceeEngine == null) {
-                terminal.writer().println(WindowsCompatibility.Symbols.TOOL + " Initializing Lucee CFML engine...");
+                terminal.writer().println(WindowsSupport.Symbols.TOOL + " Initializing Lucee CFML engine...");
                 terminal.writer().flush();
                 
                 luceeEngine = LuceeScriptEngine.getInstance(true, false);
-                terminal.writer().println(WindowsCompatibility.Symbols.SUCCESS + " Lucee engine ready.");
+                terminal.writer().println(WindowsSupport.Symbols.SUCCESS + " Lucee engine ready.");
             }
             
             luceeEngine.eval("version = SERVER.LUCEE.version");
@@ -318,7 +318,7 @@ public class InteractiveTerminal {
             terminal.writer().println("Lucee Version: " + version);
             
         } catch (Exception e) {
-            terminal.writer().println(WindowsCompatibility.Symbols.ERROR + " Error getting Lucee version: " + e.getMessage());
+            terminal.writer().println(WindowsSupport.Symbols.ERROR + " Error getting Lucee version: " + e.getMessage());
         }
         terminal.writer().flush();
     }

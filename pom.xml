@@ -386,7 +386,7 @@
                       <fileset file="src/bin/lucli.bat" />
                       <fileset file="target/lucli.jar" />
                     </concat>
-                    <echo message="${WindowsCompatibility.Symbols.SUCCESS} Created Windows binary: target/lucli.cmd" />
+                    <echo message="${WindowsSupport.Symbols.SUCCESS} Created Windows binary: target/lucli.cmd" />
                   </target>
                 </configuration>
               </execution>
@@ -400,7 +400,7 @@
                   <target>
                     <mkdir dir="${user.home}/bin" />
                     <copy file="target/lucli.cmd" tofile="${user.home}/bin/lucli.cmd" overwrite="true" />
-                    <echo message="${WindowsCompatibility.Symbols.SUCCESS} Copied Windows binary to ${user.home}/bin/lucli.cmd" />
+                    <echo message="${WindowsSupport.Symbols.SUCCESS} Copied Windows binary to ${user.home}/bin/lucli.cmd" />
                   </target>
                 </configuration>
               </execution>

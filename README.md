@@ -181,7 +181,7 @@ prompt terminal  # Show terminal capabilities
 ### Core Components
 - **StringOutput**: Centralized output post-processor with emoji and placeholder support
 - **LuceeScriptEngine**: Lucee CFML engine integration with externalized script templates
-- **WindowsCompatibility**: Smart terminal detection and emoji capability analysis
+- **WindowsSupport**: Smart terminal detection and emoji capability analysis
 - **UnifiedCommandExecutor**: Consistent command handling across CLI and terminal modes
 
 ### Externalized Script System
