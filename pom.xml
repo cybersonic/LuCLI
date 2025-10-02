@@ -6,7 +6,7 @@
 
   <groupId>org.lucee</groupId>
   <artifactId>lucli</artifactId>
-  <version>1.0.77-SNAPSHOT</version>
+  <version>1.0.83-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>LuCLI</name>
   <description>A CLI for Lucee</description>
@@ -81,6 +81,13 @@
       <artifactId>jackson-databind</artifactId>
       <version>2.15.2</version>
     </dependency>
+    
+    <!-- Picocli for command-line argument parsing -->
+    <dependency>
+      <groupId>info.picocli</groupId>
+      <artifactId>picocli</artifactId>
+      <version>4.7.5</version>
+    </dependency>
 
     <!-- JUnit Jupiter API for testing -->
     <dependency>
@@ -136,8 +143,21 @@
                 <filter>
                   <artifact>*:*</artifact>
                   <excludes>
-                    <!-- Exclude Lucee extension files (.lex) -->
-                    <!-- <exclude>**/*.lex</exclude> -->
+                    <!-- Exclude large Lucee extension files (.lex) that aren't needed for basic CLI -->
+                    <!-- PDF Extension (11 MB) - PDF manipulation not needed for CLI -->
+                    <exclude>extensions/66E312DD-D083-27C0-64189D16753FD6F0-2.0.0.0-SNAPSHOT.lex</exclude>
+                    <!-- Image Extension (9.9 MB) - Image processing not needed for CLI -->
+                    <exclude>extensions/B737ABC4-D43F-4D91-8E8E973E37C40D1B-3.0.0.6-SNAPSHOT.lex</exclude>
+                    <!-- S3 Resource Extension (7.3 MB) - AWS S3 integration optional -->
+                    <exclude>extensions/17AB52DE-B300-A94B-E058BD978511E39E-2.0.2.21.lex</exclude>
+                    <!-- ESAPI Security Extension (3.4 MB) - Web security not needed for CLI -->
+                    <exclude>extensions/37C61C0A-5D7E-4256-8572639BE0CF5838-2.6.0.1.lex</exclude>
+                    
+                    <!-- Exclude database drivers to save additional ~4.6 MB -->
+                    <exclude>extensions/7E673D15-D87C-41A6-8B5F1956528C605F-9.4.0.lex</exclude>  <!-- MySQL (2.3 MB) -->
+                    <exclude>extensions/99A4EF8D-F2FD-40C8-8FB8C2E67A4EEEB6-12.6.3.jre11.lex</exclude>  <!-- MS SQL (1.3 MB) -->
+                    <exclude>extensions/671B01B8-B3B3-42B9-AC055A356BED5281-42.7.7.lex</exclude>  <!-- PostgreSQL (1.0 MB) -->
+                    
                     <!-- Exclude documentation and metadata -->
                     <exclude>META-INF/maven/**</exclude>
                     <exclude>META-INF/*.txt</exclude>
