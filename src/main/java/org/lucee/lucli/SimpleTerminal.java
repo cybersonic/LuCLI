@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import org.jline.reader.EndOfFileException;
@@ -20,10 +21,54 @@ public class SimpleTerminal {
     private static Terminal terminal;
     private static CommandProcessor commandProcessor;
     private static ExternalCommandProcessor externalCommandProcessor;
+    private static CommandDispatcher commandDispatcher;
     
+    /**
+     * Main entry point for terminal mode
+     * @param args Command line arguments for one-shot mode, or empty for interactive mode
+     */
     public static void main(String[] args) throws Exception {
+        boolean oneShotMode = args.length > 0;
+        
+        if (oneShotMode) {
+            executeOneShotCommand(args);
+            return;
+        }
+        
+        startInteractiveMode();
+    }
+    
+    /**
+     * Execute a single command and exit (CLI mode)
+     */
+    private static void executeOneShotCommand(String[] args) throws Exception {
+        Path currentDir = Paths.get(System.getProperty("user.dir"));
+        commandDispatcher = new CommandDispatcher(false, currentDir);
+        
+        String command = args[0];
+        String[] commandArgs = args.length > 1 ? Arrays.copyOfRange(args, 1, args.length) : new String[0];
+        
+        CommandDispatcher.CommandResult result = commandDispatcher.dispatch(command, commandArgs);
+        
+        if (result.output != null && !result.output.isEmpty()) {
+            System.out.println(result.output);
+        }
+        
+        if (result.shouldExit) {
+            System.exit(0);
+        }
+    }
+    
+    /**
+     * Start interactive terminal mode
+     */
+    private static void startInteractiveMode() throws Exception {
         // Configure Windows-friendly terminal environment
         WindowsCompatibility.configureTerminalEnvironment();
+        
+        // Initialize command dispatcher for interactive mode
+        Path currentDir = Paths.get(System.getProperty("user.dir"));
+        commandDispatcher = new CommandDispatcher(true, currentDir);
         
         try {
             terminal = TerminalBuilder.builder()
@@ -85,12 +130,6 @@ public class SimpleTerminal {
                 if (trimmed.toLowerCase().startsWith("cfml ")) {
                     String cfmlCode = trimmed.substring(5).trim(); // Remove "cfml " prefix
                     executeCFML(cfmlCode);
-                } else if (trimmed.equalsIgnoreCase("help")) {
-                    showHelp();
-                } else if (trimmed.equalsIgnoreCase("--version") || trimmed.equalsIgnoreCase("version")) {
-                    terminal.writer().println(LuCLI.getVersionInfo());
-                } else if (trimmed.equalsIgnoreCase("--lucee-version") || trimmed.equalsIgnoreCase("lucee-version")) {
-                    showLuceeVersion();
                 } else if (trimmed.isEmpty()) {
                     // Do nothing for empty lines
                     continue;
@@ -105,21 +144,15 @@ public class SimpleTerminal {
                         cmdArgs = parseArguments(parts[1]);
                     }
                     
-                    // Try UnifiedCommandExecutor first for unified commands (server, modules, etc.)
-                    if (isUnifiedCommand(command)) {
-                        Path currentDir = commandProcessor.getFileSystemState().getCurrentWorkingDirectory();
-                        UnifiedCommandExecutor executor = new UnifiedCommandExecutor(true, currentDir);
-                        String result = executor.executeCommand(command, cmdArgs);
-                        if (result != null && !result.isEmpty()) {
-                            terminal.writer().println(result);
+                    // Try CommandDispatcher first for main commands (server, modules, help, version, etc.)
+                    if (isMainCommand(command)) {
+                        CommandDispatcher.CommandResult result = commandDispatcher.dispatch(command, cmdArgs);
+                        if (result.output != null && !result.output.isEmpty()) {
+                            terminal.writer().println(result.output);
                         }
-                    } 
-                    // Check if command is a module name (same as CLI mode logic)
-                    else if (ModuleCommand.moduleExists(command)) {
-                        try {
-                            executeModule(command, cmdArgs);
-                        } catch (Exception e) {
-                            terminal.writer().println(WindowsCompatibility.Symbols.ERROR + " Error executing module '" + command + "': " + e.getMessage());
+                        if (result.shouldExit) {
+                            // Some commands like monitor will request exit
+                            break;
                         }
                     } else {
                         // Fall back to ExternalCommandProcessor for file system commands and external commands
@@ -303,50 +336,26 @@ public class SimpleTerminal {
         terminal.writer().println();
     }
     
-    /**
-     * Execute a module in terminal mode (similar to CLI mode logic)
-     */
-    private static void executeModule(String moduleName, String[] moduleArgs) throws Exception {
-        // Capture output from module execution and display in terminal
-        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
-        java.io.PrintStream originalOut = System.out;
-        java.io.PrintStream originalErr = System.err;
-        
-        try {
-            // Redirect System.out/err to capture module output
-            System.setOut(new java.io.PrintStream(baos));
-            System.setErr(new java.io.PrintStream(baos));
-            
-            // Execute module using ModuleCommand (same as CLI mode)
-            ModuleCommand.executeModuleByName(moduleName, moduleArgs);
-            
-            // Get captured output and display in terminal
-            String output = baos.toString().trim();
-            if (!output.isEmpty()) {
-                terminal.writer().println(output);
-            }
-            
-        } finally {
-            // Always restore original streams
-            System.setOut(originalOut);
-            System.setErr(originalErr);
-        }
-    }
+    // Note: executeModule method removed - now handled by CommandDispatcher
     
     /**
-     * Check if a command should be handled by the UnifiedCommandExecutor
+     * Check if a command should be handled by the CommandDispatcher
      */
-    private static boolean isUnifiedCommand(String command) {
-        // List of commands handled by UnifiedCommandExecutor
-        String[] unifiedCommands = {"server", "modules", "monitor", "cflint"};
+    private static boolean isMainCommand(String command) {
+        // List of commands handled by CommandDispatcher
+        String[] mainCommands = {
+            "server", "modules", "cflint", "help", "--help", "-h",
+            "version", "--version", "lucee-version", "--lucee-version"
+        };
         
-        for (String unifiedCommand : unifiedCommands) {
-            if (command.equalsIgnoreCase(unifiedCommand)) {
+        for (String mainCommand : mainCommands) {
+            if (command.equalsIgnoreCase(mainCommand)) {
                 return true;
             }
         }
         
-        return false;
+        // Also check if it's a module name or script file
+        return ModuleCommand.moduleExists(command) || command.endsWith(".cfs") || command.endsWith(".cfm");
     }
     
     /**
