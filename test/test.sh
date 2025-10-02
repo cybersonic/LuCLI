@@ -169,7 +169,7 @@ if (structKeyExists(variables, "__arguments") && isArray(__arguments)) {
 }
 EOF
 
-run_test_with_output "Execute CFML script" "timeout 15 java -jar ../$LUCLI_JAR hello.cfs arg1 arg2 2>&1 || echo 'CFML test completed'" "Hello from CFML script|CFML test completed"
+run_test_with_output "Execute CFML script" "timeout 15 java -jar ../$LUCLI_JAR hello.cfs arg1 arg2 2>&1 || echo 'CFML test completed'" "Hello from CFML script"
 
 # Test 8: Error Handling
 echo -e "${BLUE}=== Error Handling Tests ===${NC}"
@@ -207,8 +207,8 @@ run_test "Binary terminal mode" "timeout 3 echo 'exit' | ../$LUCLI_BINARY termin
 
 # Test 14: Server Management Tests
 echo -e "${BLUE}=== Server Management Tests ===${NC}"
-run_test_with_output "Server help" "java -jar ../$LUCLI_JAR server --help 2>&1 || echo 'Server commands available'" "server|Server|available"
-run_test_with_output "List servers" "java -jar ../$LUCLI_JAR server list 2>&1 || echo 'Server list works'" "server|Server|works|found"
+run_test_with_output "Server help" "java -jar ../$LUCLI_JAR server --help 2>&1 || echo 'Server commands available'" "Available commands"
+run_test_with_output "List servers" "java -jar ../$LUCLI_JAR server list 2>&1 || echo 'Server list works'" "Server instances"
 
 # Create a test project directory with CFML files
 mkdir -p test_project
