@@ -36,6 +36,7 @@ public class LuCLI {
                 boolean shortcutVerbose = java.util.Arrays.asList(args).contains("--verbose") || java.util.Arrays.asList(args).contains("-v");
                 
                 // Check if this might be a shortcut (module or CFML file)
+                // BUT ONLY if it's not a recognized subcommand
                 if (ex instanceof CommandLine.UnmatchedArgumentException && args.length >= 1) {
                     // Find the first non-flag argument
                     String firstArg = null;
@@ -48,10 +49,8 @@ public class LuCLI {
                         }
                     }
                     
-                    // Skip if no non-flag argument found
-                    if (firstArg == null) {
-                        // Fall through to default error handling
-                    } else {
+                    // Skip shortcuts if the first argument is a known subcommand
+                    if (firstArg != null && !isKnownSubcommand(firstArg)) {
                         java.io.File file = new java.io.File(firstArg);
                         
                         // Extract remaining arguments (after the first non-flag arg)
@@ -156,6 +155,20 @@ public class LuCLI {
         
         // Final fallback
         return "unknown";
+    }
+    
+    /**
+     * Check if the given string is a known subcommand
+     * @param command The command to check
+     * @return true if it's a known subcommand, false otherwise
+     */
+    private static boolean isKnownSubcommand(String command) {
+        // List of known subcommands that should not be treated as shortcuts
+        return "server".equals(command) || 
+               "modules".equals(command) || 
+               "cfml".equals(command) || 
+               "help".equals(command) ||
+               "terminal".equals(command);
     }
     
     /**
