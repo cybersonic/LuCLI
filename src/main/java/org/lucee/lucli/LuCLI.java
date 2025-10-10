@@ -1,83 +1,132 @@
 package org.lucee.lucli;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import picocli.CommandLine;
+import org.lucee.lucli.cli.LuCLICommand;
 
 public class LuCLI {
 
-    private static final int EXIT_SUCCESS = 0;
-    private static final int EXIT_ERROR = 1;
-    
     public static boolean verbose = false;
     public static boolean debug = false;
     public static boolean timing = false;
 
     public static void main(String[] args) throws Exception {
-        // Parse arguments first to get flags
-        ParseResult parseResult = parseArgs(args);
-        verbose = parseResult.verbose;
-        debug = parseResult.debug;
-        timing = parseResult.timing;
+        // Create Picocli CommandLine with our main command
+        CommandLine cmd = new CommandLine(new LuCLICommand());
         
-        // Initialize timing if requested
-        Timer.setEnabled(timing);
-        Timer.start("Total Execution");
-        
-        // Handle help early
-        if (parseResult.showHelp) {
-            showHelp();
-            // Exit with error code if help was shown due to invalid option
-            if (parseResult.invalidOption) {
-                System.exit(EXIT_ERROR);
+        // Configure CommandLine behavior
+        cmd.setExecutionExceptionHandler(new CommandLine.IExecutionExceptionHandler() {
+            @Override
+            public int handleExecutionException(Exception ex,
+                                                CommandLine commandLine,
+                                                CommandLine.ParseResult parseResult) throws Exception {
+                StringOutput.Quick.error("Error: " + ex.getMessage());
+                if (verbose || debug) {
+                    ex.printStackTrace();
+                }
+                return 1;
             }
-            return;
-        }
+        });
         
-        try {
-            // Configure Lucee directories BEFORE any Lucee initialization
-            Timer.start("Configure Lucee Directories");
-            configureLuceeDirectories();
-            Timer.stop("Configure Lucee Directories");
-
-            // Determine if we're running in terminal mode or one-shot command mode
-            if (parseResult.scriptFile != null) {
-                // One-shot command mode - pass command and args to InteractiveTerminal
-                Timer.start("One-Shot Command Mode");
+        // Handle parameter exceptions (like unknown options) more gracefully
+        cmd.setParameterExceptionHandler(new CommandLine.IParameterExceptionHandler() {
+            @Override
+            public int handleParseException(CommandLine.ParameterException ex, String[] args) {
+                // Extract debug and verbose flags from args for shortcut handling
+                boolean shortcutDebug = java.util.Arrays.asList(args).contains("--debug") || java.util.Arrays.asList(args).contains("-d");
+                boolean shortcutVerbose = java.util.Arrays.asList(args).contains("--verbose") || java.util.Arrays.asList(args).contains("-v");
                 
-                List<String> terminalArgs = new ArrayList<>();
-                terminalArgs.add(parseResult.scriptFile);
-                if (parseResult.scriptArgs != null) {
-                    terminalArgs.addAll(Arrays.asList(parseResult.scriptArgs));
+                // Check if this might be a shortcut (module or CFML file)
+                if (ex instanceof CommandLine.UnmatchedArgumentException && args.length >= 1) {
+                    // Find the first non-flag argument
+                    String firstArg = null;
+                    int firstArgIndex = -1;
+                    for (int i = 0; i < args.length; i++) {
+                        if (!args[i].startsWith("-")) {
+                            firstArg = args[i];
+                            firstArgIndex = i;
+                            break;
+                        }
+                    }
+                    
+                    // Skip if no non-flag argument found
+                    if (firstArg == null) {
+                        // Fall through to default error handling
+                    } else {
+                        java.io.File file = new java.io.File(firstArg);
+                        
+                        // Extract remaining arguments (after the first non-flag arg)
+                        String[] remainingArgs = java.util.Arrays.copyOfRange(args, firstArgIndex + 1, args.length);
+                        
+                        // Check if it's an existing CFML file
+                        if (file.exists() && (firstArg.endsWith(".cfs") || firstArg.endsWith(".cfm") || firstArg.endsWith(".cfml"))) {
+                            try {
+                                return executeCfmlFileShortcut(firstArg, remainingArgs, shortcutVerbose, shortcutDebug);
+                            } catch (Exception cfmlEx) {
+                                // If CFML file execution fails, fall through to normal error handling
+                                if (shortcutVerbose || shortcutDebug) {
+                                    StringOutput.Quick.error("CFML file execution failed: " + cfmlEx.getMessage());
+                                }
+                            }
+                        }
+                        // If it's not an existing file, try to execute as module shortcut
+                        else if (!file.exists()) {
+                            try {
+                                return executeModuleShortcut(firstArg, remainingArgs, shortcutVerbose, shortcutDebug);
+                            } catch (Exception moduleEx) {
+                                // If module execution fails, fall through to normal error handling
+                                if (shortcutVerbose || shortcutDebug) {
+                                    StringOutput.Quick.error("Module shortcut failed: " + moduleEx.getMessage());
+                                }
+                            }
+                        }
+                    }
                 }
                 
-                InteractiveTerminal.main(terminalArgs.toArray(new String[0]));
-                Timer.stop("One-Shot Command Mode");
-            } else {
-                // Interactive terminal mode
-                Timer.start("Terminal Mode");
-                InteractiveTerminal.main(new String[0]);
-                Timer.stop("Terminal Mode");
+                // Default error handling
+                CommandLine commandLine = ex.getCommandLine();
+                CommandLine.UnmatchedArgumentException.printSuggestions(ex, commandLine.getErr());
+                commandLine.usage(commandLine.getErr());
+                return commandLine == cmd ? 2 : 1;
             }
-        } catch(Exception e) {
-            StringOutput.Quick.error("Error: " + e.getMessage());
-            if (verbose || debug) {
-                e.printStackTrace();
-            }
-            System.exit(EXIT_ERROR);
-        } finally {
-            // Always stop total timer and show results before exit (if timing enabled)
-            Timer.stop("Total Execution");
-            Timer.printResults();
-        }
+        });
         
-        // Exit cleanly after all operations are complete
-        System.exit(EXIT_SUCCESS);
+        // Execute the command and exit with the returned code
+        int exitCode = cmd.execute(args);
+        System.exit(exitCode);
     }
     
     public static String getVersionInfo() {
         String version = getVersion();
         return "LuCLI " + version;
+    }
+    
+    /**
+     * Get both LuCLI and Lucee version information
+     */
+    public static String getFullVersionInfo() {
+        StringBuilder versionInfo = new StringBuilder();
+        versionInfo.append(getVersionInfo());
+        
+        try {
+            String luceeVersion = getLuceeVersionInfo();
+            if (luceeVersion != null) {
+                versionInfo.append("\n").append(luceeVersion);
+            }
+        } catch (Exception e) {
+            versionInfo.append("\nLucee Version: Error retrieving version - ").append(e.getMessage());
+        }
+        
+        return versionInfo.toString();
+    }
+    
+    /**
+     * Get Lucee version information
+     */
+    public static String getLuceeVersionInfo() throws Exception {
+        LuceeScriptEngine engine = LuceeScriptEngine.getInstance(false, false);
+        engine.eval("version = SERVER.LUCEE.version");
+        Object version = engine.getEngine().get("version");
+        return "Lucee Version: " + version;
     }
     
     public static String getVersion() {
@@ -109,112 +158,129 @@ public class LuCLI {
         return "unknown";
     }
     
-    private static void showHelp() {
-        System.out.println(StringOutput.loadText("/text/main-help.txt"));
-    }
-    
-    private static void configureLuceeDirectories() throws java.io.IOException {
-        // Allow customization of lucli home via environment variable or system property
-        String lucliHomeStr = System.getProperty("lucli.home");
-        if (lucliHomeStr == null) {
-            lucliHomeStr = System.getenv("LUCLI_HOME");
-        }
-        if (lucliHomeStr == null) {
-            String userHome = System.getProperty("user.home");
-            lucliHomeStr = java.nio.file.Paths.get(userHome, ".lucli").toString();
-        }
-        
-        java.nio.file.Path lucliHome = java.nio.file.Paths.get(lucliHomeStr);
-        java.nio.file.Path luceeServerDir = lucliHome.resolve("lucee-server");
-        java.nio.file.Path patchesDir = lucliHome.resolve("patches");
-        
-        // Create all necessary directories if they don't exist
-        java.nio.file.Files.createDirectories(luceeServerDir);
-        java.nio.file.Files.createDirectories(patchesDir);
-        
+    /**
+     * Execute a module shortcut by redirecting to "modules run <moduleName> [args...]"
+     * @param moduleName The name of the module to run
+     * @param args Additional arguments to pass to the module
+     * @param verbose Enable verbose output
+     * @param debug Enable debug output  
+     * @return Exit code from module execution
+     */
+    private static int executeModuleShortcut(String moduleName, String[] args, boolean verbose, boolean debug) throws Exception {
         if (verbose || debug) {
-            System.out.println(StringOutput.msg("config.lucee.directories"));
-            System.out.println("  " + StringOutput.msg("config.lucli.home", lucliHome.toString()));
-            System.out.println("  " + StringOutput.msg("config.lucee.server", luceeServerDir.toString()));
-            System.out.println("  " + StringOutput.msg("config.patches", patchesDir.toString()));
+            StringOutput.Quick.info("Executing module shortcut: " + moduleName + 
+                " (equivalent to 'lucli modules run " + moduleName + "')");
         }
-
-        // Set Lucee system properties
-        System.setProperty("lucee.base.dir", luceeServerDir.toString());
-        System.setProperty("lucee.server.dir", luceeServerDir.toString());
-        System.setProperty("lucee.web.dir", luceeServerDir.toString());
-        System.setProperty("lucee.patch.dir", patchesDir.toString());
-        System.setProperty("lucee.controller.disabled", "true"); // Disable web controller for CLI
         
-        // Ensure Lucee doesn't try to create default directories in system paths
-        System.setProperty("lucee.controller.disabled", "true");
-        System.setProperty("lucee.use.lucee.configs", "false");
-    }
-
-    private static class ParseResult {
-        String scriptFile;
-        String[] scriptArgs;
-        boolean verbose = false;
-        boolean debug = false;
-        boolean timing = false;
-        boolean showHelp = false;
-        boolean invalidOption = false;
+        // Build the new arguments array: ["modules", "run", moduleName, ...additionalArgs]
+        java.util.List<String> newArgs = new java.util.ArrayList<>();
+        newArgs.add("modules");
+        newArgs.add("run");
+        newArgs.add(moduleName);
+        
+        // Add any additional arguments
+        if (args != null && args.length > 0) {
+            for (String arg : args) {
+                newArgs.add(arg);
+            }
+        }
+        
+        // Create a new CommandLine instance with the same configuration
+        CommandLine cmd = new CommandLine(new org.lucee.lucli.cli.LuCLICommand());
+        
+        // Configure the same exception handlers
+        cmd.setExecutionExceptionHandler(new CommandLine.IExecutionExceptionHandler() {
+            @Override
+            public int handleExecutionException(Exception ex,
+                                                CommandLine commandLine,
+                                                CommandLine.ParseResult parseResult) throws Exception {
+                StringOutput.Quick.error("Error: " + ex.getMessage());
+                if (verbose || debug) {
+                    ex.printStackTrace();
+                }
+                return 1;
+            }
+        });
+        
+        // Execute the modules run command
+        return cmd.execute(newArgs.toArray(new String[0]));
     }
     
-    private static ParseResult parseArgs(String[] args) {
-        ParseResult result = new ParseResult();
-        
-        if (args.length == 0) {
-            // Default to terminal mode when no arguments provided
-            result.scriptFile = null; // Will trigger interactive terminal mode
-            return result;
+    /**
+     * Execute a CFML file shortcut by using LuceeScriptEngine.executeScript
+     * @param filePath The path to the CFML file to execute
+     * @param args Additional arguments to pass to the script
+     * @param verbose Enable verbose output
+     * @param debug Enable debug output
+     * @return Exit code from file execution
+     */
+    private static int executeCfmlFileShortcut(String filePath, String[] args, boolean verbose, boolean debug) throws Exception {
+        if (verbose || debug) {
+            StringOutput.Quick.info("Executing CFML file: " + filePath);
         }
         
-        int scriptFileIndex = -1;
+        // Check if file exists and is a CFML file
+        java.nio.file.Path path = java.nio.file.Paths.get(filePath);
+        if (!java.nio.file.Files.exists(path)) {
+            StringOutput.Quick.error("File not found: " + filePath);
+            return 1;
+        }
         
-        // Parse flags
-        for (int i = 0; i < args.length; i++) {
-            String arg = args[i];
+        if (java.nio.file.Files.isDirectory(path)) {
+            StringOutput.Quick.error("'" + filePath + "' is a directory");
+            return 1;
+        }
+        
+        // Check if file has a supported CFML extension
+        String fileName = path.getFileName().toString().toLowerCase();
+        if (!fileName.endsWith(".cfm") && !fileName.endsWith(".cfc") && !fileName.endsWith(".cfs")) {
+            StringOutput.Quick.error("'" + filePath + "' is not a CFML file (.cfm, .cfc, or .cfs)");
+            return 1;
+        }
+        
+        try {
+            // Get or create the LuceeScriptEngine instance
+            LuceeScriptEngine luceeEngine = LuceeScriptEngine.getInstance(verbose, debug);
             
-            if (arg.equals("-v") || arg.equals("--verbose")) {
-                result.verbose = true;
-            } else if (arg.equals("-d") || arg.equals("--debug")) {
-                result.debug = true;
-            } else if (arg.equals("-t") || arg.equals("--timing")) {
-                result.timing = true;
-            } else if (arg.equals("-h") || arg.equals("--help")) {
-                result.showHelp = true;
-                return result;
-            } else if (arg.equals("--version") || arg.equals("--lucee-version") || arg.equals("help")) {
-                // These commands don't take additional arguments
-                scriptFileIndex = i;
-                break;
-            } else if (!arg.startsWith("-")) {
-                // This is the script file or command
-                scriptFileIndex = i;
-                break;
+            // For .cfs files, we need to set up the ARGS array manually since setupScriptContext is disabled
+            if (fileName.endsWith(".cfs")) {
+                // Read the file content
+                String fileContent = java.nio.file.Files.readString(path, java.nio.charset.StandardCharsets.UTF_8);
+                
+                // Create ARGS array setup
+                StringBuilder scriptWithArgs = new StringBuilder();
+                scriptWithArgs.append("// Auto-generated ARGS array setup\n");
+                scriptWithArgs.append("ARGS = ['" + filePath + "'");
+                if (args != null && args.length > 0) {
+                    for (String arg : args) {
+                        scriptWithArgs.append(", '" + arg.replace("'", "''") + "'");
+                    }
+                }
+                scriptWithArgs.append("];\n\n");
+                scriptWithArgs.append(fileContent);
+                
+                if (debug) {
+                    System.err.println("[DEBUG] Script with ARGS setup:");
+                    System.err.println(scriptWithArgs.toString());
+                    System.err.println("[DEBUG] End of script");
+                }
+                
+                // Execute the wrapped script content directly
+                luceeEngine.eval(scriptWithArgs.toString());
             } else {
-                System.err.println("Unknown option: " + arg);
-                result.showHelp = true;
-                result.invalidOption = true;
-                return result;
+                // For .cfm and .cfc files, use the existing method
+                luceeEngine.executeScript(path.toAbsolutePath().toString(), args);
             }
-        }
-        
-        if (scriptFileIndex >= 0) {
-            result.scriptFile = args[scriptFileIndex];
             
-            // Everything after the script file are script arguments
-            if (scriptFileIndex + 1 < args.length) {
-                result.scriptArgs = Arrays.copyOfRange(args, scriptFileIndex + 1, args.length);
-            } else {
-                result.scriptArgs = new String[0];
+            // Success
+            return 0;
+            
+        } catch (Exception e) {
+            StringOutput.Quick.error("Error executing CFML script '" + filePath + "': " + e.getMessage());
+            if (debug) {
+                e.printStackTrace();
             }
-        } else {
-            // No script file found, default to interactive terminal mode
-            result.scriptFile = null;
+            return 1;
         }
-        
-        return result;
     }
 }
