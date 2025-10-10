@@ -22,6 +22,12 @@ public class LuceeServerConfig {
         public String webroot = "./";
         public MonitoringConfig monitoring = new MonitoringConfig();
         public JvmConfig jvm = new JvmConfig();
+        public UrlRewriteConfig urlRewrite = new UrlRewriteConfig();
+    }
+    
+    public static class UrlRewriteConfig {
+        public boolean enabled = true;
+        public String routerFile = "index.cfm";
     }
     
     public static class MonitoringConfig {
@@ -60,6 +66,12 @@ public class LuceeServerConfig {
         // Set default name if not specified - use only the last part of the path
         if (config.name == null || config.name.trim().isEmpty()) {
             config.name = projectDir.getFileName().toString();
+        }
+        
+        // Ensure urlRewrite is initialized for backward compatibility with older configs
+        // that don't have this field in their JSON
+        if (config.urlRewrite == null) {
+            config.urlRewrite = new UrlRewriteConfig();
         }
         
         // Don't resolve port conflicts here - do it just before starting server
