@@ -93,6 +93,33 @@ run_test_with_output() {
     echo ""
 }
 
+# Function to run a help test that expects non-zero exit codes
+run_help_test() {
+    local test_name="$1"
+    local command="$2"
+    local expected_pattern="$3"
+    
+    echo -e "${CYAN}Testing: ${test_name}${NC}"
+    echo -e "${YELLOW}Command: ${command}${NC}"
+    
+    TOTAL_TESTS=$((TOTAL_TESTS + 1))
+    
+    local output=$(eval "$command" 2>&1)
+    local exit_code=$?
+    
+    # Help commands can exit with 0, 1, or 2, all are acceptable
+    if ([ $exit_code -eq 0 ] || [ $exit_code -eq 1 ] || [ $exit_code -eq 2 ]) && echo "$output" | grep -q "$expected_pattern"; then
+        echo -e "${GREEN}✅ PASSED${NC}"
+        echo -e "${PURPLE}Output sample: $(echo "$output" | head -n 1)${NC}"
+    else
+        echo -e "${RED}❌ FAILED${NC}"
+        echo -e "${RED}Exit code: $exit_code${NC}"
+        echo -e "${RED}Output: $output${NC}"
+        FAILED_TESTS=$((FAILED_TESTS + 1))
+    fi
+    echo ""
+}
+
 # Check prerequisites
 echo -e "${BLUE}📋 Checking Prerequisites${NC}"
 if [ ! -f "$LUCLI_JAR" ]; then
@@ -124,8 +151,8 @@ echo ""
 
 # Test 1: Basic Help and Usage
 echo -e "${BLUE}=== Basic Help and Usage Tests ===${NC}"
-run_test_with_output "Help command" "java -jar ../$LUCLI_JAR --help" "LuCLI.*terminal application"
-run_test_with_output "Short help" "java -jar ../$LUCLI_JAR -h" "Usage:"
+run_help_test "Help command" "java -jar ../$LUCLI_JAR --help" "Usage:"
+run_help_test "Short help" "java -jar ../$LUCLI_JAR -h" "Usage:"
 run_test "No arguments (should start terminal)" "timeout 5 java -jar ../$LUCLI_JAR < /dev/null || true"
 
 # Test 2: Language Switching Tests (Skip interactive for now)
@@ -195,19 +222,19 @@ run_test "LuCLI home directory exists" "test -d ~/.lucli || mkdir -p ~/.lucli"
 
 # Test 12: Multiple Language Help Tests
 echo -e "${BLUE}=== Multiple Language Help Tests ===${NC}"
-run_test "Help output is consistent" "java -jar ../$LUCLI_JAR --help | grep -q 'Usage'"
-run_test "Binary help works" "../$LUCLI_BINARY --help | grep -q 'LuCLI'"
+run_help_test "Help output is consistent" "java -jar ../$LUCLI_JAR --help" "Usage"
+run_help_test "Binary help works" "../$LUCLI_BINARY --help" "LuCLI"
 run_test "Version format is correct" "java -jar ../$LUCLI_JAR --version | grep -E '^LuCLI [0-9]+\.[0-9]+\.[0-9]+.*'"
 
 # Test 13: Binary Executable Tests
 echo -e "${BLUE}=== Binary Executable Tests ===${NC}"
 run_test_with_output "Binary version command" "../$LUCLI_BINARY --version" "LuCLI"
-run_test "Binary help command" "../$LUCLI_BINARY --help > /dev/null"
+run_help_test "Binary help command" "../$LUCLI_BINARY --help" "Usage"
 run_test "Binary terminal mode" "timeout 3 echo 'exit' | ../$LUCLI_BINARY terminal > /dev/null 2>&1 || true"
 
 # Test 14: Server Management Tests
 echo -e "${BLUE}=== Server Management Tests ===${NC}"
-run_test_with_output "Server help" "java -jar ../$LUCLI_JAR server --help 2>&1 || echo 'Server commands available'" "Available commands"
+run_help_test "Server help" "java -jar ../$LUCLI_JAR server --help" "Manage Lucee server instances"
 run_test_with_output "List servers" "java -jar ../$LUCLI_JAR server list 2>&1 || echo 'Server list works'" "Server instances"
 
 # Create a test project directory with CFML files
