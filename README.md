@@ -6,23 +6,10 @@ A modern, feature-rich command line interface for Lucee CFML that provides both 
 
 ## ✨ Key Features
 
-### 🖥️ Dual Execution Modes
-- **Interactive Terminal**: Persistent session with command history, auto-completion, and syntax highlighting
-- **One-Shot CLI**: Direct command execution for scripting and automation
-
 ### 🎯 Core Capabilities
 - **CFML Script Execution**: Run .cfs, .cfm, and .cfc files with full Lucee support
 - **Server Management**: Start, stop, monitor, and manage Lucee server instances
 - **Module System**: Create and manage reusable CFML modules
-- **Smart Output Processing**: Intelligent emoji handling and placeholder substitution
-- **Cross-Platform**: Windows, macOS, and Linux support with platform-specific optimizations
-
-### 🎨 Advanced Terminal Features
-- **Configurable Prompts**: 14+ built-in prompt themes with JSON-based customization
-- **Smart Emoji Support**: Automatic terminal capability detection with graceful fallbacks
-- **Command Auto-completion**: Intelligent completion for commands, files, and arguments
-- **Syntax Highlighting**: CFML syntax highlighting in interactive mode
-- **Windows Compatibility**: Optimized for various Windows terminal environments
 
 ## 📦 Installation
 
