@@ -59,6 +59,10 @@ public class ServerCommand implements Callable<Integer> {
                 description = "Custom name for the server instance")
         private String name;
 
+        @Option(names = {"-p", "--port"}, 
+                description = "Port number for the server (e.g., 8080)")
+        private Integer port;
+
         @Option(names = {"-f", "--force"}, 
                 description = "Force replace existing server with same name")
         private boolean force = false;
@@ -89,6 +93,10 @@ public class ServerCommand implements Callable<Integer> {
             if (name != null) {
                 args.add("--name"); 
                 args.add(name);
+            }
+            if (port != null) {
+                args.add("--port");
+                args.add(port.toString());
             }
             if (force) {
                 args.add("--force");
