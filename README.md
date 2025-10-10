@@ -8,8 +8,10 @@ A modern, feature-rich command line interface for Lucee CFML that provides both 
 
 ### 🎯 Core Capabilities
 - **CFML Script Execution**: Run .cfs, .cfm, and .cfc files with full Lucee support
-- **Server Management**: Start, stop, monitor, and manage Lucee server instances
+- **Server Management**: Start, stop, monitor, and manage Lucee server instances  
 - **Module System**: Create and manage reusable CFML modules
+- **Comprehensive Help System**: Context-sensitive help for all commands and subcommands
+- **Interactive Terminal**: Feature-rich terminal mode with auto-completion and history
 
 ## 📦 Installation
 
@@ -60,14 +62,31 @@ lucli> pwd
 # Start Lucee server for current directory
 lucli server start
 
-# Start with specific version and custom webroot
-lucli server start --version 7.0.0.123 --webroot ./public
+# Start with specific version and port
+lucli server start --version 6.2.2.91 --port 8080
+
+# Start with custom name and force replacement
+lucli server start --name myapp --port 8888 --force
 
 # Monitor server with real-time JMX dashboard
 lucli server monitor
 
 # View server logs
 lucli server log --follow
+```
+
+### Help System
+```bash
+# Get general help
+lucli --help
+
+# Get help for specific commands
+lucli server --help
+lucli server start --help
+lucli modules --help
+
+# Get help for CFML commands
+lucli cfml --help
 ```
 
 **Framework-Style URL Routing:**
@@ -89,6 +108,29 @@ This routes all requests through your router file (default: `index.cfm`) with `P
 Compatible with ColdBox, FW/1, CFWheels, ContentBox, and custom frameworks.
 
 📖 **[Complete URL Rewriting Guide →](documentation/URL_REWRITING.md)**
+
+## 🆘 Help System
+
+LuCLI features a comprehensive, hierarchical help system built on Picocli that provides context-sensitive assistance at every level:
+
+### Universal Help Access
+```bash
+# Any command supports --help
+lucli --help                    # Root application help
+lucli server --help             # Server command overview  
+lucli server start --help       # Specific subcommand help
+lucli modules run --help        # Module execution help
+lucli cfml --help               # CFML expression help
+```
+
+### Key Help Features
+- **Hierarchical Structure**: From general overview to specific command details
+- **Consistent Interface**: `--help` works on every command and subcommand
+- **Rich Examples**: Practical usage examples in every help screen
+- **Error Guidance**: Smart error messages with helpful suggestions
+- **Interactive Discovery**: Terminal mode with `help` command and tab completion
+
+📖 **[Complete Help System Guide →](documentation/HELP_SYSTEM.md)**
 
 ### Module Management
 ```bash
@@ -230,13 +272,20 @@ writeOutput('[OK] Processing completed at 2025-01-04T13:22:25');
 |---------|-------------|---------|
 | `--version` | Show version information | `lucli --version` |
 | `--lucee-version` | Show Lucee engine version | `lucli --lucee-version` |
-| `help` | Show help information | `lucli help` |
+| `--help` | Show help information | `lucli --help` |
+| `help` | Show help for specific commands | `lucli help server` |
 | `terminal` | Start interactive mode | `lucli terminal` |
+
+### CFML Commands
+| Command | Description | Example |
+|---------|-------------|---------|
+| `cfml` | Execute CFML expressions | `lucli cfml 'now()'` |
+| `script.cfs` | Execute CFML script file | `lucli script.cfs arg1 arg2` |
 
 ### Server Commands
 | Command | Description | Example |
 |---------|-------------|---------|
-| `server start` | Start Lucee server | `lucli server start --version 7.0.0.123` |
+| `server start` | Start Lucee server | `lucli server start --version 6.2.2.91 --port 8080` |
 | `server stop` | Stop server | `lucli server stop --name myapp` |
 | `server status` | Check server status | `lucli server status` |
 | `server list` | List all servers | `lucli server list` |
@@ -279,7 +328,7 @@ mvn clean package
 mvn clean package -Pbinary
 
 # Run tests
-./test.sh
+./test/test.sh
 
 # Quick development cycle
 ./dev-lucli.sh
@@ -299,34 +348,34 @@ lucli/
 ```
 
 ### Key Dependencies
-- **Lucee 7.0.0.242-RC**: CFML engine
+- **Lucee 7.0.0.346-RC**: CFML engine
 - **JLine 3.26.3**: Terminal interface and command-line handling
 - **Jackson 2.15.2**: JSON configuration parsing
+- **Picocli 4.7.5**: Command-line parsing and help system
 
 ## 📚 Documentation
 
-### Comprehensive Guides
-- [**WARP.md**](WARP.md) - Developer guide and architecture overview
-- [**URL Rewriting Guide**](documentation/URL_REWRITING.md) - Complete URL rewriting and framework routing documentation
-- [**STRING_OUTPUT_SYSTEM.md**](STRING_OUTPUT_SYSTEM.md) - Output processing system documentation
-- [**EXTERNALIZED_SCRIPTS.md**](EXTERNALIZED_SCRIPTS.md) - CFML script template system
-- [**EMOJI_IMPROVEMENTS.md**](EMOJI_IMPROVEMENTS.md) - Emoji handling and terminal compatibility
-- [**PROMPTS.md**](PROMPTS.md) - Prompt system and customization guide
+### Core Documentation
+- [**WARP.md**](WARP.md) - Developer guide and architecture overview  
+- [**Help System Guide**](documentation/HELP_SYSTEM.md) - Complete help system documentation
+- [**URL Rewriting Guide**](documentation/URL_REWRITING.md) - Framework routing and URL rewriting
 
-### Feature Documentation
-- [**UNIFIED_COMMAND_ARCHITECTURE.md**](UNIFIED_COMMAND_ARCHITECTURE.md) - Command consistency architecture
-- [**TAB_COMPLETION_GUIDE.md**](TAB_COMPLETION_GUIDE.md) - Auto-completion system
-- [**PIPELINE_SUMMARY.md**](PIPELINE_SUMMARY.md) - Development pipeline and processes
+### Additional Guides
+- [**SHORTCUTS.md**](SHORTCUTS.md) - Quick reference for shortcuts and commands
+- [**TODO.md**](TODO.md) - Current development roadmap and tasks
 
 ## 🧪 Testing
 
 ### Test Suites
 ```bash
-# Comprehensive test suite
-./test.sh
+# Comprehensive test suite (52 tests)
+./test/test.sh
 
-# Simple functionality tests  
-./test-simple.sh
+# Server and CFML integration tests
+./test/test-server-cfml.sh
+
+# URL rewrite integration tests
+./test/test-urlrewrite-integration.sh
 
 # Build and run binary test
 ./dev-lucli.sh
@@ -334,13 +383,15 @@ lucli/
 
 ### Test Categories
 - ✅ Basic functionality (help, version commands)
+- ✅ Comprehensive help system (all commands and subcommands)  
 - ✅ CFML script execution (.cfs, .cfm, .cfc)
-- ✅ Server management (start, stop, status, monitor)
+- ✅ Server management (start, stop, status, monitor) with --port option
 - ✅ File system operations and navigation
 - ✅ Module system (create, list, execute)
 - ✅ Command consistency between CLI and terminal modes
 - ✅ Binary executable functionality
 - ✅ Configuration handling and persistence
+- ✅ URL rewrite and framework routing
 - ✅ Error scenarios and edge cases
 
 ## 🌟 Advanced Features
