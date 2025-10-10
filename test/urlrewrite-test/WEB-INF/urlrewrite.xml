@@ -42,8 +42,8 @@
         <!-- Exclude files with common static extensions -->
         <condition type="request-uri" operator="notequal">\.(css|js|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot|pdf|zip|json|xml|txt|map)$</condition>
         
-        <!-- Exclude Lucee admin paths -->
-        <condition type="request-uri" operator="notequal">^/lucee/.*$</condition>
+        <!-- Exclude Lucee admin paths - improved pattern -->
+        <condition type="request-uri" operator="notequal">^/lucee.*$</condition>
         
         <!-- Exclude REST API paths (if you have a separate REST handler) -->
         <condition type="request-uri" operator="notequal">^/rest/.*$</condition>
