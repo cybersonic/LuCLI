@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee
+         https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd"
+         version="6.0">
+
+    <display-name>Lucee CFML Application</display-name>
+    <description>Lucee CFML Server Application</description>
+
+    <!-- UrlRewriteFilter for Extension-less URLs -->
+    <filter>
+        <filter-name>UrlRewriteFilter</filter-name>
+        <filter-class>org.tuckey.web.filters.urlrewrite.UrlRewriteFilter</filter-class>
+        <init-param>
+            <param-name>logLevel</param-name>
+            <param-value>INFO</param-value>
+        </init-param>
+        <init-param>
+            <param-name>statusEnabled</param-name>
+            <param-value>true</param-value>
+        </init-param>
+    </filter>
+    
+    <filter-mapping>
+        <filter-name>UrlRewriteFilter</filter-name>
+        <url-pattern>/*</url-pattern>
+        <dispatcher>REQUEST</dispatcher>
+        <dispatcher>FORWARD</dispatcher>
+    </filter-mapping>
+
+    <!-- Lucee Configuration -->
+    <context-param>
+        <param-name>lucee-server-directory</param-name>
+        <param-value>/Users/markdrew/.lucli/servers/urlrewrite-integration-1760126454/lucee-server</param-value>
+    </context-param>
+    
+    <context-param>
+        <param-name>lucee-web-directory</param-name>
+        <param-value>/Users/markdrew/.lucli/servers/urlrewrite-integration-1760126454/lucee-web</param-value>
+    </context-param>
+
+    <!-- Lucee CFML Servlet -->
+    <servlet>
+        <servlet-name>CFMLServlet</servlet-name>
+        <servlet-class>lucee.loader.servlet.jakarta.CFMLServlet</servlet-class>
+        <init-param>
+            <param-name>lucee-server-root</param-name>
+            <param-value>/Users/markdrew/.lucli/servers/urlrewrite-integration-1760126454/lucee-server</param-value>
+        </init-param>
+        <init-param>
+            <param-name>lucee-web-root</param-name>
+            <param-value>/Users/markdrew/.lucli/servers/urlrewrite-integration-1760126454/lucee-web</param-value>
+        </init-param>
+        <load-on-startup>1</load-on-startup>
+    </servlet>
+
+    <!-- Lucee REST Servlet -->
+    <servlet>
+        <servlet-name>RESTServlet</servlet-name>
+        <servlet-class>lucee.loader.servlet.jakarta.RestServlet</servlet-class>
+        <load-on-startup>2</load-on-startup>
+    </servlet>
+
+    <!-- CFML Servlet Mappings -->
+    <servlet-mapping>
+        <servlet-name>CFMLServlet</servlet-name>
+        <url-pattern>*.cfm</url-pattern>
+    </servlet-mapping>
+    
+    <servlet-mapping>
+        <servlet-name>CFMLServlet</servlet-name>
+        <url-pattern>*.cfml</url-pattern>
+    </servlet-mapping>
+    
+    <servlet-mapping>
+        <servlet-name>CFMLServlet</servlet-name>
+        <url-pattern>*.cfc</url-pattern>
+    </servlet-mapping>
+
+    <servlet-mapping>
+        <servlet-name>CFMLServlet</servlet-name>
+        <url-pattern>*.cfs</url-pattern>
+    </servlet-mapping>
+    
+    <servlet-mapping>
+        <servlet-name>CFMLServlet</servlet-name>
+        <url-pattern>/index.cfm/*</url-pattern>
+    </servlet-mapping>
+
+    <!-- ADMIN_MAPPINGS_START -->
+    <!-- Lucee Admin Servlet Mappings -->
+    <servlet-mapping>
+        <servlet-name>CFMLServlet</servlet-name>
+        <url-pattern>/lucee/*</url-pattern>
+    </servlet-mapping>
+    
+    <servlet-mapping>
+        <servlet-name>CFMLServlet</servlet-name>
+        <url-pattern>/lucee/admin/*</url-pattern>
+    </servlet-mapping>
+    <!-- ADMIN_MAPPINGS_END -->
+
+    <!-- REST Servlet Mappings -->
+    <servlet-mapping>
+        <servlet-name>RESTServlet</servlet-name>
+        <url-pattern>/rest/*</url-pattern>
+    </servlet-mapping>
+
+    <!-- Default CFML Page -->
+    <welcome-file-list>
+        <welcome-file>index.cfm</welcome-file>
+        <welcome-file>index.cfml</welcome-file>
+        <welcome-file>index.html</welcome-file>
+        <welcome-file>index.htm</welcome-file>
+    </welcome-file-list>
+
+    <!-- Session Configuration -->
+    <session-config>
+        <session-timeout>30</session-timeout>
+        <cookie-config>
+            <http-only>true</http-only>
+        </cookie-config>
+    </session-config>
+
+</web-app>

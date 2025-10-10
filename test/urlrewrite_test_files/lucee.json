@@ -1,0 +1,14 @@
+{
+  "name": "urlrewrite-integration-test",
+  "version": "6.2.2.91",
+  "port": 8809,
+  "webroot": "./",
+  "urlRewrite": {
+    "enabled": true,
+    "routerFile": "index.cfm"
+  },
+  "jvm": {
+    "maxMemory": "256m",
+    "minMemory": "64m"
+  }
+}
