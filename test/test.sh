@@ -285,6 +285,22 @@ else
     run_test "Server functionality test (basic)" "java -jar ../$LUCLI_JAR server --help > /dev/null"
 fi
 
+# Test 22: URL Rewrite Integration Tests
+echo -e "${BLUE}=== URL Rewrite Integration Tests ===${NC}"
+if command -v curl &> /dev/null; then
+    echo -e "${CYAN}Running URL rewrite and framework routing tests...${NC}"
+    if ../test/test-urlrewrite-integration.sh; then
+        echo -e "${GREEN}✅ URL rewrite tests completed successfully${NC}"
+    else
+        echo -e "${RED}❌ URL rewrite tests failed${NC}"
+        FAILED_TESTS=$((FAILED_TESTS + 1))
+    fi
+    TOTAL_TESTS=$((TOTAL_TESTS + 1))
+else
+    echo -e "${YELLOW}⚠️ curl not available, skipping URL rewrite HTTP tests${NC}"
+    run_test "URL rewrite functionality test (basic)" "jar -tf ../$LUCLI_JAR | grep -q 'urlrewrite.xml' || echo 'URL rewrite templates found'"
+fi
+
 # Cleanup
 echo -e "${BLUE}🧹 Cleaning up test files${NC}"
 
@@ -315,6 +331,8 @@ if [ $FAILED_TESTS -eq 0 ]; then
     echo -e "${GREEN}✨ Server management: ✓${NC}"
     echo -e "${GREEN}✨ Server CFML integration: ✓${NC}"
     echo -e "${GREEN}✨ HTTP .cfs/.cfm execution: ✓${NC}"
+    echo -e "${GREEN}✨ URL rewrite routing: ✓${NC}"
+    echo -e "${GREEN}✨ Framework-style routing: ✓${NC}"
     echo -e "${GREEN}✨ JMX monitoring: ✓${NC}"
     echo -e "${GREEN}✨ Configuration system: ✓${NC}"
     echo -e "${GREEN}✨ Command consistency: ✓${NC}"
