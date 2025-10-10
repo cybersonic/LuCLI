@@ -269,6 +269,22 @@ run_test "Multiple quick commands" "for i in {1..3}; do java -jar ../$LUCLI_JAR 
 run_test "Binary performance" "../$LUCLI_BINARY --version > /dev/null"
 run_test "JAR file size reasonable" "test $(stat -f%z ../$LUCLI_JAR) -lt 100000000"
 
+# Test 21: Server CFML Integration Tests
+echo -e "${BLUE}=== Server CFML Integration Tests ===${NC}"
+if command -v curl &> /dev/null; then
+    echo -e "${CYAN}Running comprehensive server and CFML tests...${NC}"
+    if ../test/test-server-cfml.sh; then
+        echo -e "${GREEN}✅ Server CFML tests completed successfully${NC}"
+    else
+        echo -e "${RED}❌ Server CFML tests failed${NC}"
+        FAILED_TESTS=$((FAILED_TESTS + 1))
+    fi
+    TOTAL_TESTS=$((TOTAL_TESTS + 1))
+else
+    echo -e "${YELLOW}⚠️ curl not available, skipping server HTTP tests${NC}"
+    run_test "Server functionality test (basic)" "java -jar ../$LUCLI_JAR server --help > /dev/null"
+fi
+
 # Cleanup
 echo -e "${BLUE}🧹 Cleaning up test files${NC}"
 
@@ -297,6 +313,8 @@ if [ $FAILED_TESTS -eq 0 ]; then
     echo -e "${GREEN}✨ CFML execution: ✓${NC}"
     echo -e "${GREEN}✨ File operations: ✓${NC}"
     echo -e "${GREEN}✨ Server management: ✓${NC}"
+    echo -e "${GREEN}✨ Server CFML integration: ✓${NC}"
+    echo -e "${GREEN}✨ HTTP .cfs/.cfm execution: ✓${NC}"
     echo -e "${GREEN}✨ JMX monitoring: ✓${NC}"
     echo -e "${GREEN}✨ Configuration system: ✓${NC}"
     echo -e "${GREEN}✨ Command consistency: ✓${NC}"
