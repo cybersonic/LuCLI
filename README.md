@@ -172,10 +172,17 @@ LuCLI features an advanced output processing system with intelligent emoji handl
 [OK] Server started successfully on port 8080
 ```
 
-### Placeholder System
-- **Dynamic Variables**: `${NOW}`, `${USER_NAME}`, `${WORKING_DIR}`
-- **Environment Access**: `${ENV_PATH}`, `${ENV_USERNAME}`
-- **Smart Emojis**: `${EMOJI_SUCCESS}`, `${EMOJI_ERROR}`, `${EMOJI_WARNING}`
+### Smart Output Processing
+LuCLI includes an intelligent placeholder system that enhances internal messages and error handling:
+
+**Available Placeholders:**
+- **Time Variables**: `${NOW}`, `${DATE}`, `${TIME}`, `${TIMESTAMP}`
+- **System Info**: `${USER_NAME}`, `${WORKING_DIR}`, `${USER_HOME}`, `${OS_NAME}`, `${JAVA_VERSION}`
+- **LuCLI Info**: `${LUCLI_VERSION}`, `${LUCLI_HOME}`
+- **Environment**: `${ENV_PATH}`, `${ENV_USERNAME}`, etc.
+- **Smart Emojis**: `${EMOJI_SUCCESS}`, `${EMOJI_ERROR}`, `${EMOJI_WARNING}`, `${EMOJI_INFO}`
+
+**Note**: These placeholders work in LuCLI's internal templates and error messages, not in user CFML script output.
 
 ## 🔧 Configuration
 
@@ -253,16 +260,16 @@ src/main/resources/script_engine/
 ```
 
 ### Template-Based Processing
-Scripts use placeholder substitution and post-processing:
+LuCLI's internal script templates use placeholder substitution for consistent error handling and messaging:
 ```cfml
-// Template content
-writeOutput('${EMOJI_SUCCESS} Processing completed at ${NOW}');
+// Internal template content (cfmlOutput.cfs)
+writeOutput('${EMOJI_ERROR} CFML Error: ' & e.message);
 
-// Processed output (emoji-capable terminal)  
-writeOutput('✅ Processing completed at 2025-01-04T13:22:25');
+// Processed for emoji-capable terminal
+writeOutput('❌ CFML Error: ' & e.message);
 
-// Processed output (legacy terminal)
-writeOutput('[OK] Processing completed at 2025-01-04T13:22:25');
+// Processed for legacy terminal
+writeOutput('[ERROR] CFML Error: ' & e.message);
 ```
 
 ## 📋 Commands Reference
