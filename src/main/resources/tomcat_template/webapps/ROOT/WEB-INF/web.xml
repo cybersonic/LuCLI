@@ -83,6 +83,8 @@
         <url-pattern>/index.cfm/*</url-pattern>
     </servlet-mapping>
 
+    <!-- ADMIN_MAPPINGS_START --><!-- ADMIN_MAPPINGS_END -->
+
     <!-- REST Servlet Mappings -->
     <servlet-mapping>
         <servlet-name>RESTServlet</servlet-name>

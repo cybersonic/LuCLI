@@ -67,7 +67,7 @@ public class TomcatConfigGenerator {
         Path webroot = LuceeServerConfig.resolveWebroot(config, projectDir);
         Path webrootWebInf = webroot.resolve("WEB-INF");
         Files.createDirectories(webrootWebInf);
-        applyTemplate("tomcat_template/webapps/ROOT/WEB-INF/web.xml", webrootWebInf.resolve("web.xml"), placeholders);
+        applyWebXmlTemplate("tomcat_template/webapps/ROOT/WEB-INF/web.xml", webrootWebInf.resolve("web.xml"), placeholders, config);
         
         // Apply urlrewrite.xml template to PROJECT directory only if URL rewrite is enabled
         if (config.urlRewrite != null && config.urlRewrite.enabled) {
@@ -145,6 +145,51 @@ public class TomcatConfigGenerator {
         String processedContent = templateContent;
         for (Map.Entry<String, String> entry : placeholders.entrySet()) {
             processedContent = processedContent.replace(entry.getKey(), entry.getValue());
+        }
+        
+        // Ensure output directory exists
+        Files.createDirectories(outputPath.getParent());
+        
+        // Write processed content to output file
+        Files.writeString(outputPath, processedContent, StandardCharsets.UTF_8);
+    }
+    
+    /**
+     * Apply web.xml template with conditional admin servlet mappings
+     */
+    private void applyWebXmlTemplate(String templateResourcePath, Path outputPath, Map<String, String> placeholders,
+                                    LuceeServerConfig.ServerConfig config) throws IOException {
+        // Load template from resources
+        String templateContent;
+        try (InputStream is = getClass().getClassLoader().getResourceAsStream(templateResourcePath)) {
+            if (is == null) {
+                throw new IOException("Template not found: " + templateResourcePath);
+            }
+            templateContent = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        
+        // Replace placeholders
+        String processedContent = templateContent;
+        for (Map.Entry<String, String> entry : placeholders.entrySet()) {
+            processedContent = processedContent.replace(entry.getKey(), entry.getValue());
+        }
+        
+        // Conditionally inject admin servlet mappings
+        if (config.admin != null && config.admin.enabled) {
+            String adminMappings = "\n    <!-- Lucee Admin Servlet Mappings -->\n" +
+                    "    <servlet-mapping>\n" +
+                    "        <servlet-name>CFMLServlet</servlet-name>\n" +
+                    "        <url-pattern>/lucee/*</url-pattern>\n" +
+                    "    </servlet-mapping>\n" +
+                    "    \n" +
+                    "    <servlet-mapping>\n" +
+                    "        <servlet-name>CFMLServlet</servlet-name>\n" +
+                    "        <url-pattern>/lucee/admin/*</url-pattern>\n" +
+                    "    </servlet-mapping>\n";
+            
+            // Insert admin mappings at the placeholder location
+            processedContent = processedContent.replace("<!-- ADMIN_MAPPINGS_START --><!-- ADMIN_MAPPINGS_END -->",
+                    "<!-- ADMIN_MAPPINGS_START -->" + adminMappings + "    <!-- ADMIN_MAPPINGS_END -->");
         }
         
         // Ensure output directory exists
