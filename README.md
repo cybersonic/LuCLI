@@ -99,7 +99,9 @@ This routes all requests through your router file (default: `index.cfm`) with `P
 - `/hello` → `/index.cfm/hello` (PATH_INFO = `/hello`)
 - `/api/users/123` → `/index.cfm/api/users/123` (PATH_INFO = `/api/users/123`)
 
-Compatible with ColdBox, FW/1, CFWheels, ContentBox, and custom frameworks. See `test/urlrewrite-test/` for complete examples.
+Compatible with ColdBox, FW/1, CFWheels, ContentBox, and custom frameworks.
+
+📖 **[Complete URL Rewriting Guide →](documentation/URL_REWRITING.md)**
 
 ### Module Management
 ```bash
@@ -318,6 +320,7 @@ lucli/
 
 ### Comprehensive Guides
 - [**WARP.md**](WARP.md) - Developer guide and architecture overview
+- [**URL Rewriting Guide**](documentation/URL_REWRITING.md) - Complete URL rewriting and framework routing documentation
 - [**STRING_OUTPUT_SYSTEM.md**](STRING_OUTPUT_SYSTEM.md) - Output processing system documentation
 - [**EXTERNALIZED_SCRIPTS.md**](EXTERNALIZED_SCRIPTS.md) - CFML script template system
 - [**EMOJI_IMPROVEMENTS.md**](EMOJI_IMPROVEMENTS.md) - Emoji handling and terminal compatibility
