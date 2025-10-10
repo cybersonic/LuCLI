@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 # Configuration
 TEST_DIR="test/urlrewrite-test"
 SERVER_NAME="urlrewrite-test"
-BASE_PORT=8888
+BASE_PORT=8889
 
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}   LuCLI Framework Routing Test Suite${NC}"
