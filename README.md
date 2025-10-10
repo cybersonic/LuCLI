@@ -6,23 +6,10 @@ A modern, feature-rich command line interface for Lucee CFML that provides both 
 
 ## ✨ Key Features
 
-### 🖥️ Dual Execution Modes
-- **Interactive Terminal**: Persistent session with command history, auto-completion, and syntax highlighting
-- **One-Shot CLI**: Direct command execution for scripting and automation
-
 ### 🎯 Core Capabilities
 - **CFML Script Execution**: Run .cfs, .cfm, and .cfc files with full Lucee support
 - **Server Management**: Start, stop, monitor, and manage Lucee server instances
 - **Module System**: Create and manage reusable CFML modules
-- **Smart Output Processing**: Intelligent emoji handling and placeholder substitution
-- **Cross-Platform**: Windows, macOS, and Linux support with platform-specific optimizations
-
-### 🎨 Advanced Terminal Features
-- **Configurable Prompts**: 14+ built-in prompt themes with JSON-based customization
-- **Smart Emoji Support**: Automatic terminal capability detection with graceful fallbacks
-- **Command Auto-completion**: Intelligent completion for commands, files, and arguments
-- **Syntax Highlighting**: CFML syntax highlighting in interactive mode
-- **Windows Compatibility**: Optimized for various Windows terminal environments
 
 ## 📦 Installation
 
@@ -68,13 +55,13 @@ lucli> cd myproject
 lucli> pwd
 ```
 
-### Server Management  
+### Server Management
 ```bash
 # Start Lucee server for current directory
 lucli server start
 
-# Start with specific version
-lucli server start --version 7.0.0.123
+# Start with specific version and custom webroot
+lucli server start --version 7.0.0.123 --webroot ./public
 
 # Monitor server with real-time JMX dashboard
 lucli server monitor
@@ -82,6 +69,26 @@ lucli server monitor
 # View server logs
 lucli server log --follow
 ```
+
+**Framework-Style URL Routing:**
+LuCLI servers include built-in support for framework-style URL routing (extension-less URLs). Enable it in your `lucee.json`:
+
+```json
+{
+  "urlRewrite": {
+    "enabled": true,
+    "routerFile": "index.cfm"
+  }
+}
+```
+
+This routes all requests through your router file (default: `index.cfm`) with `PATH_INFO` set correctly:
+- `/hello` → `/index.cfm/hello` (PATH_INFO = `/hello`)
+- `/api/users/123` → `/index.cfm/api/users/123` (PATH_INFO = `/api/users/123`)
+
+Compatible with ColdBox, FW/1, CFWheels, ContentBox, and custom frameworks.
+
+📖 **[Complete URL Rewriting Guide →](documentation/URL_REWRITING.md)**
 
 ### Module Management
 ```bash
@@ -146,9 +153,13 @@ LuCLI stores configuration in `~/.lucli/`:
 ```json
 {
   "name": "my-project",
-  "version": "7.0.0.123", 
+  "version": "7.0.0.123",
   "port": 8080,
   "webroot": "./",
+  "urlRewrite": {
+    "enabled": true,
+    "routerFile": "index.cfm"
+  },
   "monitoring": {
     "enabled": true,
     "jmx": { "port": 8999 }
@@ -159,6 +170,10 @@ LuCLI stores configuration in `~/.lucli/`:
   }
 }
 ```
+
+**URL Rewrite Configuration:**
+- `enabled` (boolean, default: `true`) - Enable/disable framework-style URL routing
+- `routerFile` (string, default: `"index.cfm"`) - Central router file for handling all routes
 
 ### Prompt Customization
 ```bash
@@ -292,6 +307,7 @@ lucli/
 
 ### Comprehensive Guides
 - [**WARP.md**](WARP.md) - Developer guide and architecture overview
+- [**URL Rewriting Guide**](documentation/URL_REWRITING.md) - Complete URL rewriting and framework routing documentation
 - [**STRING_OUTPUT_SYSTEM.md**](STRING_OUTPUT_SYSTEM.md) - Output processing system documentation
 - [**EXTERNALIZED_SCRIPTS.md**](EXTERNALIZED_SCRIPTS.md) - CFML script template system
 - [**EMOJI_IMPROVEMENTS.md**](EMOJI_IMPROVEMENTS.md) - Emoji handling and terminal compatibility

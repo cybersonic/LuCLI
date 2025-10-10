@@ -29,6 +29,7 @@
 
       <Host name="localhost" appBase="webapps"
             unpackWARs="true" autoDeploy="true">
+        <JarScanner scanClassPath="false"/>
 
         <!-- Lucee server administration context -->
         <Context path="/lucee" 

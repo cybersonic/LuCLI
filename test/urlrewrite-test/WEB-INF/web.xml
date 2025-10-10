@@ -32,12 +32,12 @@
     <!-- Lucee Configuration -->
     <context-param>
         <param-name>lucee-server-directory</param-name>
-        <param-value>${luceeServerPath}</param-value>
+        <param-value>/Users/markdrew/.lucli/servers/urlrewrite-test/lucee-server</param-value>
     </context-param>
     
     <context-param>
         <param-name>lucee-web-directory</param-name>
-        <param-value>${luceeWebPath}</param-value>
+        <param-value>/Users/markdrew/.lucli/servers/urlrewrite-test/lucee-web</param-value>
     </context-param>
 
     <!-- Lucee CFML Servlet -->
@@ -46,11 +46,11 @@
         <servlet-class>lucee.loader.servlet.jakarta.CFMLServlet</servlet-class>
         <init-param>
             <param-name>lucee-server-root</param-name>
-            <param-value>${luceeServerPath}</param-value>
+            <param-value>/Users/markdrew/.lucli/servers/urlrewrite-test/lucee-server</param-value>
         </init-param>
         <init-param>
             <param-name>lucee-web-root</param-name>
-            <param-value>${luceeWebPath}</param-value>
+            <param-value>/Users/markdrew/.lucli/servers/urlrewrite-test/lucee-web</param-value>
         </init-param>
         <load-on-startup>1</load-on-startup>
     </servlet>
@@ -88,7 +88,18 @@
         <url-pattern>/index.cfm/*</url-pattern>
     </servlet-mapping>
 
-    <!-- ADMIN_MAPPINGS_START --><!-- ADMIN_MAPPINGS_END -->
+    <!-- ADMIN_MAPPINGS_START -->
+    <!-- Lucee Admin Servlet Mappings -->
+    <servlet-mapping>
+        <servlet-name>CFMLServlet</servlet-name>
+        <url-pattern>/lucee/*</url-pattern>
+    </servlet-mapping>
+    
+    <servlet-mapping>
+        <servlet-name>CFMLServlet</servlet-name>
+        <url-pattern>/lucee/admin/*</url-pattern>
+    </servlet-mapping>
+    <!-- ADMIN_MAPPINGS_END -->
 
     <!-- REST Servlet Mappings -->
     <servlet-mapping>
