@@ -30,6 +30,12 @@ public class InteractiveTerminal {
     public static void main(String[] args) throws Exception {
         boolean oneShotMode = args.length > 0;
         
+        // Debug output
+        if (LuCLI.debug || LuCLI.verbose) {
+            System.err.println("[DEBUG InteractiveTerminal] Args: " + java.util.Arrays.toString(args));
+            System.err.println("[DEBUG InteractiveTerminal] OneShotMode: " + oneShotMode);
+        }
+        
         if (oneShotMode) {
             executeOneShotCommand(args);
             return;
@@ -42,17 +48,28 @@ public class InteractiveTerminal {
      * Execute a single command and exit (CLI mode)
      */
     private static void executeOneShotCommand(String[] args) throws Exception {
+        // Debug output
+        if (LuCLI.debug || LuCLI.verbose) {
+            System.err.println("[DEBUG executeOneShotCommand] Starting with args: " + java.util.Arrays.toString(args));
+        }
+        
         Path currentDir = Paths.get(System.getProperty("user.dir"));
         unifiedExecutor = new UnifiedCommandExecutor(false, currentDir);
         
         String command = args[0];
         String[] commandArgs = args.length > 1 ? Arrays.copyOfRange(args, 1, args.length) : new String[0];
         
+        // Debug output
+        if (LuCLI.debug || LuCLI.verbose) {
+            System.err.println("[DEBUG executeOneShotCommand] Command: " + command);
+            System.err.println("[DEBUG executeOneShotCommand] CommandArgs: " + java.util.Arrays.toString(commandArgs));
+        }
+        
         // Handle basic commands first
         switch (command.toLowerCase()) {
             case "--version":
             case "version":
-                System.out.println(LuCLI.getVersionInfo());
+                System.out.println(LuCLI.getFullVersionInfo());
                 return;
             case "--lucee-version":
             case "lucee-version":
@@ -62,6 +79,16 @@ public class InteractiveTerminal {
             case "--help":
             case "-h":
                 showHelpNonInteractive();
+                return;
+            case "cfml":
+                // Handle CFML expression execution in one-shot mode
+                if (commandArgs.length > 0) {
+                    String cfmlCode = String.join(" ", commandArgs);
+                    executeCFMLNonInteractive(cfmlCode);
+                } else {
+                    System.err.println("Error: cfml command requires an expression. Example: cfml now()");
+                    System.exit(1);
+                }
                 return;
         }
         
@@ -247,6 +274,57 @@ public class InteractiveTerminal {
             }
         }
         terminal.writer().flush();
+    }
+    
+    /**
+     * Execute CFML code in non-interactive mode (one-shot command)
+     */
+    private static void executeCFMLNonInteractive(String cfmlCode) {
+        Timer.start("CFML Execution");
+        
+        try {
+            // Initialize Lucee engine if not already done
+            Timer.start("Lucee Engine Initialization");
+            if (luceeEngine == null) {
+                if (LuCLI.verbose) {
+                    System.out.println("Initializing Lucee CFML engine...");
+                }
+                
+                luceeEngine = LuceeScriptEngine.getInstance(LuCLI.verbose, LuCLI.debug);
+                if (LuCLI.verbose) {
+                    System.out.println("Lucee engine ready.");
+                }
+            }
+            Timer.stop("Lucee Engine Initialization");
+            
+            // Wrap the expression to capture and return the result
+            Timer.start("Script Generation");
+            String wrappedScript = createOutputScript(cfmlCode);
+            Timer.stop("Script Generation");
+            
+            // Execute the CFML code
+            Timer.start("Script Execution");
+            Object result = luceeEngine.eval(wrappedScript);
+            Timer.stop("Script Execution");
+            
+            // The output should already be printed by writeOutput in the script
+            // but we can also handle direct results if needed
+            if (result != null && !result.toString().trim().isEmpty() && LuCLI.debug) {
+                System.out.println(result.toString());
+            }
+
+        } catch (Exception e) {
+            System.err.println("Error executing CFML: " + e.getMessage());
+            if (e.getCause() != null && (LuCLI.verbose || LuCLI.debug)) {
+                System.err.println("Cause: " + e.getCause().getMessage());
+            }
+            if (LuCLI.debug) {
+                e.printStackTrace();
+            }
+            System.exit(1);
+        } finally {
+            Timer.stop("CFML Execution");
+        }
     }
     
     private static String createOutputScript(String cfmlExpression) {
