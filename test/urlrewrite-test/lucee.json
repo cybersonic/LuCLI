@@ -1,0 +1,23 @@
+{
+  "name": "urlrewrite-test",
+  "version": "6.2.2.91",
+  "port": 8889,
+  "webroot": "./",
+  "urlRewrite": {
+    "enabled": true,
+    "routerFile": "index.cfm"
+  },
+  "admin": {
+    "enabled": true
+  },
+  "monitoring": {
+    "enabled": true,
+    "jmx": {
+      "port": 9000
+    }
+  },
+  "jvm": {
+    "maxMemory": "512m",
+    "minMemory": "128m"
+  }
+}
