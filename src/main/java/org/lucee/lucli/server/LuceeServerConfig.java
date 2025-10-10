@@ -23,6 +23,11 @@ public class LuceeServerConfig {
         public MonitoringConfig monitoring = new MonitoringConfig();
         public JvmConfig jvm = new JvmConfig();
         public UrlRewriteConfig urlRewrite = new UrlRewriteConfig();
+        public AdminConfig admin = new AdminConfig();
+    }
+    
+    public static class AdminConfig {
+        public boolean enabled = true;
     }
     
     public static class UrlRewriteConfig {
@@ -72,6 +77,12 @@ public class LuceeServerConfig {
         // that don't have this field in their JSON
         if (config.urlRewrite == null) {
             config.urlRewrite = new UrlRewriteConfig();
+        }
+        
+        // Ensure admin is initialized for backward compatibility with older configs
+        // that don't have this field in their JSON
+        if (config.admin == null) {
+            config.admin = new AdminConfig();
         }
         
         // Don't resolve port conflicts here - do it just before starting server

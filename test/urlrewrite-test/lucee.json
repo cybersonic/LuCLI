@@ -7,6 +7,9 @@
     "enabled": true,
     "routerFile": "index.cfm"
   },
+  "admin": {
+    "enabled": true
+  },
   "monitoring": {
     "enabled": true,
     "jmx": {
