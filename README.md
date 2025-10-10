@@ -2,7 +2,7 @@
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)]() [![Java 17+](https://img.shields.io/badge/java-17+-blue)]() [![License](https://img.shields.io/badge/license-MIT-green)]()
 
-A modern, feature-rich command line interface for Lucee CFML that provides both interactive terminal mode and one-shot command execution. LuCLI integrates the powerful Lucee CFML engine into a modern terminal interface with advanced features like server management, JMX monitoring, module management, and intelligent output processing.
+A modern, feature-rich command line interface for Lucee CFML that brings the power of CFML to your terminal. LuCLI integrates the Lucee CFML engine with advanced features like server management, JMX monitoring, module management, and intelligent output processing.
 
 ## ✨ Key Features
 
@@ -20,10 +20,10 @@ A modern, feature-rich command line interface for Lucee CFML that provides both 
 # Download the latest release
 wget https://github.com/your-org/lucli/releases/latest/download/lucli.jar
 
-# Run interactive terminal
+# Start using LuCLI
 java -jar lucli.jar
 
-# Execute a CFML script
+# Execute CFML scripts directly
 java -jar lucli.jar myscript.cfs arg1 arg2
 ```
 
@@ -32,26 +32,26 @@ java -jar lucli.jar myscript.cfs arg1 arg2
 # Build self-executing binary
 mvn clean package -Pbinary
 
-# Run without Java command
+# Use directly without Java command
 ./target/lucli --version
-./target/lucli terminal
+./target/lucli
 ```
 
-## 🚀 Quick Usage Examples
+## 🚀 Usage Examples
 
-### Interactive Terminal Mode
+### CFML Development
 ```bash
-# Start interactive session
+# Start interactive CFML session
 java -jar lucli.jar
 
-# Execute CFML expressions
+# Execute CFML expressions directly
 lucli> cfml now()
 2025-01-04T13:22:25.123Z
 
 lucli> cfml dateFormat(now(), 'yyyy-mm-dd')  
 2025-01-04
 
-# File system operations
+# Navigate and work with files
 lucli> ls -la
 lucli> cd myproject
 lucli> pwd
@@ -128,7 +128,7 @@ lucli cfml --help               # CFML expression help
 - **Consistent Interface**: `--help` works on every command and subcommand
 - **Rich Examples**: Practical usage examples in every help screen
 - **Error Guidance**: Smart error messages with helpful suggestions
-- **Interactive Discovery**: Terminal mode with `help` command and tab completion
+- **Interactive Discovery**: Built-in `help` command and tab completion for easy exploration
 
 📖 **[Complete Help System Guide →](documentation/HELP_SYSTEM.md)**
 
@@ -239,7 +239,7 @@ prompt terminal  # Show terminal capabilities
 - **StringOutput**: Centralized output post-processor with emoji and placeholder support
 - **LuceeScriptEngine**: Lucee CFML engine integration with externalized script templates
 - **WindowsSupport**: Smart terminal detection and emoji capability analysis
-- **UnifiedCommandExecutor**: Consistent command handling across CLI and terminal modes
+- **UnifiedCommandExecutor**: Consistent command handling across all execution modes
 
 ### Externalized Script System
 LuCLI uses externalized CFML templates for better maintainability:
@@ -269,12 +269,11 @@ writeOutput('[OK] Processing completed at 2025-01-04T13:22:25');
 
 ### Global Commands
 | Command | Description | Example |
-|---------|-------------|---------|
+|---------|-------------|---------||
 | `--version` | Show version information | `lucli --version` |
 | `--lucee-version` | Show Lucee engine version | `lucli --lucee-version` |
 | `--help` | Show help information | `lucli --help` |
 | `help` | Show help for specific commands | `lucli help server` |
-| `terminal` | Start interactive mode | `lucli terminal` |
 
 ### CFML Commands
 | Command | Description | Example |
@@ -300,7 +299,7 @@ writeOutput('[OK] Processing completed at 2025-01-04T13:22:25');
 | `modules run` | Execute module | `lucli modules run my-module arg1` |
 | `<module-name>` | Direct module execution | `lucli my-module arg1 arg2` |
 
-### Terminal Commands (Interactive Mode)
+### Interactive Commands
 | Command | Description | Example |
 |---------|-------------|---------|
 | `cfml <expr>` | Execute CFML expression | `cfml now()` |
@@ -344,7 +343,7 @@ lucli/
 │   └── tomcat_template/               # Server configuration templates
 ├── test/                              # Test suites and examples
 ├── demo_servers/                      # Development test servers
-└── docs/                              # Additional documentation
+└── documentation/                     # Additional documentation
 ```
 
 ### Key Dependencies
@@ -388,7 +387,7 @@ lucli/
 - ✅ Server management (start, stop, status, monitor) with --port option
 - ✅ File system operations and navigation
 - ✅ Module system (create, list, execute)
-- ✅ Command consistency between CLI and terminal modes
+- ✅ Command consistency across all execution modes
 - ✅ Binary executable functionality
 - ✅ Configuration handling and persistence
 - ✅ URL rewrite and framework routing
@@ -491,4 +490,4 @@ lucli> cfml "Hello, World!"
 
 **LuCLI** - Making CFML development faster, easier, and more enjoyable from the command line.
 
-*For detailed documentation and examples, explore the docs/ directory or visit our [GitHub repository](https://github.com/your-org/lucli).*
+*For detailed documentation and examples, explore the documentation/ directory or visit our [GitHub repository](https://github.com/your-org/lucli).*
