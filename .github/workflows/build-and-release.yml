@@ -43,7 +43,7 @@ jobs:
       if: runner.os == 'Windows'
       run: |
         # Create Windows batch file for binary
-        mkdir -p target
+        if (!(Test-Path target)) { New-Item -ItemType Directory -Path target }
         echo '@echo off' > target/lucli.bat
         echo 'java -jar "%~dp0lucli.jar" %*' >> target/lucli.bat
 
