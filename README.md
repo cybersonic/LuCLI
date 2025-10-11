@@ -334,7 +334,7 @@ mvn clean package
 mvn clean package -Pbinary
 
 # Run tests
-./test/test.sh
+./tests/test.sh
 
 # Quick development cycle
 ./dev-lucli.sh
@@ -348,7 +348,7 @@ lucli/
 │   ├── script_engine/                 # Externalized CFML templates
 │   ├── prompts/                       # Built-in prompt themes
 │   └── tomcat_template/               # Server configuration templates
-├── test/                              # Test suites and examples
+├── tests/                             # Test suites and examples
 ├── demo_servers/                      # Development test servers
 └── documentation/                     # Additional documentation
 ```
@@ -375,13 +375,13 @@ lucli/
 ### Test Suites
 ```bash
 # Comprehensive test suite (52 tests)
-./test/test.sh
+./tests/test.sh
 
 # Server and CFML integration tests
-./test/test-server-cfml.sh
+./tests/test-server-cfml.sh
 
 # URL rewrite integration tests
-./test/test-urlrewrite-integration.sh
+./tests/test-urlrewrite-integration.sh
 
 # Build and run binary test
 ./dev-lucli.sh

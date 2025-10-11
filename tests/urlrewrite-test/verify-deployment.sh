@@ -280,7 +280,7 @@ if [ "$all_checks_passed" = true ]; then
     echo "  ./lucli server start --name $SERVER_NAME"
     echo ""
     echo "Or run the full test suite:"
-    echo "  ./test/urlrewrite-test/test-urlrewrite.sh"
+    echo "  ./tests/urlrewrite-test/test-urlrewrite.sh"
     echo ""
     exit 0
 else
