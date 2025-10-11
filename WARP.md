@@ -34,13 +34,13 @@ mvn clean package
 mvn clean package -Pbinary
 
 # Run comprehensive test suite
-./test/test.sh
+./tests/test.sh
 
 # Quick development cycle (build and run binary)
 ./dev-lucli.sh
 
 # Run simple tests
-./test/test-simple.sh
+./tests/test-simple.sh
 ```
 
 ### Running the Application
@@ -200,7 +200,7 @@ StringOutput provides centralized output handling with:
 
 ## Testing Strategy
 
-The test suite (`test/test.sh`) covers:
+The test suite (`tests/test.sh`) covers:
 - Basic functionality (help, version commands)
 - CFML script execution
 - File system operations

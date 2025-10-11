@@ -15,7 +15,7 @@ import org.lucee.lucli.LuceeScriptEngine;
  */
 public class LuceeScriptEngineTest {
     
-    private static final String TEST_DIR = "test/cfml";
+    private static final String TEST_DIR = "tests/cfml";
     
     public static void main(String[] args) {
         System.out.println("LuceeScriptEngine Test Suite");

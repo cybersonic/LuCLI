@@ -562,7 +562,7 @@ if (structKeyExists(url, "debug")) {
 </cfscript>
 ```
 
-Test with: `http://localhost:8080/test/path?debug=1`
+Test with: `http://localhost:8080/tests/path?debug=1`
 
 #### 2. Check URL Rewrite Status
 

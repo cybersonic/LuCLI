@@ -300,7 +300,7 @@ run_test "JAR file size reasonable" "test $(stat -f%z ../$LUCLI_JAR) -lt 1000000
 echo -e "${BLUE}=== Server CFML Integration Tests ===${NC}"
 if command -v curl &> /dev/null; then
     echo -e "${CYAN}Running comprehensive server and CFML tests...${NC}"
-    if ../test/test-server-cfml.sh; then
+    if ../tests/test-server-cfml.sh; then
         echo -e "${GREEN}✅ Server CFML tests completed successfully${NC}"
     else
         echo -e "${RED}❌ Server CFML tests failed${NC}"
@@ -316,7 +316,7 @@ fi
 echo -e "${BLUE}=== URL Rewrite Integration Tests ===${NC}"
 if command -v curl &> /dev/null; then
     echo -e "${CYAN}Running URL rewrite and framework routing tests...${NC}"
-    if ../test/test-urlrewrite-integration.sh; then
+    if ../tests/test-urlrewrite-integration.sh; then
         echo -e "${GREEN}✅ URL rewrite tests completed successfully${NC}"
     else
         echo -e "${RED}❌ URL rewrite tests failed${NC}"
