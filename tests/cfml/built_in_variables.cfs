@@ -1,0 +1,10 @@
+echo("__scriptFile: #__scriptFile#");
+echo("__scriptPath: #__scriptPath#");
+echo("__scriptDir: #__scriptDir#");
+echo("__arguments: #arrayToList(__arguments, ', ')#");
+echo("__argumentCount: #__argumentCount#");
+echo("__env: [complex object - " & structCount(__env) & " keys]");
+echo("__systemProps: [complex object - " & structCount(__systemProps) & " keys]");
+echo("__lucliHome: #__lucliHome#");
+echo("__lucliVersion: #__lucliVersion#");
+echo("__currentDir: #__currentDir#");

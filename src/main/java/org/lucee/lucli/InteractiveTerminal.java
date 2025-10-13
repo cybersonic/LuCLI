@@ -257,8 +257,8 @@ public class InteractiveTerminal {
             String wrappedScript = createOutputScript(cfmlCode);
             
             //We can also directly add a variable. So we dont even need to replace.
-            // Execute the CFML code
-            Object result = luceeEngine.eval(wrappedScript);
+            // Execute the CFML code with built-in variables
+            Object result = luceeEngine.evalWithBuiltinVariables(wrappedScript);
             
             // The output should already be printed by writeOutput in the script
             // but we can also handle direct results if needed
@@ -302,9 +302,9 @@ public class InteractiveTerminal {
             String wrappedScript = createOutputScript(cfmlCode);
             Timer.stop("Script Generation");
             
-            // Execute the CFML code
+            // Execute the CFML code with built-in variables
             Timer.start("Script Execution");
-            Object result = luceeEngine.eval(wrappedScript);
+            Object result = luceeEngine.evalWithBuiltinVariables(wrappedScript);
             Timer.stop("Script Execution");
             
             // The output should already be printed by writeOutput in the script
@@ -332,11 +332,26 @@ public class InteractiveTerminal {
             // Read the external script template
             String scriptTemplate = readScriptTemplate("/script_engine/cfmlOutput.cfs");
             
-            // Replace the placeholder with the actual expression
-            String result = scriptTemplate.replace("${cfmlExpression}", cfmlExpression);
-            
-            // Post-process through StringOutput for emoji and placeholder handling
-            return StringOutput.getInstance().process(result);
+            // Get built-in variables setup (no script file or args for interactive mode)
+            try {
+                org.lucee.lucli.BuiltinVariableManager variableManager = org.lucee.lucli.BuiltinVariableManager.getInstance(LuCLI.verbose, LuCLI.debug);
+                String builtinSetup = variableManager.createVariableSetupScript(null, null);
+                
+                // Replace placeholders with the actual expression and built-in variables
+                String result = scriptTemplate
+                    .replace("${builtinVariablesSetup}", builtinSetup)
+                    .replace("${cfmlExpression}", cfmlExpression);
+                
+                // Post-process through StringOutput for emoji and placeholder handling
+                return StringOutput.getInstance().process(result);
+            } catch (Exception e) {
+                if (LuCLI.debug) {
+                    System.err.println("Warning: Failed to inject built-in variables in createOutputScript: " + e.getMessage());
+                }
+                // Fallback: just replace the expression without built-in variables
+                String result = scriptTemplate.replace("${cfmlExpression}", cfmlExpression);
+                return StringOutput.getInstance().process(result);
+            }
             
         } catch (Exception e) {
             // Fallback to inline generation if reading external script fails

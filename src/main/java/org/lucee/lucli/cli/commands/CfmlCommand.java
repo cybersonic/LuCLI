@@ -40,30 +40,43 @@ public class CfmlCommand implements Callable<Integer> {
     )
     private String[] cfmlParts;
 
+    @Option(names = {"-t", "--timing"}, description = "Enable timing output")
+    private boolean timing = false;
+
     @Override
     public Integer call() throws Exception {
         // Set global flags for backward compatibility
         LuCLI.verbose = LuCLI.verbose || verbose;
         LuCLI.debug = LuCLI.debug || debug;
+        LuCLI.timing = LuCLI.timing || timing;
         
-        if (cfmlParts == null || cfmlParts.length == 0) {
-            System.err.println("Error: cfml command requires an expression. Example: cfml now()");
-            return 1;
-        }
+        // Initialize timing if requested
+        Timer.setEnabled(LuCLI.timing);
+        Timer.start("CFML Command Execution");
+        
+        try {
+            if (cfmlParts == null || cfmlParts.length == 0) {
+                System.err.println("Error: cfml command requires an expression. Example: cfml now()");
+                return 1;
+            }
 
-        // Join all parts into a single CFML expression
-        String cfmlCode = String.join(" ", cfmlParts);
-        
-        // Debug output
-        if (LuCLI.debug) {
-            System.err.println("[DEBUG CfmlCommand] cfmlParts: " + java.util.Arrays.toString(cfmlParts));
-            System.err.println("[DEBUG CfmlCommand] cfmlCode: '" + cfmlCode + "'");
+            // Join all parts into a single CFML expression
+            String cfmlCode = String.join(" ", cfmlParts);
+            
+            // Debug output
+            if (LuCLI.debug) {
+                System.err.println("[DEBUG CfmlCommand] cfmlParts: " + java.util.Arrays.toString(cfmlParts));
+                System.err.println("[DEBUG CfmlCommand] cfmlCode: '" + cfmlCode + "'");
+            }
+            
+            // Execute the CFML code
+            executeCFMLNonInteractive(cfmlCode);
+            
+            return 0;
+        } finally {
+            Timer.stop("CFML Command Execution");
+            Timer.printResults();
         }
-        
-        // Execute the CFML code
-        executeCFMLNonInteractive(cfmlCode);
-        
-        return 0;
     }
 
     /**
@@ -101,9 +114,9 @@ public class CfmlCommand implements Callable<Integer> {
             
             Timer.stop("Script Generation");
             
-            // Execute the CFML code
+            // Execute the CFML code with built-in variables
             Timer.start("Script Execution");
-            Object result = luceeEngine.eval(wrappedScript);
+            Object result = luceeEngine.evalWithBuiltinVariables(wrappedScript);
             Timer.stop("Script Execution");
             
             // The output should already be printed by writeOutput in the script
@@ -134,11 +147,26 @@ public class CfmlCommand implements Callable<Integer> {
             // Read the external script template
             String scriptTemplate = readScriptTemplate("/script_engine/cfmlOutput.cfs");
             
-            // Replace the placeholder with the actual expression
-            String result = scriptTemplate.replace("${cfmlExpression}", cfmlExpression);
-            
-            // Post-process through StringOutput for emoji and placeholder handling
-            return org.lucee.lucli.StringOutput.getInstance().process(result);
+            // Get built-in variables setup (no script file or args for CLI mode)
+            try {
+                org.lucee.lucli.BuiltinVariableManager variableManager = org.lucee.lucli.BuiltinVariableManager.getInstance(LuCLI.verbose, LuCLI.debug);
+                String builtinSetup = variableManager.createVariableSetupScript(null, null);
+                
+                // Replace placeholders with the actual expression and built-in variables
+                String result = scriptTemplate
+                    .replace("${builtinVariablesSetup}", builtinSetup)
+                    .replace("${cfmlExpression}", cfmlExpression);
+                
+                // Post-process through StringOutput for emoji and placeholder handling
+                return org.lucee.lucli.StringOutput.getInstance().process(result);
+            } catch (Exception e) {
+                if (LuCLI.debug) {
+                    System.err.println("Warning: Failed to inject built-in variables in CfmlCommand createOutputScript: " + e.getMessage());
+                }
+                // Fallback: just replace the expression without built-in variables
+                String result = scriptTemplate.replace("${cfmlExpression}", cfmlExpression);
+                return org.lucee.lucli.StringOutput.getInstance().process(result);
+            }
             
         } catch (Exception e) {
             // Fallback to inline generation if reading external script fails

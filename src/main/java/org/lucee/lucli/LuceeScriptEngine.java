@@ -98,6 +98,8 @@ public class LuceeScriptEngine {
      * Execute a simple CFML code snippet
      */
     public Object eval(String script) throws ScriptException {
+
+
         return engine.eval(script);
     }
     
@@ -198,9 +200,19 @@ public class LuceeScriptEngine {
             StringOutput.getInstance().println("${EMOJI_INFO} Arguments: " + Arrays.toString(scriptArgs));
         }
         
+        // For CFS scripts, inject built-in variables directly into the script content
+        // so they are available as CFML variables, not just engine bindings
+        String scriptWithVariables = injectBuiltinVariables(scriptContent, scriptFile, scriptArgs);
+        
+        if (isVerboseMode() || isDebugMode()) {
+            System.out.println("=== CFS Script with Built-in Variables ===");
+            System.out.println(scriptWithVariables);
+            System.out.println("=== End Script ===");
+        }
+        
         // CFM files can contain CFML tags and need to be processed as templates
         // The JSR223 engine should handle this, but we may need to wrap it appropriately
-        executeWrappedScript(scriptContent, scriptFile, scriptArgs);
+        executeWrappedScript(scriptWithVariables, scriptFile, scriptArgs);
     }
     
 
@@ -235,8 +247,28 @@ public class LuceeScriptEngine {
             throw new ScriptException("CFML ScriptEngine not found. Make sure Lucee is properly configured.");
         }
         
-        // Set up script context
-        // setupScriptContext(engine, scriptFile, scriptArgs);
+        // Set up built-in variables using centralized manager
+        try {
+            BuiltinVariableManager variableManager = BuiltinVariableManager.getInstance(verbose, debug);
+            variableManager.setupBuiltinVariables(engine, scriptFile, scriptArgs);
+            
+            // Set up component mapping for ~/.lucli directory
+            Path lucliHome = getLucliHomeDirectory();
+            String mappingScript = createLucliMappingScript(lucliHome);
+            if (isVerboseMode()) {
+                System.out.println("Setting up lucli mapping: " + lucliHome);
+                System.out.println("Mapping script: " + mappingScript);
+            }
+            engine.eval(mappingScript);
+        } catch (IOException e) {
+            if (isDebugMode()) {
+                System.err.println("Warning: Failed to set up built-in variables: " + e.getMessage());
+            }
+        } catch (Exception e) {
+            if (isDebugMode()) {
+                System.err.println("Warning: Failed to set up lucli mapping: " + e.getMessage());
+            }
+        }
         
         // Execute the script
         if (isVerboseMode()) {
@@ -443,8 +475,13 @@ public class LuceeScriptEngine {
                 }
             }
             
+            // Get built-in variables setup
+            BuiltinVariableManager variableManager = BuiltinVariableManager.getInstance(verbose, debug);
+            String builtinSetup = variableManager.createVariableSetupScript(null, scriptArgs);
+            
             // Replace placeholders and post-process
             String result = scriptTemplate
+                .replace("${builtinVariablesSetup}", builtinSetup)
                 .replace("${argumentSetup}", argSetup.toString())
                 .replace("${moduleExecutionContent}", executionContent);
                 
@@ -495,8 +532,13 @@ public class LuceeScriptEngine {
                 componentInstantiation = "  obj = createObject('component', '" + componentPath + "');\n";
             }
             
+            // Get built-in variables setup
+            BuiltinVariableManager variableManager = BuiltinVariableManager.getInstance(verbose, debug);
+            String builtinSetup = variableManager.createVariableSetupScript(scriptFile, scriptArgs);
+            
             // Replace placeholders and post-process
             String result = scriptTemplate
+                .replace("${builtinVariablesSetup}", builtinSetup)
                 .replace("${scriptFile}", scriptFile)
                 .replace("${componentPath}", componentPath)
                 .replace("${argumentSetup}", argSetup.toString())
@@ -945,6 +987,89 @@ public class LuceeScriptEngine {
         content = fixVariableScoping(content);
         
         return content;
+    }
+    
+    /**
+     * Evaluate CFML script with built-in variables available
+     * This method ensures built-in variables are available for interactive and CLI usage
+     * 
+     * @param scriptContent The CFML script content to execute
+     * @return The result of script execution
+     * @throws Exception if script execution fails
+     */
+    public Object evalWithBuiltinVariables(String scriptContent) throws Exception {
+        return evalWithBuiltinVariables(scriptContent, null, null);
+    }
+    
+    /**
+     * Create a script with built-in variables injected as CFML variables
+     * This is useful for templates that need built-in variables available as CFML vars
+     * 
+     * @param scriptContent The base script content
+     * @param scriptFile The script file path (can be null)
+     * @param scriptArgs The script arguments (can be null) 
+     * @return Script content with built-in variables prepended
+     * @throws Exception if variable setup fails
+     */
+    public String injectBuiltinVariables(String scriptContent, String scriptFile, String[] scriptArgs) throws Exception {
+        try {
+            BuiltinVariableManager variableManager = BuiltinVariableManager.getInstance(verbose, debug);
+            String variableSetup = variableManager.createVariableSetupScript(scriptFile, scriptArgs);
+            
+            // Prepend the variable setup to the script content
+            StringBuilder fullScript = new StringBuilder();
+            fullScript.append(variableSetup);
+            fullScript.append("\n// === Original Script Content ===\n");
+            fullScript.append(scriptContent);
+            
+            return fullScript.toString();
+        } catch (IOException e) {
+            if (isDebugMode()) {
+                System.err.println("Warning: Failed to inject built-in variables: " + e.getMessage());
+            }
+            // Return original script content if injection fails
+            return scriptContent;
+        }
+    }
+    
+    /**
+     * Evaluate CFML script with built-in variables and specific script context
+     * 
+     * @param scriptContent The CFML script content to execute
+     * @param scriptFile The script file path (can be null for interactive mode)
+     * @param scriptArgs The script arguments (can be null)
+     * @return The result of script execution
+     * @throws Exception if script execution fails
+     */
+    public Object evalWithBuiltinVariables(String scriptContent, String scriptFile, String[] scriptArgs) throws Exception {
+        if (engine == null) {
+            throw new ScriptException("CFML ScriptEngine not found. Make sure Lucee is properly configured.");
+        }
+        
+        // Set up built-in variables using centralized manager
+        try {
+            BuiltinVariableManager variableManager = BuiltinVariableManager.getInstance(verbose, debug);
+            variableManager.setupBuiltinVariables(engine, scriptFile, scriptArgs);
+            
+            // Set up component mapping for ~/.lucli directory
+            Path lucliHome = getLucliHomeDirectory();
+            String mappingScript = createLucliMappingScript(lucliHome);
+            if (isVerboseMode()) {
+                System.out.println("Setting up lucli mapping: " + lucliHome);
+            }
+            engine.eval(mappingScript);
+        } catch (IOException e) {
+            if (isDebugMode()) {
+                System.err.println("Warning: Failed to set up built-in variables: " + e.getMessage());
+            }
+        } catch (Exception e) {
+            if (isDebugMode()) {
+                System.err.println("Warning: Failed to set up lucli mapping: " + e.getMessage());
+            }
+        }
+        
+        // Execute the script
+        return engine.eval(scriptContent);
     }
     
     /**
