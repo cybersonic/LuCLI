@@ -4,30 +4,45 @@
   // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
   "version": "0.2.0",
   "configurations": [
-  
     {
       "type": "java",
       "name": "💻 LucCLI Terminal",
       "request": "launch",
-      "mainClass": "org.lucee.lucli.LucCLI",
-      "args": "terminal",
-      "projectName": "LuCLI"
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["terminal"],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
     },
     {
       "type": "java",
       "name": "📄 LucCLI File",
       "request": "launch",
-      "mainClass": "org.lucee.lucli.LucCLI",
-      "args": "examples/hello.cfc",
-      "projectName": "LuCLI"
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["examples/hello.cfc"],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
     },
     {
       "type": "java",
       "name": "🔌 LucCLI Module",
       "request": "launch",
-      "mainClass": "org.lucee.lucli.LucCLI",
-      "args": ["install", "lucee_lint", "arg2", "arg3"],
-      "projectName": "LuCLI"
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["--debug", "modules", "run", "test-module"],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "java",
+      "name": "🔍 LucCLI Help",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["--help"],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
     }
   ]
 }
