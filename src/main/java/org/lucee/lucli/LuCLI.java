@@ -31,9 +31,10 @@ public class LuCLI {
         cmd.setParameterExceptionHandler(new CommandLine.IParameterExceptionHandler() {
             @Override
             public int handleParseException(CommandLine.ParameterException ex, String[] args) {
-                // Extract debug and verbose flags from args for shortcut handling
+                // Extract debug, verbose, and timing flags from args for shortcut handling
                 boolean shortcutDebug = java.util.Arrays.asList(args).contains("--debug") || java.util.Arrays.asList(args).contains("-d");
                 boolean shortcutVerbose = java.util.Arrays.asList(args).contains("--verbose") || java.util.Arrays.asList(args).contains("-v");
+                boolean shortcutTiming = java.util.Arrays.asList(args).contains("--timing") || java.util.Arrays.asList(args).contains("-t");
                 
                 // Check if this might be a shortcut (module or CFML file)
                 // BUT ONLY if it's not a recognized subcommand
@@ -59,7 +60,7 @@ public class LuCLI {
                         // Check if it's an existing CFML file
                         if (file.exists() && (firstArg.endsWith(".cfs") || firstArg.endsWith(".cfm") || firstArg.endsWith(".cfml"))) {
                             try {
-                                return executeCfmlFileShortcut(firstArg, remainingArgs, shortcutVerbose, shortcutDebug);
+                                return executeCfmlFileShortcut(firstArg, remainingArgs, shortcutVerbose, shortcutDebug, shortcutTiming);
                             } catch (Exception cfmlEx) {
                                 // If CFML file execution fails, fall through to normal error handling
                                 if (shortcutVerbose || shortcutDebug) {
@@ -70,7 +71,7 @@ public class LuCLI {
                         // If it's not an existing file, try to execute as module shortcut
                         else if (!file.exists()) {
                             try {
-                                return executeModuleShortcut(firstArg, remainingArgs, shortcutVerbose, shortcutDebug);
+                                return executeModuleShortcut(firstArg, remainingArgs, shortcutVerbose, shortcutDebug, shortcutTiming);
                             } catch (Exception moduleEx) {
                                 // If module execution fails, fall through to normal error handling
                                 if (shortcutVerbose || shortcutDebug) {
@@ -176,10 +177,11 @@ public class LuCLI {
      * @param moduleName The name of the module to run
      * @param args Additional arguments to pass to the module
      * @param verbose Enable verbose output
-     * @param debug Enable debug output  
+     * @param debug Enable debug output
+     * @param timing Enable timing output
      * @return Exit code from module execution
      */
-    private static int executeModuleShortcut(String moduleName, String[] args, boolean verbose, boolean debug) throws Exception {
+    private static int executeModuleShortcut(String moduleName, String[] args, boolean verbose, boolean debug, boolean timing) throws Exception {
         if (verbose || debug) {
             StringOutput.Quick.info("Executing module shortcut: " + moduleName + 
                 " (equivalent to 'lucli modules run " + moduleName + "')");
@@ -187,6 +189,18 @@ public class LuCLI {
         
         // Build the new arguments array: ["modules", "run", moduleName, ...additionalArgs]
         java.util.List<String> newArgs = new java.util.ArrayList<>();
+        
+        // Add flags first
+        if (verbose) {
+            newArgs.add("--verbose");
+        }
+        if (debug) {
+            newArgs.add("--debug");
+        }
+        if (timing) {
+            newArgs.add("--timing");
+        }
+        
         newArgs.add("modules");
         newArgs.add("run");
         newArgs.add(moduleName);
@@ -225,9 +239,19 @@ public class LuCLI {
      * @param args Additional arguments to pass to the script
      * @param verbose Enable verbose output
      * @param debug Enable debug output
+     * @param timing Enable timing output
      * @return Exit code from file execution
      */
-    private static int executeCfmlFileShortcut(String filePath, String[] args, boolean verbose, boolean debug) throws Exception {
+    private static int executeCfmlFileShortcut(String filePath, String[] args, boolean verbose, boolean debug, boolean timing) throws Exception {
+        // Set global flags
+        LuCLI.verbose = verbose;
+        LuCLI.debug = debug;
+        LuCLI.timing = timing;
+        
+        // Initialize timing if requested
+        Timer.setEnabled(timing);
+        Timer.start("CFML File Execution");
+        
         if (verbose || debug) {
             StringOutput.Quick.info("Executing CFML file: " + filePath);
         }
@@ -253,15 +277,32 @@ public class LuCLI {
         
         try {
             // Get or create the LuceeScriptEngine instance
+            Timer.start("Lucee Engine Initialization");
             LuceeScriptEngine luceeEngine = LuceeScriptEngine.getInstance(verbose, debug);
+            Timer.stop("Lucee Engine Initialization");
             
             // For .cfs files, we need to set up the ARGS array manually since setupScriptContext is disabled
             if (fileName.endsWith(".cfs")) {
+                Timer.start("Script Preparation");
                 // Read the file content
                 String fileContent = java.nio.file.Files.readString(path, java.nio.charset.StandardCharsets.UTF_8);
                 
-                // Create ARGS array setup
+                // Create script with built-in variables and ARGS array setup
                 StringBuilder scriptWithArgs = new StringBuilder();
+                
+                // Add built-in variables setup
+                try {
+                    org.lucee.lucli.BuiltinVariableManager variableManager = org.lucee.lucli.BuiltinVariableManager.getInstance(verbose, debug);
+                    String builtinSetup = variableManager.createVariableSetupScript(filePath, args);
+                    scriptWithArgs.append(builtinSetup);
+                    scriptWithArgs.append("\n");
+                } catch (Exception e) {
+                    if (debug) {
+                        System.err.println("Warning: Failed to inject built-in variables: " + e.getMessage());
+                    }
+                }
+                
+                // Add ARGS array setup for backward compatibility
                 scriptWithArgs.append("// Auto-generated ARGS array setup\n");
                 scriptWithArgs.append("ARGS = ['" + filePath + "'");
                 if (args != null && args.length > 0) {
@@ -271,6 +312,7 @@ public class LuCLI {
                 }
                 scriptWithArgs.append("];\n\n");
                 scriptWithArgs.append(fileContent);
+                Timer.stop("Script Preparation");
                 
                 if (debug) {
                     System.err.println("[DEBUG] Script with ARGS setup:");
@@ -278,11 +320,15 @@ public class LuCLI {
                     System.err.println("[DEBUG] End of script");
                 }
                 
-                // Execute the wrapped script content directly
-                luceeEngine.eval(scriptWithArgs.toString());
+                // Execute the wrapped script content with built-in variables
+                Timer.start("Script Execution");
+                luceeEngine.evalWithBuiltinVariables(scriptWithArgs.toString(), filePath, args);
+                Timer.stop("Script Execution");
             } else {
                 // For .cfm and .cfc files, use the existing method
+                Timer.start("Script Execution");
                 luceeEngine.executeScript(path.toAbsolutePath().toString(), args);
+                Timer.stop("Script Execution");
             }
             
             // Success
@@ -294,6 +340,10 @@ public class LuCLI {
                 e.printStackTrace();
             }
             return 1;
+        } finally {
+            // Always stop total timer and show results before exit (if timing enabled)
+            Timer.stop("CFML File Execution");
+            Timer.printResults();
         }
     }
 }
