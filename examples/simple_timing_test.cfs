@@ -1,0 +1,10 @@
+// Simple working test script for timing functionality
+echo("Starting test...");
+
+// Simulate some work with simple operations
+for (i = 1; i <= 3; i++) {
+    echo("Processing step " & i);
+    x = i * 2;
+}
+
+echo("Test completed!");
