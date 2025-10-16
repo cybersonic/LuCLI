@@ -1,11 +1,5 @@
 package org.lucee.lucli.monitoring;
 
-import org.lucee.lucli.monitoring.CliDashboard.ServerMetrics;
-import org.lucee.lucli.monitoring.JmxConnection.*;
-import org.lucee.lucli.server.LuceeServerConfig;
-import org.lucee.lucli.server.LuceeServerManager;
-import org.lucee.lucli.StringOutput;
-
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -14,6 +8,17 @@ import java.util.Scanner;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+
+import org.lucee.lucli.StringOutput;
+import org.lucee.lucli.monitoring.CliDashboard.ServerMetrics;
+import org.lucee.lucli.monitoring.JmxConnection.GcMetrics;
+import org.lucee.lucli.monitoring.JmxConnection.LuceeMetrics;
+import org.lucee.lucli.monitoring.JmxConnection.MemoryMetrics;
+import org.lucee.lucli.monitoring.JmxConnection.OsMetrics;
+import org.lucee.lucli.monitoring.JmxConnection.RuntimeMetrics;
+import org.lucee.lucli.monitoring.JmxConnection.ThreadingMetrics;
+import org.lucee.lucli.server.LuceeServerConfig;
+import org.lucee.lucli.server.LuceeServerManager;
 
 /**
  * Interactive monitoring command for Lucee servers via JMX

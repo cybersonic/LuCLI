@@ -1,8 +1,6 @@
 package org.lucee.lucli.interactive;
 
-import java.io.IOException;
 import java.util.List;
-import java.util.Scanner;
 import java.util.function.Function;
 
 /**

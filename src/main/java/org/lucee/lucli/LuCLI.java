@@ -1,7 +1,8 @@
 package org.lucee.lucli;
 
-import picocli.CommandLine;
 import org.lucee.lucli.cli.LuCLICommand;
+
+import picocli.CommandLine;
 
 public class LuCLI {
 
@@ -95,7 +96,7 @@ public class LuCLI {
         System.exit(exitCode);
     }
     
-    public static String getVersionInfo() {
+	public static String getVersionInfo() {
         String version = getVersion();
         return "LuCLI " + version;
     }
@@ -121,14 +122,17 @@ public class LuCLI {
     
     /**
      * Get Lucee version information
+     * @return the version of lucee the lucli is running by default
      */
     public static String getLuceeVersionInfo() throws Exception {
-        LuceeScriptEngine engine = LuceeScriptEngine.getInstance(false, false);
-        engine.eval("version = SERVER.LUCEE.version");
-        Object version = engine.getEngine().get("version");
-        return "Lucee Version: " + version;
+    	String lucee_version = LuceeScriptEngine.getInstance(false,false).getVersion();
+        return "Lucee Version: " + lucee_version;
     }
     
+    /**
+     * Get the version of LuCLI
+     * @return version in pom
+     */
     public static String getVersion() {
         // Try to read version from JAR manifest
         Package pkg = LuCLI.class.getPackage();
@@ -167,6 +171,7 @@ public class LuCLI {
         // List of known subcommands that should not be treated as shortcuts
         return "server".equals(command) || 
                "modules".equals(command) || 
+               "module".equals(command) || 
                "cfml".equals(command) || 
                "help".equals(command) ||
                "terminal".equals(command);

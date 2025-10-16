@@ -2,13 +2,13 @@ package org.lucee.lucli.cli.commands;
 
 import java.util.concurrent.Callable;
 
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
-
 import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.LuceeScriptEngine;
 import org.lucee.lucli.Timer;
+
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
+import picocli.CommandLine.Parameters;
 
 /**
  * CFML command for executing CFML expressions directly from command line

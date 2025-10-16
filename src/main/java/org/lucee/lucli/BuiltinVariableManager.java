@@ -1,14 +1,15 @@
 package org.lucee.lucli;
 
-import javax.script.Bindings;
-import javax.script.ScriptEngine;
-import javax.script.ScriptContext;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
-import java.util.Map;
 import java.util.HashMap;
+import java.util.Map;
+
+import javax.script.Bindings;
+import javax.script.ScriptContext;
+import javax.script.ScriptEngine;
 
 /**
  * Centralized manager for LuCLI built-in variables that should be available to all scripts.

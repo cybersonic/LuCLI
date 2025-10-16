@@ -1,10 +1,18 @@
 package org.lucee.lucli.monitoring;
 
-import javax.management.*;
-import javax.management.openmbean.CompositeData;
-import javax.management.remote.*;
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import javax.management.MBeanServerConnection;
+import javax.management.ObjectName;
+import javax.management.openmbean.CompositeData;
+import javax.management.remote.JMXConnector;
+import javax.management.remote.JMXConnectorFactory;
+import javax.management.remote.JMXServiceURL;
 
 /**
  * Utility class for connecting to and retrieving metrics from JMX-enabled Lucee servers

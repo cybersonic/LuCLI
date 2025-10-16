@@ -1,15 +1,15 @@
 package org.lucee.lucli;
 
-import org.jline.reader.Candidate;
-import org.jline.reader.Completer;
-import org.jline.reader.LineReader;
-import org.jline.reader.ParsedLine;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.Stream;
+
+import org.jline.reader.Candidate;
+import org.jline.reader.Completer;
+import org.jline.reader.LineReader;
+import org.jline.reader.ParsedLine;
 
 /**
  * Tab completion for LuCLI commands and file paths

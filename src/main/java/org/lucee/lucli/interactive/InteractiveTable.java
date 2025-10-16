@@ -1,13 +1,12 @@
 package org.lucee.lucli.interactive;
 
-import org.jline.terminal.Terminal;
-import org.jline.terminal.TerminalBuilder;
-
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
+
+import org.jline.terminal.Terminal;
+import org.jline.terminal.TerminalBuilder;
 
 /**
  * Interactive table component with keyboard navigation and row selection

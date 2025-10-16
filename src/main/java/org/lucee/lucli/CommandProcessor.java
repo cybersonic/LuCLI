@@ -1,17 +1,27 @@
 package org.lucee.lucli;
 
 import java.io.IOException;
-import java.nio.file.*;
+import java.nio.file.DirectoryNotEmptyException;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
+
+import org.lucee.lucli.cflint.CFLintCommand;
 import org.lucee.lucli.commands.UnifiedCommandExecutor;
 import org.lucee.lucli.interactive.InteractiveTestCommand;
-import org.lucee.lucli.cflint.CFLintCommand;
 
 /**
  * Processes file system commands for the terminal
@@ -1265,7 +1275,7 @@ public class CommandProcessor {
             System.setOut(new java.io.PrintStream(baos));
             System.setErr(new java.io.PrintStream(baos));
             
-            boolean result = cfLintCommand.handleLintCommand(commandLine);
+            //boolean result = cfLintCommand.handleLintCommand(commandLine);
             
             // Restore original streams
             System.setOut(originalOut);

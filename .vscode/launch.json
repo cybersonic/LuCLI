@@ -43,6 +43,16 @@
       "projectName": "lucli",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal"
+    },
+    {
+      "type": "java",
+      "name": "ℹ️ LucCLI Version",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["--version"],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
     }
   ]
 }
