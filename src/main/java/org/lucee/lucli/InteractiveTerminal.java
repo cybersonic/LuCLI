@@ -11,7 +11,6 @@ import org.jline.reader.EndOfFileException;
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.UserInterruptException;
-import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 import org.lucee.lucli.commands.UnifiedCommandExecutor;
 import org.lucee.lucli.modules.ModuleCommand;

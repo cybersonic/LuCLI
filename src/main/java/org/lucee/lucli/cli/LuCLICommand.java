@@ -2,18 +2,17 @@ package org.lucee.lucli.cli;
 
 import java.util.concurrent.Callable;
 
+import org.lucee.lucli.InteractiveTerminal;
+import org.lucee.lucli.LuCLI;
+import org.lucee.lucli.StringOutput;
+import org.lucee.lucli.Timer;
+import org.lucee.lucli.cli.commands.CfmlCommand;
+import org.lucee.lucli.cli.commands.ModulesCommand;
+import org.lucee.lucli.cli.commands.ServerCommand;
+
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
-
-import org.lucee.lucli.LuCLI;
-import org.lucee.lucli.InteractiveTerminal;
-import org.lucee.lucli.Timer;
-import org.lucee.lucli.StringOutput;
-import org.lucee.lucli.cli.commands.ServerCommand;
-import org.lucee.lucli.cli.commands.ModulesCommand;
-import org.lucee.lucli.cli.commands.CfmlCommand;
 
 /**
  * Main CLI command class using Picocli framework
@@ -88,9 +87,7 @@ public class LuCLICommand implements Callable<Integer> {
 
         try {
             // Configure Lucee directories BEFORE any Lucee initialization
-            Timer.start("Configure Lucee Directories");
-            configureLuceeDirectories();
-            Timer.stop("Configure Lucee Directories");
+            
 
             // Handle special version command
             if (luceeVersionRequested) {
@@ -138,44 +135,4 @@ public class LuCLICommand implements Callable<Integer> {
         }
     }
 
-    /**
-     * Configure Lucee directories (copied from original LuCLI.java)
-     */
-    private void configureLuceeDirectories() throws java.io.IOException {
-        // Allow customization of lucli home via environment variable or system property
-        String lucliHomeStr = System.getProperty("lucli.home");
-        if (lucliHomeStr == null) {
-            lucliHomeStr = System.getenv("LUCLI_HOME");
-        }
-        if (lucliHomeStr == null) {
-            String userHome = System.getProperty("user.home");
-            lucliHomeStr = java.nio.file.Paths.get(userHome, ".lucli").toString();
-        }
-        
-        java.nio.file.Path lucliHome = java.nio.file.Paths.get(lucliHomeStr);
-        java.nio.file.Path luceeServerDir = lucliHome.resolve("lucee-server");
-        java.nio.file.Path patchesDir = lucliHome.resolve("patches");
-        
-        // Create all necessary directories if they don't exist
-        java.nio.file.Files.createDirectories(luceeServerDir);
-        java.nio.file.Files.createDirectories(patchesDir);
-        
-        if (verbose || debug) {
-            System.out.println(StringOutput.msg("config.lucee.directories"));
-            System.out.println("  " + StringOutput.msg("config.lucli.home", lucliHome.toString()));
-            System.out.println("  " + StringOutput.msg("config.lucee.server", luceeServerDir.toString()));
-            System.out.println("  " + StringOutput.msg("config.patches", patchesDir.toString()));
-        }
-
-        // Set Lucee system properties
-        System.setProperty("lucee.base.dir", luceeServerDir.toString());
-        System.setProperty("lucee.server.dir", luceeServerDir.toString());
-        System.setProperty("lucee.web.dir", luceeServerDir.toString());
-        System.setProperty("lucee.patch.dir", patchesDir.toString());
-        System.setProperty("lucee.controller.disabled", "true"); // Disable web controller for CLI
-        
-        // Ensure Lucee doesn't try to create default directories in system paths
-        System.setProperty("lucee.controller.disabled", "true");
-        System.setProperty("lucee.use.lucee.configs", "false");
-    }
 }

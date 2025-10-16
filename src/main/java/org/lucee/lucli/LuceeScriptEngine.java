@@ -10,12 +10,9 @@ import java.util.Arrays;
 import javax.script.Bindings;
 import javax.script.ScriptContext;
 import javax.script.ScriptEngine;
-import javax.script.ScriptEngineFactory;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
-import lucee.loader.engine.CFMLEngine;
-import lucee.loader.engine.CFMLEngineFactory;
 
 /**
  * Singleton ScriptEngine wrapper for Lucee CFML that handles all script execution responsibilities.
@@ -41,8 +38,9 @@ public class LuceeScriptEngine {
     
     /**
      * Private constructor - use getInstance() to get the singleton
+     * @throws IOException 
      */
-    private LuceeScriptEngine(boolean verboseMode, boolean debugMode) {
+    private LuceeScriptEngine(boolean verboseMode, boolean debugMode) throws IOException {
         this.verbose = verboseMode;
         this.debug = debugMode;
         
@@ -59,12 +57,14 @@ public class LuceeScriptEngine {
     
     /**
      * Get the singleton instance of LuceeScriptEngine
+     * @throws IOException 
      */
-    public static LuceeScriptEngine getInstance(boolean verboseMode, boolean debugMode) {
+    public static LuceeScriptEngine getInstance(boolean verboseMode, boolean debugMode) throws IOException {
         Timer.start("LuceeScriptEngine Initialization");
         if (instance == null) {
             synchronized (lock) {
                 if (instance == null) {
+
                     instance = new LuceeScriptEngine(verboseMode, debugMode);
                 }
             }
@@ -76,8 +76,10 @@ public class LuceeScriptEngine {
     }
     /**
      * Initialize the JSR223 ScriptEngine for CFML
+     * @throws IOException 
      */
-    private ScriptEngine initializeEngine() {
+    private ScriptEngine initializeEngine() throws IOException {
+        configureLuceeDirectories();
         ScriptEngineManager manager = new ScriptEngineManager();
         ScriptEngine engine = manager.getEngineByName(ENGINE_NAME);
         if (engine == null) {
@@ -94,6 +96,7 @@ public class LuceeScriptEngine {
         return engine;
     }
     
+    
     /**
      * Execute a simple CFML code snippet
      */
@@ -101,6 +104,21 @@ public class LuceeScriptEngine {
 
 
         return engine.eval(script);
+    }
+    
+    
+    /**
+     * Returns the version of lucee we are running
+     * @return
+     * @throws ScriptException 
+     */
+    public String getVersion() throws ScriptException {
+    	
+     
+    	instance.eval("version = SERVER.LUCEE.version");
+         String version = (String)engine.get("version");
+         return version;
+
     }
     
     /**
@@ -1094,5 +1112,46 @@ public class LuceeScriptEngine {
         script.append("}\n");
         
         return script.toString();
+    }
+
+     /**
+     * Configure Lucee directories (copied from original LuCLI.java)
+     */
+    private void configureLuceeDirectories() throws java.io.IOException {
+        // Allow customization of lucli home via environment variable or system property
+        String lucliHomeStr = System.getProperty("lucli.home");
+        if (lucliHomeStr == null) {
+            lucliHomeStr = System.getenv("LUCLI_HOME");
+        }
+        if (lucliHomeStr == null) {
+            String userHome = System.getProperty("user.home");
+            lucliHomeStr = java.nio.file.Paths.get(userHome, ".lucli").toString();
+        }
+        
+        java.nio.file.Path lucliHome = java.nio.file.Paths.get(lucliHomeStr);
+        java.nio.file.Path luceeServerDir = lucliHome.resolve("lucee-server");
+        java.nio.file.Path patchesDir = lucliHome.resolve("patches");
+        
+        // Create all necessary directories if they don't exist
+        java.nio.file.Files.createDirectories(luceeServerDir);
+        java.nio.file.Files.createDirectories(patchesDir);
+        
+        if (verbose || debug) {
+            System.out.println(StringOutput.msg("config.lucee.directories"));
+            System.out.println("  " + StringOutput.msg("config.lucli.home", lucliHome.toString()));
+            System.out.println("  " + StringOutput.msg("config.lucee.server", luceeServerDir.toString()));
+            System.out.println("  " + StringOutput.msg("config.patches", patchesDir.toString()));
+        }
+
+        // Set Lucee system properties
+        System.setProperty("lucee.base.dir", luceeServerDir.toString());
+        System.setProperty("lucee.server.dir", luceeServerDir.toString());
+        System.setProperty("lucee.web.dir", luceeServerDir.toString());
+        System.setProperty("lucee.patch.dir", patchesDir.toString());
+        System.setProperty("lucee.controller.disabled", "true"); // Disable web controller for CLI
+        
+        // Ensure Lucee doesn't try to create default directories in system paths
+        System.setProperty("lucee.controller.disabled", "true");
+        System.setProperty("lucee.use.lucee.configs", "false");
     }
 }

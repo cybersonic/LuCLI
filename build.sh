@@ -1,4 +1,6 @@
 #!/bin/bash
 
-mvn clean package
+mvn clean package -Pbinary
 java -jar target/lucli.jar --version
+target/lucli --version
+target/lucli --help

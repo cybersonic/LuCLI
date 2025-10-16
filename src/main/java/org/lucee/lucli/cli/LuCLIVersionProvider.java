@@ -1,7 +1,8 @@
 package org.lucee.lucli.cli;
 
-import picocli.CommandLine.IVersionProvider;
 import org.lucee.lucli.LuCLI;
+
+import picocli.CommandLine.IVersionProvider;
 
 /**
  * Version provider for Picocli that dynamically retrieves version information

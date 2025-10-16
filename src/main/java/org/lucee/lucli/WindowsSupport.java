@@ -1,8 +1,5 @@
 package org.lucee.lucli;
 
-import java.io.IOException;
-import java.util.Locale;
-
 /**
  * Utility class to handle Windows-specific terminal and display compatibility issues
  */

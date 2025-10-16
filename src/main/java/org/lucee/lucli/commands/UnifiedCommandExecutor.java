@@ -7,12 +7,12 @@ import java.util.List;
 
 import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.Timer;
-import org.lucee.lucli.server.LuceeServerManager;
-import org.lucee.lucli.server.LuceeServerConfig;
-import org.lucee.lucli.server.ServerConflictException;
+import org.lucee.lucli.modules.ModuleCommand;
 import org.lucee.lucli.monitoring.MonitorCommand;
 import org.lucee.lucli.server.LogCommand;
-import org.lucee.lucli.modules.ModuleCommand;
+import org.lucee.lucli.server.LuceeServerConfig;
+import org.lucee.lucli.server.LuceeServerManager;
+import org.lucee.lucli.server.ServerConflictException;
 
 /**
  * Unified command executor that provides single implementation for all commands

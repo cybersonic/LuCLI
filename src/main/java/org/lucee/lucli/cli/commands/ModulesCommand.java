@@ -3,12 +3,12 @@ package org.lucee.lucli.cli.commands;
 import java.nio.file.Paths;
 import java.util.concurrent.Callable;
 
+import org.lucee.lucli.cli.LuCLICommand;
+import org.lucee.lucli.commands.UnifiedCommandExecutor;
+
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
-
-import org.lucee.lucli.cli.LuCLICommand;
-import org.lucee.lucli.commands.UnifiedCommandExecutor;
 
 /**
  * Module management command using Picocli
