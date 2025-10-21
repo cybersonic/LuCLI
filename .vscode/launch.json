@@ -66,6 +66,16 @@
     },
     {
       "type": "java",
+      "name": "🧩➡️ LucCLI Lint Module Direct",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["lint", "file=/Users/markdrew/.lucli/modules/lint/tests/test_sql_query.cfm", "format=json", "rules='AVOID_USING_SQL'"],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "java",
       "name": "📚 Simple Lucee Exec",
       "request": "launch",
       "mainClass": "org.lucee.lucli.SimpleLucee",

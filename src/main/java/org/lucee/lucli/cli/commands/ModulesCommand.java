@@ -126,6 +126,10 @@ public class ModulesCommand implements Callable<Integer> {
             org.lucee.lucli.LuCLI.debug = rootCommand.isDebug();
             org.lucee.lucli.LuCLI.timing = rootCommand.isTiming();
             
+            // Initialize timing if requested
+            org.lucee.lucli.Timer.setEnabled(rootCommand.isTiming());
+            org.lucee.lucli.Timer.start("Module Execution");
+            
 
 
             
@@ -146,13 +150,19 @@ public class ModulesCommand implements Callable<Integer> {
                 }
             }
 
-            // Execute the modules run command
-            String result = executor.executeCommand("modules", args.toArray(new String[0]));
-            if (result != null && !result.isEmpty()) {
-                System.out.println(result);
-            }
+            try {
+                // Execute the modules run command
+                String result = executor.executeCommand("modules", args.toArray(new String[0]));
+                if (result != null && !result.isEmpty()) {
+                    System.out.println(result);
+                }
 
-            return 0;
+                return 0;
+            } finally {
+                // Always stop timer and show results before exit (if timing enabled)
+                org.lucee.lucli.Timer.stop("Module Execution");
+                org.lucee.lucli.Timer.printResults();
+            }
         }
     }
 }
