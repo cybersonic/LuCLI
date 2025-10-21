@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Scanner;
 
+import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.LuceeScriptEngine;
 import org.lucee.lucli.StringOutput;
 
@@ -143,7 +144,7 @@ public class ModuleCommand {
     /**
      * Get the modules directory (~/.lucli/modules)
      */
-    private static Path getModulesDirectory() throws IOException {
+    public static Path getModulesDirectory() throws IOException {
         String lucliHomeStr = System.getProperty("lucli.home");
         if (lucliHomeStr == null) {
             lucliHomeStr = System.getenv("LUCLI_HOME");
@@ -413,8 +414,8 @@ public class ModuleCommand {
         Path moduleFile = moduleDir.resolve("Module.cfc");
         if (Files.exists(moduleFile)) {
             // Execute the Module.cfc with arguments
-            LuceeScriptEngine engine = LuceeScriptEngine.getInstance(false, false);
-            engine.executeScript(moduleFile.toString(), moduleArgs != null ? moduleArgs : new String[0]);
+            LuceeScriptEngine engine = LuceeScriptEngine.getInstance(LuCLI.verbose, LuCLI.debug);
+            engine.executeModule(moduleName, moduleArgs != null ? moduleArgs : new String[0]);
         } else {
             System.err.println("Module '" + moduleName + "' does not have a Module.cfc file.");
             System.exit(1);
