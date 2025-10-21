@@ -1,0 +1,29 @@
+// We only output if verbose is on systemOutput("---------- #DateTimeFormat(now(),'yyyy-mm-dd HH:nn:ss')# - Initilaizing Engine ----------", true);
+
+request.SERVERADMINPASSWORD = "luclipassword";
+server.SERVERADMINPASSWORD = request.SERVERADMINPASSWORD;
+param name="__verboseMode" default=false;	
+
+config = {
+	"Mappings": {
+        "/modules": {
+            "inspectTemplate": "auto",
+            "physical":"#lucli_modules_path#",
+            "primary": "physical",
+            "toplevel": false
+		}
+    }
+	// ,"generalErrorTemplate":"/lucee/templates/error/error-terminal.cfm"
+	// ,"missingErrorTemplate":"/lucee/templates/error/error-terminal.cfm"
+}
+
+
+if(__verboseMode){
+	echo( serializeJSON(var=config, compact=false) );
+	echo("#Chr(10)#Lucee Engine Initialized at: #expandPath("/lucee/")# #Chr(10)#");
+}
+configImport(
+	data=config,
+	password=request.SERVERADMINPASSWORD,
+	type="server"
+)

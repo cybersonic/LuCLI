@@ -19,7 +19,7 @@
       "name": "📄 LucCLI File",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",
-      "args": ["examples/hello.cfc"],
+      "args": ["--debug", "examples/component.cfs"],
       "projectName": "lucli",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal"
@@ -49,7 +49,27 @@
       "name": "ℹ️ LucCLI Version",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",
-      "args": ["--version"],
+      "args": ["--verbose",  "--debug", "--version"],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "java",
+      "name": "🧩 LucCLI Lint Module",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["--verbose", "modules", "run", "lint", "file=/Users/markdrew/.lucli/modules/lint/tests/test_sql_query.cfm", "format=json", "rules=\"AVOID_USING_SQL\""],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "java",
+      "name": "📚 Simple Lucee Exec",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.SimpleLucee",
+      "args": [],
       "projectName": "lucli",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal"

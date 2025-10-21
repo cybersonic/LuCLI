@@ -134,5 +134,20 @@ public class LuCLICommand implements Callable<Integer> {
             }
         }
     }
+    
+    /**
+     * Getter methods for subcommands to access flags
+     */
+    public boolean isVerbose() {
+        return verbose;
+    }
+    
+    public boolean isDebug() {
+        return debug;
+    }
+    
+    public boolean isTiming() {
+        return timing;
+    }
 
 }

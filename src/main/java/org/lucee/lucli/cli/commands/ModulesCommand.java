@@ -104,17 +104,33 @@ public class ModulesCommand implements Callable<Integer> {
         @ParentCommand 
         private ModulesCommand parent;
 
-        @Parameters(paramLabel = "MODULE_NAME", 
+        @Parameters(index = "0",
+                    paramLabel = "MODULE_NAME", 
                     description = "Name of the module to run")
         private String moduleName;
 
-        @Parameters(paramLabel = "ARGS", 
+        @Parameters(index = "1..*",
+                    paramLabel = "ARGS", 
                     description = "Arguments to pass to the module",
                     arity = "0..*")
         private String[] moduleArgs = new String[0];
 
         @Override
         public Integer call() throws Exception {
+            // Access flags from grandparent (root) command via parent
+            // parent.parent is the LuCLICommand instance
+            LuCLICommand rootCommand = parent.parent;
+            
+            // Set global flags from root command
+            org.lucee.lucli.LuCLI.verbose = rootCommand.isVerbose();
+            org.lucee.lucli.LuCLI.debug = rootCommand.isDebug();
+            org.lucee.lucli.LuCLI.timing = rootCommand.isTiming();
+            
+
+
+            
+
+
             // Create UnifiedCommandExecutor for CLI mode
             UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, Paths.get(System.getProperty("user.dir")));
 

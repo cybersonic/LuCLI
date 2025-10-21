@@ -6,12 +6,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.Map;
 
 import javax.script.Bindings;
 import javax.script.ScriptContext;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
+
+import org.lucee.lucli.modules.ModuleCommand;
 
 
 /**
@@ -32,9 +35,9 @@ public class LuceeScriptEngine {
     private static LuceeScriptEngine instance;
     private static final Object lock = new Object();
     
-    private final ScriptEngine engine;
-    private final boolean verbose;
-    private final boolean debug;
+    private ScriptEngine engine;
+    private boolean verbose;
+    private boolean debug;
     
     /**
      * Private constructor - use getInstance() to get the singleton
@@ -48,7 +51,12 @@ public class LuceeScriptEngine {
             StringOutput.getInstance().println("${EMOJI_TOOL} Initializing LuceeScriptEngine singleton...");
         }
         
-        this.engine = initializeEngine();
+        try {
+            this.engine = initializeEngine();
+        } catch (Exception e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
         
         if (verbose) {
             StringOutput.Quick.success("LuceeScriptEngine initialized successfully");
@@ -76,16 +84,25 @@ public class LuceeScriptEngine {
     }
     /**
      * Initialize the JSR223 ScriptEngine for CFML
-     * @throws IOException 
+     * @throws Exception 
      */
-    private ScriptEngine initializeEngine() throws IOException {
+    private ScriptEngine initializeEngine() throws Exception {
         configureLuceeDirectories();
         ScriptEngineManager manager = new ScriptEngineManager();
         ScriptEngine engine = manager.getEngineByName(ENGINE_NAME);
         if (engine == null) {
             throw new IllegalStateException("CFML ScriptEngine not found. Make sure Lucee is properly configured.");
         }
+
+        // Get the path to modules. 
+        Path modulepath = ModuleCommand.getModulesDirectory();
+
+        engine.put("lucli_modules_path", modulepath.toString());
+        engine.put("__verboseMode", verbose);
+        engine.put("__debugMode", debug);
         
+        String script = readScriptTemplate("/script_engine/initializeEngine.cfs");
+        engine.eval(script);
         return engine;
     }
     
@@ -101,8 +118,6 @@ public class LuceeScriptEngine {
      * Execute a simple CFML code snippet
      */
     public Object eval(String script) throws ScriptException {
-
-
         return engine.eval(script);
     }
     
@@ -113,14 +128,54 @@ public class LuceeScriptEngine {
      * @throws ScriptException 
      */
     public String getVersion() throws ScriptException {
-    	
-     
     	instance.eval("version = SERVER.LUCEE.version");
-         String version = (String)engine.get("version");
-         return version;
-
+        String version = (String)engine.get("version");
+        return version;
     }
+
+    private static String unwrap(String str) {
+		if (str == null) return null;
+		str = str.trim();
+		if (str.length() == 0) return null;
+
+		if (str.startsWith("\"") && str.endsWith("\"")) str = str.substring(1, str.length() - 1);
+		if (str.startsWith("'") && str.endsWith("'")) str = str.substring(1, str.length() - 1);
+		return str;
+	}
     
+    public void executeModule(String moduleName, String[] scriptArgs) throws Exception {
+
+        // Parse key=value arguments into a map
+        Map<String, String> argsMap = new java.util.HashMap<>();
+        for (String arg : scriptArgs) {
+            int equalsIndex = arg.indexOf('=');
+            if (equalsIndex > 0) {
+                String key = arg.substring(0, equalsIndex).trim();
+                String value = arg.substring(equalsIndex + 1).trim();
+                // Remove quotes if present
+                value = unwrap(value);
+                argsMap.put(key, value);
+            }
+        }
+
+            Timer.start("Module Execution: " + moduleName);
+            if (isVerboseMode() || isDebugMode()) {
+                System.out.println("=== Direct Module Execution Script ===");
+                
+            }
+
+            // TOOD: add timing
+            setupScriptContext(engine, moduleName, scriptArgs);
+            engine.put("moduleName", moduleName);
+
+            engine.put("argsCollection", Arrays.asList(scriptArgs));
+            engine.put("argCollection", argsMap);
+            String script = readScriptTemplate("/script_engine/executeModule.cfs");
+            engine.eval(script);
+            Timer.stop("Module Execution: " + moduleName);
+
+    
+    }
     /**
      * Main script execution entry point - determines file type and executes appropriately
      */
@@ -138,7 +193,7 @@ public class LuceeScriptEngine {
         String fileName = scriptFile.toLowerCase();
         boolean isCFC = fileName.endsWith(".cfc");
         boolean isCFM = fileName.endsWith(".cfm");
-        boolean isCFS = fileName.endsWith(".cfs");
+        // boolean isCFS = fileName.endsWith(".cfs");
         Timer.stop("File Type Detection");
         
         Timer.start("Read Script Content");
@@ -150,7 +205,7 @@ public class LuceeScriptEngine {
             Timer.start("Component Execution");
             executeComponent(scriptFile, scriptContent, scriptArgs);
             Timer.stop("Component Execution");
-        } else if (isCFM) {
+         } else if (isCFM) {
             Timer.start("Template Execution");
             executeTemplate(scriptFile, scriptContent, scriptArgs);
             Timer.stop("Template Execution");
@@ -271,13 +326,9 @@ public class LuceeScriptEngine {
             variableManager.setupBuiltinVariables(engine, scriptFile, scriptArgs);
             
             // Set up component mapping for ~/.lucli directory
-            Path lucliHome = getLucliHomeDirectory();
-            String mappingScript = createLucliMappingScript(lucliHome);
-            if (isVerboseMode()) {
-                System.out.println("Setting up lucli mapping: " + lucliHome);
-                System.out.println("Mapping script: " + mappingScript);
-            }
-            engine.eval(mappingScript);
+            // Path lucliHome = getLucliHomeDirectory();
+            // String mappingScript = createLucliMappingScript(lucliHome);
+          
         } catch (IOException e) {
             if (isDebugMode()) {
                 System.err.println("Warning: Failed to set up built-in variables: " + e.getMessage());
@@ -316,12 +367,16 @@ public class LuceeScriptEngine {
             }
             
         } catch (ScriptException e) {
+
+            if(isDebugMode()) {
+                e.printStackTrace();
+            }
             throw new ScriptException("Error executing CFML script '" + scriptFile +  "': " + e.getMessage());
             
         }
     }
 
-        private void setupScriptContext(ScriptEngine engine, String scriptFile, String[] scriptArgs) throws IOException {
+    private void setupScriptContext(ScriptEngine engine, String scriptFile, String[] scriptArgs) throws IOException {
 
         Bindings bindings = engine.createBindings();
         
@@ -355,19 +410,19 @@ public class LuceeScriptEngine {
         
         engine.setBindings(bindings, ScriptContext.ENGINE_SCOPE);
         
-        // Set up component mapping for ~/.lucli directory
-        try {
-            String mappingScript = createLucliMappingScript(lucliHome);
-            if (isVerboseMode()) {
-                System.out.println("Setting up lucli mapping: " + lucliHome);
-                System.out.println("Mapping script: " + mappingScript);
-            }
-            engine.eval(mappingScript);
-        } catch (Exception e) {
-            if (isDebugMode()) {
-                System.err.println("Warning: Failed to set up lucli mapping: " + e.getMessage());
-            }
-        }
+        // // Set up component mapping for ~/.lucli directory
+        // try {
+        //     String mappingScript = createLucliMappingScript(lucliHome);
+        //     if (isVerboseMode()) {
+        //         System.out.println("Setting up lucli mapping: " + lucliHome);
+        //         System.out.println("Mapping script: " + mappingScript);
+        //     }
+        //     engine.eval(mappingScript);
+        // } catch (Exception e) {
+        //     if (isDebugMode()) {
+        //         System.err.println("Warning: Failed to set up lucli mapping: " + e.getMessage());
+        //     }
+        // }
         
         if (isVerboseMode()) {
             System.out.println("Script context variables set:");
@@ -619,29 +674,6 @@ public class LuceeScriptEngine {
         }
     }
     
-    /**
-     * Create CFML script to set up component mappings for lucli home directory
-     */
-    private String createLucliMappingScript(Path lucliHome) {
-        try {
-            // Read the external script template
-            String scriptTemplate = readScriptTemplate("/script_engine/lucliMappings.cfs");
-            
-            // Replace the placeholder with the actual lucli home path
-            String normalizedPath = lucliHome.toString().replace("\\", "/");
-            String result = scriptTemplate.replace("${lucliHome}", normalizedPath);
-            
-            // Post-process through StringOutput for emoji and placeholder handling
-            return StringOutput.getInstance().process(result);
-            
-        } catch (Exception e) {
-            // Fallback to inline generation if reading external script fails
-            if (isDebugMode()) {
-                System.err.println("Warning: Failed to read external script template, using fallback: " + e.getMessage());
-            }
-            return createLucliMappingScriptFallback(lucliHome);
-        }
-    }
     
     /**
      * Generate the correct component path for CFML createObject() calls
@@ -936,30 +968,7 @@ public class LuceeScriptEngine {
         return wrapper.toString();
     }
     
-    /**
-     * Fallback method for createLucliMappingScript when external template fails
-     */
-    private String createLucliMappingScriptFallback(Path lucliHome) {
-        StringBuilder script = new StringBuilder();
-        script.append("// Set up lucli component mappings\n");
-        
-        // Try to set application mapping if we have access to application scope
-        script.append("try {\n");
-        script.append("  // Try to set up application mapping\n");
-        script.append("  if (isDefined('application') && isStruct(application)) {\n");
-        script.append("    if (!structKeyExists(application, 'mappings')) {\n");
-        script.append("      application.mappings = {};\n");
-        script.append("    }\n");
-        script.append("    application.mappings['/modules'] = '").append(lucliHome.toString().replace("\\", "/")).append("/modules';\n");
-        script.append("    application.mappings['/builtin'] = '").append(lucliHome.toString().replace("\\", "/")).append("/builtin';\n");
-        script.append("  }\n");
-        script.append("} catch (any e) {\n");
-        script.append("  // Ignore mapping errors\n");
-        script.append("}\n");
-        
-        return script.toString();
-    }
-    
+   
     /**
      * Process component content by removing wrapper and fixing scoping
      */
@@ -1065,26 +1074,26 @@ public class LuceeScriptEngine {
         }
         
         // Set up built-in variables using centralized manager
-        try {
-            BuiltinVariableManager variableManager = BuiltinVariableManager.getInstance(verbose, debug);
-            variableManager.setupBuiltinVariables(engine, scriptFile, scriptArgs);
+        // try {
+        //     BuiltinVariableManager variableManager = BuiltinVariableManager.getInstance(verbose, debug);
+        //     variableManager.setupBuiltinVariables(engine, scriptFile, scriptArgs);
             
-            // Set up component mapping for ~/.lucli directory
-            Path lucliHome = getLucliHomeDirectory();
-            String mappingScript = createLucliMappingScript(lucliHome);
-            if (isVerboseMode()) {
-                System.out.println("Setting up lucli mapping: " + lucliHome);
-            }
-            engine.eval(mappingScript);
-        } catch (IOException e) {
-            if (isDebugMode()) {
-                System.err.println("Warning: Failed to set up built-in variables: " + e.getMessage());
-            }
-        } catch (Exception e) {
-            if (isDebugMode()) {
-                System.err.println("Warning: Failed to set up lucli mapping: " + e.getMessage());
-            }
-        }
+        //     // Set up component mapping for ~/.lucli directory
+        //     Path lucliHome = getLucliHomeDirectory();
+        //     String mappingScript = createLucliMappingScript(lucliHome);
+        //     if (isVerboseMode()) {
+        //         System.out.println("Setting up lucli mapping: " + lucliHome);
+        //     }
+        //     engine.eval(mappingScript);
+        // } catch (IOException e) {
+        //     if (isDebugMode()) {
+        //         System.err.println("Warning: Failed to set up built-in variables: " + e.getMessage());
+        //     }
+        // } catch (Exception e) {
+        //     if (isDebugMode()) {
+        //         System.err.println("Warning: Failed to set up lucli mapping: " + e.getMessage());
+        //     }
+        // }
         
         // Execute the script
         return engine.eval(scriptContent);
