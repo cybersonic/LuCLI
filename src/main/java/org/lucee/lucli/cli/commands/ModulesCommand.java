@@ -3,12 +3,16 @@ package org.lucee.lucli.cli.commands;
 import java.nio.file.Paths;
 import java.util.concurrent.Callable;
 
+import org.lucee.lucli.LuCLI;
+import org.lucee.lucli.Timer;
 import org.lucee.lucli.cli.LuCLICommand;
 import org.lucee.lucli.commands.UnifiedCommandExecutor;
 
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
+import org.lucee.lucli.cli.completion.DynamicArgumentCompletion;
 
 /**
  * Module management command using Picocli
@@ -19,7 +23,8 @@ import picocli.CommandLine.ParentCommand;
     subcommands = {
         ModulesCommand.ListCommand.class,
         ModulesCommand.InitCommand.class,
-        ModulesCommand.RunCommand.class
+        ModulesCommand.RunCommand.class,
+        ModulesCommand.InstallCommand.class
     }
 )
 public class ModulesCommand implements Callable<Integer> {
@@ -92,6 +97,30 @@ public class ModulesCommand implements Callable<Integer> {
         }
     }
 
+    @Command(
+        name = "install",
+        description = "Install a module"
+    )
+    static class InstallCommand implements Callable<Integer> {
+        @Parameters(paramLabel = "MODULE_NAME", description = "Name of module to install")
+        private String moduleName;
+        
+        @Option(names = {"-u", "--url"}, description = "Git URL (overrides registry lookup)")
+        private String gitUrl;
+        
+        @Override
+        public Integer call() throws Exception {
+            System.out.println("This is the install command. Not impemented yet");
+            // UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, Paths.get(System.getProperty("user.dir")));
+            // String result = executor.executeCommand("modules", new String[]{"install", moduleName, gitUrl});
+            // if (result != null && !result.isEmpty()) {
+            //     System.out.println(result);
+            // }
+            return 0;
+        } 
+    }   
+
+
     /**
      * Modules run subcommand
      */
@@ -112,7 +141,8 @@ public class ModulesCommand implements Callable<Integer> {
         @Parameters(index = "1..*",
                     paramLabel = "ARGS", 
                     description = "Arguments to pass to the module",
-                    arity = "0..*")
+                    arity = "0..*",
+                    completionCandidates = DynamicArgumentCompletion.class)
         private String[] moduleArgs = new String[0];
 
         @Override
@@ -122,13 +152,13 @@ public class ModulesCommand implements Callable<Integer> {
             LuCLICommand rootCommand = parent.parent;
             
             // Set global flags from root command
-            org.lucee.lucli.LuCLI.verbose = rootCommand.isVerbose();
-            org.lucee.lucli.LuCLI.debug = rootCommand.isDebug();
-            org.lucee.lucli.LuCLI.timing = rootCommand.isTiming();
+            LuCLI.verbose = rootCommand.isVerbose();
+            LuCLI.debug = rootCommand.isDebug();
+            LuCLI.timing = rootCommand.isTiming();
             
             // Initialize timing if requested
-            org.lucee.lucli.Timer.setEnabled(rootCommand.isTiming());
-            org.lucee.lucli.Timer.start("Module Execution");
+            Timer.setEnabled(rootCommand.isTiming());
+            Timer.start("Module Execution");
             
 
 
@@ -160,8 +190,8 @@ public class ModulesCommand implements Callable<Integer> {
                 return 0;
             } finally {
                 // Always stop timer and show results before exit (if timing enabled)
-                org.lucee.lucli.Timer.stop("Module Execution");
-                org.lucee.lucli.Timer.printResults();
+                Timer.stop("Module Execution");
+                Timer.printResults();
             }
         }
     }

@@ -1,7 +1,13 @@
 #!/bin/bash
 buildDockerImage=false
+installLocally=false
+
 if [[ "$1" == "docker" ]]; then
     buildDockerImage=true
+fi
+
+if [[ "$1" == "install" ]]; then
+    installLocally=true
 fi
 
 # Build the JAR and binary
@@ -13,6 +19,12 @@ java -jar target/lucli.jar --version
 echo "Testing the built binary..."
 target/lucli --version
 target/lucli --help
+
+if [ "$installLocally" = true ] ; then
+    echo "Installing lucli binary to ~/bin/lucli..."
+    cp target/lucli ~/bin/lucli
+    echo "Installed lucli binary to ~/bin/lucli"
+fi
 
 if [ "$buildDockerImage" = false ] ; then
     echo "Build and tests completed successfully."

@@ -44,7 +44,8 @@ public class ModuleCommand {
             
         } catch (Exception e) {
             System.err.println("Error executing module command: " + e.getMessage());
-            if (options.verbose) {
+            
+            if (LuCLI.verbose) {
                 e.printStackTrace();
             }
             System.exit(1);
