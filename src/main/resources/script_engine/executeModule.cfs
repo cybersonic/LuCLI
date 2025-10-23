@@ -1,2 +1,6 @@
 // results = createObject("component", "modules.#moduleName#.Module").main(argumentCollection=__arguments);
-results = createObject("component", "modules.#moduleName#.Module").main(argumentCollection=argCollection);
+results = createObject("component", "modules.#moduleName#.Module").init(
+    verbose=verbose,
+    timing=timing,
+    cwd=__cwd
+).main(argumentCollection=argCollection);

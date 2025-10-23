@@ -170,12 +170,16 @@ public class LuceeScriptEngine {
 
             engine.put("argsCollection", Arrays.asList(scriptArgs));
             engine.put("argCollection", argsMap);
+
+            engine.put("verbose", LuCLI.verbose);
+            engine.put("timing", LuCLI.timing);
+
             String script = readScriptTemplate("/script_engine/executeModule.cfs");
             engine.eval(script);
             Timer.stop("Module Execution: " + moduleName);
-
-    
     }
+
+
     /**
      * Main script execution entry point - determines file type and executes appropriately
      */
@@ -379,7 +383,8 @@ public class LuceeScriptEngine {
     private void setupScriptContext(ScriptEngine engine, String scriptFile, String[] scriptArgs) throws IOException {
 
         Bindings bindings = engine.createBindings();
-        
+        // Set current working directory
+        bindings.put("__cwd", System.getProperty("user.dir"));
         // Set script file information
         bindings.put("__scriptFile", scriptFile);
         bindings.put("__scriptPath", Paths.get(scriptFile).toAbsolutePath().toString());
