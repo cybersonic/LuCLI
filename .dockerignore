@@ -1,6 +1,7 @@
 # Build artifacts
 target/
 !target/lucli.jar
+!target/lucli
 
 # IDE files
 .idea/

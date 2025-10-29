@@ -3,8 +3,12 @@ FROM eclipse-temurin:17-jre
 # Set working directory
 WORKDIR /app
 
-# Copy the JAR file
+# Copy the JAR file and executable
 COPY target/lucli.jar /app/lucli.jar
+COPY target/lucli /usr/local/bin/lucli
+
+# Make the executable file executable (in case permissions are lost)
+RUN chmod +x /usr/local/bin/lucli
 
 # Create .lucli directory for configuration
 RUN mkdir -p /root/.lucli
