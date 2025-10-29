@@ -173,6 +173,7 @@ public class LuceeScriptEngine {
 
             engine.put("verbose", LuCLI.verbose);
             engine.put("timing", LuCLI.timing);
+            engine.put("timer", Timer.getInstance());
 
             String script = readScriptTemplate("/script_engine/executeModule.cfs");
             engine.eval(script);

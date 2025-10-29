@@ -13,14 +13,26 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class Timer {
     
-    private static final Map<String, TimerEntry> timers = new ConcurrentHashMap<>();
-    private static boolean enabled = false;
-    private static final ThreadLocal<List<String>> timerStack = ThreadLocal.withInitial(ArrayList::new);
+    private static Timer instance;
+    
+    // Instance fields (non-static so each instance has its own state)
+    private final Map<String, TimerEntry> timers = new ConcurrentHashMap<>();
+    private boolean enabled = false;
+    private final ThreadLocal<List<String>> timerStack = ThreadLocal.withInitial(ArrayList::new);
+
+    private Timer() {
+    }
+
     
     /**
      * Enable or disable timing globally
      */
     public static void setEnabled(boolean enable) {
+        getInstance()._setEnabled(enable);
+    }
+
+    /** Instance implementation of setEnabled */
+    public void _setEnabled(boolean enable) {
         enabled = enable;
         if (!enabled) {
             timers.clear();
@@ -31,24 +43,45 @@ public class Timer {
      * Check if timing is enabled
      */
     public static boolean isEnabled() {
+        return getInstance()._isEnabled();
+    }
+
+    /** Instance implementation of isEnabled */
+    public boolean _isEnabled() {
         return enabled;
     }
-    
+
+
+    public static Timer getInstance(){
+        if(instance == null){
+            synchronized (Timer.class) {
+                if(instance == null){
+                    instance = new Timer();
+                }
+            }
+        }
+        return instance;
+    }
     /**
-     * Start timing an operation
+     * Instance implementation for starting a timer
      */
-    public static void start(String operationName) {
+    public void _start(String operationName) {
         if (!enabled) return;
-        
-        // Store the timer with the simple name for lookups
         timers.put(operationName, new TimerEntry(operationName, Instant.now()));
         timerStack.get().add(operationName);
     }
+
+    /**
+     * Start timing an operation (static facade)
+     */
+    public static void start(String operationName) {
+        getInstance()._start(operationName);
+    }
     
     /**
-     * Stop timing an operation and record the duration
+     * Instance implementation for stopping a timer
      */
-    public static Duration stop(String operationName) {
+    public Duration _stop(String operationName) {
         if (!enabled) return Duration.ZERO;
         
         TimerEntry entry = timers.get(operationName);
@@ -70,12 +103,19 @@ public class Timer {
         
         return duration;
     }
+
+    /**
+     * Stop timing an operation and record the duration (static facade)
+     */
+    public static Duration stop(String operationName) {
+        return getInstance()._stop(operationName);
+    }
     
     /**
      * Get a hierarchical operation name based on the current timer stack
      */
     private static String getFullOperationName(String operationName) {
-        List<String> stack = timerStack.get();
+        List<String> stack = getInstance().timerStack.get();
         if (stack.isEmpty()) {
             return operationName;
         }
@@ -95,6 +135,11 @@ public class Timer {
      * Output all timing results
      */
     public static void printResults() {
+        getInstance()._printResults();
+    }
+
+    /** Instance implementation of printResults */
+    public void _printResults() {
         if (!enabled || timers.isEmpty()) {
             return;
         }
@@ -149,6 +194,11 @@ public class Timer {
      * Clear all timing data
      */
     public static void clear() {
+        getInstance()._clear();
+    }
+
+    /** Instance implementation of clear */
+    public void _clear() {
         timers.clear();
         timerStack.remove();
     }
@@ -157,6 +207,11 @@ public class Timer {
      * Get the duration of a specific operation (for programmatic access)
      */
     public static Duration getDuration(String operationName) {
+        return getInstance()._getDuration(operationName);
+    }
+
+    /** Instance implementation of getDuration */
+    public Duration _getDuration(String operationName) {
         TimerEntry entry = timers.get(operationName);
         return entry != null ? entry.duration : Duration.ZERO;
     }
