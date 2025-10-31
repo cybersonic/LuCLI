@@ -11,6 +11,12 @@ config = {
             "physical":"#lucli_modules_path#",
             "primary": "physical",
             "toplevel": false
+		},
+		 "/luclihome": {
+            "inspectTemplate": "auto",
+            "physical":"#lucli_home_path#",
+            "primary": "physical",
+            "toplevel": false
 		}
     }
 	// ,"generalErrorTemplate":"/lucee/templates/error/error-terminal.cfm"

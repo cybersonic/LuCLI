@@ -2,6 +2,30 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "Run Linter",
+      "type": "shell",
+      "command": "lucli",
+      "args": ["lint", "file=${file}", "format=tsc"],
+      "problemMatcher": {
+        "owner": "lucli",
+        "fileLocation": "absolute",
+        "pattern": {
+          "regexp": "^(.+)\\((\\d+),(\\d+),(\\d+),(\\d+)\\):\\s+(warning|error):\\s+(.+)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "endLine": 4,
+          "endColumn": 5,
+          "severity": 6,
+          "message": 7
+        }
+      },
+      "presentation": {
+        "reveal": "always"
+      },
+      "group": "build"
+    },
+    {
       "type": "shell",
       "label": "🔨 Maven: Clean Compile",
       "command": "mvn",

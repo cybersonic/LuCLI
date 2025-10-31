@@ -4,6 +4,7 @@
     
     varNoScope &= "Limit 1";
 
+    NotSQLVar = "Hello thingy";
     
     QueryExecute( varNoScope );
     QueryExecute( "SELECT * FROM users WHERE NAME = 'Bobby Drop Tables'" );

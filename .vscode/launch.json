@@ -79,7 +79,7 @@
       "name": "💿 LucCLI Install Module",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",
-      "args": ["modules", "install", "hello-world"],
+      "args": ["install", "hello-world"],
       "projectName": "lucli",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal"
@@ -92,6 +92,27 @@
       "args": [],
       "projectName": "lucli",
       "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "java",
+      "name": "🛜 Server Restart",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["server", "restart"],
+      "projectName": "lucli",
+      "cwd": "/Users/markdrew/.lucli/modules/lint",
+      "console": "integratedTerminal"
+    },
+    
+    {
+      "type": "java",
+      "name": "⏱️ Lucli Module Timing ",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["--timing", "--verbose", "lint", "file=tests/rules/SQL_CHECK/test_02.cfm", "format=text", "rules=SQL_CHECK"],
+      "projectName": "lucli",
+      "cwd": "/Users/markdrew/.lucli/modules/lint",
       "console": "integratedTerminal"
     }
   ]

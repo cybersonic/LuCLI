@@ -19,6 +19,7 @@ import org.lucee.lucli.cli.completion.DynamicArgumentCompletion;
  */
 @Command(
     name = "modules",
+    aliases = {"module"},
     description = "Manage LuCLI modules",
     subcommands = {
         ModulesCommand.ListCommand.class,
