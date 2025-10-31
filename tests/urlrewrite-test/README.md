@@ -76,7 +76,7 @@ The easiest way to test is using the automated test script:
 
 ```bash
 # From the LuCLI project root directory
-./test/urlrewrite-test/test-urlrewrite.sh
+./tests/urlrewrite-test/test-urlrewrite.sh
 ```
 
 This script will:
@@ -152,7 +152,7 @@ If you prefer to test manually:
 ./lucli server start \
     --name urlrewrite-test \
     --port 8888 \
-    --webroot test/urlrewrite-test \
+    --webroot tests/urlrewrite-test \
     --open false
 ```
 
@@ -363,7 +363,7 @@ rm -rf ~/.lucli/servers/urlrewrite-test
 
 ```bash
 # Run tests in CI/CD pipeline
-./test/urlrewrite-test/test-urlrewrite.sh
+./tests/urlrewrite-test/test-urlrewrite.sh
 
 # Script exits with 0 on success, 1 on failure
 if [ $? -eq 0 ]; then
@@ -380,7 +380,7 @@ If you encounter issues:
 
 1. Run the automated test script first
 2. Check server logs: `./lucli server logs --name urlrewrite-test`
-3. Verify deployment files: `./test/urlrewrite-test/verify-deployment.sh`
+3. Verify deployment files: `./tests/urlrewrite-test/verify-deployment.sh`
 4. Test manually to isolate the issue
 5. Check that `lucee.json` has correct configuration
 

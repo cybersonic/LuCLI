@@ -14,10 +14,14 @@ import java.util.stream.Collectors;
 /**
  * Integration test for tab completion functionality
  * Tests the actual completion logic without requiring interactive input
+ * 
+ * Note: Debug output (System.out.println statements) has been commented out 
+ * to keep Maven build output clean. To re-enable debug output for debugging,
+ * uncomment the System.out.println lines in individual test methods.
  */
 public class CompletionIntegrationTest {
 
-    private LuCLICompleter completer;
+    private LucliCompleter completer;
     private DefaultParser parser;
     private MockCommandProcessor mockProcessor;
 
@@ -44,7 +48,7 @@ public class CompletionIntegrationTest {
     @BeforeEach
     void setUp() {
         mockProcessor = new MockCommandProcessor();
-        completer = new LuCLICompleter(mockProcessor);
+        completer = new LucliCompleter(mockProcessor);
         parser = new DefaultParser();
     }
 
@@ -73,8 +77,9 @@ public class CompletionIntegrationTest {
         assertTrue(has7xVersions, 
             "Should contain properly formatted 7.x versions");
         
-        System.out.println("Found version completions for 'version=7':");
-        versionCandidates.forEach(version -> System.out.println("  " + version));
+        // Debug output (commented out to keep build clean)
+        // System.out.println("Found version completions for 'version=7':");
+        // versionCandidates.forEach(version -> System.out.println("  " + version));
     }
 
     /**
@@ -95,8 +100,9 @@ public class CompletionIntegrationTest {
         assertFalse(versionCandidates.isEmpty(), 
             "Should find version completions starting with '7'");
         
-        System.out.println("Found version completions for 'set version=7':");
-        versionCandidates.forEach(version -> System.out.println("  " + version));
+        // Debug output (commented out to keep build clean)
+        // System.out.println("Found version completions for 'set version=7':");
+        // versionCandidates.forEach(version -> System.out.println("  " + version));
     }
 
     /**
@@ -117,8 +123,9 @@ public class CompletionIntegrationTest {
         assertFalse(portCandidates.isEmpty(), 
             "Should find port completions starting with '80'");
         
-        System.out.println("Found port completions for 'port=80':");
-        portCandidates.forEach(port -> System.out.println("  " + port));
+        // Debug output (commented out to keep build clean)
+        // System.out.println("Found port completions for 'port=80':");
+        // portCandidates.forEach(port -> System.out.println("  " + port));
     }
 
     /**
@@ -139,8 +146,9 @@ public class CompletionIntegrationTest {
         assertFalse(booleanCandidates.isEmpty(), 
             "Should find 'true' completion for boolean field");
         
-        System.out.println("Found boolean completions for 'monitoring.enabled=tr':");
-        booleanCandidates.forEach(bool -> System.out.println("  " + bool));
+        // Debug output (commented out to keep build clean)
+        // System.out.println("Found boolean completions for 'monitoring.enabled=tr':");
+        // booleanCandidates.forEach(bool -> System.out.println("  " + bool));
     }
 
     /**
@@ -161,8 +169,9 @@ public class CompletionIntegrationTest {
         assertFalse(configCandidates.isEmpty(), 
             "Should find 'config' completion for 'server conf'");
         
-        System.out.println("Found server subcommand completions for 'server conf':");
-        candidates.forEach(candidate -> System.out.println("  " + candidate.value()));
+        // Debug output (commented out to keep build clean)
+        // System.out.println("Found server subcommand completions for 'server conf':");
+        // candidates.forEach(candidate -> System.out.println("  " + candidate.value()));
     }
 
     /**
@@ -183,8 +192,9 @@ public class CompletionIntegrationTest {
         assertFalse(getCandidates.isEmpty(), 
             "Should find 'get' completion for 'server config g'");
         
-        System.out.println("Found config subcommand completions for 'server config g':");
-        candidates.forEach(candidate -> System.out.println("  " + candidate.value()));
+        // Debug output (commented out to keep build clean)
+        // System.out.println("Found config subcommand completions for 'server config g':");
+        // candidates.forEach(candidate -> System.out.println("  " + candidate.value()));
     }
 
     /**
@@ -205,13 +215,13 @@ public class CompletionIntegrationTest {
     }
 
     /**
-     * Integration test that verifies the SimpleServerConfigHelper works
+     * Integration test that verifies the ServerConfigHelper works
      */
     @Test
     void testVersionHelperIntegration() {
         try {
-            org.lucee.lucli.commands.SimpleServerConfigHelper helper = 
-                new org.lucee.lucli.commands.SimpleServerConfigHelper();
+            org.lucee.lucli.commands.ServerConfigHelper helper = 
+                new org.lucee.lucli.commands.ServerConfigHelper();
             
             List<String> versions = helper.getAvailableVersions();
             
@@ -224,17 +234,18 @@ public class CompletionIntegrationTest {
             
             assertTrue(has7xVersions, "Should have 7.x versions available");
             
-            System.out.println("Available versions from SimpleServerConfigHelper:");
-            versions.forEach(version -> {
-                if (version.startsWith("7")) {
-                    System.out.println("  " + version + " (7.x version)");
-                } else {
-                    System.out.println("  " + version);
-                }
-            });
+            // Debug output (commented out to keep build clean)
+            // System.out.println("Available versions from ServerConfigHelper:");
+            // versions.forEach(version -> {
+            //     if (version.startsWith("7")) {
+            //         System.out.println("  " + version + " (7.x version)");
+            //     } else {
+            //         System.out.println("  " + version);
+            //     }
+            // });
             
         } catch (Exception e) {
-            fail("SimpleServerConfigHelper integration test failed: " + e.getMessage());
+            fail("ServerConfigHelper integration test failed: " + e.getMessage());
         }
     }
 }

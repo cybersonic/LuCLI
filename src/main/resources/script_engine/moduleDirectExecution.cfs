@@ -6,6 +6,9 @@
 // - moduleContent: The content of the module component
 // - scriptArgs: Array of arguments passed to the module
 
+// === Built-in Variables Setup ===
+${builtinVariablesSetup}
+
 // Direct module execution - converted from component to script
 
 // Set up args parameter for function

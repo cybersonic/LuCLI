@@ -5,7 +5,13 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -13,13 +19,13 @@ import java.util.concurrent.TimeUnit;
  */
 public class ExternalCommandProcessor {
     private final CommandProcessor fileSystemProcessor;
-    private final Settings settings;
+//    private final Settings settings;
     private final Set<String> knownExternalCommands;
     private final Map<String, CommandIntegration> integrations;
     
     public ExternalCommandProcessor(CommandProcessor fileSystemProcessor, Settings settings) {
         this.fileSystemProcessor = fileSystemProcessor;
-        this.settings = settings;
+//        this.settings = settings;
         this.knownExternalCommands = new HashSet<>();
         this.integrations = new HashMap<>();
         

@@ -1,29 +1,41 @@
 // CFML Expression Output Script
 // This script evaluates a CFML expression and outputs the result
-// Replaces: SimpleTerminal.createOutputScript()
+// Replaces: InteractiveTerminal.createOutputScript()
 //
 // Parameters:
 // - cfmlExpression: The CFML expression to evaluate
+
+// === Built-in Variables Setup ===
+${builtinVariablesSetup}
 
 // The expression will be injected here by the Java code
 // ${cfmlExpression} placeholder will be replaced
 
 try {
+    // The CFML expression gets injected here
     result = ${cfmlExpression};
+    
     if (isDefined('result')) {
         if (isSimpleValue(result)) {
-            writeOutput(result);
+            writeOutput(toString(result));
         } else if (isArray(result)) {
             writeOutput('[' & arrayToList(result, ', ') & ']');
         } else if (isStruct(result)) {
             writeOutput(serializeJSON(result));
+        } else if (isQuery(result)) {
+            writeOutput('Query with ' & result.recordCount & ' rows');
         } else {
             writeOutput(toString(result));
         }
+    } else {
+        writeOutput('(undefined)');
     }
 } catch (any e) {
     writeOutput('${EMOJI_ERROR} CFML Error: ' & e.message);
     if (len(e.detail)) {
         writeOutput(' - ' & e.detail);
+    }
+    if (LEN(trim(e.stackTrace))) {
+        writeOutput(chr(10) & 'Stack trace: ' & e.stackTrace);
     }
 }

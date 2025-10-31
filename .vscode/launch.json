@@ -8,25 +8,112 @@
       "type": "java",
       "name": "💻 LucCLI Terminal",
       "request": "launch",
-      "mainClass": "org.lucee.lucli.LucCLI",
-      "args": "terminal",
-      "projectName": "LuCLI"
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["terminal"],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
     },
     {
       "type": "java",
       "name": "📄 LucCLI File",
       "request": "launch",
-      "mainClass": "org.lucee.lucli.LucCLI",
-      "args": "examples/hello.cfc",
-      "projectName": "LuCLI"
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["--debug", "examples/component.cfs"],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
     },
     {
       "type": "java",
       "name": "🔌 LucCLI Module",
       "request": "launch",
-      "mainClass": "org.lucee.lucli.LucCLI",
-      "args": ["install", "lucee_lint", "arg2", "arg3"],
-      "projectName": "LuCLI"
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["--debug", "modules", "run", "test-module"],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "java",
+      "name": "🔍 LucCLI Help",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["--help"],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "java",
+      "name": "ℹ️ LucCLI Version",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["--verbose",  "--debug", "--version"],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "java",
+      "name": "🧩 LucCLI Lint Module",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["--verbose", "modules", "run", "lint", "file=/Users/markdrew/.lucli/modules/lint/tests/test_sql_query.cfm", "format=json", "rules=\"AVOID_USING_SQL\""],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "java",
+      "name": "🧩➡️ LucCLI Lint Module Direct",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["--verbose", "lint", "file=tests/test_sql_query.cfm", "format=json", "rules=AVOID_USING_SQL"],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "java",
+      "name": "💿 LucCLI Install Module",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["install", "hello-world"],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "java",
+      "name": "📚 Simple Lucee Exec",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.SimpleLucee",
+      "args": [],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "java",
+      "name": "🛜 Server Restart",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["server", "restart"],
+      "projectName": "lucli",
+      "cwd": "/Users/markdrew/.lucli/modules/lint",
+      "console": "integratedTerminal"
+    },
+    
+    {
+      "type": "java",
+      "name": "⏱️ Lucli Module Timing ",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["--timing", "--verbose", "lint", "file=tests/rules/SQL_CHECK/test_02.cfm", "format=text", "rules=SQL_CHECK"],
+      "projectName": "lucli",
+      "cwd": "/Users/markdrew/.lucli/modules/lint",
+      "console": "integratedTerminal"
     }
   ]
 }

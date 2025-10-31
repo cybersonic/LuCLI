@@ -7,12 +7,12 @@ import java.util.List;
 
 import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.Timer;
-import org.lucee.lucli.server.LuceeServerManager;
-import org.lucee.lucli.server.LuceeServerConfig;
-import org.lucee.lucli.server.ServerConflictException;
+import org.lucee.lucli.modules.ModuleCommand;
 import org.lucee.lucli.monitoring.MonitorCommand;
 import org.lucee.lucli.server.LogCommand;
-import org.lucee.lucli.modules.ModuleCommand;
+import org.lucee.lucli.server.LuceeServerConfig;
+import org.lucee.lucli.server.LuceeServerManager;
+import org.lucee.lucli.server.ServerConflictException;
 
 /**
  * Unified command executor that provides single implementation for all commands
@@ -59,7 +59,7 @@ public class UnifiedCommandExecutor {
      */
     private String executeServerCommand(String[] args) throws Exception {
         if (args.length == 0) {
-        return formatOutput("❌ server: missing subcommand\n💡 Usage: server [start|stop|status|list|prune|monitor|log|debug] [options]", true);
+        return formatOutput("❌ server: missing subcommand\n💡 Usage: server [start|stop|restart|status|list|prune|monitor|log|debug] [options]", true);
         }
         
         String subCommand = args[0];
@@ -73,6 +73,8 @@ public class UnifiedCommandExecutor {
                     return handleServerStart(serverManager, args);
                 case "stop":  
                     return handleServerStop(serverManager, args);
+                case "restart":
+                    return handleServerRestart(serverManager, args);
                 case "status":
                     return handleServerStatus(serverManager, args);
                 case "list":
@@ -89,7 +91,7 @@ public class UnifiedCommandExecutor {
                     return handleServerDebug(Arrays.copyOfRange(args, 1, args.length));
                 default:
                     return formatOutput("❌ Unknown server command: " + subCommand + 
-                        "\n💡 Available commands: start, stop, status, list, prune, config, monitor, log, debug", true);
+                        "\n💡 Available commands: start, stop, restart, status, list, prune, config, monitor, log, debug", true);
             }
         } finally {
             Timer.stop("Server " + subCommand + " Command");
@@ -213,6 +215,13 @@ public class UnifiedCommandExecutor {
         }
         
         return formatOutput(result.toString(), false);
+    }
+    
+    private String handleServerRestart(LuceeServerManager serverManager, String[] args) throws Exception {
+
+        handleServerStop(serverManager, args);
+        handleServerStart(serverManager, args);
+        return "Server Restarted Successfully\n\n";
     }
     
     private String handleServerStatus(LuceeServerManager serverManager, String[] args) throws Exception {
@@ -412,7 +421,7 @@ public class UnifiedCommandExecutor {
         }
         
         String configCommand = args[1];
-        SimpleServerConfigHelper configHelper = new SimpleServerConfigHelper();
+        ServerConfigHelper configHelper = new ServerConfigHelper();
         
         switch (configCommand.toLowerCase()) {
             case "get":
@@ -425,7 +434,7 @@ public class UnifiedCommandExecutor {
         }
     }
     
-    private String handleConfigGet(SimpleServerConfigHelper configHelper, String[] args) throws Exception {
+    private String handleConfigGet(ServerConfigHelper configHelper, String[] args) throws Exception {
         if (args.length < 3) {
             return formatOutput("❌ config get: missing key\n💡 Usage: server config get <key>", true);
         }
@@ -446,7 +455,7 @@ public class UnifiedCommandExecutor {
         }
     }
     
-    private String handleConfigSet(SimpleServerConfigHelper configHelper, String[] args) throws Exception {
+    private String handleConfigSet(ServerConfigHelper configHelper, String[] args) throws Exception {
         if (args.length < 3) {
             return formatOutput("❌ config set: missing key=value\n" +
                 "💡 Usage: server config set <key=value>\n" +

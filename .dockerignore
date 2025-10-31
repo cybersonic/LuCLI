@@ -1,0 +1,29 @@
+# Build artifacts
+target/
+!target/lucli.jar
+!target/lucli
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+
+# Git
+.git/
+.gitignore
+
+# Demo and test files
+demo_servers/
+tests/
+
+# Maven
+.mvn/
+mvnw
+mvnw.cmd
+
+# Documentation
+*.md
+!README.md
+
+# OS files
+.DS_Store

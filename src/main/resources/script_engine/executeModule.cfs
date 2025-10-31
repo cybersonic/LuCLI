@@ -1,0 +1,11 @@
+// results = createObject("component", "modules.#moduleName#.Module").main(argumentCollection=__arguments);
+Timer.start("Execute Module Script");
+
+results = createObject("component", "modules.#moduleName#.Module").init(
+    verbose=verbose,
+    timingEnabled=timing,
+    cwd=__cwd,
+    timer=Timer
+    ).main(argumentCollection=argCollection);
+
+Timer.stop("Execute Module Script");

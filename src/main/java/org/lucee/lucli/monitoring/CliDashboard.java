@@ -1,9 +1,14 @@
 package org.lucee.lucli.monitoring;
 
-import org.lucee.lucli.monitoring.JmxConnection.*;
-import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.List;
+
+import org.lucee.lucli.monitoring.JmxConnection.GcMetrics;
+import org.lucee.lucli.monitoring.JmxConnection.LuceeMetrics;
+import org.lucee.lucli.monitoring.JmxConnection.MemoryMetrics;
+import org.lucee.lucli.monitoring.JmxConnection.OsMetrics;
+import org.lucee.lucli.monitoring.JmxConnection.RuntimeMetrics;
+import org.lucee.lucli.monitoring.JmxConnection.ThreadingMetrics;
 
 /**
  * ASCII-based CLI dashboard for displaying Lucee server metrics

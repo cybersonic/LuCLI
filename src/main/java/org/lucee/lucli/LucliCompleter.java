@@ -1,20 +1,20 @@
 package org.lucee.lucli;
 
-import org.jline.reader.Candidate;
-import org.jline.reader.Completer;
-import org.jline.reader.LineReader;
-import org.jline.reader.ParsedLine;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.Stream;
 
+import org.jline.reader.Candidate;
+import org.jline.reader.Completer;
+import org.jline.reader.LineReader;
+import org.jline.reader.ParsedLine;
+
 /**
  * Tab completion for LuCLI commands and file paths
  */
-public class LuCLICompleter implements Completer {
+public class LucliCompleter implements Completer {
     private final CommandProcessor commandProcessor;
     private final String[] commands = {
         "ls", "dir", "cd", "pwd", "mkdir", "rmdir", "rm", "cp", "mv", 
@@ -22,7 +22,7 @@ public class LuCLICompleter implements Completer {
         "help", "exit", "quit", "clear", "history", "env", "echo", "server", "lint"
     };
     
-    public LuCLICompleter(CommandProcessor commandProcessor) {
+    public LucliCompleter(CommandProcessor commandProcessor) {
         this.commandProcessor = commandProcessor;
     }
     
@@ -693,7 +693,7 @@ public class LuCLICompleter implements Completer {
         
         if (currentFunction != null && !currentFunction.trim().isEmpty()) {
             // Get CFML function completions
-            List<Candidate> cfmlCandidates = CFMLCompleter.getCompletions(currentFunction);
+            List<Candidate> cfmlCandidates = CfmlCompleter.getCompletions(currentFunction);
             candidates.addAll(cfmlCandidates);
         }
     }
@@ -839,8 +839,8 @@ public class LuCLICompleter implements Completer {
      */
     private void completeConfigKeys(String partial, List<Candidate> candidates) {
         try {
-            // Use SimpleServerConfigHelper to get available keys
-            org.lucee.lucli.commands.SimpleServerConfigHelper configHelper = new org.lucee.lucli.commands.SimpleServerConfigHelper();
+            // Use ServerConfigHelper to get available keys
+            org.lucee.lucli.commands.ServerConfigHelper configHelper = new org.lucee.lucli.commands.ServerConfigHelper();
             List<String> availableKeys = configHelper.getAvailableKeys();
             
             for (String key : availableKeys) {
@@ -894,7 +894,7 @@ public class LuCLICompleter implements Completer {
         } else {
             // Complete keys with '=' suffix
             try {
-                org.lucee.lucli.commands.SimpleServerConfigHelper configHelper = new org.lucee.lucli.commands.SimpleServerConfigHelper();
+                org.lucee.lucli.commands.ServerConfigHelper configHelper = new org.lucee.lucli.commands.ServerConfigHelper();
                 List<String> availableKeys = configHelper.getAvailableKeys();
                 
                 for (String key : availableKeys) {
@@ -944,7 +944,7 @@ public class LuCLICompleter implements Completer {
             case "version":
                 // Complete Lucee versions
                 try {
-                    org.lucee.lucli.commands.SimpleServerConfigHelper configHelper = new org.lucee.lucli.commands.SimpleServerConfigHelper();
+                    org.lucee.lucli.commands.ServerConfigHelper configHelper = new org.lucee.lucli.commands.ServerConfigHelper();
                     List<String> versions = configHelper.getAvailableVersions();
                     
                     for (String version : versions) {

@@ -1,9 +1,11 @@
 package org.lucee.lucli.interactive;
 
-import org.lucee.lucli.interactive.SampleData.*;
-
 import java.io.IOException;
 import java.util.List;
+
+import org.lucee.lucli.interactive.SampleData.FileEntry;
+import org.lucee.lucli.interactive.SampleData.LogEntry;
+import org.lucee.lucli.interactive.SampleData.Server;
 
 /**
  * Test command to demonstrate interactive table functionality

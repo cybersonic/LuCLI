@@ -1,15 +1,15 @@
 package org.lucee.lucli;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /**
  * Manages LuCLI settings stored in ~/.lucli/settings.json
@@ -74,11 +74,11 @@ public class Settings {
         defaultSettings.put("currentPrompt", "default");
         
         // Auto-detect emoji support based on terminal capabilities
-        boolean emojiSupport = WindowsCompatibility.supportsEmojis();
+        boolean emojiSupport = WindowsSupport.supportsEmojis();
         defaultSettings.put("showEmojis", emojiSupport);
         
         // Auto-detect color support
-        boolean colorSupport = WindowsCompatibility.supportsColors();
+        boolean colorSupport = WindowsSupport.supportsColors();
         defaultSettings.put("colorSupport", colorSupport);
         
         defaultSettings.put("historySize", 1000);

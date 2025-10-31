@@ -69,7 +69,7 @@ fi
 
 # Check if LuCLI JAR exists and determine path (consistent with main test suite)
 if [ -f "../target/lucli.jar" ]; then
-    LUCLI_JAR="$(pwd)/../target/lucli.jar"  # Running from test/ directory - make absolute
+    LUCLI_JAR="$(pwd)/../target/lucli.jar"  # Running from tests/ directory - make absolute
     print_status "Using LuCLI JAR: $LUCLI_JAR"
 elif [ -f "./target/lucli.jar" ]; then
     LUCLI_JAR="$(pwd)/target/lucli.jar"  # Running from project root - make absolute

@@ -1,7 +1,5 @@
 package org.lucee.lucli.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.nio.file.Files;
@@ -9,6 +7,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashSet;
 import java.util.Set;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 
 /**
  * Handles Lucee server configuration from lucee.json files
