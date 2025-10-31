@@ -220,102 +220,74 @@ public class ModuleCommand {
      * Create the main Module.cfc file
      */
     private static void createModuleFile(Path moduleDir, String moduleName) throws IOException {
-        String moduleContent = String.format(
-            "component {\n" +
-            "    /**\n" +
-            "     * %s Module\n" +
-            "     * \n" +
-            "     * This is the main entry point for your module.\n" +
-            "     * Implement your module logic in the main() function.\n" +
-            "     */\n" +
-            "    \n" +
-            "    function init() {\n" +
-            "        // Module initialization code goes here\n" +
-            "        return this;\n" +
-            "    }\n" +
-            "    \n" +
-            "    function main(args) {\n" +
-            "        // Main module logic goes here\n" +
-            "        writeOutput(\"Hello from %s module!\" & chr(10));\n" +
-            "        writeOutput(\"Arguments passed: \" & arrayLen(args) & chr(10));\n" +
-            "        \n" +
-            "        for (var i = 1; i <= arrayLen(args); i++) {\n" +
-            "            writeOutput(\"  Arg \" & i & \": \" & args[i] & chr(10));\n" +
-            "        }\n" +
-            "        \n" +
-            "        return \"Module executed successfully\";\n" +
-            "    }\n" +
-            "    \n" +
-            "    // Add your helper functions here\n" +
-            "    \n" +
-            "}\n",
-            moduleName, moduleName
-        );
-        
-        Files.writeString(moduleDir.resolve("Module.cfc"), moduleContent);
+
+        // Load template from resources
+        String templatePath = "/modules/template/Module.cfc";
+        String moduleTemplate;
+        try {
+            moduleTemplate = new String(
+                ModuleCommand.class.getResourceAsStream(templatePath).readAllBytes()
+            );
+        } catch (Exception e) {
+            throw new IOException("Failed to load module template from " + templatePath, e);
+        }
+
+        // Replace placeholders in template
+        moduleTemplate = moduleTemplate.replace("{{MODULE_NAME}}", moduleName);
+        moduleTemplate = moduleTemplate.replace("{{MODULE_NAME_UPPER}}", moduleName.toUpperCase());
+        moduleTemplate = moduleTemplate.replace("{{MODULE_NAME_LOWER}}", moduleName.toLowerCase());
+
+        Files.writeString(moduleDir.resolve("Module.cfc"), moduleTemplate);
+
+
     }
     
     /**
      * Create module metadata file
      */
     private static void createModuleMetadata(Path moduleDir, String moduleName) throws IOException {
-        String metadataContent = String.format(
-            "{\n" +
-            "  \"name\": \"%s\",\n" +
-            "  \"version\": \"1.0.0\",\n" +
-            "  \"description\": \"A new LuCLI module\",\n" +
-            "  \"author\": \"Your Name\",\n" +
-            "  \"license\": \"MIT\",\n" +
-            "  \"keywords\": [\"lucli\", \"module\", \"cfml\"],\n" +
-            "  \"main\": \"Module.cfc\",\n" +
-            "  \"created\": \"%s\"\n" +
-            "}\n",
-            moduleName,
-            java.time.Instant.now().toString()
-        );
-        
-        Files.writeString(moduleDir.resolve("module.json"), metadataContent);
+        // Load template from resources
+        String templatePath = "/modules/template/module.json";
+        String metadataTemplate;
+        try {
+            metadataTemplate = new String(
+                ModuleCommand.class.getResourceAsStream(templatePath).readAllBytes()
+            );
+        } catch (Exception e) {
+            throw new IOException("Failed to load module metadata template from " + templatePath, e);
+        }
+
+        // Replace placeholders in template
+        metadataTemplate = metadataTemplate.replace("{{MODULE_NAME}}", moduleName);
+        metadataTemplate = metadataTemplate.replace("{{MODULE_NAME_UPPER}}", moduleName.toUpperCase());
+        metadataTemplate = metadataTemplate.replace("{{MODULE_NAME_LOWER}}", moduleName.toLowerCase());
+        metadataTemplate = metadataTemplate.replace("{{TIMESTAMP}}", java.time.Instant.now().toString());
+
+        Files.writeString(moduleDir.resolve("module.json"), metadataTemplate);
     }
     
     /**
      * Create module README.md file
      */
     private static void createModuleReadme(Path moduleDir, String moduleName) throws IOException {
-        String readmeContent = String.format(
-            "# %s\n" +
-            "\n" +
-            "A LuCLI module that does amazing things.\n" +
-            "\n" +
-            "## Usage\n" +
-            "\n" +
-            "```bash\n" +
-            "# Execute the module\n" +
-            "lucli %s/Module.cfc\n" +
-            "\n" +
-            "# Execute with arguments\n" +
-            "lucli %s/Module.cfc arg1 arg2 arg3\n" +
-            "```\n" +
-            "\n" +
-            "## Description\n" +
-            "\n" +
-            "Add a detailed description of what your module does here.\n" +
-            "\n" +
-            "## Arguments\n" +
-            "\n" +
-            "- `arg1`: Description of first argument\n" +
-            "- `arg2`: Description of second argument\n" +
-            "\n" +
-            "## Examples\n" +
-            "\n" +
-            "Add usage examples here.\n" +
-            "\n" +
-            "## Development\n" +
-            "\n" +
-            "This module was created with `lucli modules init %s`.\n",
-            moduleName, moduleName, moduleName, moduleName
-        );
-        
-        Files.writeString(moduleDir.resolve("README.md"), readmeContent);
+
+        // Load template from resources
+        String templatePath = "/modules/template/README.md";
+        String readmeTemplate;
+        try {
+            readmeTemplate = new String(
+                ModuleCommand.class.getResourceAsStream(templatePath).readAllBytes()
+            );
+        } catch (Exception e) {
+            throw new IOException("Failed to load README template from " + templatePath, e);
+        }
+
+        // Replace placeholders in template
+        readmeTemplate = readmeTemplate.replace("{{MODULE_NAME}}", moduleName);
+        readmeTemplate = readmeTemplate.replace("{{MODULE_NAME_UPPER}}", moduleName.toUpperCase());
+        readmeTemplate = readmeTemplate.replace("{{MODULE_NAME_LOWER}}", moduleName.toLowerCase());
+
+        Files.writeString(moduleDir.resolve("README.md"), readmeTemplate);
     }
     
     /**

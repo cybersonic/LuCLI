@@ -21,6 +21,7 @@ import picocli.CommandLine.ParentCommand;
     subcommands = {
         ServerCommand.StartCommand.class,
         ServerCommand.StopCommand.class,
+        ServerCommand.RestartCommand.class,
         ServerCommand.StatusCommand.class,
         ServerCommand.ListCommand.class,
         ServerCommand.LogCommand.class,
@@ -154,6 +155,47 @@ public class ServerCommand implements Callable<Integer> {
             return 0;
         }
     }
+
+    /**
+     * Server restart subcommand
+     */
+    @Command(
+        name = "restart", 
+        description = "Show status of server instances"
+    )
+    static class RestartCommand implements Callable<Integer> {
+
+        @ParentCommand 
+        private ServerCommand parent;
+
+        @Option(names = {"-n", "--name"}, 
+                description = "Name of the server instance to restart")
+        private String name;
+
+        @Override
+        public Integer call() throws Exception {
+            // Create UnifiedCommandExecutor for CLI mode
+            UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, Paths.get(System.getProperty("user.dir")));
+
+            // Build arguments array
+            java.util.List<String> args = new java.util.ArrayList<>();
+            args.add("restart");
+            
+            if (name != null) {
+                args.add("--name");
+                args.add(name);
+            }
+
+            // Execute the server restart command
+            String result = executor.executeCommand("server", args.toArray(new String[0]));
+            if (result != null && !result.isEmpty()) {
+                System.out.println(result);
+            }
+
+            return 0;
+        }
+    }
+
 
     /**
      * Server status subcommand

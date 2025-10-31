@@ -59,7 +59,7 @@ public class UnifiedCommandExecutor {
      */
     private String executeServerCommand(String[] args) throws Exception {
         if (args.length == 0) {
-        return formatOutput("❌ server: missing subcommand\n💡 Usage: server [start|stop|status|list|prune|monitor|log|debug] [options]", true);
+        return formatOutput("❌ server: missing subcommand\n💡 Usage: server [start|stop|restart|status|list|prune|monitor|log|debug] [options]", true);
         }
         
         String subCommand = args[0];
@@ -73,6 +73,8 @@ public class UnifiedCommandExecutor {
                     return handleServerStart(serverManager, args);
                 case "stop":  
                     return handleServerStop(serverManager, args);
+                case "restart":
+                    return handleServerRestart(serverManager, args);
                 case "status":
                     return handleServerStatus(serverManager, args);
                 case "list":
@@ -89,7 +91,7 @@ public class UnifiedCommandExecutor {
                     return handleServerDebug(Arrays.copyOfRange(args, 1, args.length));
                 default:
                     return formatOutput("❌ Unknown server command: " + subCommand + 
-                        "\n💡 Available commands: start, stop, status, list, prune, config, monitor, log, debug", true);
+                        "\n💡 Available commands: start, stop, restart, status, list, prune, config, monitor, log, debug", true);
             }
         } finally {
             Timer.stop("Server " + subCommand + " Command");
@@ -213,6 +215,13 @@ public class UnifiedCommandExecutor {
         }
         
         return formatOutput(result.toString(), false);
+    }
+    
+    private String handleServerRestart(LuceeServerManager serverManager, String[] args) throws Exception {
+
+        handleServerStop(serverManager, args);
+        handleServerStart(serverManager, args);
+        return "Server Restarted Successfully\n\n";
     }
     
     private String handleServerStatus(LuceeServerManager serverManager, String[] args) throws Exception {
