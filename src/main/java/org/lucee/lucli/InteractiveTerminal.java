@@ -11,14 +11,13 @@ import org.jline.reader.EndOfFileException;
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.UserInterruptException;
-import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 import org.lucee.lucli.commands.UnifiedCommandExecutor;
 import org.lucee.lucli.modules.ModuleCommand;
 
-public class SimpleTerminal {
+public class InteractiveTerminal {
     private static LuceeScriptEngine luceeEngine;
-    private static Terminal terminal;
+    private static org.jline.terminal.Terminal terminal;
     private static CommandProcessor commandProcessor;
     private static ExternalCommandProcessor externalCommandProcessor;
     private static UnifiedCommandExecutor unifiedExecutor;
@@ -29,6 +28,12 @@ public class SimpleTerminal {
      */
     public static void main(String[] args) throws Exception {
         boolean oneShotMode = args.length > 0;
+        
+        // Debug output
+        if (LuCLI.debug || LuCLI.verbose) {
+            System.err.println("[DEBUG InteractiveTerminal] Args: " + java.util.Arrays.toString(args));
+            System.err.println("[DEBUG InteractiveTerminal] OneShotMode: " + oneShotMode);
+        }
         
         if (oneShotMode) {
             executeOneShotCommand(args);
@@ -42,17 +47,28 @@ public class SimpleTerminal {
      * Execute a single command and exit (CLI mode)
      */
     private static void executeOneShotCommand(String[] args) throws Exception {
+        // Debug output
+        if (LuCLI.debug || LuCLI.verbose) {
+            System.err.println("[DEBUG executeOneShotCommand] Starting with args: " + java.util.Arrays.toString(args));
+        }
+        
         Path currentDir = Paths.get(System.getProperty("user.dir"));
         unifiedExecutor = new UnifiedCommandExecutor(false, currentDir);
         
         String command = args[0];
         String[] commandArgs = args.length > 1 ? Arrays.copyOfRange(args, 1, args.length) : new String[0];
         
+        // Debug output
+        if (LuCLI.debug || LuCLI.verbose) {
+            System.err.println("[DEBUG executeOneShotCommand] Command: " + command);
+            System.err.println("[DEBUG executeOneShotCommand] CommandArgs: " + java.util.Arrays.toString(commandArgs));
+        }
+        
         // Handle basic commands first
         switch (command.toLowerCase()) {
             case "--version":
             case "version":
-                System.out.println(LuCLI.getVersionInfo());
+                System.out.println(LuCLI.getFullVersionInfo());
                 return;
             case "--lucee-version":
             case "lucee-version":
@@ -62,6 +78,16 @@ public class SimpleTerminal {
             case "--help":
             case "-h":
                 showHelpNonInteractive();
+                return;
+            case "cfml":
+                // Handle CFML expression execution in one-shot mode
+                if (commandArgs.length > 0) {
+                    String cfmlCode = String.join(" ", commandArgs);
+                    executeCFMLNonInteractive(cfmlCode);
+                } else {
+                    System.err.println("Error: cfml command requires an expression. Example: cfml now()");
+                    System.exit(1);
+                }
                 return;
         }
         
@@ -99,7 +125,7 @@ public class SimpleTerminal {
      */
     private static void startInteractiveMode() throws Exception {
         // Configure Windows-friendly terminal environment
-        WindowsCompatibility.configureTerminalEnvironment();
+        WindowsSupport.configureTerminalEnvironment();
         
         // Initialize unified command executor for interactive mode
         Path currentDir = Paths.get(System.getProperty("user.dir"));
@@ -131,19 +157,19 @@ public class SimpleTerminal {
         
         LineReader reader = LineReaderBuilder.builder()
                 .terminal(terminal)
-                .completer(new LuCLICompleter(commandProcessor))
+                .completer(new LucliCompleter(commandProcessor))
                 .variable(LineReader.HISTORY_FILE, historyFile)
                 .variable(LineReader.HISTORY_SIZE, 1000) // Maximum entries in memory
                 .variable(LineReader.HISTORY_FILE_SIZE, 2000) // Maximum entries in file
                 .build();
 
-        terminal.writer().println(WindowsCompatibility.Symbols.ROCKET + " LuCLI Terminal " + LuCLI.getVersion() +"  Type 'exit' or 'quit' to leave.");
-        terminal.writer().println(WindowsCompatibility.Symbols.FOLDER + " Working Directory: " + commandProcessor.getFileSystemState().getCurrentWorkingDirectory());
+        terminal.writer().println(WindowsSupport.Symbols.ROCKET + " LuCLI Terminal " + LuCLI.getVersion() +"  Type 'exit' or 'quit' to leave.");
+        terminal.writer().println(WindowsSupport.Symbols.FOLDER + " Working Directory: " + commandProcessor.getFileSystemState().getCurrentWorkingDirectory());
         if(LuCLI.verbose) {
-            terminal.writer().println(WindowsCompatibility.Symbols.COMPUTER + " Use 'cfml <expression>' to execute CFML code, e.g., 'cfml now()')");
-            terminal.writer().println(WindowsCompatibility.Symbols.FOLDER + " File system commands available: ls, cd, pwd, mkdir, cp, mv, rm, cat, etc.");
-            terminal.writer().println(WindowsCompatibility.Symbols.TOOL + " External commands supported: git, npm, docker, grep, and more!");
-            terminal.writer().println(WindowsCompatibility.Symbols.ART + " Type 'prompt' to change your prompt style!");
+            terminal.writer().println(WindowsSupport.Symbols.COMPUTER + " Use 'cfml <expression>' to execute CFML code, e.g., 'cfml now()')");
+            terminal.writer().println(WindowsSupport.Symbols.FOLDER + " File system commands available: ls, cd, pwd, mkdir, cp, mv, rm, cat, etc.");
+            terminal.writer().println(WindowsSupport.Symbols.TOOL + " External commands supported: git, npm, docker, grep, and more!");
+            terminal.writer().println(WindowsSupport.Symbols.ART + " Type 'prompt' to change your prompt style!");
         }
         terminal.writer().flush();
 
@@ -205,7 +231,7 @@ public class SimpleTerminal {
             }
         }
 
-        terminal.writer().println(WindowsCompatibility.Symbols.WAVE + " Goodbye!");
+        terminal.writer().println(WindowsSupport.Symbols.WAVE + " Goodbye!");
         terminal.writer().flush();
 
         terminal.close();
@@ -216,13 +242,13 @@ public class SimpleTerminal {
             // Initialize Lucee engine if not already done
             if (luceeEngine == null) {
                 if(LuCLI.verbose) {
-                    terminal.writer().println(WindowsCompatibility.Symbols.TOOL + " Initializing Lucee CFML engine...");
+                    terminal.writer().println(WindowsSupport.Symbols.TOOL + " Initializing Lucee CFML engine...");
                     terminal.writer().flush();
                 }
                 
                 luceeEngine = LuceeScriptEngine.getInstance(LuCLI.verbose, LuCLI.debug); // non-verbose for cleaner output
                 if(LuCLI.verbose) {
-                    terminal.writer().println(WindowsCompatibility.Symbols.SUCCESS + " Lucee engine ready.");
+                    terminal.writer().println(WindowsSupport.Symbols.SUCCESS + " Lucee engine ready.");
                 }
             }
             
@@ -230,8 +256,8 @@ public class SimpleTerminal {
             String wrappedScript = createOutputScript(cfmlCode);
             
             //We can also directly add a variable. So we dont even need to replace.
-            // Execute the CFML code
-            Object result = luceeEngine.eval(wrappedScript);
+            // Execute the CFML code with built-in variables
+            Object result = luceeEngine.evalWithBuiltinVariables(wrappedScript);
             
             // The output should already be printed by writeOutput in the script
             // but we can also handle direct results if needed
@@ -241,7 +267,7 @@ public class SimpleTerminal {
             terminal.writer().println("");
 
         } catch (Exception e) {
-            terminal.writer().println(WindowsCompatibility.Symbols.ERROR + " Error executing CFML: " + e.getMessage());
+            terminal.writer().println(WindowsSupport.Symbols.ERROR + " Error executing CFML: " + e.getMessage());
             if (e.getCause() != null) {
                 terminal.writer().println("Cause: " + e.getCause().getMessage());
             }
@@ -249,16 +275,82 @@ public class SimpleTerminal {
         terminal.writer().flush();
     }
     
+    /**
+     * Execute CFML code in non-interactive mode (one-shot command)
+     */
+    private static void executeCFMLNonInteractive(String cfmlCode) {
+        Timer.start("CFML Execution");
+        
+        try {
+            // Initialize Lucee engine if not already done
+            Timer.start("Lucee Engine Initialization");
+            if (luceeEngine == null) {
+                if (LuCLI.verbose) {
+                    System.out.println("Initializing Lucee CFML engine...");
+                }
+                
+                luceeEngine = LuceeScriptEngine.getInstance(LuCLI.verbose, LuCLI.debug);
+                if (LuCLI.verbose) {
+                    System.out.println("Lucee engine ready.");
+                }
+            }
+            Timer.stop("Lucee Engine Initialization");
+            
+            // Wrap the expression to capture and return the result
+            Timer.start("Script Generation");
+            String wrappedScript = createOutputScript(cfmlCode);
+            Timer.stop("Script Generation");
+            
+            // Execute the CFML code with built-in variables
+            Timer.start("Script Execution");
+            Object result = luceeEngine.evalWithBuiltinVariables(wrappedScript);
+            Timer.stop("Script Execution");
+            
+            // The output should already be printed by writeOutput in the script
+            // but we can also handle direct results if needed
+            if (result != null && !result.toString().trim().isEmpty() && LuCLI.debug) {
+                System.out.println(result.toString());
+            }
+
+        } catch (Exception e) {
+            System.err.println("Error executing CFML: " + e.getMessage());
+            if (e.getCause() != null && (LuCLI.verbose || LuCLI.debug)) {
+                System.err.println("Cause: " + e.getCause().getMessage());
+            }
+            if (LuCLI.debug) {
+                e.printStackTrace();
+            }
+            System.exit(1);
+        } finally {
+            Timer.stop("CFML Execution");
+        }
+    }
+    
     private static String createOutputScript(String cfmlExpression) {
         try {
             // Read the external script template
             String scriptTemplate = readScriptTemplate("/script_engine/cfmlOutput.cfs");
             
-            // Replace the placeholder with the actual expression
-            String result = scriptTemplate.replace("${cfmlExpression}", cfmlExpression);
-            
-            // Post-process through StringOutput for emoji and placeholder handling
-            return StringOutput.getInstance().process(result);
+            // Get built-in variables setup (no script file or args for interactive mode)
+            try {
+                org.lucee.lucli.BuiltinVariableManager variableManager = org.lucee.lucli.BuiltinVariableManager.getInstance(LuCLI.verbose, LuCLI.debug);
+                String builtinSetup = variableManager.createVariableSetupScript(null, null);
+                
+                // Replace placeholders with the actual expression and built-in variables
+                String result = scriptTemplate
+                    .replace("${builtinVariablesSetup}", builtinSetup)
+                    .replace("${cfmlExpression}", cfmlExpression);
+                
+                // Post-process through StringOutput for emoji and placeholder handling
+                return StringOutput.getInstance().process(result);
+            } catch (Exception e) {
+                if (LuCLI.debug) {
+                    System.err.println("Warning: Failed to inject built-in variables in createOutputScript: " + e.getMessage());
+                }
+                // Fallback: just replace the expression without built-in variables
+                String result = scriptTemplate.replace("${cfmlExpression}", cfmlExpression);
+                return StringOutput.getInstance().process(result);
+            }
             
         } catch (Exception e) {
             // Fallback to inline generation if reading external script fails
@@ -294,7 +386,7 @@ public class SimpleTerminal {
      * Read a script template from resources
      */
     private static String readScriptTemplate(String templatePath) throws Exception {
-        try (java.io.InputStream is = SimpleTerminal.class.getResourceAsStream(templatePath)) {
+        try (java.io.InputStream is = InteractiveTerminal.class.getResourceAsStream(templatePath)) {
             if (is == null) {
                 throw new java.io.FileNotFoundException("Script template not found: " + templatePath);
             }
@@ -306,11 +398,11 @@ public class SimpleTerminal {
         try {
             // Initialize Lucee engine if not already done
             if (luceeEngine == null) {
-                terminal.writer().println(WindowsCompatibility.Symbols.TOOL + " Initializing Lucee CFML engine...");
+                terminal.writer().println(WindowsSupport.Symbols.TOOL + " Initializing Lucee CFML engine...");
                 terminal.writer().flush();
                 
                 luceeEngine = LuceeScriptEngine.getInstance(true, false);
-                terminal.writer().println(WindowsCompatibility.Symbols.SUCCESS + " Lucee engine ready.");
+                terminal.writer().println(WindowsSupport.Symbols.SUCCESS + " Lucee engine ready.");
             }
             
             luceeEngine.eval("version = SERVER.LUCEE.version");
@@ -318,7 +410,7 @@ public class SimpleTerminal {
             terminal.writer().println("Lucee Version: " + version);
             
         } catch (Exception e) {
-            terminal.writer().println(WindowsCompatibility.Symbols.ERROR + " Error getting Lucee version: " + e.getMessage());
+            terminal.writer().println(WindowsSupport.Symbols.ERROR + " Error getting Lucee version: " + e.getMessage());
         }
         terminal.writer().flush();
     }

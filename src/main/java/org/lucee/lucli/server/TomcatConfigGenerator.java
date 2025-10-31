@@ -57,6 +57,10 @@ public class TomcatConfigGenerator {
         Path luceeWebDir = serverInstanceDir.resolve("lucee-web");
         Files.createDirectories(luceeWebDir);
         
+        // Ensure the global patches directory exists
+        Path patchesDir = getLucliHome().resolve("patches");
+        Files.createDirectories(patchesDir);
+        
         // Apply server.xml template
         applyTemplate("tomcat_template/conf/server.xml", serverInstanceDir.resolve("conf/server.xml"), placeholders);
         
@@ -107,6 +111,7 @@ public class TomcatConfigGenerator {
         Path webroot = LuceeServerConfig.resolveWebroot(config, projectDir);
         Path luceeServerPath = serverInstanceDir.resolve("lucee-server");
         Path luceeWebPath = serverInstanceDir.resolve("lucee-web");
+        Path luceePatchesPath = getLucliHome().resolve("patches");
         int shutdownPort = LuceeServerConfig.getShutdownPort(config.port);
         
         // Add all placeholder values
@@ -116,6 +121,7 @@ public class TomcatConfigGenerator {
         placeholders.put("${webroot}", webroot.toAbsolutePath().toString());
         placeholders.put("${luceeServerPath}", luceeServerPath.toAbsolutePath().toString());
         placeholders.put("${luceeWebPath}", luceeWebPath.toAbsolutePath().toString());
+        placeholders.put("${luceePatches}", luceePatchesPath.toAbsolutePath().toString());
         placeholders.put("${jvmRoute}", config.name);
         placeholders.put("${logLevel}", "INFO");
         

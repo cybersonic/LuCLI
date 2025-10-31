@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-TEST_DIR="test/urlrewrite-test"
+TEST_DIR="tests/urlrewrite-test"
 SERVER_NAME="urlrewrite-test"
 BASE_PORT=8889
 

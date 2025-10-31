@@ -1,0 +1,2 @@
+// results = createObject("component", "modules.#moduleName#.Module").main(argumentCollection=__arguments);
+results = createObject("component", "modules.#moduleName#.Module").showHelp();

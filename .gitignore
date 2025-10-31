@@ -11,3 +11,7 @@ docs/
 LuCLI.code-workspace
 demo_servers/
 no_commit/
+.settings/
+
+.classpath
+.project

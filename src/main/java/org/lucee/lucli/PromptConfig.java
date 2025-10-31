@@ -1,17 +1,23 @@
 package org.lucee.lucli;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Stream;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /**
  * Manages prompt configurations and templates
@@ -611,7 +617,7 @@ public class PromptConfig {
     }
     
     /**
-     * Replace emojis with Windows-compatible symbols using WindowsCompatibility.getEmoji()
+     * Replace emojis with Windows-compatible symbols using WindowsSupport.getEmoji()
      */
     private String removeEmojis(String text) {
         if (text == null || text.isEmpty()) {
@@ -621,27 +627,27 @@ public class PromptConfig {
         // Replace common prompt emojis with Windows-compatible alternatives
         String result = text
                 // Tool/wrench emoji (common in prompts)
-                .replace("🔧", WindowsCompatibility.Symbols.TOOL)
-                .replace("⚙️", WindowsCompatibility.Symbols.TOOL)
-                .replace("🛠️", WindowsCompatibility.Symbols.TOOL)
+                .replace("🔧", WindowsSupport.Symbols.TOOL)
+                .replace("⚙️", WindowsSupport.Symbols.TOOL)
+                .replace("🛠️", WindowsSupport.Symbols.TOOL)
                 
                 // Folder/directory emojis
-                .replace("📁", WindowsCompatibility.Symbols.FOLDER)
-                .replace("📂", WindowsCompatibility.Symbols.FOLDER)
+                .replace("📁", WindowsSupport.Symbols.FOLDER)
+                .replace("📂", WindowsSupport.Symbols.FOLDER)
                 
                 // Computer/terminal emojis
-                .replace("💻", WindowsCompatibility.Symbols.COMPUTER)
-                .replace("🖥️", WindowsCompatibility.Symbols.COMPUTER)
+                .replace("💻", WindowsSupport.Symbols.COMPUTER)
+                .replace("🖥️", WindowsSupport.Symbols.COMPUTER)
                 
                 // Success/check emojis
-                .replace("✅", WindowsCompatibility.Symbols.SUCCESS)
-                .replace("✔️", WindowsCompatibility.Symbols.SUCCESS)
-                .replace("✓", WindowsCompatibility.Symbols.SUCCESS)
+                .replace("✅", WindowsSupport.Symbols.SUCCESS)
+                .replace("✔️", WindowsSupport.Symbols.SUCCESS)
+                .replace("✓", WindowsSupport.Symbols.SUCCESS)
                 
                 // Error/warning emojis
-                .replace("❌", WindowsCompatibility.Symbols.ERROR)
-                .replace("❗", WindowsCompatibility.Symbols.ERROR)
-                .replace("⚠️", WindowsCompatibility.Symbols.WARNING)
+                .replace("❌", WindowsSupport.Symbols.ERROR)
+                .replace("❗", WindowsSupport.Symbols.ERROR)
+                .replace("⚠️", WindowsSupport.Symbols.WARNING)
                 
                 // Arrow emojis (commonly used in prompts)
                 .replace("➤", ">")
@@ -650,11 +656,11 @@ public class PromptConfig {
                 .replace("►", ">")
                 
                 // Rocket/lightning emojis
-                .replace("🚀", WindowsCompatibility.Symbols.ROCKET)
+                .replace("🚀", WindowsSupport.Symbols.ROCKET)
                 .replace("⚡", "[ZAP]")
                 
                 // Art/design emojis
-                .replace("🎨", WindowsCompatibility.Symbols.ART)
+                .replace("🎨", WindowsSupport.Symbols.ART)
                 .replace("✨", "*")
                 
                 // Time emojis
@@ -662,10 +668,10 @@ public class PromptConfig {
                 .replace("⏰", "[TIME]")
                 
                 // Wave/goodbye emoji
-                .replace("👋", WindowsCompatibility.Symbols.WAVE)
+                .replace("👋", WindowsSupport.Symbols.WAVE)
                 
                 // Information emojis
-                .replace("ℹ️", WindowsCompatibility.Symbols.INFO)
+                .replace("ℹ️", WindowsSupport.Symbols.INFO)
                 .replace("💡", "[TIP]")
                 
                 // Train/locomotive emojis (for train prompt)

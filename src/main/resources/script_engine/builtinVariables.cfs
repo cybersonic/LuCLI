@@ -1,0 +1,19 @@
+// Built-in Variables Setup Template
+// This template sets up all LuCLI built-in variables for CFML scripts
+// This content gets prepended to scripts that need built-in variables available
+
+// Built-in variables are injected here by BuiltinVariableManager
+${builtinVariablesSetup}
+
+// Now the built-in variables are available for use in the script:
+// - __scriptFile: Path to the current script file
+// - __scriptPath: Absolute path to the current script file  
+// - __scriptDir: Directory containing the current script file
+// - __arguments: Array of arguments passed to the script
+// - __argumentCount: Number of arguments passed to the script
+// - __env: Environment variables (complex object)
+// - __systemProps: System properties (complex object)
+// - __lucliHome: Path to the LuCLI home directory (~/.lucli)
+// - __lucliVersion: Version of LuCLI
+// - __currentDir: Current working directory
+// - arg1, arg2, etc.: Individual script arguments

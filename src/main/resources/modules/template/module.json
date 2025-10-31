@@ -1,0 +1,10 @@
+{
+  "name": "{{MODULE_NAME}}",
+  "version": "1.0.0",
+  "description": "A new LuCLI module",
+  "author": "Your Name",
+  "license": "MIT",
+  "keywords": ["lucli", "module", "cfml"],
+  "main": "Module.cfc",
+  "created": "{{TIMESTAMP}}"
+}

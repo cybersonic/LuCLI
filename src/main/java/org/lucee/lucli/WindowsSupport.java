@@ -1,12 +1,9 @@
 package org.lucee.lucli;
 
-import java.io.IOException;
-import java.util.Locale;
-
 /**
  * Utility class to handle Windows-specific terminal and display compatibility issues
  */
-public class WindowsCompatibility {
+public class WindowsSupport {
     
     private static final boolean IS_WINDOWS = System.getProperty("os.name", "").toLowerCase().startsWith("windows");
     private static final boolean IS_WINDOWS_TERMINAL = System.getenv("WT_SESSION") != null;

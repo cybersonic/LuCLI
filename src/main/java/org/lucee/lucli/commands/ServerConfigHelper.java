@@ -1,9 +1,5 @@
 package org.lucee.lucli.commands;
 
-import org.lucee.lucli.server.LuceeServerConfig;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.JsonNode;
-
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -13,16 +9,25 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+
+import org.lucee.lucli.server.LuceeServerConfig;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Simplified helper class for server configuration operations
  * Handles basic configuration get/set operations and provides version caching placeholder
  */
-public class SimpleServerConfigHelper {
+public class ServerConfigHelper {
     
     private static final String CACHE_DIR = System.getProperty("user.home") + "/.lucli";
     private static final String VERSION_CACHE_FILE = "lucee-versions.json";

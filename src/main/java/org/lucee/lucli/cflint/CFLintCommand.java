@@ -1,18 +1,16 @@
 package org.lucee.lucli.cflint;
 
-import java.lang.reflect.Method;
-import java.lang.reflect.InvocationTargetException;
 import java.io.File;
 import java.io.IOException;
 import java.io.StringWriter;
-import java.io.PrintWriter;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Properties;
 import java.util.stream.Stream;
 
 import org.lucee.lucli.StringOutput;

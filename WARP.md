@@ -34,13 +34,13 @@ mvn clean package
 mvn clean package -Pbinary
 
 # Run comprehensive test suite
-./test.sh
+./tests/test.sh
 
 # Quick development cycle (build and run binary)
 ./dev-lucli.sh
 
 # Run simple tests
-./test/test-simple.sh
+./tests/test-simple.sh
 ```
 
 ### Running the Application
@@ -100,7 +100,7 @@ This helps keep test server instances organized and separate from production env
 ### Core Components
 
 - **LuCLI.java**: Main entry point handling command-line argument parsing and dispatching
-- **SimpleTerminal.java**: Interactive terminal mode with JLine integration
+- **InteractiveTerminal.java**: Interactive terminal mode with JLine integration
 - **LuceeScriptEngine.java**: Lucee CFML engine integration wrapper with externalized script templates
 - **StringOutput.java**: Centralized output post-processor with emoji handling and placeholder substitution
 - **CommandProcessor.java**: Internal command processing (file operations, system commands)
@@ -124,9 +124,9 @@ This helps keep test server instances organized and separate from production env
 - **PromptConfig.java**: Configurable prompt styles (14 different themes)
 - **Settings.java**: User settings persistence
 - **StringOutput.java**: Centralized output post-processing with emoji/placeholder support
-- **WindowsCompatibility.java**: Smart emoji detection and terminal capability analysis
-- **CFMLCompleter.java & LuCLICompleter.java**: Command auto-completion
-- **CFMLSyntaxHighlighter.java**: Syntax highlighting for CFML
+- **WindowsSupport.java**: Smart emoji detection and terminal capability analysis
+- **CfmlCompleter.java & LucliCompleter.java**: Command auto-completion
+- **CfmlSyntaxHighlighter.java**: Syntax highlighting for CFML
 - **FileSystemState.java**: Working directory tracking
 
 ## Key Design Patterns
@@ -200,7 +200,7 @@ StringOutput provides centralized output handling with:
 
 ## Testing Strategy
 
-The test suite (`test.sh`) covers:
+The test suite (`tests/test.sh`) covers:
 - Basic functionality (help, version commands)
 - CFML script execution
 - File system operations

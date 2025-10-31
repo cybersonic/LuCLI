@@ -1,6 +1,8 @@
 package org.lucee.lucli.debug;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Debug command handler - provides the k9s-style debug interface functionality

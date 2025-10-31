@@ -1,17 +1,27 @@
 package org.lucee.lucli;
 
 import java.io.IOException;
-import java.nio.file.*;
+import java.nio.file.DirectoryNotEmptyException;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
+
+import org.lucee.lucli.cflint.CFLintCommand;
 import org.lucee.lucli.commands.UnifiedCommandExecutor;
 import org.lucee.lucli.interactive.InteractiveTestCommand;
-import org.lucee.lucli.cflint.CFLintCommand;
 
 /**
  * Processes file system commands for the terminal
@@ -791,7 +801,7 @@ public class CommandProcessor {
         if (args.length == 0) {
             // List available prompts and show current prompt
             StringBuilder result = new StringBuilder();
-            result.append(WindowsCompatibility.getEmoji("🎨", "[PROMPTS]") + " Available prompt templates:\n\n");
+            result.append(WindowsSupport.getEmoji("🎨", "[PROMPTS]") + " Available prompt templates:\n\n");
             
             String currentPrompt = settings.getCurrentPrompt();
             List<String> templates = promptConfig.getAvailableTemplateNames();
@@ -799,18 +809,18 @@ public class CommandProcessor {
             for (String templateName : templates) {
                 PromptConfig.PromptTemplate template = promptConfig.getTemplate(templateName);
                 if (template != null) {
-                    String marker = templateName.equals(currentPrompt) ? WindowsCompatibility.getEmoji("➤ ", "> ") : "  ";
-                    String emoji = template.useEmoji ? WindowsCompatibility.getEmoji("✨ ", "[*] ") : "";
+                    String marker = templateName.equals(currentPrompt) ? WindowsSupport.getEmoji("➤ ", "> ") : "  ";
+                    String emoji = template.useEmoji ? WindowsSupport.getEmoji("✨ ", "[*] ") : "";
                     result.append(String.format("%s%s%s - %s\n", marker, emoji, templateName, template.description));
                 }
             }
             
-            result.append("\n" + WindowsCompatibility.getEmoji("💡", "[TIP]") + " Current prompt: ").append(currentPrompt);
-            result.append("\n" + WindowsCompatibility.getEmoji("🔧", "[CMD]") + " Usage: prompt <template-name> to switch prompts");
-            result.append("\n" + WindowsCompatibility.getEmoji("🔄", "[REFRESH]") + " Usage: prompt refresh to update templates from JAR resources");
-            result.append("\n" + WindowsCompatibility.getEmoji("😀", "[EMOJI]") + " Usage: prompt emoji [on|off|status] to manage emoji display");
-            result.append("\n" + WindowsCompatibility.getEmoji("🔍", "[DIAG]") + " Usage: prompt terminal to check terminal capabilities");
-            result.append("\n" + WindowsCompatibility.getEmoji("📁", "[DIR]") + " Custom prompts are stored in ~/.lucli/prompts/");
+            result.append("\n" + WindowsSupport.getEmoji("💡", "[TIP]") + " Current prompt: ").append(currentPrompt);
+            result.append("\n" + WindowsSupport.getEmoji("🔧", "[CMD]") + " Usage: prompt <template-name> to switch prompts");
+            result.append("\n" + WindowsSupport.getEmoji("🔄", "[REFRESH]") + " Usage: prompt refresh to update templates from JAR resources");
+            result.append("\n" + WindowsSupport.getEmoji("😀", "[EMOJI]") + " Usage: prompt emoji [on|off|status] to manage emoji display");
+            result.append("\n" + WindowsSupport.getEmoji("🔍", "[DIAG]") + " Usage: prompt terminal to check terminal capabilities");
+            result.append("\n" + WindowsSupport.getEmoji("📁", "[DIR]") + " Custom prompts are stored in ~/.lucli/prompts/");
             
             return result.toString();
         } else {
@@ -819,9 +829,9 @@ public class CommandProcessor {
             // Handle refresh subcommand
             if ("refresh".equals(command)) {
                 int refreshedCount = promptConfig.refreshPromptFiles();
-                return WindowsCompatibility.getEmoji("🔄", "[REFRESH]") + " Refreshed " + refreshedCount + " prompt template files from JAR resources\n"
-                     + WindowsCompatibility.getEmoji("✅", "[OK]") + " Latest prompt templates are now available in ~/.lucli/prompts/\n"
-                     + WindowsCompatibility.getEmoji("💡", "[TIP]") + " Use 'prompt' to see all available templates.";
+                return WindowsSupport.getEmoji("🔄", "[REFRESH]") + " Refreshed " + refreshedCount + " prompt template files from JAR resources\n"
+                     + WindowsSupport.getEmoji("✅", "[OK]") + " Latest prompt templates are now available in ~/.lucli/prompts/\n"
+                     + WindowsSupport.getEmoji("💡", "[TIP]") + " Use 'prompt' to see all available templates.";
             }
             
             // Handle emoji management subcommand
@@ -829,7 +839,7 @@ public class CommandProcessor {
                 if (args.length == 1) {
                     // Show current emoji status
                     boolean emojiEnabled = settings.showEmojis();
-                    boolean emojiSupported = WindowsCompatibility.supportsEmojis();
+                    boolean emojiSupported = WindowsSupport.supportsEmojis();
                     
                     StringBuilder result = new StringBuilder();
                     result.append("Emoji Status:\n");
@@ -853,15 +863,15 @@ public class CommandProcessor {
                     switch (subCommand) {
                         case "on":
                             settings.setBoolean("showEmojis", true);
-                            return WindowsCompatibility.getEmoji("✅", "[OK]") + " Emojis enabled! " + 
-                                   WindowsCompatibility.getEmoji("😀🎉", "[TEST]");
+                            return WindowsSupport.getEmoji("✅", "[OK]") + " Emojis enabled! " + 
+                                   WindowsSupport.getEmoji("😀🎉", "[TEST]");
                         
                         case "off":
                             settings.setBoolean("showEmojis", false);
                             return "[OK] Emojis disabled. Prompts will show text-only symbols.";
                         
                         case "test":
-                            return "Emoji test: " + WindowsCompatibility.getEmoji("🎨🚀⚡🔧💻📁🌈", "[NO-EMOJI-SUPPORT]") + 
+                            return "Emoji test: " + WindowsSupport.getEmoji("🎨🚀⚡🔧💻📁🌈", "[NO-EMOJI-SUPPORT]") + 
                                    "\nIf you see question marks or boxes, your terminal doesn't support emojis.";
                         
                         default:
@@ -872,18 +882,18 @@ public class CommandProcessor {
             
             // Handle terminal capabilities diagnostic
             if ("terminal".equals(command)) {
-                return "Terminal Capabilities Report:\n\n" + WindowsCompatibility.TerminalCapabilities.getCapabilityReport();
+                return "Terminal Capabilities Report:\n\n" + WindowsSupport.TerminalCapabilities.getCapabilityReport();
             }
             
             // Handle template switching
             String templateName = command;
             if (promptConfig.setCurrentTemplate(templateName)) {
                 PromptConfig.PromptTemplate template = promptConfig.getTemplate(templateName);
-                String emoji = settings.showEmojis() && template.useEmoji ? WindowsCompatibility.getEmoji("✨ ", "[*] ") : "";
-                return WindowsCompatibility.getEmoji("✅", "[OK]") + " Prompt changed to: " + emoji + templateName + " - " + template.description;
+                String emoji = settings.showEmojis() && template.useEmoji ? WindowsSupport.getEmoji("✨ ", "[*] ") : "";
+                return WindowsSupport.getEmoji("✅", "[OK]") + " Prompt changed to: " + emoji + templateName + " - " + template.description;
             } else {
-                return WindowsCompatibility.getEmoji("❌", "[ERROR]") + " Unknown prompt template: " + templateName + 
-                       "\n" + WindowsCompatibility.getEmoji("💡", "[TIP]") + " Use 'prompt' to see available templates.";
+                return WindowsSupport.getEmoji("❌", "[ERROR]") + " Unknown prompt template: " + templateName + 
+                       "\n" + WindowsSupport.getEmoji("💡", "[TIP]") + " Use 'prompt' to see available templates.";
             }
         }
     }
@@ -934,7 +944,7 @@ public class CommandProcessor {
      * Get the appropriate emoji or text prefix for a file based on its type and extension
      */
     private String getFileEmoji(Path file) {
-        boolean emojiSupported = settings.showEmojis() && WindowsCompatibility.supportsEmojis();
+        boolean emojiSupported = settings.showEmojis() && WindowsSupport.supportsEmojis();
         
         try {
             if (Files.isDirectory(file)) {
@@ -1265,7 +1275,7 @@ public class CommandProcessor {
             System.setOut(new java.io.PrintStream(baos));
             System.setErr(new java.io.PrintStream(baos));
             
-            boolean result = cfLintCommand.handleLintCommand(commandLine);
+            //boolean result = cfLintCommand.handleLintCommand(commandLine);
             
             // Restore original streams
             System.setOut(originalOut);

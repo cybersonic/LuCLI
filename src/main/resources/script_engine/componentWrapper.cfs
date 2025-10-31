@@ -7,6 +7,9 @@
 // - scriptFile: The path to the script file being executed
 // - scriptArgs: Array of arguments passed to the component
 
+// === Built-in Variables Setup ===
+${builtinVariablesSetup}
+
 // Auto-generated wrapper for CFC: ${scriptFile}
 // Component path: ${componentPath}
 

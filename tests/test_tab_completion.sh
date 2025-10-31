@@ -91,7 +91,7 @@ test_completion_with_java_harness() {
     
     # Create a simple Java test program that calls the completion directly
     cat > CompletionTest.java <<EOF
-import org.lucee.lucli.LuCLICompleter;
+import org.lucee.lucli.LucliCompleter;
 import org.lucee.lucli.CommandProcessor;
 import org.jline.reader.Candidate;
 import org.jline.reader.impl.LineReaderImpl;
@@ -111,7 +111,7 @@ public class CompletionTest {
                 // We'll need to provide minimal implementations
             };
             
-            LuCLICompleter completer = new LuCLICompleter(mockProcessor);
+            LucliCompleter completer = new LucliCompleter(mockProcessor);
             DefaultParser parser = new DefaultParser();
             
             // Parse the input line

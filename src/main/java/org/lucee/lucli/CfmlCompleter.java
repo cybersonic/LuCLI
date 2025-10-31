@@ -1,15 +1,18 @@
 package org.lucee.lucli;
 
-import org.jline.reader.Candidate;
-
-import javax.script.ScriptException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+
+import org.jline.reader.Candidate;
 
 /**
  * Provides tab completion for CFML functions using Lucee's built-in function introspection
  */
-public class CFMLCompleter {
+public class CfmlCompleter {
     private static final Map<String, Set<String>> functionCache = new ConcurrentHashMap<>();
     private static final Map<String, FunctionInfo> functionDataCache = new ConcurrentHashMap<>();
     private static boolean cacheInitialized = false;
@@ -82,8 +85,8 @@ public class CFMLCompleter {
                           "  writeOutput('GetFunctionList_ERROR:' & e.message); " +
                           "}";
             Object result = luceeEngine.eval(script);
-            Object functionList = luceeEngine.getEngine().get("functionList");
-            Object functionNameArr = luceeEngine.getEngine().get("functionNameArr");
+            //Object functionList = luceeEngine.getEngine().get("functionList");
+            //Object functionNameArr = luceeEngine.getEngine().get("functionNameArr");
             
             if (result != null) {
                 String functionListStr = result.toString();
