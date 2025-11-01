@@ -98,6 +98,7 @@ public class LuceeScriptEngine {
         Path modulepath = ModuleCommand.getModulesDirectory();
 
         engine.put("lucli_modules_path", modulepath.toString());
+        engine.put("lucli_home_path", getLucliHomeDirectory().toString());
         engine.put("__verboseMode", verbose);
         engine.put("__debugMode", debug);
         

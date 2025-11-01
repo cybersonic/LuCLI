@@ -16,6 +16,10 @@ fi
 
 # Build the JAR and binary
 mvn clean package --activate-profiles binary --quiet
+if [ $? -ne 0 ]; then
+    echo "Maven build failed!"
+    exit 1
+fi
 
 # Test the JAR and binary
 echo "Testing the built JAR and binary..."
@@ -68,7 +72,7 @@ docker buildx build \
 echo "Testing Docker image..."
 docker run --rm markdrew/lucli:${VERSION} --version
 
-docker run -it --entrypoint /bin/bash markdrew/lucli:latest
+# docker run -it --entrypoint /bin/bash markdrew/lucli:latest
 
 echo "Build and tests completed successfully."
 echo "Multi-platform images pushed for: linux/amd64, linux/arm/v7, linux/arm64/v8"
