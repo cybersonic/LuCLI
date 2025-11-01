@@ -10,9 +10,6 @@ A modern, feature-rich command line interface for Lucee CFML that brings the pow
 - **CFML Script Execution**: Run .cfs, .cfm, and .cfc files with full Lucee support
 - **Server Management**: Start, stop, monitor, and manage Lucee server instances  
 - **Module System**: Create and manage reusable CFML modules
-- **Comprehensive Help System**: Context-sensitive help for all commands and subcommands
-- **Interactive Terminal**: Feature-rich terminal mode with auto-completion and history
-
 ## 📦 Installation
 
 ### Quick Start
@@ -37,6 +34,10 @@ mvn clean package -Pbinary
 ./target/lucli
 ```
 
+### Running from Docker
+```bash
+docker run markdrew/lucli:latest --version
+```
 ## 🚀 Usage Examples
 
 ### CFML Development
