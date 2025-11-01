@@ -6,6 +6,7 @@ if [[ "$1" == "docker" ]]; then
     buildDockerImage=true
 fi
 
+
 if [[ "$1" == "install" ]]; then
     installLocally=true
 fi
@@ -48,6 +49,19 @@ if [ "$installLocally" = true ] ; then
     cp target/lucli ~/bin/lucli
     echo "Installed lucli binary to ~/bin/lucli"
 fi
+
+if [[ "$1" == "dockerlocal" ]]; then
+    VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+    echo "Building local Docker image...'markdrew/lucli:${VERSION}'"
+
+    docker build -t markdrew/lucli:${VERSION} .
+    
+    echo "Testing Docker image..."
+    docker run --rm markdrew/lucli:${VERSION} --version
+    echo "  docker run --rm markdrew/lucli:${VERSION} [options]"
+fi
+
+
 
 if [ "$buildDockerImage" = false ] ; then
     echo "Build and tests completed successfully."

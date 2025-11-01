@@ -202,11 +202,18 @@ jobs:
         VERSION="${{ needs.check-version.outputs.version }}"
         mkdir -p final-release-assets
         
-        # Collect all artifacts
-        find all-artifacts -name "*.jar" -exec cp {} final-release-assets/ \;
-        find all-artifacts -name "lucli-*" -exec cp {} final-release-assets/ \;
-        find all-artifacts -name "*.bat" -exec cp {} final-release-assets/ \;
-        find all-artifacts -name "*.ps1" -exec cp {} final-release-assets/ \;
+        # Collect all artifacts from different OS builds
+        for dir in all-artifacts/*/; do
+          if [ -f "$dir/lucli.jar" ]; then
+            cp "$dir/lucli.jar" final-release-assets/lucli.jar
+          fi
+          if [ -f "$dir/lucli" ]; then
+            cp "$dir/lucli" final-release-assets/lucli
+          fi
+        done
+        
+        # Make binary executable
+        [ -f final-release-assets/lucli ] && chmod +x final-release-assets/lucli
         
         # Create a unified JAR (just copy one of them and rename)
         if [ -f "final-release-assets/lucli-$VERSION.jar" ]; then
@@ -310,23 +317,35 @@ jobs:
         
         $CHANGELOG
         
-        ## Binary Downloads
+        ## 🐳 Docker Image
+        
+        LuCLI is also available as a Docker image:
+        \`\`\`bash
+        docker run --rm markdrew/lucli:$VERSION --help
+        docker run --rm markdrew/lucli:latest --help
+        \`\`\`
+        
+        Multi-platform support: linux/amd64, linux/arm64, linux/arm/v7
+        
+        📖 See [Docker documentation](#) for more details.
+        
+        ## Downloads
         
         Choose the appropriate download for your platform:
         
-        ### Cross-Platform (Requires Java 17+)
-        - **lucli.jar** - Universal JAR file, works on any platform with Java
-        
-        ### Platform-Specific Binaries
-        - **lucli-$VERSION-Linux** - Native Linux binary  
-        - **lucli-$VERSION-macOS** - Native macOS binary
-        - **lucli-$VERSION.bat** - Windows batch script (requires lucli.jar)
-        - **lucli-$VERSION.ps1** - Windows PowerShell script (requires lucli.jar)
+        ### Downloads
+        - **lucli** - Self-executing binary (works on Linux/macOS, includes embedded JAR)
+        - **lucli.jar** - Universal JAR file (requires Java 17+, works on all platforms)
         
         ### Installation Scripts
         - **install.sh** - Automated installation script for Linux/macOS
         
         ## Quick Install
+        
+        ### Using Docker (Recommended for Linux/ARM)
+        \`\`\`bash
+        docker run --rm markdrew/lucli:$VERSION
+        \`\`\`
         
         ### Linux/macOS (One-liner)
         \`\`\`bash
@@ -344,7 +363,8 @@ jobs:
         \`\`\`
         
         ## System Requirements
-        - Java 17 or higher (for JAR usage)
+        - Java 17 or higher (for JAR/binary usage)
+        - Docker (for Docker image usage)
         - No Java required for native binaries
         EOF
 
