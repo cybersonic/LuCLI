@@ -1,6 +1,8 @@
 # 🚀 LuCLI - Lucee Command Line Interface
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)]() [![Java 17+](https://img.shields.io/badge/java-17+-blue)]() [![License](https://img.shields.io/badge/license-MIT-green)]()
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)]() [![Java 17+](https://img.shields.io/badge/java-17+-blue)]() [![License](https://img.shields.io/badge/license-MIT-green)]() [![Alpha](https://img.shields.io/badge/status-alpha-orange)]
+
+⚠️ **This is an alpha release** - Expect breaking changes and limitations. The API and features may change significantly before v1.0. We appreciate feedback and contributions!
 
 A modern, feature-rich command line interface for Lucee CFML that brings the power of CFML to your terminal. LuCLI integrates the Lucee CFML engine with advanced features like server management, JMX monitoring, module management, and intelligent output processing.
 
