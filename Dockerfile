@@ -13,6 +13,9 @@ RUN chmod +x /usr/local/bin/lucli
 # Create .lucli directory for configuration
 RUN mkdir -p /root/.lucli
 
+# Warm up LuCLI (optional)
+RUN lucli --version
+
 # Set entrypoint to run the JAR
 ENTRYPOINT ["java", "-jar", "/app/lucli.jar"]
 
