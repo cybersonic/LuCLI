@@ -1,5 +1,5 @@
 # FROM eclipse-temurin:17-jre
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:21-jre
 
 # Set working directory
 WORKDIR /app
