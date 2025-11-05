@@ -174,7 +174,7 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: .
-        platforms: linux/amd64,linux/arm64,linux/arm/v7
+        platforms: linux/amd64,linux/arm64,linux/arm/v8
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
@@ -325,7 +325,7 @@ jobs:
         docker run --rm markdrew/lucli:latest --help
         \`\`\`
         
-        Multi-platform support: linux/amd64, linux/arm64, linux/arm/v7
+        Multi-platform support: linux/amd64, linux/arm64, linux/arm/v8
         
         📖 See [Docker documentation](#) for more details.
         
