@@ -8,10 +8,10 @@ component {
      */
     
     function init(
-        verbose=false,
+        verboseEnabled=false,
         timingEnabled=false,
         cwd="",
-        timer
+        timer=nullValue()
         ) {
             variables.verbose = arguments.verbose;
             variables.timingEnabled = arguments.timingEnabled;

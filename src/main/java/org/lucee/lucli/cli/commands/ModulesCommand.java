@@ -112,6 +112,7 @@ public class ModulesCommand implements Callable<Integer> {
         @Override
         public Integer call() throws Exception {
             System.out.println("This is the install command. Not impemented yet");
+            // This will redirect to `lucli install <args>` 
             // UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, Paths.get(System.getProperty("user.dir")));
             // String result = executor.executeCommand("modules", new String[]{"install", moduleName, gitUrl});
             // if (result != null && !result.isEmpty()) {
@@ -124,6 +125,8 @@ public class ModulesCommand implements Callable<Integer> {
 
     /**
      * Modules run subcommand
+     * TODO: We should be able to add subcommands here, so for exampple
+     * lucli lint export arg=1 arg2=etc
      */
     @Command(
         name = "run", 
