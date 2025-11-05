@@ -1,11 +1,22 @@
-// results = createObject("component", "modules.#moduleName#.Module").main(argumentCollection=__arguments);
-Timer.start("Execute Module Script");
 
-results = createObject("component", "modules.#moduleName#.Module").init(
-    verbose=verbose,
-    timingEnabled=timing,
-    cwd=__cwd,
-    timer=Timer
-    ).main(argumentCollection=argCollection);
+// results = createObject("component", "modules.#moduleName#.Module").main(argumentCollection=__arguments);
+
+if(verbose){
+    echo(serializeJSON(var=variables, compact=false));
+}
+Timer.start("Execute Module Script");
+echo(IsDefineD("argCollection"));
+modules = createObject("component", "modules.#moduleName#.Module").init(
+        verboseEnabled=verbose,
+        timingEnabled=timing,
+        cwd=__cwd,
+        timer=Timer
+    );
+
+    echo("subCommand: " & subcommand & chr(10));
+// if(!modules.keyExists(subcommand)){
+//     throw(type="InvalidSubcommand", message="The subcommand #subcommand# does not exist for module #moduleName#");
+// }
+results = modules[subcommand](argumentCollection=argCollection);
 
 Timer.stop("Execute Module Script");

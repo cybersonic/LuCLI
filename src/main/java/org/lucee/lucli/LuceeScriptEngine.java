@@ -146,9 +146,27 @@ public class LuceeScriptEngine {
     
     public void executeModule(String moduleName, String[] scriptArgs) throws Exception {
 
+
+        String subCommand = "main";
+
         // Parse key=value arguments into a map
         Map<String, String> argsMap = new java.util.HashMap<>();
+
+        // Check the first argument, if it doesnt have = then its the subcommand
+        if (scriptArgs.length > 0) {
+            String firstArg = scriptArgs[0];
+            if (!firstArg.contains("=")) {
+                subCommand = firstArg;
+                // Remove first argument from scriptArgs
+                scriptArgs = Arrays.copyOfRange(scriptArgs, 1, scriptArgs.length);
+            }
+        }
+        if(isVerboseMode() || isDebugMode()) {
+            System.out.println("Module subcommand: " + subCommand);
+        }
+        int count = 0;
         for (String arg : scriptArgs) {
+            count++;
             int equalsIndex = arg.indexOf('=');
             if (equalsIndex > 0) {
                 String key = arg.substring(0, equalsIndex).trim();
@@ -157,19 +175,27 @@ public class LuceeScriptEngine {
                 value = unwrap(value);
                 argsMap.put(key, value);
             }
+            else{
+                argsMap.put("arg" + count, arg);
+            }
         }
-
             Timer.start("Module Execution: " + moduleName);
             if (isVerboseMode() || isDebugMode()) {
                 System.out.println("=== Direct Module Execution Script ===");
                 
             }
+            
+            if(subCommand == null || subCommand.isEmpty()) {
+            	subCommand = "main";
+            }
 
-            // TOOD: add timing
+            
+            // The setup will clear everything as it binds to ENGINE_SCOPE
             setupScriptContext(engine, moduleName, scriptArgs);
+            engine.put("subCommand", subCommand);
             engine.put("moduleName", moduleName);
 
-            engine.put("argsCollection", Arrays.asList(scriptArgs));
+            // engine.put("args", Arrays.asList(scriptArgs));
             engine.put("argCollection", argsMap);
 
             engine.put("verbose", LuCLI.verbose);
@@ -177,6 +203,7 @@ public class LuceeScriptEngine {
             engine.put("timer", Timer.getInstance());
 
             String script = readScriptTemplate("/script_engine/executeModule.cfs");
+            
             engine.eval(script);
             Timer.stop("Module Execution: " + moduleName);
     }
@@ -384,38 +411,38 @@ public class LuceeScriptEngine {
 
     private void setupScriptContext(ScriptEngine engine, String scriptFile, String[] scriptArgs) throws IOException {
 
-        Bindings bindings = engine.createBindings();
+        // Bindings bindings = engine.createBindings();
         // Set current working directory
-        bindings.put("__cwd", System.getProperty("user.dir"));
+        engine.put("__cwd", System.getProperty("user.dir"));
         // Set script file information
-        bindings.put("__scriptFile", scriptFile);
-        bindings.put("__scriptPath", Paths.get(scriptFile).toAbsolutePath().toString());
+        engine.put("__scriptFile", scriptFile);
+        engine.put("__scriptPath", Paths.get(scriptFile).toAbsolutePath().toString());
         
         // Handle case where file is in current directory (getParent() returns null)
         Path parent = Paths.get(scriptFile).getParent();
         String scriptDir = parent != null ? parent.toAbsolutePath().toString() : System.getProperty("user.dir");
-        bindings.put("__scriptDir", scriptDir);
+        engine.put("__scriptDir", scriptDir);
         
         // Set arguments
-        bindings.put("__arguments", scriptArgs);
-        bindings.put("__argumentCount", scriptArgs.length);
+        engine.put("__arguments", scriptArgs);
+        engine.put("__argumentCount", scriptArgs.length);
         
         // Set individual arguments for easy access (similar to CGI.argv)
         for (int i = 0; i < scriptArgs.length; i++) {
-            bindings.put("arg" + (i + 1), scriptArgs[i]);
+            engine.put("arg" + (i + 1), scriptArgs[i]);
         }
         
         // Environment variables
-        bindings.put("__env", System.getenv());
+        engine.put("__env", System.getenv());
         
         // System properties
-        bindings.put("__systemProps", System.getProperties());
+        engine.put("__systemProps", System.getProperties());
         
         // Add lucli home directory path for component mapping
         Path lucliHome = getLucliHomeDirectory();
-        bindings.put("__lucliHome", lucliHome.toString());
+        engine.put("__lucliHome", lucliHome.toString());
         
-        engine.setBindings(bindings, ScriptContext.ENGINE_SCOPE);
+        
         
         // // Set up component mapping for ~/.lucli directory
         // try {
@@ -1169,5 +1196,9 @@ public class LuceeScriptEngine {
         // Ensure Lucee doesn't try to create default directories in system paths
         System.setProperty("lucee.controller.disabled", "true");
         System.setProperty("lucee.use.lucee.configs", "false");
+    }
+
+    public static String testFunction() {
+        return "Hello from the test injected function!";
     }
 }
