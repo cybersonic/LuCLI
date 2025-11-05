@@ -139,14 +139,13 @@ jobs:
       id: get_version
       run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ github.ref_name }}
-        release_name: LuCLI ${{ steps.get_version.outputs.VERSION }}
+        name: LuCLI ${{ steps.get_version.outputs.VERSION }}
         body: |
           ## LuCLI Release ${{ steps.get_version.outputs.VERSION }}
           
@@ -181,53 +180,4 @@ jobs:
           
         draft: false
         prerelease: false
-
-    - name: Upload JAR to Release
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: release-artifacts/lucli.jar
-        asset_name: lucli.jar
-        asset_content_type: application/java-archive
-
-    - name: Upload Unix Binary to Release
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: release-artifacts/lucli-unix
-        asset_name: lucli-unix
-        asset_content_type: application/octet-stream
-
-    - name: Upload Windows Batch to Release
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: release-artifacts/lucli.bat
-        asset_name: lucli.bat
-        asset_content_type: text/plain
-
-    - name: Upload Windows PowerShell to Release
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: release-artifacts/lucli.ps1
-        asset_name: lucli.ps1
-        asset_content_type: text/plain
-
-    - name: Upload Install Script to Release
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: release-artifacts/install.sh
-        asset_name: install.sh
-        asset_content_type: text/plain
+        files: release-artifacts/*

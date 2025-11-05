@@ -34,6 +34,7 @@
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal"
     },
+    
     {
       "type": "java",
       "name": "🔍 LucCLI Help",
@@ -79,7 +80,7 @@
       "name": "💿 LucCLI Install Module",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",
-      "args": ["install", "hello-world"],
+      "args": ["install", "name=hello-world"],
       "projectName": "lucli",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal"
@@ -114,6 +115,16 @@
       "projectName": "lucli",
       "cwd": "/Users/markdrew/.lucli/modules/lint",
       "console": "integratedTerminal"
-    }
+    },
+    {
+      "type": "java",
+      "name": "🔌💡 LucCLI Module Subcommand",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["--verbose", "modules", "run", "hello-world", "subCommand", "thefirstargument", "arg2=value2"],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
   ]
 }
