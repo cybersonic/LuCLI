@@ -5,7 +5,7 @@ if(verbose){
     echo(serializeJSON(var=variables, compact=false));
 }
 Timer.start("Execute Module Script");
-echo(IsDefineD("argCollection"));
+
 modules = createObject("component", "modules.#moduleName#.Module").init(
         verboseEnabled=verbose,
         timingEnabled=timing,
@@ -13,10 +13,8 @@ modules = createObject("component", "modules.#moduleName#.Module").init(
         timer=Timer
     );
 
+if(verbose){
     echo("subCommand: " & subcommand & chr(10));
-// if(!modules.keyExists(subcommand)){
-//     throw(type="InvalidSubcommand", message="The subcommand #subcommand# does not exist for module #moduleName#");
-// }
+}
 results = modules[subcommand](argumentCollection=argCollection);
-
 Timer.stop("Execute Module Script");
