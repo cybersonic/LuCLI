@@ -28,40 +28,15 @@ jobs:
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
 
-      - name: Build
+      - name: Build with Maven
         run: mvn clean package -Pbinary
-
-      - name: Prepare artifacts (Unix)
-        if: runner.os != 'Windows'
-        run: |
-          mkdir -p release-artifacts
-          cp target/lucli.jar release-artifacts/
-          if [ -f target/lucli ]; then
-            cp target/lucli release-artifacts/lucli-${{ runner.os }}
-          fi
-
-      - name: Prepare artifacts (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          mkdir -p release-artifacts
-          powershell -Command "Copy-Item target/lucli.jar release-artifacts/"
-          if (Test-Path target/lucli.bat) {
-            Copy-Item target/lucli.bat release-artifacts/
-          }
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: artifacts-${{ matrix.os }}
-          path: release-artifacts/
+          name: artifacts-${{ runner.os }}
+          path: target/lucli*
           retention-days: 1
-
-  publish:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    
     steps:
       - uses: actions/checkout@v4
         with:
@@ -104,14 +79,27 @@ jobs:
           mkdir -p release-files
           
           # Copy JAR once (from any artifact directory)
-          cp artifacts-ubuntu-latest/lucli.jar release-files/lucli-$VERSION.jar || cp artifacts-macos-latest/lucli.jar release-files/lucli-$VERSION.jar || cp artifacts-windows-latest/lucli.jar release-files/lucli-$VERSION.jar
+          cp artifacts-ubuntu-latest/lucli.jar release-files/lucli-$VERSION.jar 2>/dev/null || \
+          cp artifacts-macOS-latest/lucli.jar release-files/lucli-$VERSION.jar 2>/dev/null || \
+          cp artifacts-Windows-latest/lucli.jar release-files/lucli-$VERSION.jar
           
-          # Copy OS-specific binaries
-          [ -f "artifacts-macos-latest/lucli-Darwin" ] && cp "artifacts-macos-latest/lucli-Darwin" release-files/lucli-$VERSION-macos
-          [ -f "artifacts-ubuntu-latest/lucli-Linux" ] && cp "artifacts-ubuntu-latest/lucli-Linux" release-files/lucli-$VERSION-linux
-          [ -f "artifacts-windows-latest/lucli.bat" ] && cp "artifacts-windows-latest/lucli.bat" release-files/lucli.bat
+          # Copy Unix/Linux binary (created by Maven)
+          if [ -f "artifacts-ubuntu-latest/lucli" ]; then
+            cp "artifacts-ubuntu-latest/lucli" release-files/lucli-$VERSION-linux
+            chmod +x release-files/lucli-$VERSION-linux
+          fi
           
-          chmod +x release-files/lucli-* 2>/dev/null || true
+          # Copy macOS binary (created by Maven)
+          if [ -f "artifacts-macOS-latest/lucli" ]; then
+            cp "artifacts-macOS-latest/lucli" release-files/lucli-$VERSION-macos
+            chmod +x release-files/lucli-$VERSION-macos
+          fi
+          
+          # Copy Windows binary (created by Maven)
+          if [ -f "artifacts-Windows-latest/lucli.bat" ]; then
+            cp "artifacts-Windows-latest/lucli.bat" release-files/lucli-$VERSION.bat
+          fi
+          
           ls -la release-files/
 
       - name: Create git tag
@@ -133,8 +121,10 @@ jobs:
             ## LuCLI v${{ steps.version.outputs.VERSION }}
             
             ### Downloads
-            - **lucli-${{ steps.version.outputs.VERSION }}.jar** - Universal JAR (Java 17+)
-            - **lucli-${{ steps.version.outputs.VERSION }}-linux** - Linux binary
-            - **lucli-${{ steps.version.outputs.VERSION }}-macos** - macOS binary
-            - **lucli.bat** - Windows batch wrapper
+            - **lucli-${{ steps.version.outputs.VERSION }}.jar** - Universal JAR (Java 17+, works everywhere)
+            - **lucli-${{ steps.version.outputs.VERSION }}-linux** - Self-contained Linux binary (no Java needed)
+            - **lucli-${{ steps.version.outputs.VERSION }}-macos** - Self-contained macOS binary (no Java needed)
+            - **lucli-${{ steps.version.outputs.VERSION }}.bat** - Self-contained Windows binary (no Java needed)
+            
+            All binaries are built with `mvn clean package -Pbinary`
           files: release-files/*
