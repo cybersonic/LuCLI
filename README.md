@@ -16,8 +16,8 @@ A modern, feature-rich command line interface for Lucee CFML that brings the pow
 
 ### Quick Start
 ```bash
-# Download the latest release
-wget https://github.com/your-org/lucli/releases/latest/download/lucli.jar
+# Download the latest JAR release
+wget https://github.com/cybersonic/LuCLI/releases/latest/download/lucli.jar
 
 # Start using LuCLI
 java -jar lucli.jar
@@ -25,6 +25,13 @@ java -jar lucli.jar
 # Execute CFML scripts directly
 java -jar lucli.jar myscript.cfs arg1 arg2
 ```
+
+### Download Options
+Visit the [Releases Page](https://github.com/cybersonic/LuCLI/releases) to download:
+- **lucli.jar** - Universal JAR file (requires Java 17+)
+- **lucli** - Self-executing binary for Linux/macOS
+- **lucli.bat** - Windows batch file
+- **install.sh** - Automated installation script
 
 ### Binary Installation (Recommended)
 ```bash
