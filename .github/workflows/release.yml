@@ -85,28 +85,36 @@ jobs:
           VERSION="${{ steps.version.outputs.VERSION }}"
           mkdir -p release-files
           
-          # Copy JAR once (from any artifact directory)
-          cp artifacts-ubuntu-latest/lucli.jar release-files/lucli-$VERSION.jar 2>/dev/null || \
-          cp artifacts-macOS-latest/lucli.jar release-files/lucli-$VERSION.jar 2>/dev/null || \
-          cp artifacts-Windows-latest/lucli.jar release-files/lucli-$VERSION.jar
+          # Find and copy artifacts from any OS build
+          for dir in artifacts-*; do
+            if [ -d "$dir" ]; then
+              echo "Processing $dir"
+              
+              # Copy JAR (once)
+              if [ -f "$dir/lucli.jar" ] && [ ! -f "release-files/lucli-$VERSION.jar" ]; then
+                cp "$dir/lucli.jar" "release-files/lucli-$VERSION.jar"
+              fi
+              
+              # Copy Unix binary
+              if [ -f "$dir/lucli" ] && [[ "$dir" == *"ubuntu"* || "$dir" == *"Linux"* ]]; then
+                cp "$dir/lucli" "release-files/lucli-$VERSION-linux"
+                chmod +x "release-files/lucli-$VERSION-linux"
+              fi
+              
+              # Copy macOS binary
+              if [ -f "$dir/lucli" ] && [[ "$dir" == *"macos"* || "$dir" == *"macOS"* ]]; then
+                cp "$dir/lucli" "release-files/lucli-$VERSION-macos"
+                chmod +x "release-files/lucli-$VERSION-macos"
+              fi
+              
+              # Copy Windows batch
+              if [ -f "$dir/lucli.bat" ]; then
+                cp "$dir/lucli.bat" "release-files/lucli-$VERSION.bat"
+              fi
+            fi
+          done
           
-          # Copy Unix/Linux binary (created by Maven)
-          if [ -f "artifacts-ubuntu-latest/lucli" ]; then
-            cp "artifacts-ubuntu-latest/lucli" release-files/lucli-$VERSION-linux
-            chmod +x release-files/lucli-$VERSION-linux
-          fi
-          
-          # Copy macOS binary (created by Maven)
-          if [ -f "artifacts-macOS-latest/lucli" ]; then
-            cp "artifacts-macOS-latest/lucli" release-files/lucli-$VERSION-macos
-            chmod +x release-files/lucli-$VERSION-macos
-          fi
-          
-          # Copy Windows binary (created by Maven)
-          if [ -f "artifacts-Windows-latest/lucli.bat" ]; then
-            cp "artifacts-Windows-latest/lucli.bat" release-files/lucli-$VERSION.bat
-          fi
-          
+          echo "Release files prepared:"
           ls -la release-files/
 
       - name: Create git tag
