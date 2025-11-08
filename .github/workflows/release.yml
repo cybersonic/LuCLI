@@ -37,6 +37,13 @@ jobs:
           name: artifacts-${{ runner.os }}
           path: target/lucli*
           retention-days: 1
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
     steps:
       - uses: actions/checkout@v4
         with:
