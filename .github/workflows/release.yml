@@ -31,11 +31,29 @@ jobs:
       - name: Build
         run: mvn clean package -Pbinary
 
+      - name: Prepare artifacts (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p release-artifacts
+          cp target/lucli.jar release-artifacts/
+          if [ -f target/lucli ]; then
+            cp target/lucli release-artifacts/lucli-${{ runner.os }}
+          fi
+
+      - name: Prepare artifacts (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          mkdir -p release-artifacts
+          powershell -Command "Copy-Item target/lucli.jar release-artifacts/"
+          if (Test-Path target/lucli.bat) {
+            Copy-Item target/lucli.bat release-artifacts/
+          }
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: artifacts-${{ matrix.os }}
-          path: target/lucli*
+          path: release-artifacts/
           retention-days: 1
 
   publish:
@@ -79,6 +97,23 @@ jobs:
         if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
         uses: actions/download-artifact@v4
 
+      - name: Organize release files
+        if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          mkdir -p release-files
+          
+          # Copy JAR once (from any artifact directory)
+          cp artifacts-ubuntu-latest/lucli.jar release-files/lucli-$VERSION.jar || cp artifacts-macos-latest/lucli.jar release-files/lucli-$VERSION.jar || cp artifacts-windows-latest/lucli.jar release-files/lucli-$VERSION.jar
+          
+          # Copy OS-specific binaries
+          [ -f "artifacts-macos-latest/lucli-Darwin" ] && cp "artifacts-macos-latest/lucli-Darwin" release-files/lucli-$VERSION-macos
+          [ -f "artifacts-ubuntu-latest/lucli-Linux" ] && cp "artifacts-ubuntu-latest/lucli-Linux" release-files/lucli-$VERSION-linux
+          [ -f "artifacts-windows-latest/lucli.bat" ] && cp "artifacts-windows-latest/lucli.bat" release-files/lucli.bat
+          
+          chmod +x release-files/lucli-* 2>/dev/null || true
+          ls -la release-files/
+
       - name: Create git tag
         if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
         run: |
@@ -98,7 +133,8 @@ jobs:
             ## LuCLI v${{ steps.version.outputs.VERSION }}
             
             ### Downloads
-            - **lucli.jar** - Universal JAR (Java 17+)
-            - **lucli** - Linux/macOS binary (self-contained)
+            - **lucli-${{ steps.version.outputs.VERSION }}.jar** - Universal JAR (Java 17+)
+            - **lucli-${{ steps.version.outputs.VERSION }}-linux** - Linux binary
+            - **lucli-${{ steps.version.outputs.VERSION }}-macos** - macOS binary
             - **lucli.bat** - Windows batch wrapper
-          files: artifacts-*/*
+          files: release-files/*
