@@ -126,5 +126,32 @@
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal"
     },
+    {
+      "type": "java",
+      "name": "📑 Debug LuCLI with Input File",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "projectName": "lucli",
+      "console": "integratedTerminal",
+      "args": "< ${workspaceFolder}/tests/heredoc_commands.txt"
+    },
+    {
+      "type": "java",
+      "name": "📜 Debug LuCLI Script File",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "projectName": "lucli",
+      "console": "integratedTerminal",
+      "args": "tests/testing.lucli"
+    },
+    {
+      "type": "java",
+      "name": "📜🔊 Debug LuCLI Script (Verbose)",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "projectName": "jline-basic",
+      "console": "integratedTerminal",
+      "args": "--verbose --debug tests/testing.lucli"
+    }
   ]
 }
