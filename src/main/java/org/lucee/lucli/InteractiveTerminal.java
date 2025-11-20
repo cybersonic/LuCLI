@@ -155,6 +155,10 @@ public class InteractiveTerminal {
         Path homeDir = Paths.get(System.getProperty("user.home"));
         Path historyFile = homeDir.resolve(".lucli").resolve("history");
         
+        // Check if input is from a pipe/redirect (non-interactive)
+        boolean isPiped = !terminal.input().getClass().getName().contains("FileInputStream") 
+                         || System.console() == null;
+        
         LineReader reader = LineReaderBuilder.builder()
                 .terminal(terminal)
                 .completer(new LucliCompleter(commandProcessor))
@@ -163,78 +167,142 @@ public class InteractiveTerminal {
                 .variable(LineReader.HISTORY_FILE_SIZE, 2000) // Maximum entries in file
                 .build();
 
-        terminal.writer().println(WindowsSupport.Symbols.ROCKET + " LuCLI Terminal " + LuCLI.getVersion() +"  Type 'exit' or 'quit' to leave.");
-        terminal.writer().println(WindowsSupport.Symbols.FOLDER + " Working Directory: " + commandProcessor.getFileSystemState().getCurrentWorkingDirectory());
-        if(LuCLI.verbose) {
-            terminal.writer().println(WindowsSupport.Symbols.COMPUTER + " Use 'cfml <expression>' to execute CFML code, e.g., 'cfml now()')");
-            terminal.writer().println(WindowsSupport.Symbols.FOLDER + " File system commands available: ls, cd, pwd, mkdir, cp, mv, rm, cat, etc.");
-            terminal.writer().println(WindowsSupport.Symbols.TOOL + " External commands supported: git, npm, docker, grep, and more!");
-            terminal.writer().println(WindowsSupport.Symbols.ART + " Type 'prompt' to change your prompt style!");
+        // Only show banner in interactive mode (not when running scripts)
+        if (!LuCLI.isLucliScript()) {
+            terminal.writer().println(WindowsSupport.Symbols.ROCKET + " LuCLI Terminal " + LuCLI.getVersion() +"  Type 'exit' or 'quit' to leave.");
+            terminal.writer().println(WindowsSupport.Symbols.FOLDER + " Working Directory: " + commandProcessor.getFileSystemState().getCurrentWorkingDirectory());
+            if(LuCLI.verbose) {
+                terminal.writer().println(WindowsSupport.Symbols.COMPUTER + " Use 'cfml <expression>' to execute CFML code, e.g., 'cfml now()')");
+                terminal.writer().println(WindowsSupport.Symbols.FOLDER + " File system commands available: ls, cd, pwd, mkdir, cp, mv, rm, cat, etc.");
+                terminal.writer().println(WindowsSupport.Symbols.TOOL + " External commands supported: git, npm, docker, grep, and more!");
+                terminal.writer().println(WindowsSupport.Symbols.ART + " Type 'prompt' to change your prompt style!");
+            }
+            terminal.writer().flush();
         }
-        terminal.writer().flush();
 
-        while (true) {
-            try {
-                // Generate dynamic prompt using PromptConfig
-                String dynamicPrompt = commandProcessor.getPromptConfig().generatePrompt(commandProcessor.getFileSystemState());
-                
-                String line = reader.readLine(dynamicPrompt);
-                if (line == null) {
-                    break; // EOF
+        // If input is piped, use BufferedReader to read all lines
+        if (isPiped) {
+            // Use System.in directly (not terminal.input()) for proper EOF detection when stdin is redirected
+            try (java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(System.in))) {
+                String line;
+                int commandCount = 0;
+                while ((line = br.readLine()) != null) {
+                    String trimmed = line.trim();
+                    // Skip blank lines and comments starting with #
+                    if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                        continue;
+                    }
+                    if (trimmed.equalsIgnoreCase("exit") || trimmed.equalsIgnoreCase("quit")) {
+                        break;
+                    }
+                    
+                    commandCount++;
+                    
+                    // Show what command is being executed (only in non-script mode)
+                    if (!LuCLI.isLucliScript()) {
+                        terminal.writer().print(commandProcessor.getPromptConfig().generatePrompt(commandProcessor.getFileSystemState()));
+                        terminal.writer().println(line);
+                        terminal.writer().flush();
+                    }
+                    
+                    processCommand(trimmed);
                 }
-                String trimmed = line.trim();
-                if (trimmed.equalsIgnoreCase("exit") || trimmed.equalsIgnoreCase("quit")) {
+                
+                if (LuCLI.isLucliScript() && LuCLI.debug) {
+                    System.err.println("Script completed: " + commandCount + " commands executed");
+                }
+            } catch (IOException e) {
+                if (LuCLI.debug) {
+                    terminal.writer().println("Error reading piped input: " + e.getMessage());
+                }
+            }
+        } else {
+            // Interactive mode with JLine reader
+            while (true) {
+                try {
+                    // Generate dynamic prompt using PromptConfig
+                    String dynamicPrompt = commandProcessor.getPromptConfig().generatePrompt(commandProcessor.getFileSystemState());
+                    
+                    String line = reader.readLine(dynamicPrompt);
+                    if (line == null) {
+                        break; // EOF
+                    }
+                    String trimmed = line.trim();
+                    if (trimmed.equalsIgnoreCase("exit") || trimmed.equalsIgnoreCase("quit")) {
+                        break;
+                    }
+                    
+                    if (!trimmed.isEmpty()) {
+                        processCommand(trimmed);
+                    }
+                    terminal.writer().flush();
+                } catch (UserInterruptException e) {
+                    // Ctrl-C: just move to next prompt
+                    terminal.writer().println("^C");
+                    terminal.writer().flush();
+                    continue;
+                } catch (EndOfFileException e) {
+                    // Ctrl-D / EOF: exit
                     break;
                 }
-                
-                // Handle CFML command
-                if (trimmed.toLowerCase().startsWith("cfml ")) {
-                    String cfmlCode = trimmed.substring(5).trim(); // Remove "cfml " prefix
-                    executeCFML(cfmlCode);
-                } else if (trimmed.isEmpty()) {
-                    // Do nothing for empty lines
-                    continue;
-                } else {
-                    // Parse command and arguments
-                    String[] parts = trimmed.split("\\s+", 2);
-                    String command = parts[0].toLowerCase();
-                    String[] cmdArgs = new String[0];
-                    
-                    if (parts.length > 1) {
-                        // Split arguments properly handling quoted strings
-                        cmdArgs = parseArguments(parts[1]);
-                    }
-                    
-                    // Try UnifiedCommandExecutor first for main commands (server, modules, etc.)
-                    if (isMainCommand(command)) {
-                        String result = unifiedExecutor.executeCommand(command, cmdArgs);
-                        if (result != null && !result.isEmpty()) {
-                            terminal.writer().println(result);
-                        }
-                    } else {
-                        // Fall back to ExternalCommandProcessor for file system commands and external commands
-                        String result = externalCommandProcessor.executeCommand(trimmed);
-                        if (result != null && !result.isEmpty()) {
-                            terminal.writer().println(result);
-                        }
-                    }
-                }
-                terminal.writer().flush();
-            } catch (UserInterruptException e) {
-                // Ctrl-C: just move to next prompt
-                terminal.writer().println("^C");
-                terminal.writer().flush();
-                continue;
-            } catch (EndOfFileException e) {
-                // Ctrl-D / EOF: exit
-                break;
             }
         }
 
-        terminal.writer().println(WindowsSupport.Symbols.WAVE + " Goodbye!");
-        terminal.writer().flush();
+        // Only show goodbye message in interactive mode
+        if (!LuCLI.isLucliScript()) {
+            terminal.writer().println(WindowsSupport.Symbols.WAVE + " Goodbye!");
+            terminal.writer().flush();
+        }
 
         terminal.close();
+    }
+    
+    /**
+     * Process a single command (used by both piped and interactive modes)
+     */
+    private static void processCommand(String trimmed) {
+        // Handle CFML command
+        if (trimmed.toLowerCase().startsWith("cfml ")) {
+            String cfmlCode = trimmed.substring(5).trim(); // Remove "cfml " prefix
+            executeCFML(cfmlCode);
+        } else {
+            // Parse command and arguments
+            String[] parts = trimmed.split("\\s+", 2);
+            String command = parts[0].toLowerCase();
+            String[] cmdArgs = new String[0];
+            
+            if (parts.length > 1) {
+                // Split arguments properly handling quoted strings
+                cmdArgs = parseArguments(parts[1]);
+            }
+            
+            // Try UnifiedCommandExecutor first for main commands (server, modules, etc.)
+            if (isMainCommand(command)) {
+                String result = unifiedExecutor.executeCommand(command, cmdArgs);
+                if (result != null && !result.isEmpty()) {
+                    terminal.writer().println(result);
+                }
+            }
+            // Check if it's a module shortcut
+            else if (ModuleCommand.moduleExists(command)) {
+                try {
+                    executeModule(command, cmdArgs);
+                } catch (Exception e) {
+                    terminal.writer().println(WindowsSupport.Symbols.ERROR + " Error executing module '" + command + "': " + e.getMessage());
+                    if (LuCLI.debug) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+            else {
+                // Fall back to ExternalCommandProcessor for file system commands and external commands
+                String result = externalCommandProcessor.executeCommand(trimmed);
+                if (result != null && !result.isEmpty()) {
+                    terminal.writer().println(result);
+                }
+            }
+        }
+        terminal.writer().flush();
     }
     
     private static void executeCFML(String cfmlCode) {
@@ -460,33 +528,12 @@ public class InteractiveTerminal {
     }
     
     /**
-     * Execute a module in terminal mode (similar to CLI mode logic)
+     * Execute a module in terminal mode
+     * Module output goes directly to stdout (no redirection needed)
      */
     private static void executeModule(String moduleName, String[] moduleArgs) throws Exception {
-        // Capture output from module execution and display in terminal
-        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
-        java.io.PrintStream originalOut = System.out;
-        java.io.PrintStream originalErr = System.err;
-        
-        try {
-            // Redirect System.out/err to capture module output
-            System.setOut(new java.io.PrintStream(baos));
-            System.setErr(new java.io.PrintStream(baos));
-            
-            // Execute module using ModuleCommand (same as CLI mode)
-            ModuleCommand.executeModuleByName(moduleName, moduleArgs);
-            
-            // Get captured output and display in terminal
-            String output = baos.toString().trim();
-            if (!output.isEmpty()) {
-                System.out.println(output);
-            }
-            
-        } finally {
-            // Always restore original streams
-            System.setOut(originalOut);
-            System.setErr(originalErr);
-        }
+        // Execute module using ModuleCommand - output goes directly to stdout
+        ModuleCommand.executeModuleByName(moduleName, moduleArgs);
     }
     
     /**

@@ -6,7 +6,7 @@
 
   <groupId>org.lucee</groupId>
   <artifactId>lucli</artifactId>
-  <version>0.1.24</version>
+  <version>0.1.41-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>LuCLI</name>
   <description>A CLI for Lucee</description>
@@ -106,11 +106,25 @@
       <artifactId>picocli</artifactId>
       <version>4.7.5</version>
     </dependency>
+    
+    <!-- Picocli-JLine3 integration for interactive shell -->
+    <dependency>
+      <groupId>info.picocli</groupId>
+      <artifactId>picocli-shell-jline3</artifactId>
+      <version>4.7.5</version>
+    </dependency>
 
     <!-- JUnit Jupiter API for testing -->
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-api</artifactId>
+      <version>5.11.0</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- Ensure the Jupiter engine is present so tests are discovered/run in all environments -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-engine</artifactId>
       <version>5.11.0</version>
       <scope>test</scope>
     </dependency>
@@ -129,6 +143,11 @@
           <source>17</source>
           <target>17</target>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.2.5</version>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>

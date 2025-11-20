@@ -9,6 +9,15 @@ public class LuCLI {
     public static boolean verbose = false;
     public static boolean debug = false;
     public static boolean timing = false;
+    private static boolean lucliScript = false;
+    
+    /**
+     * Check if we're running in script mode (executing a .lucli file)
+     * This is used to suppress prompts and other interactive elements
+     */
+    public static boolean isLucliScript() {
+        return lucliScript;
+    }
 
     public static void main(String[] args) throws Exception {
         // Create Picocli CommandLine with our main command
@@ -55,11 +64,32 @@ public class LuCLI {
                     if (firstArg != null && !isKnownSubcommand(firstArg)) {
                         java.io.File file = new java.io.File(firstArg);
                         
-                        // Extract remaining arguments (after the first non-flag arg)
-                        String[] remainingArgs = java.util.Arrays.copyOfRange(args, firstArgIndex + 1, args.length);
+                        // Extract remaining arguments (after the first non-flag arg), filtering out known flags
+                        java.util.List<String> remainingArgsList = new java.util.ArrayList<>();
+                        for (int i = firstArgIndex + 1; i < args.length; i++) {
+                            String arg = args[i];
+                            // Skip known flags that should be handled at the root level
+                            if (!arg.equals("--verbose") && !arg.equals("-v") &&
+                                !arg.equals("--debug") && !arg.equals("-d") &&
+                                !arg.equals("--timing") && !arg.equals("-t")) {
+                                remainingArgsList.add(arg);
+                            }
+                        }
+                        String[] remainingArgs = remainingArgsList.toArray(new String[0]);
                         
+                        // Check if it's a LuCLI script file
+                        if (file.exists() && firstArg.endsWith(".lucli")) {
+                            try {
+                                return executeLucliScript(firstArg, shortcutVerbose, shortcutDebug, shortcutTiming);
+                            } catch (Exception scriptEx) {
+                                // If script execution fails, fall through to normal error handling
+                                if (shortcutVerbose || shortcutDebug) {
+                                    StringOutput.Quick.error("LuCLI script execution failed: " + scriptEx.getMessage());
+                                }
+                            }
+                        }
                         // Check if it's an existing CFML file
-                        if (file.exists() && (firstArg.endsWith(".cfs") || firstArg.endsWith(".cfm") || firstArg.endsWith(".cfml"))) {
+                        else if (file.exists() && (firstArg.endsWith(".cfs") || firstArg.endsWith(".cfm") || firstArg.endsWith(".cfml"))) {
                             try {
                                 return executeCfmlFileShortcut(firstArg, remainingArgs, shortcutVerbose, shortcutDebug, shortcutTiming);
                             } catch (Exception cfmlEx) {
@@ -69,6 +99,7 @@ public class LuCLI {
                                 }
                             }
                         }
+                        
                         // If it's not an existing file, try to execute as module shortcut
                         else if (!file.exists()) {
                             try {
@@ -163,6 +194,55 @@ public class LuCLI {
     }
     
     /**
+     * Execute a .lucli script file line by line
+     * Each line is a command that gets executed individually
+     */
+    private static int executeLucliScript(String scriptPath, boolean verbose, boolean debug, boolean timing) throws Exception {
+        // Set global flags
+        LuCLI.verbose = verbose;
+        LuCLI.debug = debug;
+        LuCLI.timing = timing;
+        LuCLI.lucliScript = true;
+
+        java.nio.file.Path path = java.nio.file.Paths.get(scriptPath);
+        if (!java.nio.file.Files.exists(path)) {
+            StringOutput.Quick.error("Script not found: " + scriptPath);
+            return 1;
+        }
+
+        if (verbose) {
+            StringOutput.Quick.info("Executing LuCLI script: " + scriptPath);
+        }
+
+        // Read all lines from the script file
+        java.util.List<String> lines = java.nio.file.Files.readAllLines(path, java.nio.charset.StandardCharsets.UTF_8);
+        if (lines.isEmpty()) {
+            if (verbose) {
+                StringOutput.Quick.info("Script is empty: " + scriptPath);
+            }
+            return 0;
+        }
+
+        // Execute using InteractiveTerminal's script mode
+        // This redirects stdin to feed the script lines
+        String content = String.join("\n", lines) + "\n";
+        java.io.InputStream originalIn = System.in;
+        try {
+            System.setIn(new java.io.ByteArrayInputStream(content.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            InteractiveTerminal.main(new String[0]);
+            return 0; // Success if no exception thrown
+        } catch (Exception e) {
+            StringOutput.Quick.error("Error executing script: " + e.getMessage());
+            if (debug) {
+                e.printStackTrace();
+            }
+            return 1;
+        } finally {
+            System.setIn(originalIn);
+        }
+    }
+    
+    /**
      * Check if the given string is a known subcommand
      * @param command The command to check
      * @return true if it's a known subcommand, false otherwise
@@ -187,15 +267,21 @@ public class LuCLI {
      * @return Exit code from module execution
      */
     private static int executeModuleShortcut(String moduleName, String[] args, boolean verbose, boolean debug, boolean timing) throws Exception {
+        // Set global flags
+        LuCLI.verbose = verbose;
+        LuCLI.debug = debug;
+        LuCLI.timing = timing;
+        
         if (verbose || debug) {
             StringOutput.Quick.info("Executing module shortcut: " + moduleName + 
                 " (equivalent to 'lucli modules run " + moduleName + "')");
         }
         
-        // Build the new arguments array: ["modules", "run", moduleName, ...additionalArgs]
+        // Build the new arguments array: [flags..., "modules", "run", moduleName, ...additionalArgs]
+        // Flags must come BEFORE the subcommand, not after
         java.util.List<String> newArgs = new java.util.ArrayList<>();
         
-        // Add flags first
+        // Add flags first (before subcommands)
         if (verbose) {
             newArgs.add("--verbose");
         }
