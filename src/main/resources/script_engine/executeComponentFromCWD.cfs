@@ -1,0 +1,22 @@
+
+out("=== executeComponentFromCWD.cfs ===");
+out("Component: #__scriptFile#");
+out("componentPath: #componentPath#");
+out("subCommand: #subCommand#");
+out("Creating component instance...");
+
+comp = createObject("component", componentPath);
+
+out("Component instance created successfully.");
+result = comp[ subCommand ]( argumentCollection=argCollection );
+
+function out(message){
+    if(verbose){
+        writeOutput("executeComponentFromCWD.cfs: " & message & chr(10));
+        if(isSimpleValue(message)){
+            writeOutput(message & chr(10));
+        } else {
+            writeOutput(serializeJSON(message) & chr(10));
+        }
+    }
+}

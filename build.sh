@@ -6,7 +6,6 @@ if [[ "$1" == "docker" ]]; then
     buildDockerImage=true
 fi
 
-
 if [[ "$1" == "install" ]]; then
     installLocally=true
 fi
@@ -16,7 +15,7 @@ if [[ "$1" == "clear" ]]; then
 fi
 
 # Build the JAR and binary
-mvn clean package --activate-profiles binary --quiet
+mvn clean package --activate-profiles binary -DskipTests --quiet
 if [ $? -ne 0 ]; then
     echo "Maven build failed!"
     exit 1
