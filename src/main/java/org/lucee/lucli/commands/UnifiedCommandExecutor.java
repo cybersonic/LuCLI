@@ -104,6 +104,8 @@ public class UnifiedCommandExecutor {
         String customName = null;
         Path projectDir = currentWorkingDirectory; // Default to current directory
         
+        LuceeServerManager.AgentOverrides agentOverrides = new LuceeServerManager.AgentOverrides();
+        
         // Parse additional arguments (skip "start")
         for (int i = 1; i < args.length; i++) {
             if ((args[i].equals("--version") || args[i].equals("-v")) && i + 1 < args.length) {
@@ -114,10 +116,43 @@ public class UnifiedCommandExecutor {
             } else if ((args[i].equals("--name") || args[i].equals("-n")) && i + 1 < args.length) {
                 customName = args[i + 1];
                 i++; // Skip next argument
+            } else if (args[i].equals("--no-agents")) {
+                agentOverrides.disableAllAgents = true;
+            } else if ((args[i].equals("--agents")) && i + 1 < args.length) {
+                String value = args[i + 1];
+                java.util.Set<String> ids = new java.util.HashSet<>();
+                for (String part : value.split(",")) {
+                    String trimmed = part.trim();
+                    if (!trimmed.isEmpty()) {
+                        ids.add(trimmed);
+                    }
+                }
+                agentOverrides.includeAgents = ids;
+                i++; // Skip next argument
+            } else if (args[i].equals("--enable-agent") && i + 1 < args.length) {
+                if (agentOverrides.enableAgents == null) {
+                    agentOverrides.enableAgents = new java.util.HashSet<>();
+                }
+                agentOverrides.enableAgents.add(args[i + 1]);
+                i++; // Skip next argument
+            } else if (args[i].equals("--disable-agent") && i + 1 < args.length) {
+                if (agentOverrides.disableAgents == null) {
+                    agentOverrides.disableAgents = new java.util.HashSet<>();
+                }
+                agentOverrides.disableAgents.add(args[i + 1]);
+                i++; // Skip next argument
             } else if (!args[i].startsWith("-") && i == 1) {
                 // If the first non-option argument after "start" is provided, use it as project directory
                 projectDir = Paths.get(args[i]);
             }
+        }
+        
+        // If no agent-related flags were actually set, avoid passing a non-null overrides object
+        if (!agentOverrides.disableAllAgents &&
+            (agentOverrides.includeAgents == null || agentOverrides.includeAgents.isEmpty()) &&
+            (agentOverrides.enableAgents == null || agentOverrides.enableAgents.isEmpty()) &&
+            (agentOverrides.disableAgents == null || agentOverrides.disableAgents.isEmpty())) {
+            agentOverrides = null;
         }
         
         try {
@@ -129,9 +164,9 @@ public class UnifiedCommandExecutor {
                 result.append("Starting Lucee server in: ").append(projectDir).append("\n");
             }
             
-            LuceeServerManager.ServerInstance instance = serverManager.startServer(projectDir, versionOverride, forceReplace, customName);
+            LuceeServerManager.ServerInstance instance = serverManager.startServer(projectDir, versionOverride, forceReplace, customName, agentOverrides);
             
-            // Load configuration to get monitoring/JMX port info
+            // Load configuration to get monitoring/JMX port and agent info
             LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(projectDir);
             
             result.append("✅ Server started successfully!\n");
@@ -142,6 +177,12 @@ public class UnifiedCommandExecutor {
             
             if (config.monitoring != null && config.monitoring.enabled && config.monitoring.jmx != null) {
                 result.append("   JMX Port:      ").append(config.monitoring.jmx.port).append("\n");
+            }
+            
+            // Show active agents, if any
+            java.util.Set<String> activeAgents = serverManager.getActiveAgentsForConfig(config, agentOverrides);
+            if (activeAgents != null && !activeAgents.isEmpty()) {
+                result.append("   Agents:        ").append(String.join(", ", activeAgents)).append("\n");
             }
             
             result.append("   URL:           http://localhost:").append(instance.getPort()).append("\n");

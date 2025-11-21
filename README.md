@@ -226,6 +226,16 @@ LuCLI stores configuration in `~/.lucli/`:
   "jvm": {
     "maxMemory": "1024m",
     "minMemory": "256m"
+  },
+  "agents": {
+    "luceedebug": {
+      "enabled": false,
+      "jvmArgs": [
+        "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=localhost:9999",
+        "-javaagent:${LUCLI_HOME}/dependencies/luceedebug.jar=jdwpHost=localhost,jdwpPort=9999,debugHost=0.0.0.0,debugPort=10000,jarPath=${LUCLI_HOME}/dependencies/luceedebug.jar"
+      ],
+      "description": "Lucee step debugger agent"
+    }
   }
 }
 ```
@@ -233,6 +243,10 @@ LuCLI stores configuration in `~/.lucli/`:
 **URL Rewrite Configuration:**
 - `enabled` (boolean, default: `true`) - Enable/disable framework-style URL routing
 - `routerFile` (string, default: `"index.cfm"`) - Central router file for handling all routes
+
+**Agent Configuration:**
+- `agents` (object, optional) - Named Java agents with `enabled` and `jvmArgs` fields.
+- See `documentation/SERVER_AGENTS.md` for detailed examples and startup flags.
 
 ### Prompt Customization
 ```bash
