@@ -5,7 +5,9 @@ import java.net.ServerSocket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,6 +27,7 @@ public class LuceeServerConfig {
         public JvmConfig jvm = new JvmConfig();
         public UrlRewriteConfig urlRewrite = new UrlRewriteConfig();
         public AdminConfig admin = new AdminConfig();
+        public Map<String, AgentConfig> agents = new HashMap<>();
     }
     
     public static class AdminConfig {
@@ -49,6 +52,12 @@ public class LuceeServerConfig {
         public String maxMemory = "512m";
         public String minMemory = "128m";
         public String[] additionalArgs = new String[0];
+    }
+    
+    public static class AgentConfig {
+        public boolean enabled = false;
+        public String[] jvmArgs = new String[0];
+        public String description;
     }
     
     private static final ObjectMapper objectMapper = new ObjectMapper()
@@ -84,6 +93,11 @@ public class LuceeServerConfig {
         // that don't have this field in their JSON
         if (config.admin == null) {
             config.admin = new AdminConfig();
+        }
+        
+        // Ensure agents is initialized for backward compatibility with older configs
+        if (config.agents == null) {
+            config.agents = new HashMap<>();
         }
         
         // Don't resolve port conflicts here - do it just before starting server

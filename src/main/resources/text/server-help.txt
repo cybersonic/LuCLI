@@ -7,6 +7,10 @@ Commands:
     --version VERSION        Specify Lucee version
     --name NAME              Specify custom server name
     --force                  Replace existing server
+    --agents LIST            Comma-separated agent IDs to enable for this start
+    --enable-agent NAME      Enable a specific agent for this start
+    --disable-agent NAME     Disable a specific agent for this start
+    --no-agents              Disable all agents for this start
   stop [options]             Stop the server for the current directory
     --name NAME              Stop a specific server by name
   status [options]           Show server status for the current directory
@@ -23,13 +27,17 @@ Configuration:
   If lucee.json doesn't exist, a default one will be created.
 
 Examples:
-  lucli server start                   # Start server with default settings
-  lucli server start --version 6.1.0.123  # Start server with specific version
-  lucli server stop                    # Stop the server for current directory
-  lucli server stop --name my_server   # Stop a specific server by name
-  lucli server status                  # Check server status for current directory
-  lucli server status --name my_server # Check status for a specific server
-  lucli server list                    # List all servers
-  lucli server prune                   # Remove stopped server for current directory
-  lucli server prune --all             # Remove all stopped servers
-  lucli server monitor                 # Monitor server via JMX dashboard
+  lucli server start                            # Start server with default settings
+  lucli server start --version 6.1.0.123        # Start server with specific version
+  lucli server start --agents luceedebug        # Start with only the luceedebug agent enabled
+  lucli server start --enable-agent luceedebug  # Enable luceedebug in addition to default agents
+                                                
+  lucli server start --no-agents                # Start with all agents disabled
+  lucli server stop                             # Stop the server for current directory
+  lucli server stop --name my_server            # Stop a specific server by name
+  lucli server status                           # Check server status for current directory
+  lucli server status --name my_server          # Check status for a specific server
+  lucli server list                             # List all servers
+  lucli server prune                            # Remove stopped server for current directory
+  lucli server prune --all                      # Remove all stopped servers
+  lucli server monitor                          # Monitor server via JMX dashboard

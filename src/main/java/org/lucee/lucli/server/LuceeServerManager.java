@@ -11,8 +11,10 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -21,6 +23,17 @@ import java.util.zip.ZipInputStream;
  * Manages Lucee server instances - downloading, configuring, starting, and stopping servers
  */
 public class LuceeServerManager {
+    
+    /**
+     * Runtime overrides for Java agent activation when starting a server.
+     * This does not modify persisted configuration in lucee.json.
+     */
+    public static class AgentOverrides {
+        public boolean disableAllAgents;
+        public Set<String> includeAgents;  // When non-empty, defines the exact set of agents to enable
+        public Set<String> enableAgents;
+        public Set<String> disableAgents;
+    }
     
     private static final String LUCEE_CDN_URL_TEMPLATE = "https://cdn.lucee.org/lucee-express-{version}.zip";
     private static final String DEFAULT_VERSION = "6.2.2.91";
@@ -54,17 +67,25 @@ public class LuceeServerManager {
         return Paths.get(lucliHomeStr);
     }
     
-    /**
+/**
      * Start a Lucee server for the current project directory
      */
     public ServerInstance startServer(Path projectDir, String versionOverride) throws Exception {
-        return startServer(projectDir, versionOverride, false, null);
+        return startServer(projectDir, versionOverride, false, null, null);
     }
     
     /**
      * Start a Lucee server with options for handling existing servers
      */
     public ServerInstance startServer(Path projectDir, String versionOverride, boolean forceReplace, String customName) throws Exception {
+        return startServer(projectDir, versionOverride, forceReplace, customName, null);
+    }
+    
+    /**
+     * Core server startup method that also accepts agent overrides.
+     */
+    public ServerInstance startServer(Path projectDir, String versionOverride, boolean forceReplace, String customName,
+                                      AgentOverrides agentOverrides) throws Exception {
         // Load configuration
         LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(projectDir);
         
@@ -195,7 +216,7 @@ public class LuceeServerManager {
         configGenerator.generateConfiguration(serverInstanceDir, config, projectDir, luceeExpressDir);
         
         // Start the server process
-        ServerInstance instance = launchServerProcess(serverInstanceDir, config, projectDir, luceeExpressDir);
+        ServerInstance instance = launchServerProcess(serverInstanceDir, config, projectDir, luceeExpressDir, agentOverrides);
         
         // Wait for server to start
         waitForServerStartup(instance, 30); // 30 second timeout
@@ -805,11 +826,12 @@ public class LuceeServerManager {
         }
     }
     
-    /**
+/**
      * Launch the server process using Lucee Express startup script
      */
     private ServerInstance launchServerProcess(Path serverInstanceDir, LuceeServerConfig.ServerConfig config, 
-                                             Path projectDir, Path luceeExpressDir) throws Exception {
+                                             Path projectDir, Path luceeExpressDir,
+                                             AgentOverrides agentOverrides) throws Exception {
         
         // Use the Lucee Express startup script
         Path startupScript = luceeExpressDir.resolve("startup.sh");
@@ -833,20 +855,7 @@ public class LuceeServerManager {
         env.put("CATALINA_HOME", serverInstanceDir.toString()); // Same as CATALINA_BASE since we copy all files
         
         // Set JVM options through CATALINA_OPTS
-        List<String> catalinaOpts = new ArrayList<>();
-        catalinaOpts.add("-Xms" + config.jvm.minMemory);
-        catalinaOpts.add("-Xmx" + config.jvm.maxMemory);
-        
-        // Add JMX configuration if monitoring is enabled
-        if (config.monitoring.enabled) {
-            catalinaOpts.add("-Dcom.sun.management.jmxremote");
-            catalinaOpts.add("-Dcom.sun.management.jmxremote.port=" + config.monitoring.jmx.port);
-            catalinaOpts.add("-Dcom.sun.management.jmxremote.authenticate=false");
-            catalinaOpts.add("-Dcom.sun.management.jmxremote.ssl=false");
-        }
-        
-        // Add additional JVM arguments
-        catalinaOpts.addAll(Arrays.asList(config.jvm.additionalArgs));
+        List<String> catalinaOpts = buildCatalinaOpts(config, agentOverrides);
         
         // Join all CATALINA_OPTS into a single string
         env.put("CATALINA_OPTS", String.join(" ", catalinaOpts));
@@ -879,6 +888,111 @@ public class LuceeServerManager {
             }
         }
         return "java"; // Fallback to PATH
+    }
+    
+    /**
+     * Build JVM options (CATALINA_OPTS) including memory, JMX, and any configured agents.
+     */
+    private List<String> buildCatalinaOpts(LuceeServerConfig.ServerConfig config, AgentOverrides overrides) {
+        List<String> opts = new ArrayList<>();
+        
+        // Base memory settings
+        opts.add("-Xms" + config.jvm.minMemory);
+        opts.add("-Xmx" + config.jvm.maxMemory);
+        
+        // JMX configuration if monitoring is enabled
+        if (config.monitoring != null && config.monitoring.enabled && config.monitoring.jmx != null) {
+            opts.add("-Dcom.sun.management.jmxremote");
+            opts.add("-Dcom.sun.management.jmxremote.port=" + config.monitoring.jmx.port);
+            opts.add("-Dcom.sun.management.jmxremote.authenticate=false");
+            opts.add("-Dcom.sun.management.jmxremote.ssl=false");
+        }
+        
+        // Determine which agents are active for this startup
+        Set<String> activeAgents = resolveActiveAgents(config, overrides);
+        if (activeAgents != null && !activeAgents.isEmpty() && config.agents != null) {
+            for (String agentId : activeAgents) {
+                LuceeServerConfig.AgentConfig agentConfig = config.agents.get(agentId);
+                if (agentConfig != null && agentConfig.jvmArgs != null) {
+                    opts.addAll(Arrays.asList(agentConfig.jvmArgs));
+                }
+            }
+        }
+        
+        // Finally append any additional raw JVM args from config
+        if (config.jvm.additionalArgs != null) {
+            opts.addAll(Arrays.asList(config.jvm.additionalArgs));
+        }
+        
+        return opts;
+    }
+    
+    /**
+     * Compute the set of active agent IDs based on config and optional overrides.
+     */
+    private Set<String> resolveActiveAgents(LuceeServerConfig.ServerConfig config, AgentOverrides overrides) {
+        if (config.agents == null || config.agents.isEmpty()) {
+            return Set.of();
+        }
+        
+        // If no overrides are provided, use agents enabled in config
+        if (overrides == null) {
+            Set<String> enabled = new HashSet<>();
+            for (Map.Entry<String, LuceeServerConfig.AgentConfig> entry : config.agents.entrySet()) {
+                if (entry.getValue() != null && entry.getValue().enabled) {
+                    enabled.add(entry.getKey());
+                }
+            }
+            return enabled;
+        }
+        
+        // If includeAgents is specified, that list defines the active set
+        if (overrides.includeAgents != null && !overrides.includeAgents.isEmpty()) {
+            Set<String> result = new HashSet<>();
+            for (String id : overrides.includeAgents) {
+                if (config.agents.containsKey(id)) {
+                    result.add(id);
+                }
+            }
+            return result;
+        }
+        
+        // Start from agents enabled in config
+        Set<String> active = new HashSet<>();
+        for (Map.Entry<String, LuceeServerConfig.AgentConfig> entry : config.agents.entrySet()) {
+            if (entry.getValue() != null && entry.getValue().enabled) {
+                active.add(entry.getKey());
+            }
+        }
+        
+        // Apply disable-all override
+        if (overrides.disableAllAgents) {
+            active.clear();
+        }
+        
+        // Apply per-agent enables
+        if (overrides.enableAgents != null) {
+            for (String id : overrides.enableAgents) {
+                if (config.agents.containsKey(id)) {
+                    active.add(id);
+                }
+            }
+        }
+        
+        // Apply per-agent disables
+        if (overrides.disableAgents != null) {
+            active.removeAll(overrides.disableAgents);
+        }
+        
+        return active;
+    }
+    
+    /**
+     * Public helper for callers that need to know which agents are active
+     * for a given config and overrides combination (e.g. for CLI output).
+     */
+    public Set<String> getActiveAgentsForConfig(LuceeServerConfig.ServerConfig config, AgentOverrides overrides) {
+        return resolveActiveAgents(config, overrides);
     }
     
     /**
