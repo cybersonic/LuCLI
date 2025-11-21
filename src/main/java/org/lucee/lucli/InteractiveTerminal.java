@@ -156,9 +156,23 @@ public class InteractiveTerminal {
         Path historyFile = homeDir.resolve(".lucli").resolve("history");
         
         // Check if input is from a pipe/redirect (non-interactive)
-        boolean isPiped = !terminal.input().getClass().getName().contains("FileInputStream") 
-                         || System.console() == null;
+        // If terminal is dumb type, use piped mode
+        // Otherwise use interactive mode with JLine (which supports autocomplete)
+        boolean isPiped = terminal.getType().equals(org.jline.terminal.Terminal.TYPE_DUMB) 
+                         || terminal.getType().equals(org.jline.terminal.Terminal.TYPE_DUMB_COLOR);
         
+        if (LuCLI.debug) {
+            System.err.println("[DEBUG] Terminal type: " + terminal.getType());
+            System.err.println("[DEBUG] Terminal input class: " + terminal.input().getClass().getName());
+            System.err.println("[DEBUG] System.console(): " + System.console());
+            System.err.println("[DEBUG] isPiped: " + isPiped);
+        }
+        
+        if (LuCLI.debug) {
+            System.err.println("[DEBUG] Setting up LineReader with LucliCompleter (internal commands + paths)...");
+        }
+        
+        // Use LucliCompleter for internal commands and file/path completion
         LineReader reader = LineReaderBuilder.builder()
                 .terminal(terminal)
                 .completer(new LucliCompleter(commandProcessor))
@@ -182,6 +196,9 @@ public class InteractiveTerminal {
 
         // If input is piped, use BufferedReader to read all lines
         if (isPiped) {
+            if (LuCLI.debug) {
+                System.err.println("[DEBUG] Using PIPED mode (no autocomplete)");
+            }
             // Use System.in directly (not terminal.input()) for proper EOF detection when stdin is redirected
             try (java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(System.in))) {
                 String line;
@@ -217,6 +234,9 @@ public class InteractiveTerminal {
                 }
             }
         } else {
+            if (LuCLI.debug) {
+                System.err.println("[DEBUG] Using INTERACTIVE mode (with JLine autocomplete)");
+            }
             // Interactive mode with JLine reader
             while (true) {
                 try {

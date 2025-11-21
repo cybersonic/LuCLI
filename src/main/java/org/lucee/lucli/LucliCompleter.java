@@ -12,14 +12,22 @@ import org.jline.reader.LineReader;
 import org.jline.reader.ParsedLine;
 
 /**
- * Tab completion for LuCLI commands and file paths
+ * Tab completion for LuCLI internal terminal commands and file paths
+ * Note: PicoCLI provides completion for: server, modules, cfml, help
+ * This completer handles: internal terminal commands (ls, cd, pwd, etc.) and context-specific completions
  */
 public class LucliCompleter implements Completer {
     private final CommandProcessor commandProcessor;
-    private final String[] commands = {
+    
+    // Internal terminal commands and high-level LuCLI commands available in interactive mode
+    private final String[] internalCommands = {
+        // Shell-like file system commands
         "ls", "dir", "cd", "pwd", "mkdir", "rmdir", "rm", "cp", "mv", 
-        "cat", "edit", "touch", "find", "wc", "head", "tail", "cfml", "run", "prompt", 
-        "help", "exit", "quit", "clear", "history", "env", "echo", "server", "lint"
+        "cat", "edit", "touch", "find", "wc", "head", "tail", "run", "prompt", 
+        // Terminal/session commands
+        "exit", "quit", "clear", "history", "env", "echo",
+        // LuCLI top-level commands that unifiedExecutor handles
+        "server", "modules", "cfml", "lint", "help"
     };
     
     public LucliCompleter(CommandProcessor commandProcessor) {
@@ -31,9 +39,9 @@ public class LucliCompleter implements Completer {
         String buffer = line.line();
         
         if (buffer.trim().isEmpty() || line.words().size() == 1) {
-            // Complete commands
+            // Complete internal terminal commands (PicoCLI handles server, modules, cfml, help)
             String partial = line.words().isEmpty() ? "" : line.words().get(0);
-            for (String command : commands) {
+            for (String command : internalCommands) {
                 if (command.startsWith(partial.toLowerCase())) {
                     candidates.add(new Candidate(command, command, null, null, null, null, true));
                 }
@@ -41,15 +49,16 @@ public class LucliCompleter implements Completer {
         } else {
             String command = line.words().get(0).toLowerCase();
             
-            // Handle CFML function completion
+            // Handle CFML function completion (only for internal 'cfml' usage, not PicoCLI's CfmlCommand)
             if ("cfml".equals(command)) {
                 completeCFMLFunctions(line, candidates);
             }
-            // Handle server command completion
+            // Handle server command completion (context-specific like server names, versions, config keys)
+            // PicoCLI handles basic structure, this adds context-aware completions
             else if ("server".equals(command)) {
                 completeServerCommand(line, candidates);
             }
-            // Handle lint command completion
+            // Handle lint command completion (loaded as a module)
             else if ("lint".equals(command)) {
                 completeLintCommand(line, candidates);
             }

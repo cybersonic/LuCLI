@@ -9,7 +9,7 @@
       "name": "💻 LucCLI Terminal",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",
-      "args": ["terminal"],
+      // "args": ["terminal"],
       "projectName": "lucli",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal"
