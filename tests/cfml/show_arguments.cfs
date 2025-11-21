@@ -1,0 +1,8 @@
+writeOutput("Hello from CFML script!" & chr(10));
+
+if (structKeyExists(variables, "ARGS") && isArray(ARGS)) {
+    writeOutput("Arguments passed: " & arrayLen(ARGS) & chr(10));
+    for (i = 1; i <= arrayLen(ARGS); i++) {
+        writeOutput("  Arg " & i & ": " & ARGS[i] & chr(10));
+    }
+}

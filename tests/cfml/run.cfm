@@ -1,0 +1,1 @@
+<cfset echo("Hello from a tag based file!")>

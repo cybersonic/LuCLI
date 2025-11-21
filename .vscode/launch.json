@@ -146,12 +146,30 @@
     },
     {
       "type": "java",
+      "name": "📜 Debug LuCLI Script File",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "projectName": "lucli",
+      "console": "integratedTerminal",
+      "args": "tests/testing.lucli"
+    },
+    {
+      "type": "java",
       "name": "📜🔊 Debug LuCLI Script (Verbose)",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",
-      "projectName": "jline-basic",
+      "projectName": "lucli",
       "console": "integratedTerminal",
       "args": "--verbose --debug tests/testing.lucli"
+    },
+    {
+      "type": "java",
+      "name": "👟 One-Shot run a CFC",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "projectName": "lucli",
+      "console": "integratedTerminal",
+      "args": ["tests/cfml/Run.cfc", "sayHello", "name=Mark"]
     }
   ]
 }

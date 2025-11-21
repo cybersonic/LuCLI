@@ -1,2 +1,1 @@
-#!/usr/bin/env lucli
 systemOutput("Hello for lucli script!", true, false);

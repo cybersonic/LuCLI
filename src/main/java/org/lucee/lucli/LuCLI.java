@@ -100,6 +100,21 @@ public class LuCLI {
                             }
                         }
                         
+                        else if( file.exists() && (firstArg.endsWith(".cfc")) ) {
+                            try {
+                                LuceeScriptEngine engine  = LuceeScriptEngine.getInstance(shortcutVerbose, shortcutDebug);
+                                return engine.executeScript(firstArg, remainingArgs);
+                                // return executeCfmlFileShortcut(firstArg, remainingArgs, shortcutVerbose, shortcutDebug, shortcutTiming);
+                            } catch (Exception cfmlEx) {
+                                // If CFML file execution fails, fall through to normal error handling
+                                // if (shortcutVerbose || shortcutDebug) {
+                                    StringOutput.Quick.error("CFML file execution failed: " + cfmlEx.getMessage());
+                                    return 1;
+                                // }
+                            }
+                        }
+                        // IF it is a real file but we dont know what to do with it... 
+
                         // If it's not an existing file, try to execute as module shortcut
                         else if (!file.exists()) {
                             try {

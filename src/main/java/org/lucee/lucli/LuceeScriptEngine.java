@@ -39,6 +39,18 @@ public class LuceeScriptEngine {
     private boolean verbose;
     private boolean debug;
     
+
+    // Helper methods - moved from LuCLI
+    
+    private boolean isVerboseMode() {
+        return verbose;
+    }
+    
+    private boolean isDebugMode() {
+        return debug;
+    }
+
+
     /**
      * Private constructor - use getInstance() to get the singleton
      * @throws IOException 
@@ -144,41 +156,77 @@ public class LuceeScriptEngine {
 		return str;
 	}
     
+
+    class ParsedArguments {
+        String subCommand;
+        Map<String, String> argsMap;
+    }
+
+    /**
+     * Parse script arguments into subcommand and key=value map to pass to CFCs
+     * @param scriptArgs Array of script arguments, comes from the command line as arg1 arg2 ... or key=value 
+     */
+    public ParsedArguments parseArguments(String[] scriptArgs){
+
+            Timer.start("ParseArguments");
+            String subCommand = "main";
+
+            // Parse key=value arguments into a map
+            Map<String, String> argsMap = new java.util.HashMap<>();
+
+            // Check the first argument, if it doesnt have = then its the subcommand
+            if (scriptArgs.length > 0) {
+                String firstArg = scriptArgs[0];
+                if (!firstArg.contains("=")) {
+                    subCommand = firstArg;
+                    // Remove first argument from scriptArgs
+                    scriptArgs = Arrays.copyOfRange(scriptArgs, 1, scriptArgs.length);
+                }
+            }
+
+            int count = 0;
+            for (String arg : scriptArgs) {
+                count++;
+                int equalsIndex = arg.indexOf('=');
+                if (equalsIndex > 0) {
+                    String key = arg.substring(0, equalsIndex).trim();
+                    String value = arg.substring(equalsIndex + 1).trim();
+                    // Remove quotes if present
+                    value = unwrap(value);
+                    argsMap.put(key, value);
+                }
+                else{
+                    argsMap.put("arg" + count, arg);
+                }
+            }
+
+            if(subCommand == null || subCommand.isEmpty()) {
+                subCommand = "main";
+            }
+
+            ParsedArguments parsedArgs = new ParsedArguments();
+            parsedArgs.subCommand = subCommand;
+            parsedArgs.argsMap = argsMap;
+
+            Timer.stop("ParseArguments");
+            return parsedArgs;
+    }
+
+
+    /**
+     * Execute a module by name with arguments
+     * @param moduleName
+     * @param scriptArgs
+     * @throws Exception
+     */
     public void executeModule(String moduleName, String[] scriptArgs) throws Exception {
+        
+            
+            String subCommand = "main";
+            ParsedArguments parsedArgs = parseArguments(scriptArgs);
+            subCommand = parsedArgs.subCommand;
+            Map<String, String> argsMap = parsedArgs.argsMap;
 
-
-        String subCommand = "main";
-
-        // Parse key=value arguments into a map
-        Map<String, String> argsMap = new java.util.HashMap<>();
-
-        // Check the first argument, if it doesnt have = then its the subcommand
-        if (scriptArgs.length > 0) {
-            String firstArg = scriptArgs[0];
-            if (!firstArg.contains("=")) {
-                subCommand = firstArg;
-                // Remove first argument from scriptArgs
-                scriptArgs = Arrays.copyOfRange(scriptArgs, 1, scriptArgs.length);
-            }
-        }
-        if(isVerboseMode() || isDebugMode()) {
-            System.out.println("Module subcommand: " + subCommand);
-        }
-        int count = 0;
-        for (String arg : scriptArgs) {
-            count++;
-            int equalsIndex = arg.indexOf('=');
-            if (equalsIndex > 0) {
-                String key = arg.substring(0, equalsIndex).trim();
-                String value = arg.substring(equalsIndex + 1).trim();
-                // Remove quotes if present
-                value = unwrap(value);
-                argsMap.put(key, value);
-            }
-            else{
-                argsMap.put("arg" + count, arg);
-            }
-        }
             Timer.start("Module Execution: " + moduleName);
             if (isVerboseMode() || isDebugMode()) {
                 System.out.println("=== Direct Module Execution Script ===");
@@ -189,7 +237,6 @@ public class LuceeScriptEngine {
             	subCommand = "main";
             }
 
-            
             // The setup will clear everything as it binds to ENGINE_SCOPE
             setupScriptContext(engine, moduleName, scriptArgs);
             engine.put("subCommand", subCommand);
@@ -203,7 +250,9 @@ public class LuceeScriptEngine {
             engine.put("timer", Timer.getInstance());
 
             String script = readScriptTemplate("/script_engine/executeModule.cfs");
-            
+            if (isVerboseMode() || isDebugMode()) {
+                System.out.println("=== Executing engine script /script_engine/executeModule.cfs ===");
+            }
             engine.eval(script);
             Timer.stop("Module Execution: " + moduleName);
     }
@@ -212,7 +261,7 @@ public class LuceeScriptEngine {
     /**
      * Main script execution entry point - determines file type and executes appropriately
      */
-    public void executeScript(String scriptFile, String[] scriptArgs) throws Exception {
+    public int executeScript(String scriptFile, String[] scriptArgs) throws Exception {
         Timer.start("File Validation");
         // Validate script file exists
         Path scriptPath = Paths.get(scriptFile);
@@ -248,6 +297,8 @@ public class LuceeScriptEngine {
             executeScriptContent(scriptFile, scriptContent, scriptArgs);
             Timer.stop("Script Content Execution");
         }
+        // TODO: pass this through to the sub function
+        return 0;
     }
 
     /**
@@ -273,30 +324,52 @@ public class LuceeScriptEngine {
             StringOutput.getInstance().println("${EMOJI_GEAR} Executing CFC component: " + scriptFile);
             StringOutput.getInstance().println("${EMOJI_INFO} Arguments: " + Arrays.toString(scriptArgs));
         }
-        
+
+
         // Check if this is an extracted module from ~/.lucli
         if (isExtractedModule(scriptFile)) {
+            // This should be unreachable, we have another path to run this.
             // For extracted modules, execute directly with a simple argument setup
-            String directScript = createModuleDirectScript(scriptContent, scriptArgs);
-            
+           throw(new UnsupportedOperationException("Direct execution of extracted modules should use executeModule()"));
+        } else {
+
+            ParsedArguments parsedArgs = parseArguments(scriptArgs);
+            String subCommand = parsedArgs.subCommand;
+            Map<String, String> argsMap = parsedArgs.argsMap;
+
+            Timer.start("CFC Execution: " + scriptFile);
             if (isVerboseMode() || isDebugMode()) {
                 System.out.println("=== Direct Module Execution Script ===");
-                System.out.println(directScript);
-                System.out.println("=== End Direct Script ===");
+                
             }
+        
+            // The setup will clear everything as it binds to ENGINE_SCOPE
+            setupScriptContext(engine, scriptFile, scriptArgs);
             
-            executeWrappedScript(directScript, scriptFile, scriptArgs);
-        } else {
-            // For regular CFC files, use component wrapper
-            String wrappedScript = createComponentWrapper(scriptContent, scriptFile, scriptArgs);
+            engine.put("subCommand", subCommand);
+            engine.put("argCollection", argsMap);
+            engine.put("verbose", LuCLI.verbose);
+            engine.put("timing", LuCLI.timing);
+            engine.put("timer", Timer.getInstance());
+            engine.put("componentPath", getDottedPathFromCWD(scriptFile));
+
+            // Script to run 
+            String script = readScriptTemplate("/script_engine/executeComponentFromCWD.cfs");
+
             
-            if (isVerboseMode() || isDebugMode()) {
-                System.out.println("=== Generated CFC Wrapper Script ===");
-                System.out.println(wrappedScript);
-                System.out.println("=== End Wrapper Script ===");
+            Timer.start("Executing CFC");
+            try{
+                engine.eval(script);
+
             }
-            
-            executeWrappedScript(wrappedScript, scriptFile, scriptArgs);
+            catch(ScriptException e){
+                if(isDebugMode()) {
+                    e.printStackTrace();
+                }
+                throw new ScriptException("Error executing CFC '" + scriptFile +  "': " + e.getMessage());
+            }
+            Timer.stop("Executing CFC");
+        
         }
     }
     
@@ -466,15 +539,7 @@ public class LuceeScriptEngine {
         }
     }
     
-    // Helper methods - moved from LuCLI
-    
-    private boolean isVerboseMode() {
-        return verbose;
-    }
-    
-    private boolean isDebugMode() {
-        return debug;
-    }
+ 
     
     /**
      * Process shebang lines in CFML script content
@@ -739,6 +804,20 @@ public class LuceeScriptEngine {
         
         // Regular file path - convert to dotted notation
         String componentPath = scriptFile;
+        if (componentPath.toLowerCase().endsWith(".cfc")) {
+            componentPath = componentPath.substring(0, componentPath.length() - 4); // Remove .cfc extension
+        }
+        componentPath = componentPath.replace('/', '.').replace('\\', '.'); // Convert path separators to dots
+        return componentPath;
+    }
+
+
+   public String getDottedPathFromCWD(String scriptFile) {
+        Path cwd = Paths.get(System.getProperty("user.dir")).toAbsolutePath();
+        Path scriptPath = Paths.get(scriptFile).toAbsolutePath();
+        Path relativePath = cwd.relativize(scriptPath);
+        
+        String componentPath = relativePath.toString();
         if (componentPath.toLowerCase().endsWith(".cfc")) {
             componentPath = componentPath.substring(0, componentPath.length() - 4); // Remove .cfc extension
         }
