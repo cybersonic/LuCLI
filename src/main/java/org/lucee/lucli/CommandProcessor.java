@@ -244,13 +244,24 @@ public class CommandProcessor {
                 int maxColumns = 80; // Could be made configurable
                 int columnWidth = 0;
                 
-                // Calculate column width
+                // Calculate column width based on the file name only
+                // We then add space for the emoji + space prefix and a little extra padding
                 for (Path file : sortedFiles) {
-                    columnWidth = Math.max(columnWidth, file.getFileName().toString().length());
+                    String name = file.getFileName().toString();
+                    if (Files.isDirectory(file)) {
+                        name += "/";
+                    }
+                    columnWidth = Math.max(columnWidth, name.length());
                 }
-                columnWidth += 2; // Add some padding
                 
-                int columnsPerLine = Math.max(1, maxColumns / columnWidth);
+                // columnWidth now represents the longest name.
+                // We approximate the visible width of "emoji + space" as 2 columns,
+                // and add 1 more space as padding between columns.
+                int prefixWidth = 2; // emoji + space
+                int extraPadding = 1; // space between columns
+                int totalColumnWidth = columnWidth + prefixWidth + extraPadding;
+                
+                int columnsPerLine = Math.max(1, maxColumns / totalColumnWidth);
                 
                 for (int i = 0; i < sortedFiles.size(); i++) {
                     Path file = sortedFiles.get(i);
@@ -261,8 +272,8 @@ public class CommandProcessor {
                         name += "/";
                     }
                     
-                    String displayName = emoji + name;
-                    result.append(String.format("%-" + (columnWidth + 2) + "s", displayName)); // +2 for emoji
+                    String displayName = emoji + " " + name;
+                    result.append(String.format("%-" + totalColumnWidth + "s", displayName));
                     
                     if ((i + 1) % columnsPerLine == 0 || i == sortedFiles.size() - 1) {
                         result.append("\n");
@@ -1024,6 +1035,7 @@ public class CommandProcessor {
                 }
             } else {
                 // Use emoji icons when supported
+                // Note: we prefer emojis that render with similar width in most terminals to keep columns aligned
                 switch (extension) {
                     case "java": return "☕";
                     case "js": case "javascript": return "🟨";
@@ -1037,10 +1049,12 @@ public class CommandProcessor {
                     case "txt": return "📄";
                     case "log": return "📊";
                     case "sql": return "🗃️";
-                    case "sh": case "bash": return "⚡";
-                    case "bat": case "cmd": return "⚡";
+                    // Use a rocket emoji for scripts/executables; it tends to have the same visual width
+                    // as the other document emojis, which keeps ls columns better aligned across rows.
+                    case "sh": case "bash": return "🚀";
+                    case "bat": case "cmd": return "🚀";
                     case "ps1": return "💙";
-                    case "cfm": case "cfml": case "cfc": case "cfs": return "⚡";
+                    case "cfm": case "cfml": case "cfc": case "cfs": return "🚀";
                     
                     // Image files
                     case "jpg": case "jpeg": case "png": case "gif": case "bmp": case "svg": case "webp":
@@ -1075,7 +1089,7 @@ public class CommandProcessor {
                     default:
                         // Check if file is executable
                         if (Files.isExecutable(file)) {
-                            return "⚡";
+                            return "🚀";
                         }
                         return "📄";
                 }

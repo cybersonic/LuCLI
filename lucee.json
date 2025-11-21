@@ -1,0 +1,25 @@
+{
+  "name" : "LuCLI",
+  "version" : "6.2.2.91",
+  "port" : 8000,
+  "webroot" : "./",
+  "monitoring" : {
+    "enabled" : true,
+    "jmx" : {
+      "port" : 8001
+    }
+  },
+  "jvm" : {
+    "maxMemory" : "512m",
+    "minMemory" : "128m",
+    "additionalArgs" : [ ]
+  },
+  "urlRewrite" : {
+    "enabled" : true,
+    "routerFile" : "index.cfm"
+  },
+  "admin" : {
+    "enabled" : true
+  },
+  "agents" : { }
+}
