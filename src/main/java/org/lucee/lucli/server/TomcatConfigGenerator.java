@@ -23,32 +23,29 @@ public class TomcatConfigGenerator {
         "/urlrewritefilter-" + URLREWRITE_VERSION + ".jar";
     
     /**
-     * Generate complete server instance by copying Lucee Express and applying templates
+     * Generate complete server instance by copying Lucee Express and applying templates.
+     *
+     * @param overwriteProjectConfig when true, project-level config files under WEB-INF
+     *                               (web.xml, urlrewrite.xml, UrlRewriteFilter JAR) will be
+     *                               overwritten even if they already exist. When false, any
+     *                               existing project files are preserved.
      */
     public void generateConfiguration(Path serverInstanceDir, LuceeServerConfig.ServerConfig config,
-                                    Path projectDir, Path luceeExpressDir) throws IOException {
+                                    Path projectDir, Path luceeExpressDir,
+                                    boolean overwriteProjectConfig) throws IOException {
         
         // Copy entire Lucee Express distribution to server instance directory
         copyLuceeExpressDistribution(luceeExpressDir, serverInstanceDir);
         
         // Apply template configurations
-        applyConfigurationTemplates(serverInstanceDir, config, projectDir);
-        
-        // Download and deploy UrlRewriteFilter JAR only if URL rewrite is enabled
-        if (config.urlRewrite != null && config.urlRewrite.enabled) {
-            try {
-                deployUrlRewriteFilter(serverInstanceDir);
-            } catch (Exception e) {
-                throw new IOException("Failed to deploy UrlRewriteFilter: " + e.getMessage(), e);
-            }
-        }
+        applyConfigurationTemplates(serverInstanceDir, config, projectDir, overwriteProjectConfig);
     }
     
     /**
      * Apply configuration templates by processing template files and replacing placeholders
      */
     private void applyConfigurationTemplates(Path serverInstanceDir, LuceeServerConfig.ServerConfig config,
-                                           Path projectDir) throws IOException {
+                                           Path projectDir, boolean overwriteProjectConfig) throws IOException {
         
         // Create placeholder replacement map
         Map<String, String> placeholders = createPlaceholderMap(serverInstanceDir, config, projectDir);
@@ -71,11 +68,22 @@ public class TomcatConfigGenerator {
         Path webroot = LuceeServerConfig.resolveWebroot(config, projectDir);
         Path webrootWebInf = webroot.resolve("WEB-INF");
         Files.createDirectories(webrootWebInf);
-        applyWebXmlTemplate("tomcat_template/webapps/ROOT/WEB-INF/web.xml", webrootWebInf.resolve("web.xml"), placeholders, config);
+        Path projectWebXml = webrootWebInf.resolve("web.xml");
+        
+        if (overwriteProjectConfig || !Files.exists(projectWebXml)) {
+            applyWebXmlTemplate("tomcat_template/webapps/ROOT/WEB-INF/web.xml", projectWebXml, placeholders, config);
+        } else {
+            System.out.println("Preserving existing project web.xml at " + projectWebXml.toAbsolutePath());
+        }
         
         // Apply urlrewrite.xml template to PROJECT directory only if URL rewrite is enabled
         if (config.urlRewrite != null && config.urlRewrite.enabled) {
-            applyTemplate("tomcat_template/webapps/ROOT/WEB-INF/urlrewrite.xml", webrootWebInf.resolve("urlrewrite.xml"), placeholders);
+            Path projectUrlRewriteXml = webrootWebInf.resolve("urlrewrite.xml");
+            if (overwriteProjectConfig || !Files.exists(projectUrlRewriteXml)) {
+                applyTemplate("tomcat_template/webapps/ROOT/WEB-INF/urlrewrite.xml", projectUrlRewriteXml, placeholders);
+            } else {
+                System.out.println("Preserving existing project urlrewrite.xml at " + projectUrlRewriteXml.toAbsolutePath());
+            }
         }
         
         // Deploy UrlRewriteFilter JAR to PROJECT directory's WEB-INF/lib
@@ -88,11 +96,15 @@ public class TomcatConfigGenerator {
                 
                 Path urlRewriteJar = ensureUrlRewriteFilter();
                 Path targetJar = projectWebInfLib.resolve("urlrewritefilter-" + URLREWRITE_VERSION + ".jar");
-                Files.copy(urlRewriteJar, targetJar, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                if (overwriteProjectConfig || !Files.exists(targetJar)) {
+                    Files.copy(urlRewriteJar, targetJar, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                } else {
+                    System.out.println("Preserving existing UrlRewriteFilter JAR at " + targetJar.toAbsolutePath());
+                }
                 
                 System.out.println("Deployed UrlRewriteFilter to project docBase:");
                 System.out.println("  JAR: " + targetJar.toAbsolutePath());
-                System.out.println("  web.xml: " + webrootWebInf.resolve("web.xml").toAbsolutePath());
+                System.out.println("  web.xml: " + projectWebXml.toAbsolutePath());
                 System.out.println("  urlrewrite.xml: " + webrootWebInf.resolve("urlrewrite.xml").toAbsolutePath());
             } catch (Exception e) {
                 throw new IOException("Failed to deploy UrlRewriteFilter JAR: " + e.getMessage(), e);
@@ -180,23 +192,8 @@ public class TomcatConfigGenerator {
             processedContent = processedContent.replace(entry.getKey(), entry.getValue());
         }
         
-        // Conditionally inject admin servlet mappings
-        if (config.admin != null && config.admin.enabled) {
-            String adminMappings = "\n    <!-- Lucee Admin Servlet Mappings -->\n" +
-                    "    <servlet-mapping>\n" +
-                    "        <servlet-name>CFMLServlet</servlet-name>\n" +
-                    "        <url-pattern>/lucee/*</url-pattern>\n" +
-                    "    </servlet-mapping>\n" +
-                    "    \n" +
-                    "    <servlet-mapping>\n" +
-                    "        <servlet-name>CFMLServlet</servlet-name>\n" +
-                    "        <url-pattern>/lucee/admin/*</url-pattern>\n" +
-                    "    </servlet-mapping>\n";
-            
-            // Insert admin mappings at the placeholder location
-            processedContent = processedContent.replace("<!-- ADMIN_MAPPINGS_START --><!-- ADMIN_MAPPINGS_END -->",
-                    "<!-- ADMIN_MAPPINGS_START -->" + adminMappings + "    <!-- ADMIN_MAPPINGS_END -->");
-        }
+        // Apply simple conditional blocks (UrlRewrite, admin, etc.) based on lucee.json
+        processedContent = applyConditionalBlocks(processedContent, config);
         
         // Ensure output directory exists
         Files.createDirectories(outputPath.getParent());
@@ -205,6 +202,51 @@ public class TomcatConfigGenerator {
         Files.writeString(outputPath, processedContent, StandardCharsets.UTF_8);
     }
     
+    /**
+     * Apply conditional comment blocks in the web.xml template based on config.
+     * Currently supports:
+     *   <!-- IF_URLREWRITE_ENABLED --> ... <!-- END_IF_URLREWRITE_ENABLED -->
+     *   <!-- IF_ADMIN_ENABLED -->        ... <!-- END_IF_ADMIN_ENABLED -->
+     */
+    private String applyConditionalBlocks(String content, LuceeServerConfig.ServerConfig config) {
+        boolean urlRewriteEnabled = config.urlRewrite != null && config.urlRewrite.enabled;
+        content = processBooleanBlock(content, "IF_URLREWRITE_ENABLED", urlRewriteEnabled);
+        
+        // Admin: default to enabled if config.admin is null (backwards compatibility)
+        boolean adminEnabled = (config.admin == null) || config.admin.enabled;
+        content = processBooleanBlock(content, "IF_ADMIN_ENABLED", adminEnabled);
+        
+        return content;
+    }
+    
+    /**
+     * Process a boolean block of the form:
+     *   <!-- TAG --> ... <!-- END_TAG -->
+     * If keep == true, the inner content is kept; otherwise, the whole block is removed.
+     */
+    private String processBooleanBlock(String content, String tag, boolean keep) {
+        String start = "<!-- " + tag + " -->";
+        String end = "<!-- END_" + tag + " -->";
+        int idxStart = content.indexOf(start);
+        while (idxStart != -1) {
+            int idxEnd = content.indexOf(end, idxStart);
+            if (idxEnd == -1) {
+                break; // malformed block, stop processing
+            }
+            int blockEnd = idxEnd + end.length();
+            String before = content.substring(0, idxStart);
+            String inside = content.substring(idxStart + start.length(), idxEnd);
+            String after = content.substring(blockEnd);
+            if (keep) {
+                content = before + inside + after;
+                idxStart = content.indexOf(start, before.length() + inside.length());
+            } else {
+                content = before + after;
+                idxStart = content.indexOf(start, before.length());
+            }
+        }
+        return content;
+    }
     
     /**
      * Copy the entire Lucee Express distribution to the server instance directory

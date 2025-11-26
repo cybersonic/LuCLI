@@ -8,6 +8,7 @@
     <display-name>Lucee CFML Application</display-name>
     <description>Lucee CFML Server Application</description>
 
+    <!-- IF_URLREWRITE_ENABLED -->
     <!-- UrlRewriteFilter for Extension-less URLs -->
     <filter>
         <filter-name>UrlRewriteFilter</filter-name>
@@ -28,6 +29,7 @@
         <dispatcher>REQUEST</dispatcher>
         <dispatcher>FORWARD</dispatcher>
     </filter-mapping>
+    <!-- END_IF_URLREWRITE_ENABLED -->
 
     <!-- Lucee Configuration -->
     <context-param>
@@ -97,7 +99,18 @@
         <url-pattern>/index.cfm/*</url-pattern>
     </servlet-mapping>
 
-    <!-- ADMIN_MAPPINGS_START --><!-- ADMIN_MAPPINGS_END -->
+    <!-- IF_ADMIN_ENABLED -->
+    <!-- Lucee Admin Servlet Mappings -->
+    <servlet-mapping>
+        <servlet-name>CFMLServlet</servlet-name>
+        <url-pattern>/lucee/*</url-pattern>
+    </servlet-mapping>
+    
+    <servlet-mapping>
+        <servlet-name>CFMLServlet</servlet-name>
+        <url-pattern>/lucee/admin/*</url-pattern>
+    </servlet-mapping>
+    <!-- END_IF_ADMIN_ENABLED -->
 
     <!-- REST Servlet Mappings -->
     <servlet-mapping>
@@ -112,6 +125,16 @@
         <welcome-file>index.html</welcome-file>
         <welcome-file>index.htm</welcome-file>
     </welcome-file-list>
+
+    <!-- Protect LuCEE/LuCLI configuration files from direct HTTP access -->
+    <security-constraint>
+        <web-resource-collection>
+            <web-resource-name>Lucee configuration</web-resource-name>
+            <url-pattern>/lucee.json</url-pattern>
+        </web-resource-collection>
+        <!-- Empty auth-constraint means no roles are allowed: effectively 403 for everyone -->
+        <auth-constraint/>
+    </security-constraint>
 
     <!-- Session Configuration -->
     <session-config>

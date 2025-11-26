@@ -15,15 +15,16 @@ import picocli.CommandLine.ParentCommand;
 /**
  * Server management command using Picocli
  */
-@Command(
-    name = "server",
-    description = "Manage Lucee server instances",
-    subcommands = {
+    @Command(
+        name = "server",
+        description = "Manage Lucee server instances",
+        subcommands = {
         ServerCommand.StartCommand.class,
         ServerCommand.StopCommand.class,
         ServerCommand.RestartCommand.class,
         ServerCommand.StatusCommand.class,
         ServerCommand.ListCommand.class,
+        ServerCommand.PruneCommand.class,
         ServerCommand.LogCommand.class,
         ServerCommand.MonitorCommand.class
     }
@@ -310,6 +311,51 @@ public class ServerCommand implements Callable<Integer> {
             }
 
             // Execute the server log command
+            String result = executor.executeCommand("server", args.toArray(new String[0]));
+            if (result != null && !result.isEmpty()) {
+                System.out.println(result);
+            }
+
+            return 0;
+        }
+    }
+
+    /**
+     * Server prune subcommand
+     */
+    @Command(
+        name = "prune",
+        description = "Remove stopped server instances"
+    )
+    static class PruneCommand implements Callable<Integer> {
+
+        @ParentCommand
+        private ServerCommand parent;
+
+        @Option(names = {"-a", "--all"},
+                description = "Remove all stopped servers")
+        private boolean all;
+
+        @Option(names = {"-n", "--name"},
+                description = "Remove a specific stopped server by name")
+        private String name;
+
+        @Override
+        public Integer call() throws Exception {
+            // Use UnifiedCommandExecutor in CLI mode (non-terminal)
+            UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, Paths.get(System.getProperty("user.dir")));
+
+            java.util.List<String> args = new java.util.ArrayList<>();
+            args.add("prune");
+
+            if (all) {
+                args.add("--all");
+            }
+            if (name != null) {
+                args.add("--name");
+                args.add(name);
+            }
+
             String result = executor.executeCommand("server", args.toArray(new String[0]));
             if (result != null && !result.isEmpty()) {
                 System.out.println(result);

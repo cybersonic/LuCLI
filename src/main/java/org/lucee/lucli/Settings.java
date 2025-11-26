@@ -74,11 +74,11 @@ public class Settings {
         defaultSettings.put("currentPrompt", "default");
         
         // Auto-detect emoji support based on terminal capabilities
-        boolean emojiSupport = WindowsSupport.supportsEmojis();
+        boolean emojiSupport = false; // Default to false, as WindowsSupport is removed
         defaultSettings.put("showEmojis", emojiSupport);
         
         // Auto-detect color support
-        boolean colorSupport = WindowsSupport.supportsColors();
+        boolean colorSupport = false; // Default to false, as WindowsSupport is removed
         defaultSettings.put("colorSupport", colorSupport);
         
         defaultSettings.put("historySize", 1000);

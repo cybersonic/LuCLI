@@ -158,7 +158,8 @@ public class InteractiveTerminal {
         // Check if input is from a pipe/redirect (non-interactive)
         // If terminal is dumb type, use piped mode
         // Otherwise use interactive mode with JLine (which supports autocomplete)
-        boolean isPiped = terminal.getType().equals(org.jline.terminal.Terminal.TYPE_DUMB) 
+        boolean isPiped = LuCLI.isLucliScript() 
+                         || terminal.getType().equals(org.jline.terminal.Terminal.TYPE_DUMB) 
                          || terminal.getType().equals(org.jline.terminal.Terminal.TYPE_DUMB_COLOR);
         
         if (LuCLI.debug) {
