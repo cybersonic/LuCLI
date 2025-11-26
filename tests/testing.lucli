@@ -3,3 +3,4 @@ hello-world
 echo "Hello World 2"
 hello-world
 echo "Done"
+lint showHelp
