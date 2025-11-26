@@ -1,0 +1,139 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://lucli.dev/schemas/v1/lucee.schema.json",
+  "title": "LuCLI Lucee Server Configuration",
+  "description": "Configuration file for LuCLI-managed Lucee server instances (lucee.json).",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Human-friendly server name. Defaults to the project directory name when omitted."
+    },
+    "version": {
+      "type": "string",
+      "description": "Lucee engine version to use for this server instance.",
+      "default": "6.2.2.91"
+    },
+    "port": {
+      "type": "integer",
+      "description": "HTTP port for the server.",
+      "default": 8080,
+      "minimum": 1,
+      "maximum": 65535
+    },
+    "webroot": {
+      "type": "string",
+      "description": "Path to the webroot for this server. Can be relative to the project directory.",
+      "default": "./"
+    },
+    "monitoring": {
+      "type": "object",
+      "description": "Monitoring and JMX configuration.",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable JMX monitoring for this server.",
+          "default": true
+        },
+        "jmx": {
+          "type": "object",
+          "description": "JMX endpoint configuration.",
+          "additionalProperties": false,
+          "properties": {
+            "port": {
+              "type": "integer",
+              "description": "JMX port for remote monitoring.",
+              "default": 8999,
+              "minimum": 1,
+              "maximum": 65535
+            }
+          }
+        }
+      }
+    },
+    "jvm": {
+      "type": "object",
+      "description": "JVM options for the embedded Tomcat/Lucee server.",
+      "additionalProperties": false,
+      "properties": {
+        "maxMemory": {
+          "type": "string",
+          "description": "Maximum heap size for the JVM (e.g. '512m', '2g').",
+          "default": "512m"
+        },
+        "minMemory": {
+          "type": "string",
+          "description": "Initial heap size for the JVM (e.g. '128m').",
+          "default": "128m"
+        },
+        "additionalArgs": {
+          "type": "array",
+          "description": "Additional raw JVM arguments appended to CATALINA_OPTS.",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        }
+      }
+    },
+    "urlRewrite": {
+      "type": "object",
+      "description": "Framework-style URL routing configuration.",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable framework-style URL rewriting.",
+          "default": true
+        },
+        "routerFile": {
+          "type": "string",
+          "description": "Central router file for handling all routes (e.g. 'index.cfm').",
+          "default": "index.cfm"
+        }
+      }
+    },
+    "admin": {
+      "type": "object",
+      "description": "Lucee administrator exposure settings.",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether the Lucee administrator is accessible.",
+          "default": true
+        }
+      }
+    },
+    "agents": {
+      "type": "object",
+      "description": "Named Java agents that can be toggled per server start.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether this agent is enabled by default for this instance.",
+            "default": false
+          },
+          "jvmArgs": {
+            "type": "array",
+            "description": "JVM arguments that activate/configure this agent (e.g. -javaagent:...).",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of this agent."
+          }
+        }
+      },
+      "default": {}
+    }
+  }
+}
