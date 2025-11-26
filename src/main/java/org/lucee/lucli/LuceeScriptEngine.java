@@ -8,8 +8,7 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Map;
 
-import javax.script.Bindings;
-import javax.script.ScriptContext;
+
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;

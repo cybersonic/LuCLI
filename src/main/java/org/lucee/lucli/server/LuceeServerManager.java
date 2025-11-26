@@ -213,7 +213,11 @@ public class LuceeServerManager {
         
         // Generate Tomcat configuration
         TomcatConfigGenerator configGenerator = new TomcatConfigGenerator();
-        configGenerator.generateConfiguration(serverInstanceDir, config, projectDir, luceeExpressDir);
+        // When forceReplace is true (e.g. --force), also allow overwriting project-level
+        // WEB-INF config files (web.xml, urlrewrite.xml, UrlRewriteFilter JAR). Without
+        // --force, we preserve any existing project configuration files.
+        boolean overwriteProjectConfig = forceReplace;
+        configGenerator.generateConfiguration(serverInstanceDir, config, projectDir, luceeExpressDir, overwriteProjectConfig);
         
         // Start the server process
         ServerInstance instance = launchServerProcess(serverInstanceDir, config, projectDir, luceeExpressDir, agentOverrides);

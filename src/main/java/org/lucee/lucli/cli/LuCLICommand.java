@@ -2,7 +2,7 @@ package org.lucee.lucli.cli;
 
 import java.util.concurrent.Callable;
 
-import org.lucee.lucli.InteractiveTerminal;
+import org.lucee.lucli.InteractiveTerminalV2;
 import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.StringOutput;
 import org.lucee.lucli.Timer;
@@ -96,8 +96,10 @@ public class LuCLICommand implements Callable<Integer> {
             }
 
             // If we get here, no subcommand was matched, so start interactive terminal mode
+            // Use the Picocli-integrated terminal so CLI and terminal share the same
+            // command definitions, options, and autocomplete.
             Timer.start("Terminal Mode");
-            InteractiveTerminal.main(new String[0]);
+            InteractiveTerminalV2.main(new String[0]);
             Timer.stop("Terminal Mode");
 
             return 0;
@@ -125,7 +127,7 @@ public class LuCLICommand implements Callable<Integer> {
             System.out.println("Initializing Lucee CFML engine...");
             
             // For now, delegate to InteractiveTerminal's implementation
-            InteractiveTerminal.main(new String[]{"--lucee-version"});
+            InteractiveTerminalV2.main(new String[]{"--lucee-version"});
             
         } catch (Exception e) {
             System.err.println("Error getting Lucee version: " + e.getMessage());

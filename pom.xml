@@ -6,7 +6,7 @@
 
   <groupId>org.lucee</groupId>
   <artifactId>lucli</artifactId>
-  <version>0.1.54-SNAPSHOT</version>
+  <version>0.1.80-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>LuCLI</name>
   <description>A CLI for Lucee</description>
@@ -149,7 +149,7 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <version>3.2.5</version>
       </plugin>
-      <plugin>
+          <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
         <version>3.4.1</version>
@@ -157,12 +157,16 @@
           <archive>
             <manifest>
               <addClasspath>true</addClasspath>
-              <mainClass>org.lucee.lucli.LuCLI</mainClass>
-              <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
-            </manifest>
+                  <mainClass>org.lucee.lucli.LuCLI</mainClass>
+                  <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                </manifest>
           </archive>
+          <!-- Exclude non-Java assets that shouldn't be packaged into the JAR -->
+          <excludes>
+            <exclude>icons/lucli-icon.svg</exclude>
+          </excludes>
         </configuration>
-      </plugin>
+          </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
