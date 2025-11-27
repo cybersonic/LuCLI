@@ -1,0 +1,30 @@
+# Test SET command - Environment Variables
+
+# Set some environment variables
+set MY_APP_NAME="LuCLI Test App"
+set MY_APP_VERSION="1.0.0"
+set DEBUG_MODE="true"
+set API_KEY="secret-key-12345"
+
+
+# Verify they're in SERVER.system.environment
+cfml writeOutput("=== Testing Environment Variables ===" & chr(10))
+
+cfml writeOutput("MY_APP_NAME: " & __env["MY_APP_NAME"] & chr(10))
+cfml writeOutput("MY_APP_VERSION: " & SERVER.system.environment["MY_APP_VERSION"] & chr(10))
+cfml writeOutput("DEBUG_MODE: " & SERVER.system.environment["DEBUG_MODE"] & chr(10))
+cfml writeOutput("API_KEY: " & SERVER.system.environment["API_KEY"] & chr(10))
+
+# Test with keyExists()
+cfml writeOutput(chr(10) & "=== Testing keyExists() ===" & chr(10))
+cfml writeOutput("MY_APP_NAME exists: " & SERVER.system.environment.keyExists("MY_APP_NAME") & chr(10))
+cfml writeOutput("NONEXISTENT exists: " & SERVER.system.environment.keyExists("NONEXISTENT") & chr(10))
+
+# Test placeholder substitution
+cfml writeOutput(chr(10) & "=== Testing Placeholder Substitution ===" & chr(10))
+cfml writeOutput("App: ${MY_APP_NAME} v${MY_APP_VERSION}" & chr(10))
+
+# Test with actual system environment variable (should also work)
+cfml writeOutput(chr(10) & "=== Testing Real System Environment ===" & chr(10))
+cfml writeOutput("PATH exists: " & SERVER.system.environment.keyExists("PATH") & chr(10))
+cfml writeOutput("USER: " & SERVER.system.environment["USER"] & chr(10))

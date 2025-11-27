@@ -18,7 +18,7 @@ fi
 # Use -Dmaven.test.skip=true so Maven does not compile or run tests during this
 # quick-build path. The recommended way to run the full test suite remains
 # ./tests/test.sh when you want full verification.
-mvn clean package --activate-profiles binary -Dmaven.test.skip=true --quiet
+mvn clean package --activate-profiles binary -Dmaven.test.skip=true
 if [ $? -ne 0 ]; then
     echo "Maven build failed!"
     exit 1

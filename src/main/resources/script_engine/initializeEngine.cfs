@@ -12,7 +12,7 @@ config = {
             "primary": "physical",
             "toplevel": false
 		},
-		 "/luclihome": {
+		"/luclihome": {
             "inspectTemplate": "auto",
             "physical":"#lucli_home_path#",
             "primary": "physical",

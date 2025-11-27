@@ -32,7 +32,7 @@
     <!-- END_IF_URLREWRITE_ENABLED -->
 
     <!-- Lucee Configuration -->
-    <context-param>
+    <!-- <context-param>
         <param-name>lucee-server-directory</param-name>
         <param-value>${luceeServerPath}</param-value>
     </context-param>
@@ -45,7 +45,7 @@
     <context-param>
         <param-name>lucee-patches-directory</param-name>
         <param-value>${luceePatches}</param-value>
-    </context-param>
+    </context-param> -->
 
     <!-- Lucee CFML Servlet -->
     <servlet>
@@ -59,10 +59,10 @@
             <param-name>lucee-web-root</param-name>
             <param-value>${luceeWebPath}</param-value>
         </init-param>
-        <init-param>
+        <!-- <init-param>
             <param-name>lucee-patches-directory</param-name>
             <param-value>${luceePatches}</param-value>
-        </init-param>
+        </init-param> -->
         <load-on-startup>1</load-on-startup>
     </servlet>
 

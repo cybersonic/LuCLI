@@ -505,7 +505,7 @@ public class LuceeScriptEngine {
         }
         
         // Environment variables
-        engine.put("__env", System.getenv());
+        engine.put("__env", LuCLI.scriptEnvironment);
         
         // System properties
         engine.put("__systemProps", System.getProperties());
