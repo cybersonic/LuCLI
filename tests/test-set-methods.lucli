@@ -1,0 +1,28 @@
+# Test different ways to use SET variables
+
+# Set a variable
+set TESTVAR="Hello from SET command"
+echo TESTVAR ${TESTVAR}
+cfml writeoutput("SERVER.system.environment TESTVAR: " & SERVER.system.environment["TESTVAR"] & chr(10))
+# # Method 1: Use as a placeholder in string substitution
+# cfml writeOutput("Method 1 - Placeholder: ${TESTVAR}" & chr(10))
+
+# # Method 2: Access from SERVER.system.environment (the proper way)
+# cfml writeOutput("Method 2 - Environment Variable: " & SERVER.system.environment["TESTVAR"] & chr(10))
+
+# # Method 3: Check if it exists in environment
+# cfml writeOutput("Method 3 - Exists Check: " & SERVER.system.environment.keyExists("TESTVAR") & chr(10))
+
+# # Set a numeric variable
+# set COUNT=42
+# cfml writeOutput("Count as string: ${COUNT}" & chr(10))
+# cfml writeOutput("Count from environment: " & SERVER.system.environment["COUNT"] & chr(10))
+
+# # Set a variable with special characters
+# set EMOJI="🚀 Rocket"
+# cfml writeOutput("Emoji: ${EMOJI}" & chr(10))
+# cfml writeOutput("Emoji from environment: " & SERVER.system.environment["EMOJI"] & chr(10))
+
+# # Test with path-like values
+# set MY_PATH="/usr/local/bin:/usr/bin"
+# cfml writeOutput("Path from environment: " & SERVER.system.environment["MY_PATH"] & chr(10))

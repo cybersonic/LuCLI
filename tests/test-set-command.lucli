@@ -1,0 +1,34 @@
+# Test SET command with various quote scenarios
+
+# Basic set without quotes
+set ELVIS=Presley
+cfml writeOutput("Elvis is: ${ELVIS}" & chr(10))
+
+# Set with double quotes
+set ELVIS="Presley"
+cfml writeOutput("Elvis with quotes: ${ELVIS}" & chr(10))
+
+# Set with single quotes containing apostrophe
+set ELVIS='He''s the king'
+cfml writeOutput("Elvis with apostrophe: ${ELVIS}" & chr(10))
+
+# Set with double quotes containing apostrophe  
+set ELVIS="He's the king"
+cfml writeOutput("Elvis with apostrophe v2: ${ELVIS}" & chr(10))
+
+# Set with spaces in value
+set MESSAGE="Hello World"
+cfml writeOutput("Message: ${MESSAGE}" & chr(10))
+
+# Multiple sets and usage
+set FIRSTNAME=Mark
+set LASTNAME=Drew
+cfml writeOutput("Full name: ${FIRSTNAME} ${LASTNAME}" & chr(10))
+
+# Using built-in placeholders with custom vars
+set TODAY=${DATE}
+cfml writeOutput("Today is: ${TODAY}" & chr(10))
+
+# Test accessing SET variable directly in CFML (not via placeholder)
+set MYVAR="Direct Access Test"
+cfml writeOutput("Direct CFML access to MYVAR: " & MYVAR & chr(10))

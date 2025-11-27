@@ -152,7 +152,7 @@
       "mainClass": "org.lucee.lucli.LuCLI",
       "projectName": "lucli",
       "console": "integratedTerminal",
-      "args": "tests/testing.lucli",
+      "args": "--debug tests/test-environment-vars.lucli",
       "env": {
         "TEST_NAME": "Mark from Env"
       }

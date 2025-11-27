@@ -1,6 +1,8 @@
 
 // results = createObject("component", "modules.#moduleName#.Module").main(argumentCollection=__arguments);
 
+server.env = __env;
+
 if(verbose){
     echo(serializeJSON(var=variables, compact=false));
 }
