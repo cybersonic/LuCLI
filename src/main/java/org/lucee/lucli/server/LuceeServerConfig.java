@@ -10,6 +10,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
@@ -28,6 +29,18 @@ public class LuceeServerConfig {
         public UrlRewriteConfig urlRewrite = new UrlRewriteConfig();
         public AdminConfig admin = new AdminConfig();
         public Map<String, AgentConfig> agents = new HashMap<>();
+
+        /**
+         * Optional Lucee server configuration to be written to lucee-server/context/.CFConfig.json.
+         * When present, this JSON is treated as the source of truth for CFConfig.
+         */
+        public JsonNode configuration;
+
+        /**
+         * Optional path to an external CFConfig JSON file. Relative paths are resolved
+         * against the project directory when starting the server.
+         */
+        public String configurationFile;
     }
     
     public static class AdminConfig {
@@ -406,5 +419,58 @@ public class LuceeServerConfig {
             return webroot;
         }
         return projectDir.resolve(webroot).normalize();
+    }
+
+    /**
+     * Resolve the effective CFConfig JSON for a server configuration.
+     *
+     * Precedence:
+     *  1. Inline {@code configuration} object in lucee.json, when present.
+     *  2. External JSON file referenced by {@code configurationFile}, if it exists.
+     *
+     * Returns null when no configuration is defined.
+     */
+    public static JsonNode resolveConfigurationNode(ServerConfig config, Path projectDir) throws IOException {
+        if (config == null) {
+            return null;
+        }
+
+        // Inline configuration in lucee.json takes precedence
+        if (config.configuration != null && !config.configuration.isNull()) {
+            return config.configuration;
+        }
+
+        // Fall back to external configuration file if specified
+        if (config.configurationFile != null && !config.configurationFile.trim().isEmpty()) {
+            Path cfConfigPath = Paths.get(config.configurationFile);
+            if (!cfConfigPath.isAbsolute()) {
+                cfConfigPath = projectDir.resolve(cfConfigPath);
+            }
+
+            if (Files.exists(cfConfigPath)) {
+                return objectMapper.readTree(cfConfigPath.toFile());
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * When a CFConfig definition is present in the server configuration, write it to
+     * the Lucee context directory as .CFConfig.json. This is a pure side-effect method
+     * used during server startup and does nothing when no configuration is defined.
+     */
+    public static void writeCfConfigIfPresent(ServerConfig config, Path projectDir, Path serverInstanceDir) throws IOException {
+        JsonNode cfConfig = resolveConfigurationNode(config, projectDir);
+        if (cfConfig == null || cfConfig.isNull()) {
+            return; // Nothing to write
+        }
+
+        // Ensure lucee-server/context directory exists under this server instance
+        Path contextDir = serverInstanceDir.resolve("lucee-server").resolve("context");
+        Files.createDirectories(contextDir);
+
+        Path cfConfigPath = contextDir.resolve(".CFConfig.json");
+        objectMapper.writeValue(cfConfigPath.toFile(), cfConfig);
     }
 }

@@ -218,6 +218,10 @@ public class LuceeServerManager {
         // --force, we preserve any existing project configuration files.
         boolean overwriteProjectConfig = forceReplace;
         configGenerator.generateConfiguration(serverInstanceDir, config, projectDir, luceeExpressDir, overwriteProjectConfig);
+
+        // Write CFConfig (.CFConfig.json) into the Lucee context if configured in lucee.json.
+        // This treats lucee.json as the source of truth and .CFConfig.json as a derived file.
+        LuceeServerConfig.writeCfConfigIfPresent(config, projectDir, serverInstanceDir);
         
         // Start the server process
         ServerInstance instance = launchServerProcess(serverInstanceDir, config, projectDir, luceeExpressDir, agentOverrides);

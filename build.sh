@@ -15,7 +15,10 @@ if [[ "$1" == "clear" ]]; then
 fi
 
 # Build the JAR and binary
-mvn clean package --activate-profiles binary -DskipTests --quiet
+# Use -Dmaven.test.skip=true so Maven does not compile or run tests during this
+# quick-build path. The recommended way to run the full test suite remains
+# ./tests/test.sh when you want full verification.
+mvn clean package --activate-profiles binary -Dmaven.test.skip=true --quiet
 if [ $? -ne 0 ]; then
     echo "Maven build failed!"
     exit 1

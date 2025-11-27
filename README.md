@@ -248,6 +248,10 @@ LuCLI stores configuration in `~/.lucli/`:
 - `agents` (object, optional) - Named Java agents with `enabled` and `jvmArgs` fields.
 - See `documentation/SERVER_AGENTS.md` for detailed examples and startup flags.
 
+**CFConfig Integration:**
+- `configuration` (object, optional) - Inline `.CFConfig.json` content. When present, LuCLI writes this JSON to `lucee-server/context/.CFConfig.json` on `lucli server start`.
+- `configurationFile` (string, optional) - Path (relative to the project directory or absolute) to a CFConfig JSON file. Used to populate `.CFConfig.json` when `configuration` is not set.
+
 ### Prompt Customization
 ```bash
 # View available prompts

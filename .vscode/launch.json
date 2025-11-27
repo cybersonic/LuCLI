@@ -34,6 +34,16 @@
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal"
     },
+    {
+      "type": "java",
+      "name": "🔌 LucCLI Module",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["--debug", "modules", "install", "--url", ""],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
     
     {
       "type": "java",
@@ -102,7 +112,7 @@
       "mainClass": "org.lucee.lucli.LuCLI",
       "args": ["server", "restart"],
       "projectName": "lucli",
-      "cwd": "/Users/markdrew/.lucli/modules/lint",
+      "cwd": "${workspaceFolder}/demo_servers/test_server_01",
       "console": "integratedTerminal"
     },
     
@@ -142,16 +152,10 @@
       "mainClass": "org.lucee.lucli.LuCLI",
       "projectName": "lucli",
       "console": "integratedTerminal",
-      "args": "tests/testing.lucli"
-    },
-    {
-      "type": "java",
-      "name": "📜 Debug LuCLI Script File",
-      "request": "launch",
-      "mainClass": "org.lucee.lucli.LuCLI",
-      "projectName": "lucli",
-      "console": "integratedTerminal",
-      "args": "tests/testing.lucli"
+      "args": "tests/testing.lucli",
+      "env": {
+        "TEST_NAME": "Mark from Env"
+      }
     },
     {
       "type": "java",
@@ -160,7 +164,10 @@
       "mainClass": "org.lucee.lucli.LuCLI",
       "projectName": "lucli",
       "console": "integratedTerminal",
-      "args": "--verbose --debug tests/testing.lucli"
+      "args": "--verbose --debug tests/testing.lucli",
+      "env": {
+        "TEST_NAME": "Mark from Env"
+      }
     },
     {
       "type": "java",

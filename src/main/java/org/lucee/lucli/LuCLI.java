@@ -238,9 +238,81 @@ public class LuCLI {
             return 0;
         }
 
+        // Script-scoped variables defined via "Set NAME=\"value\"" directives.
+        // java.util.Map<String,String> scriptVars = new java.util.HashMap<>();
+        // Make them visible as script-local environment overrides for this thread.
+        
+        // java.util.regex.Pattern setPattern = java.util.regex.Pattern.compile("(?i)^\\s*set\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(.*)$");
+        // java.util.regex.Pattern placeholderPattern = java.util.regex.Pattern.compile("\\$\\{([^}]+)\\}");
+
+        // Helper to expand ${VAR} from scriptVars only.
+        // Function<String,String> applyScriptVars = (text) -> {
+        //     if (text == null || text.isEmpty()) {
+        //         return text;
+        //     }
+        //     java.util.regex.Matcher m = placeholderPattern.matcher(text);
+        //     StringBuffer sb = new StringBuffer();
+        //     while (m.find()) {
+        //         String key = m.group(1);
+        //         String replacement = scriptVars.get(key);
+        //         if (replacement != null) {
+        //             m.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(replacement));
+        //         } else {
+        //             // leave placeholder as-is
+        //             m.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(m.group(0)));
+        //         }
+        //     }
+        //     m.appendTail(sb);
+        //     return sb.toString();
+        // };
+
+        // Process each line:
+        //  - handle "Set VAR=..." directives
+        //  - expand ${VAR} from scriptVars
+        //  - then run through StringOutput for global placeholders/env/etc.
+        java.util.List<String> processedLines = new java.util.ArrayList<>();
+        StringOutput stringOutput = StringOutput.getInstance();
+        for (String line : lines) {
+            if (line == null) {
+                continue;
+            }
+
+            String trimmed = line.trim();
+            if (trimmed.isEmpty()) {
+                // Skip blank lines in scripts
+                continue;
+            }
+
+             String processedLine = stringOutput.process(line);
+            processedLines.add(processedLine);
+            // java.util.regex.Matcher setMatcher = setPattern.matcher(trimmed);
+            // if (setMatcher.matches()) {
+            //     String varName = setMatcher.group(1);
+            //     String rawValue = setMatcher.group(2).trim();
+
+            //     // Remove optional surrounding single or double quotes
+            //     if (rawValue.length() >= 2 &&
+            //         ((rawValue.startsWith("\"") && rawValue.endsWith("\"")) ||
+            //          (rawValue.startsWith("'") && rawValue.endsWith("'")))) {
+            //         rawValue = rawValue.substring(1, rawValue.length() - 1);
+            //     }
+
+            //     // Allow previously defined script variables in the value.
+            //     String expandedValue = applyScriptVars.apply(rawValue);
+            //     scriptVars.put(varName, expandedValue);
+            //     // 'Set' lines are directives, not commands to execute
+            //     continue;
+            // }
+
+            // // First expand script variables, then global placeholders
+            // String withScriptVars = applyScriptVars.apply(line);
+           
+        }
+        
         // Execute using InteractiveTerminal's script mode
-        // This redirects stdin to feed the script lines
-        String content = String.join("\n", lines) + "\n";
+        // This redirects stdin to feed the processed script lines
+        String content = String.join("\n", processedLines) + "\n";
+
         java.io.InputStream originalIn = System.in;
         try {
             System.setIn(new java.io.ByteArrayInputStream(content.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
@@ -254,6 +326,7 @@ public class LuCLI {
             return 1;
         } finally {
             System.setIn(originalIn);
+
         }
     }
     
