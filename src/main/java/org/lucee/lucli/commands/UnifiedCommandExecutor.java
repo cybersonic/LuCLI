@@ -169,7 +169,7 @@ public class UnifiedCommandExecutor {
             // Load configuration to get monitoring/JMX port and agent info
             LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(projectDir);
             
-            result.append("✅ Server started successfully!\n");
+           
             result.append("   Server Name:   ").append(instance.getServerName()).append("\n");
             result.append("   Process ID:    ").append(instance.getPid()).append("\n");
             result.append("   HTTP Port:     ").append(instance.getPort()).append("\n");
@@ -186,8 +186,9 @@ public class UnifiedCommandExecutor {
             }
             
             result.append("   URL:           http://localhost:").append(instance.getPort()).append("\n");
-            result.append("   Web Root:      ").append(projectDir);
-            
+            result.append("   Admin URL:     http://localhost:").append(instance.getPort()).append("/lucee/admin.cfm\n");
+            result.append("   Web Root:      ").append(projectDir).append("\n");
+             result.append("✅ Server started successfully!\n");
             return formatOutput(result.toString(), false);
             
         } catch (ServerConflictException e) {
@@ -262,7 +263,7 @@ public class UnifiedCommandExecutor {
 
         handleServerStop(serverManager, args);
         handleServerStart(serverManager, args);
-        return "Server Restarted Successfully\n\n";
+        return "";
     }
     
     private String handleServerStatus(LuceeServerManager serverManager, String[] args) throws Exception {

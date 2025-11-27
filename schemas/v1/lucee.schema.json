@@ -134,6 +134,15 @@
         }
       },
       "default": {}
+    },
+    "configuration": {
+      "type": "object",
+      "description": "Inline Lucee CFConfig configuration to be written to lucee-server/context/.CFConfig.json on server start. The structure should match Lucee's .CFConfig.json format.",
+      "additionalProperties": true
+    },
+    "configurationFile": {
+      "type": "string",
+      "description": "Path to an external CFConfig JSON file. May be relative to the project directory or an absolute path. Used when 'configuration' is not set."
     }
   }
 }

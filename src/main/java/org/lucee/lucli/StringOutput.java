@@ -212,6 +212,12 @@ public class StringOutput {
             return System.getenv(envVar);
         }
         
+        // Fallback: treat ${FOO} as ${ENV_FOO} / ${FOO from env}
+        String envValue = System.getenv(placeholder);
+        if (envValue != null) {
+            return envValue;
+        }
+
         // Handle time format placeholders
         if (placeholder.startsWith(TIME_PREFIX)) {
             String format = placeholder.substring(TIME_PREFIX.length());
@@ -228,7 +234,7 @@ public class StringOutput {
             return getDynamicEmoji(emojiName);
         }
         
-        return null;
+        return null; //this might need to return a "" rather than null
     }
     
     /**

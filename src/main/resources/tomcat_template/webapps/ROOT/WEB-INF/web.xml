@@ -126,7 +126,7 @@
         <welcome-file>index.htm</welcome-file>
     </welcome-file-list>
 
-    <!-- Protect LuCEE/LuCLI configuration files from direct HTTP access -->
+    <!-- Protect Lucee/LuCLI configuration files from direct HTTP access -->
     <security-constraint>
         <web-resource-collection>
             <web-resource-name>Lucee configuration</web-resource-name>
