@@ -18,6 +18,9 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import java.net.URI;
+import java.awt.Desktop;
+import java.awt.GraphicsEnvironment;
 
 /**
  * Manages Lucee server instances - downloading, configuring, starting, and stopping servers
@@ -228,6 +231,10 @@ public class LuceeServerManager {
         
         // Wait for server to start
         waitForServerStartup(instance, 30); // 30 second timeout
+        
+
+        // Open the browser if enabled. 
+        openBrowserForServer(instance, config);
         
         return instance;
     }
@@ -668,6 +675,47 @@ public class LuceeServerManager {
              .forEach(File::delete);
     }
     
+
+    /**
+     * Open the configured browser URL (or default) for a started server.
+     * This is best-effort and should not cause server startup to fail.
+     */
+    private void openBrowserForServer(ServerInstance instance, LuceeServerConfig.ServerConfig config) {
+        if (config == null || !config.openBrowser) {
+            return;
+        }
+
+        String url = config.openBrowserURL;
+        if (url == null || url.trim().isEmpty()) {
+            url = "http://localhost:" + instance.getPort() + "/";
+        }
+
+        try {
+            // Prefer Desktop API when available and not headless
+            if (!GraphicsEnvironment.isHeadless()
+                    && Desktop.isDesktopSupported()
+                    && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+                Desktop.getDesktop().browse(new URI(url));
+                return;
+            }
+
+            // Fallback: small OS-specific commands
+            String os = System.getProperty("os.name", "").toLowerCase();
+
+            if (os.contains("mac")) {
+                new ProcessBuilder("open", url).start();
+            } else if (os.contains("win")) {
+                new ProcessBuilder("cmd", "/c", "start", "\"\"", url).start();
+            } else {
+                new ProcessBuilder("xdg-open", url).start();
+            }
+        } catch (Exception e) {
+            System.err.println("Could not open browser for URL " + url + ": " + e.getMessage());
+        }
+    }
+
+
+
     /**
      * Ensure Lucee Express for the specified version is available
      */
