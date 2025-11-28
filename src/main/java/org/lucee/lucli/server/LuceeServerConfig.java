@@ -28,7 +28,12 @@ public class LuceeServerConfig {
         public JvmConfig jvm = new JvmConfig();
         public UrlRewriteConfig urlRewrite = new UrlRewriteConfig();
         public AdminConfig admin = new AdminConfig();
+        // Agent configurations by name
         public Map<String, AgentConfig> agents = new HashMap<>();
+
+        // Browser Opening Behaviour
+        public boolean openBrowser = true;
+        public String openBrowserURL;
 
         /**
          * Optional Lucee server configuration to be written to lucee-server/context/.CFConfig.json.
@@ -113,6 +118,14 @@ public class LuceeServerConfig {
             config.agents = new HashMap<>();
         }
         
+
+        // Ensure browser config has sensible defaults for older configs
+        // (Jackson will leave primitive boolean as false when field is absent,
+        // so we only need to guard against null String.)
+        if (config.openBrowserURL != null && config.openBrowserURL.trim().isEmpty()) {
+            config.openBrowserURL = null;
+        }
+
         // Don't resolve port conflicts here - do it just before starting server
         // This prevents race conditions where ports become unavailable between config load and server start
         
