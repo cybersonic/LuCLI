@@ -17,15 +17,17 @@ import org.lucee.lucli.cli.completion.DynamicArgumentCompletion;
 /**
  * Module management command using Picocli
  */
-@Command(
-    name = "modules",
-    aliases = {"module"},
-    description = "Manage LuCLI modules",
-    subcommands = {
+    @Command(
+        name = "modules",
+        aliases = {"module"},
+        description = "Manage LuCLI modules",
+        subcommands = {
         ModulesCommand.ListCommand.class,
         ModulesCommand.InitCommand.class,
         ModulesCommand.RunCommand.class,
-        ModulesCommand.InstallCommand.class
+        ModulesCommand.InstallCommand.class,
+        ModulesCommand.UninstallCommand.class,
+        ModulesCommand.UpdateCommand.class
     }
 )
 public class ModulesCommand implements Callable<Integer> {
@@ -106,25 +108,102 @@ public class ModulesCommand implements Callable<Integer> {
         @Parameters(paramLabel = "MODULE_NAME", description = "Name of module to install")
         private String moduleName;
         
-        @Option(names = {"-u", "--url"}, description = "Git URL (overrides registry lookup)")
+        @Option(names = {"-u", "--url"}, description = "Git URL to install from (e.g. https://github.com/user/repo.git[#ref]]")
         private String gitUrl;
         
         @Override
         public Integer call() throws Exception {
-            System.out.println("This is the install command. Not impemented yet");
-            // This will redirect to `lucli install <args>` 
-            // UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, Paths.get(System.getProperty("user.dir")));
-            // String result = executor.executeCommand("modules", new String[]{"install", moduleName, gitUrl});
-            // if (result != null && !result.isEmpty()) {
-            //     System.out.println(result);
-            // }
+            // Create UnifiedCommandExecutor for CLI mode
+            UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, Paths.get(System.getProperty("user.dir")));
+
+            java.util.List<String> args = new java.util.ArrayList<>();
+            args.add("install");
+            if (moduleName != null) {
+                args.add(moduleName);
+            }
+            if (gitUrl != null && !gitUrl.isEmpty()) {
+                args.add("--url");
+                args.add(gitUrl);
+            }
+
+            String result = executor.executeCommand("modules", args.toArray(new String[0]));
+            if (result != null && !result.isEmpty()) {
+                System.out.println(result);
+            }
             return 0;
         } 
     }   
+ 
+ 
+    @Command(
+        name = "uninstall",
+        description = "Uninstall (remove) a module"
+    )
+    static class UninstallCommand implements Callable<Integer> {
 
+        @Parameters(paramLabel = "MODULE_NAME", description = "Name of module to uninstall")
+        private String moduleName;
 
-    /**
-     * Modules run subcommand
+        @Override
+        public Integer call() throws Exception {
+            UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, Paths.get(System.getProperty("user.dir")));
+
+            java.util.List<String> args = new java.util.ArrayList<>();
+            args.add("uninstall");
+            if (moduleName != null && !moduleName.isEmpty()) {
+                args.add(moduleName);
+            }
+
+            String result = executor.executeCommand("modules", args.toArray(new String[0]));
+            if (result != null && !result.isEmpty()) {
+                System.out.println(result);
+            }
+            return 0;
+        }
+    }
+
+    @Command(
+        name = "update",
+        description = "Update a module from git"
+    )
+    static class UpdateCommand implements Callable<Integer> {
+
+        @Parameters(paramLabel = "MODULE_NAME", description = "Name of module to update")
+        private String moduleName;
+
+        @Option(names = {"-u", "--url"}, description = "Git URL to update from (e.g. https://github.com/user/repo.git[#ref]]")
+        private String gitUrl;
+
+        @Option(names = {"-f", "--force"}, description = "Overwrite existing module if it already exists")
+        private boolean force;
+
+        @Override
+        public Integer call() throws Exception {
+            UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, Paths.get(System.getProperty("user.dir")));
+
+            java.util.List<String> args = new java.util.ArrayList<>();
+            args.add("update");
+            if (moduleName != null && !moduleName.isEmpty()) {
+                args.add(moduleName);
+            }
+            if (gitUrl != null && !gitUrl.isEmpty()) {
+                args.add("--url");
+                args.add(gitUrl);
+            }
+            if (force) {
+                args.add("--force");
+            }
+
+            String result = executor.executeCommand("modules", args.toArray(new String[0]));
+            if (result != null && !result.isEmpty()) {
+                System.out.println(result);
+            }
+            return 0;
+        }
+    }
+
+     /**
+      * Modules run subcommand
      * TODO: We should be able to add subcommands here, so for exampple
      * lucli lint export arg=1 arg2=etc
      */
