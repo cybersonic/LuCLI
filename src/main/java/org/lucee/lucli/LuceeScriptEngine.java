@@ -38,6 +38,8 @@ public class LuceeScriptEngine {
     private boolean verbose;
     private boolean debug;
     
+    // Ensure we only perform BaseModule synchronization once per JVM
+    private boolean baseModuleEnsured = false;
 
     // Helper methods - moved from LuCLI
     
@@ -220,6 +222,8 @@ public class LuceeScriptEngine {
      */
     public void executeModule(String moduleName, String[] scriptArgs) throws Exception {
         
+            // Ensure shared BaseModule.cfc in ~/.lucli/modules matches this LuCLI version
+            ensureBaseModuleUpToDate();
             
             String subCommand = "main";
             ParsedArguments parsedArgs = parseArguments(scriptArgs);
@@ -750,6 +754,81 @@ public class LuceeScriptEngine {
             }
         }
         return homeDir;
+    }
+    
+    /**
+     * Ensure the shared BaseModule.cfc in ~/.lucli/modules is in sync with the
+     * version bundled in this LuCLI JAR. We pin the file to the LuCLI version,
+     * so it is only refreshed when LuCLI itself is upgraded.
+     */
+    private void ensureBaseModuleUpToDate() {
+        if (baseModuleEnsured) {
+            return;
+        }
+
+        try {
+            // Resolve ~/.lucli/modules
+            Path lucliHome = getLucliHomeDirectory();
+            Path modulesDir = lucliHome.resolve("modules");
+            Files.createDirectories(modulesDir);
+
+            // Determine current LuCLI version
+            String currentVersion = LuCLI.getVersion();
+            if (currentVersion == null || currentVersion.trim().isEmpty()) {
+                currentVersion = "unknown";
+            }
+
+            // Version marker file for BaseModule
+            Path versionFile = modulesDir.resolve(".BaseModule.version");
+            String storedVersion = null;
+            if (Files.exists(versionFile)) {
+                try {
+                    storedVersion = Files.readString(versionFile).trim();
+                } catch (IOException e) {
+                    if (isDebugMode()) {
+                        System.err.println("Warning: Failed to read BaseModule version file: " + e.getMessage());
+                    }
+                }
+            }
+
+            Path targetBaseModule = modulesDir.resolve("BaseModule.cfc");
+
+            boolean needsUpdate = !Files.exists(targetBaseModule) || storedVersion == null || !storedVersion.equals(currentVersion);
+
+            if (needsUpdate) {
+                // Copy BaseModule.cfc from JAR resources into ~/.lucli/modules
+                try (java.io.InputStream is = LuceeScriptEngine.class.getResourceAsStream("/modules/BaseModule.cfc")) {
+                    if (is == null) {
+                        if (isDebugMode()) {
+                            System.err.println("Warning: BaseModule.cfc resource not found in JAR");
+                        }
+                        return;
+                    }
+                    Files.copy(is, targetBaseModule, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                }
+
+                // Persist the LuCLI version this BaseModule.cfc is synced with
+                try {
+                    Files.writeString(versionFile, currentVersion + System.lineSeparator());
+                } catch (IOException e) {
+                    if (isDebugMode()) {
+                        System.err.println("Warning: Failed to write BaseModule version file: " + e.getMessage());
+                    }
+                }
+
+                if (isVerboseMode()) {
+                    System.out.println("Synchronized ~/.lucli/modules/BaseModule.cfc for LuCLI version " + currentVersion);
+                }
+            }
+        } catch (IOException e) {
+            if (isDebugMode()) {
+                System.err.println("Warning: Failed to ensure BaseModule.cfc is up to date: " + e.getMessage());
+            }
+        } finally {
+            // Avoid repeating the check within the same JVM; version-based
+            // marker ensures we refresh on future LuCLI upgrades.
+            baseModuleEnsured = true;
+        }
     }
     
     /**
