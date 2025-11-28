@@ -473,12 +473,17 @@ private static ModuleOptions parseArguments(String[] args) {
     }
     
 /**
-     * Install a module from a git URL into ~/.lucli/modules
+     * Install a module from a URL into ~/.lucli/modules.
+     *
+     * Supported forms (precedence):
+     *  1) Direct archive URL (zip/tar.gz)
+     *  2) Git URL via `git clone` when git is available
+     *  3) GitHub HTTPS URL fallback to archive download when git is not available
      */
 private static void installModule(String moduleName, String gitUrl, boolean force) throws Exception {
         // Phase 1: require explicit URL
         if (gitUrl == null || gitUrl.trim().isEmpty()) {
-            System.err.println("modules install currently requires --url=<git-url> (registry-based installs are not implemented yet).");
+            System.err.println("modules install currently requires --url=<url> (registry-based installs are not implemented yet).");
             System.exit(1);
         }
 
@@ -493,25 +498,34 @@ private static void installModule(String moduleName, String gitUrl, boolean forc
             }
         }
 
-        // Create temp directory for clone
+        // Create temp working directory used by all strategies
         Path tempDir = Files.createTempDirectory("lucli-module-install-");
-        Path cloneDir = tempDir.resolve("repo");
 
         try {
-            // Clone repository
-            runGitCommand(null, new String[]{"git", "clone", "--depth", "1", baseUrl, cloneDir.toString()});
+            // Resolve the source directory (root of the unpacked/checked-out module)
+            Path sourceDir;
 
-            // Checkout specific ref if provided
-            if (ref != null && !ref.isEmpty()) {
-                runGitCommand(cloneDir, new String[]{"git", "checkout", ref});
+            if (isArchiveUrl(baseUrl)) {
+                // 1) Direct archive URL (zip/tar.gz) – no git required
+                sourceDir = installFromArchiveUrl(tempDir, baseUrl);
+            } else if (isGitAvailable()) {
+                // 2) Git available – use existing clone semantics
+                sourceDir = cloneWithGit(tempDir, baseUrl, ref);
+            } else if (isGithubHttpsUrl(baseUrl)) {
+                // 3) Git not available, but GitHub HTTPS URL – fall back to archive
+                sourceDir = installFromGithubArchive(tempDir, baseUrl, ref);
+            } else {
+                System.err.println("git is not installed and the provided URL is not a supported archive or GitHub HTTPS URL.");
+                System.exit(1);
+                return; // keep compiler happy
             }
 
             // Validate module structure (module.json + Module.cfc at repo root)
-            Path moduleJson = cloneDir.resolve("module.json");
-            Path moduleCfc = cloneDir.resolve("Module.cfc");
+            Path moduleJson = sourceDir.resolve("module.json");
+            Path moduleCfc = sourceDir.resolve("Module.cfc");
 
             if (!Files.exists(moduleJson) || !Files.exists(moduleCfc)) {
-                System.err.println("Cloned repository does not appear to be a valid LuCLI module.");
+                System.err.println("Downloaded repository does not appear to be a valid LuCLI module.");
                 System.err.println("Expected module.json and Module.cfc in the repository root.");
                 System.exit(1);
             }
@@ -563,14 +577,17 @@ private static void installModule(String moduleName, String gitUrl, boolean forc
                 }
             }
 
-            // Copy cloned contents into ~/.lucli/modules/<name>, excluding .git
+            // Copy source contents into ~/.lucli/modules/<name>, excluding .git
             Files.createDirectories(targetDir);
-            try (Stream<Path> paths = Files.walk(cloneDir)) {
+            try (Stream<Path> paths = Files.walk(sourceDir)) {
                 paths.forEach(source -> {
                     try {
-                        Path relative = cloneDir.relativize(source);
+                        Path relative = sourceDir.relativize(source);
                         if (relative.toString().startsWith(".git")) {
                             return; // skip git metadata
+                        }
+                        if (relative.toString().isEmpty()) {
+                            return; // skip root itself
                         }
                         Path dest = targetDir.resolve(relative);
                         if (Files.isDirectory(source)) {
@@ -632,6 +649,125 @@ private static void installModule(String moduleName, String gitUrl, boolean forc
         int exitCode = process.waitFor();
         if (exitCode != 0) {
             throw new IOException("git command failed with exit code " + exitCode + ": " + String.join(" ", command));
+        }
+    }
+    
+    /**
+     * Return true if git is available on PATH.
+     */
+    private static boolean isGitAvailable() {
+        try {
+            Process p = new ProcessBuilder("git", "--version")
+                .redirectErrorStream(true)
+                .start();
+            int exit = p.waitFor();
+            return exit == 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    /**
+     * Return true if URL looks like an archive we can download directly.
+     */
+    private static boolean isArchiveUrl(String url) {
+        String lower = url.toLowerCase();
+        return lower.endsWith(".zip") || lower.endsWith(".tar.gz") || lower.endsWith(".tgz");
+    }
+    
+    /**
+     * Return true if URL is a GitHub HTTPS URL.
+     */
+    private static boolean isGithubHttpsUrl(String url) {
+        return url.startsWith("https://github.com/");
+    }
+    
+    /**
+     * Clone a repository into a temporary directory using git and return the repo root.
+     */
+    private static Path cloneWithGit(Path tempDir, String baseUrl, String ref) throws Exception {
+        Path cloneDir = tempDir.resolve("repo");
+        runGitCommand(null, new String[]{"git", "clone", "--depth", "1", baseUrl, cloneDir.toString()});
+
+        // Checkout specific ref if provided
+        if (ref != null && !ref.isEmpty()) {
+            runGitCommand(cloneDir, new String[]{"git", "checkout", ref});
+        }
+
+        return cloneDir;
+    }
+    
+    /**
+     * Install from a direct archive URL (zip/tar.gz) and return the repo root directory.
+     * Currently supports .zip; .tar.gz/.tgz are reserved for future use.
+     */
+    private static Path installFromArchiveUrl(Path tempDir, String archiveUrl) throws IOException {
+        Path downloadDir = tempDir.resolve("download");
+        Files.createDirectories(downloadDir);
+
+        if (archiveUrl.toLowerCase().endsWith(".zip")) {
+            Path zipFile = downloadDir.resolve("module.zip");
+            try (java.io.InputStream in = new java.net.URL(archiveUrl).openStream()) {
+                Files.copy(in, zipFile);
+            }
+            Path extractDir = tempDir.resolve("extract");
+            Files.createDirectories(extractDir);
+            unzip(zipFile, extractDir);
+
+            // Most archives should either contain files directly or a single top-level dir
+            try (Stream<Path> children = Files.list(extractDir)) {
+                return children
+                    .filter(Files::isDirectory)
+                    .findFirst()
+                    .orElse(extractDir);
+            }
+        }
+
+        // Other archive types (tar.gz) can be added later
+        throw new IOException("Unsupported archive URL: " + archiveUrl + " (only .zip is currently supported)");
+    }
+    
+    /**
+     * Install from a GitHub HTTPS URL by downloading a zip archive instead of using git.
+     */
+    private static Path installFromGithubArchive(Path tempDir, String baseUrl, String ref) throws IOException {
+        String repo = baseUrl;
+        if (repo.endsWith(".git")) {
+            repo = repo.substring(0, repo.length() - 4);
+        }
+
+        String archiveUrl;
+        if (ref != null && !ref.isEmpty()) {
+            // Prefer tag archives; callers should pass branch/tag appropriately
+            archiveUrl = repo + "/archive/refs/tags/" + ref + ".zip";
+        } else {
+            // Default to main; in the future we could try main then master
+            archiveUrl = repo + "/archive/refs/heads/main.zip";
+        }
+
+        return installFromArchiveUrl(tempDir, archiveUrl);
+    }
+    
+    /**
+     * Simple zip extraction helper used by archive-based installs.
+     */
+    private static void unzip(Path zipFile, Path targetDir) throws IOException {
+        try (java.util.zip.ZipInputStream zis =
+                 new java.util.zip.ZipInputStream(Files.newInputStream(zipFile))) {
+            java.util.zip.ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                Path outPath = targetDir.resolve(entry.getName()).normalize();
+                if (!outPath.startsWith(targetDir)) {
+                    throw new IOException("Zip entry outside target dir: " + entry.getName());
+                }
+                if (entry.isDirectory()) {
+                    Files.createDirectories(outPath);
+                } else {
+                    Files.createDirectories(outPath.getParent());
+                    Files.copy(zis, outPath);
+                }
+                zis.closeEntry();
+            }
         }
     }
     
