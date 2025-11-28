@@ -169,9 +169,12 @@ Shows module management commands:
 Usage: lucli modules [COMMAND]
 Manage LuCLI modules
 Commands:
-  list  List available modules
-  init  Initialize a new module
-  run   Run a module
+  list      List available modules
+  init      Initialize a new module
+  run       Run a module
+  install   Install a module from git
+  uninstall Uninstall a module
+  update    Update a module from git
 ```
 
 ### Module Subcommand Help
