@@ -16,3 +16,5 @@ no_commit/
 .classpath
 .project
 TEST_RESULTS.md
+express_demo/
+documentation/todo/
