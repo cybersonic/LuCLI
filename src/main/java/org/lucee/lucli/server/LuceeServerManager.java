@@ -179,7 +179,7 @@ public class LuceeServerManager {
                 }
             }
             
-            if (config.monitoring != null && config.monitoring.jmx != null && !LuceeServerConfig.isPortAvailable(config.monitoring.jmx.port)) {
+            if (config.monitoring != null && config.monitoring.jmx != null && config.monitoring.enabled && !LuceeServerConfig.isPortAvailable(config.monitoring.jmx.port)) {
                 if (jmxPortServer != null) {
                     errorMessage.append("• JMX port ").append(config.monitoring.jmx.port)
                             .append(" is being used by Lucee server '").append(jmxPortServer).append("'\n")
@@ -834,16 +834,20 @@ public class LuceeServerManager {
         }
     }
     
-/**
+    /**
      * Launch the server process using Lucee Express startup script
      */
     private ServerInstance launchServerProcess(Path serverInstanceDir, LuceeServerConfig.ServerConfig config, 
                                              Path projectDir, Path luceeExpressDir,
                                              AgentOverrides agentOverrides) throws Exception {
         
+        // Choose the appropriate startup script based on OS
+        boolean isWindows = System.getProperty("os.name", "").toLowerCase().contains("win");
+        String scriptName = isWindows ? "startup.bat" : "startup.sh";
+        
         // Use the Lucee Express startup script
-        Path startupScript = luceeExpressDir.resolve("startup.sh");
-        if (!Files.exists(startupScript) || !Files.isExecutable(startupScript)) {
+        Path startupScript = luceeExpressDir.resolve(scriptName);
+        if (!Files.exists(startupScript) || (!isWindows && !Files.isExecutable(startupScript))) {
             throw new Exception("Lucee Express startup script not found or not executable: " + startupScript);
         }
         

@@ -22,6 +22,11 @@ public class TomcatConfigGenerator {
         "https://repo1.maven.org/maven2/org/tuckey/urlrewritefilter/" + URLREWRITE_VERSION +
         "/urlrewritefilter-" + URLREWRITE_VERSION + ".jar";
     
+    // XML patchers for server.xml and web.xml. Initially no-op; behavior will
+    // be introduced incrementally in follow-up changes.
+    private final TomcatServerXmlPatcher serverXmlPatcher = new TomcatServerXmlPatcher();
+    private final TomcatWebXmlPatcher webXmlPatcher = new TomcatWebXmlPatcher();
+    
     /**
      * Generate complete server instance by copying Lucee Express and applying templates.
      *
@@ -58,23 +63,48 @@ public class TomcatConfigGenerator {
         Path patchesDir = getLucliHome().resolve("patches");
         Files.createDirectories(patchesDir);
         
-        // Apply server.xml template
-        applyTemplate("tomcat_template/conf/server.xml", serverInstanceDir.resolve("conf/server.xml"), placeholders);
+        // Use the vendor-provided server.xml copied from Lucee Express and let
+        // the XML patcher handle any modifications. For now, the patcher only
+        // parses and writes the XML back out without semantic changes.
+        Path serverXmlPath = serverInstanceDir.resolve("conf/server.xml");
+        serverXmlPatcher.patch(serverXmlPath, config, projectDir, serverInstanceDir);
         
-        // Apply logging.properties template
+        // Apply logging.properties template (still template-based for now)
         applyTemplate("tomcat_template/conf/logging.properties", serverInstanceDir.resolve("conf/logging.properties"), placeholders);
         
-        // Apply web.xml template to PROJECT directory's WEB-INF (for docBase configuration reading)
+        // For web.xml, start from the vendor-provided ROOT web.xml inside the
+        // copied Lucee Express distribution, then copy it into the project
+        // WEB-INF if appropriate and let the XML patcher handle any
+        // modifications (currently parse+write only).
         Path webroot = LuceeServerConfig.resolveWebroot(config, projectDir);
         Path webrootWebInf = webroot.resolve("WEB-INF");
         Files.createDirectories(webrootWebInf);
         Path projectWebXml = webrootWebInf.resolve("web.xml");
-        
-        if (overwriteProjectConfig || !Files.exists(projectWebXml)) {
-            applyWebXmlTemplate("tomcat_template/webapps/ROOT/WEB-INF/web.xml", projectWebXml, placeholders, config);
+
+        // Determine the vendor web.xml location. Prefer the traditional
+        // ROOT/WEB-INF/web.xml, but fall back to conf/web.xml for Lucee
+        // Express layouts that place the global web.xml there.
+        Path vendorRootWebXml = serverInstanceDir.resolve("webapps/ROOT/WEB-INF/web.xml");
+        if (!Files.exists(vendorRootWebXml)) {
+            Path confWebXml = serverInstanceDir.resolve("conf/web.xml");
+            if (Files.exists(confWebXml)) {
+                vendorRootWebXml = confWebXml;
+            }
+        }
+
+        if (Files.exists(vendorRootWebXml) && (overwriteProjectConfig || !Files.exists(projectWebXml))) {
+            Files.copy(vendorRootWebXml, projectWebXml, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        } else if (!Files.exists(projectWebXml)) {
+            System.out.println("No vendor web.xml found at " + vendorRootWebXml.toAbsolutePath() +
+                " and no existing project web.xml to preserve.");
         } else {
             System.out.println("Preserving existing project web.xml at " + projectWebXml.toAbsolutePath());
         }
+
+        // Let the XML patcher parse and re-write the project web.xml. This is
+        // currently a no-op in terms of configuration changes but exercises
+        // the DOM load/save pipeline.
+        webXmlPatcher.patch(projectWebXml, config, projectDir, serverInstanceDir);
         
         // Apply urlrewrite.xml template to PROJECT directory only if URL rewrite is enabled
         if (config.urlRewrite != null && config.urlRewrite.enabled) {

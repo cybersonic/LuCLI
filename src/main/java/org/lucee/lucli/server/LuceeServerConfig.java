@@ -374,7 +374,7 @@ public class LuceeServerConfig {
         }
         
         // Check JMX port
-        if (config.monitoring != null && config.monitoring.jmx != null) {
+        if (config.monitoring != null && config.monitoring.jmx != null && config.monitoring.enabled) {
             if (!isPortAvailable(config.monitoring.jmx.port)) {
                 hasConflicts = true;
                 conflictMessages.append("JMX port ").append(config.monitoring.jmx.port).append(" is already in use");
