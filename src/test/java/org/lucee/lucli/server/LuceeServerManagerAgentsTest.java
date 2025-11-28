@@ -19,16 +19,10 @@ import org.lucee.lucli.server.LuceeServerManager;
  */
 public class LuceeServerManagerAgentsTest {
 
-    @SuppressWarnings("unchecked")
     private List<String> invokeBuildCatalinaOpts(LuceeServerConfig.ServerConfig config,
                                                 LuceeServerManager.AgentOverrides overrides) throws Exception {
         LuceeServerManager manager = new LuceeServerManager();
-        Method m = LuceeServerManager.class.getDeclaredMethod(
-                "buildCatalinaOpts",
-                LuceeServerConfig.ServerConfig.class,
-                LuceeServerManager.AgentOverrides.class);
-        m.setAccessible(true);
-        return (List<String>) m.invoke(manager, config, overrides);
+        return manager.buildCatalinaOpts(config, overrides);
     }
 
     @SuppressWarnings("unchecked")
