@@ -36,6 +36,16 @@
     },
     {
       "type": "java",
+      "name": "🔌📦 LucCLI Module Install",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["--debug", "modules", "install", "hello-world", "--url=https://github.com/cybersonic/lucli-hello-world.git"],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "java",
       "name": "🔌 LucCLI Module",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",

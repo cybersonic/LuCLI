@@ -6,6 +6,9 @@ Commands:
   list                       List all installed modules (default)
   init [module-name]         Initialize a new module
   run <module-name> [args]   Run a specific module with arguments
+  install [name] [options]   Install a module from git
+  uninstall <name>           Uninstall a module
+  update <name> [options]    Update a module from git
 
 Options:
   -v, --verbose              Enable verbose output
@@ -17,6 +20,10 @@ Examples:
   lucli modules init                     # Initialize module (interactive)
   lucli modules init my-awesome-module   # Initialize named module
   lucli modules run my-module arg1 arg2  # Run a module with arguments
+  lucli modules install lang -u https://github.com/user/lang-module.git          # Install with explicit name
+  lucli modules install -u https://github.com/user/lang-module.git --force      # Install using name from module.json and overwrite if exists
+  lucli modules uninstall lang                                              # Uninstall a module
+  lucli modules update lang -u https://github.com/user/lang-module.git --force # Update a module from git
 
 Module Directory:
   Modules are stored in ~/.lucli/modules/
