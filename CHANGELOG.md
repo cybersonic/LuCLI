@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+- Added documentation for lucee.json and upated the schema for `enableLucee=true` by default.
+- Updated to lucee 7.0.1.93-SNAPSHOT and Java 21.
+- Enable both `--argument=something` and `argument=something` as well as converting `--argument` to `argument=true` and `--no-argument` to `argument=false` in LuCLI one-shot command execution for better compatibility with various shells and scripts.
+- Added Timer utility to lucli file execution. 
+- Adapted Timer utility to print out columns correctly
+- Lucli modules now accept any parameters via Picocli @Option annotations.
+- Adding unmatched commands to server start command so that we can pass through arbitrary lucee server options.
+- Updating checking of all ports for conflicts before starting server, including HTTP, JMX, and shutdown ports.
+- Adding output and backgound colours to the BaseModule for output. 
+- Removed BaseModule functions from the Module.cfc template
+- updated tests/test.sh test script
+
 ## 0.1.121
 
 - Add first-class Java agent support for Lucee servers via `lucee.json`:

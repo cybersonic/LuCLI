@@ -203,7 +203,7 @@ public class LuceeServerManager {
         StringBuilder portInfo = new StringBuilder();
         portInfo.append("Starting server '").append(config.name).append("' on:");
         portInfo.append("\n  HTTP port:     ").append(config.port);
-        portInfo.append("\n  Shutdown port: ").append(LuceeServerConfig.getShutdownPort(config.port));
+        portInfo.append("\n  Shutdown port: ").append(LuceeServerConfig.getEffectiveShutdownPort(config));
         if (config.monitoring != null && config.monitoring.enabled && config.monitoring.jmx != null) {
             portInfo.append("\n  JMX port:      ").append(config.monitoring.jmx.port);
         }

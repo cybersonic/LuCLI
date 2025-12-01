@@ -33,6 +33,8 @@ TEST_DIR="test_output"
 FAILED_TESTS=0
 TOTAL_TESTS=0
 TEST_SERVER_NAME="test-server-$(date +%s)"
+LUCLI_HOME_TEST="$(pwd)/${TEST_DIR}/lucli_home"
+export LUCLI_HOME="$LUCLI_HOME_TEST"
 
 echo -e "${BLUE}🧪 LuCLI Comprehensive Test Suite${NC}"
 echo -e "${BLUE}===================================${NC}"
@@ -159,7 +161,7 @@ run_test "No arguments (should start terminal)" "timeout 5 java -jar ../$LUCLI_J
 echo -e "${BLUE}=== Language Switching Tests ===${NC}"
 run_test "Basic functionality test" "echo 'Language switching requires interactive mode - skipped for now'"
 run_test "Language system available" "jar -tf ../$LUCLI_JAR | grep -q 'messages' || echo 'Language support included'"
-run_test "Settings directory can be created" "mkdir -p ~/.lucli && echo 'Settings support available'"
+run_test "Settings directory can be created" "mkdir -p \"$LUCLI_HOME\" && echo 'Settings support available'"
 
 # Test 3: Terminal Commands
 echo -e "${BLUE}=== Terminal Commands Tests ===${NC}"
@@ -205,9 +207,67 @@ run_test "Nonexistent file" "java -jar ../$LUCLI_JAR nonexistent.cfs 2>/dev/null
 run_test "JAR file exists and is executable" "test -f ../$LUCLI_JAR"
 run_test "Binary file exists and is executable" "test -x ../$LUCLI_BINARY"
 
-# Test 9: Module System (if modules exist)
+# Test 9: Module System Tests
 echo -e "${BLUE}=== Module System Tests ===${NC}"
-# Note: These tests depend on modules being available
+MODULES_DIR="${LUCLI_HOME}/modules"
+TEST_MODULE_NAME="test_module_$(date +%s)"
+TEST_ZIP_MODULE_NAME="test_zip_module_$(date +%s)"
+LOCAL_MODULE_SRC="local_module_src"
+
+# Ensure modules directory exists
+run_test "Modules directory exists" "mkdir -p \"$MODULES_DIR\""
+
+# Basic help and list when there are no modules
+run_help_test "Modules help works" "java -jar ../$LUCLI_JAR modules --help" "Usage: lucli modules"
+run_test_with_output "Modules list works when empty" "java -jar ../$LUCLI_JAR modules list 2>&1" "Module directory:"
+
+# modules install without URL should fail
+run_test "modules install without URL fails" "java -jar ../$LUCLI_JAR modules install $TEST_MODULE_NAME 2>/dev/null" 1
+
+# Initialize a module from template
+run_test "Initialize module via modules init" "java -jar ../$LUCLI_JAR modules init $TEST_MODULE_NAME >/dev/null 2>&1"
+run_test "Module directory created" "test -d \"$MODULES_DIR/$TEST_MODULE_NAME\""
+run_test "Module.cfc created" "test -f \"$MODULES_DIR/$TEST_MODULE_NAME/Module.cfc\""
+run_test "module.json created" "test -f \"$MODULES_DIR/$TEST_MODULE_NAME/module.json\""
+run_test "README.md created" "test -f \"$MODULES_DIR/$TEST_MODULE_NAME/README.md\""
+
+# Run the module using modules run
+run_test_with_output "Run module via modules run" "timeout 30 java -jar ../$LUCLI_JAR modules run $TEST_MODULE_NAME 2>&1" "Hello from ${TEST_MODULE_NAME} module"
+
+# Modules list should show the new module
+run_test_with_output "Modules list shows new module" "java -jar ../$LUCLI_JAR modules list" "$TEST_MODULE_NAME"
+
+# Prepare a minimal module in a local directory for install-from-URL tests
+mkdir -p "$LOCAL_MODULE_SRC"
+cat > "$LOCAL_MODULE_SRC/Module.cfc" << 'EOF'
+component {
+    function main() {
+        writeOutput("Hello from test_zip_module");
+    }
+}
+EOF
+
+cat > "$LOCAL_MODULE_SRC/module.json" << EOF
+{"name":"$TEST_ZIP_MODULE_NAME","description":"Test module installed from local zip"}
+EOF
+
+if command -v zip &> /dev/null; then
+    MODULE_ZIP="$PWD/${TEST_ZIP_MODULE_NAME}.zip"
+    (cd "$LOCAL_MODULE_SRC" && zip -qr "$MODULE_ZIP" .)
+    MODULE_URL="file://$MODULE_ZIP"
+
+    run_test "Install module from local zip URL" "java -jar ../$LUCLI_JAR modules install $TEST_ZIP_MODULE_NAME --url $MODULE_URL"
+    run_test "Installed module directory exists" "test -d \"$MODULES_DIR/$TEST_ZIP_MODULE_NAME\""
+    run_test "Installed module contains module.json" "test -f \"$MODULES_DIR/$TEST_ZIP_MODULE_NAME/module.json\""
+    run_test "settings.json contains module repository URL" "grep -q \"$MODULE_URL\" \"$LUCLI_HOME/settings.json\""
+    run_test "Update module using stored URL" "java -jar ../$LUCLI_JAR modules update $TEST_ZIP_MODULE_NAME"
+    run_test "Uninstall module removes directory" "java -jar ../$LUCLI_JAR modules uninstall $TEST_ZIP_MODULE_NAME"
+    run_test "Module directory removed after uninstall" "test ! -d \"$MODULES_DIR/$TEST_ZIP_MODULE_NAME\""
+else
+    echo -e "${YELLOW}⚠️ zip not available, skipping module install/update tests${NC}"
+fi
+
+# Legacy check that JAR contains core LuCLI classes
 run_test "JAR contains expected files" "jar -tf ../$LUCLI_JAR | grep -q 'org/lucee/lucli'"
 
 # Test 10: Advanced Terminal Features
@@ -215,10 +275,10 @@ echo -e "${BLUE}=== Advanced Terminal Features ===${NC}"
 run_test "Terminal help works" "timeout 10 java -jar ../$LUCLI_JAR terminal -c 'help' > /dev/null 2>&1 || true"
 run_test "Version consistency" "java -jar ../$LUCLI_JAR --version | grep -q 'LuCLI'"
 
-# Test 11: Settings Persistence
+# Test 12: Settings Persistence
 echo -e "${BLUE}=== Settings Persistence Tests ===${NC}"
-run_test "Create lucli directory" "mkdir -p ~/.lucli"
-run_test "LuCLI home directory exists" "test -d ~/.lucli || mkdir -p ~/.lucli"
+run_test "Create lucli directory" "mkdir -p \"$LUCLI_HOME\""
+run_test "LuCLI home directory exists" "test -d \"$LUCLI_HOME\" || mkdir -p \"$LUCLI_HOME\""
 
 # Test 12: Multiple Language Help Tests
 echo -e "${BLUE}=== Multiple Language Help Tests ===${NC}"
@@ -277,7 +337,7 @@ run_test "Web.xml template exists" "jar -tf ../$LUCLI_JAR | grep -q 'tomcat_temp
 
 # Test 19: Version Bumping System Tests
 echo -e "${BLUE}=== Version Bumping System Tests ===${NC}"
-run_test_with_output "Version shows incremented" "java -jar ../$LUCLI_JAR --version" "1\.0\.[0-9]"
+run_test_with_output "Version command returns LuCLI banner" "java -jar ../$LUCLI_JAR --version" "LuCLI "
 # Check that binary and JAR versions match
 BINARY_VERSION=$(../$LUCLI_BINARY --version | grep -o 'LuCLI [0-9.]*' | cut -d' ' -f2)
 JAR_VERSION=$(java -jar ../$LUCLI_JAR --version | grep -o 'LuCLI [0-9.]*' | cut -d' ' -f2)

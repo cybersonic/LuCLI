@@ -36,6 +36,9 @@ Framework-style URL routing and rewriting configuration. Essential for building 
 
 ### Server Management
 
+**[Configuration (lucee.json)](CONFIGURATION.md)**  
+Full reference for `lucee.json` server configuration, including all available settings, defaults, and examples.
+
 **[Server Agents](SERVER_AGENTS.md)**  
 Configure and use Java agents with LuCLI servers, including the Lucee step debugger and custom JVM agents. Learn about agent configuration, JVM arguments, and debugging setup.
 

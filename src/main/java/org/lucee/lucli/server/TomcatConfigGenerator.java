@@ -159,7 +159,7 @@ public class TomcatConfigGenerator {
         Path luceeServerPath = serverInstanceDir.resolve("lucee-server");
         Path luceeWebPath = serverInstanceDir.resolve("lucee-web");
         Path luceePatchesPath = getLucliHome().resolve("patches");
-        int shutdownPort = LuceeServerConfig.getShutdownPort(config.port);
+        int shutdownPort = LuceeServerConfig.getEffectiveShutdownPort(config);
         
         // Add all placeholder values
         placeholders.put("${httpPort}", String.valueOf(config.port));

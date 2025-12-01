@@ -178,12 +178,27 @@ public class LuceeScriptEngine {
             // Check the first argument, if it doesnt have = then its the subcommand
             if (scriptArgs.length > 0) {
                 String firstArg = scriptArgs[0];
-                if (!firstArg.contains("=")) {
+                if (!firstArg.contains("=") && !firstArg.startsWith("--") && !firstArg.startsWith("-")) {
                     subCommand = firstArg;
                     // Remove first argument from scriptArgs
                     scriptArgs = Arrays.copyOfRange(scriptArgs, 1, scriptArgs.length);
                 }
             }
+
+            // Normalize bare boolean flags like --clean / --no-clean into key=value form
+            java.util.List<String> normalized = new java.util.ArrayList<>();
+            for (String raw : scriptArgs) {
+                if (raw.startsWith("--no-") && !raw.contains("=") && raw.length() > 5) {
+                    String key = raw.substring(5);
+                    normalized.add(key + "=false");
+                } else if (raw.startsWith("--") && !raw.contains("=") && raw.length() > 2) {
+                    String key = raw.substring(2);
+                    normalized.add(key + "=true");
+                } else {
+                    normalized.add(raw);
+                }
+            }
+            scriptArgs = normalized.toArray(new String[0]);
 
             int count = 0;
             for (String arg : scriptArgs) {
@@ -191,6 +206,15 @@ public class LuceeScriptEngine {
                 int equalsIndex = arg.indexOf('=');
                 if (equalsIndex > 0) {
                     String key = arg.substring(0, equalsIndex).trim();
+
+                    // Allow CLI-style flags like --foo=bar or -foo=bar by normalizing
+                    // them to "foo" for CFML named arguments.
+                    if (key.startsWith("--")) {
+                        key = key.substring(2);
+                    } else if (key.startsWith("-")) {
+                        key = key.substring(1);
+                    }
+
                     String value = arg.substring(equalsIndex + 1).trim();
                     // Remove quotes if present
                     value = unwrap(value);

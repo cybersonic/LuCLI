@@ -62,6 +62,9 @@ public class ServerConfigHelper {
         keys.add("jvm.additionalArgs");
         keys.add("monitoring.enabled");
         keys.add("monitoring.jmx.port");
+        keys.add("enableLucee");
+        keys.add("urlRewrite.enabled");
+        keys.add("urlRewrite.routerFile");
         return keys;
     }
     
@@ -151,6 +154,8 @@ public class ServerConfigHelper {
                     return config.name;
                 case "webroot":
                     return config.webroot;
+                case "enableLucee":
+                    return String.valueOf(config.enableLucee);
             }
         } else if (keyPath.length == 2) {
             String category = keyPath[0];
@@ -161,6 +166,8 @@ public class ServerConfigHelper {
                     return getJVMConfigValue(config.jvm, key);
                 case "monitoring":
                     return getMonitoringConfigValue(config.monitoring, key);
+                case "urlRewrite":
+                    return getUrlRewriteConfigValue(config.urlRewrite, key);
             }
         } else if (keyPath.length == 3) {
             String category = keyPath[0];
@@ -195,6 +202,9 @@ public class ServerConfigHelper {
                 case "name":
                     config.name = value;
                     break;
+                case "enableLucee":
+                    config.enableLucee = Boolean.parseBoolean(value);
+                    break;
             }
         } else if (keyPath.length == 2) {
             String category = keyPath[0];
@@ -208,6 +218,10 @@ public class ServerConfigHelper {
                 case "monitoring":
                     if (config.monitoring == null) config.monitoring = new LuceeServerConfig.MonitoringConfig();
                     setMonitoringConfigValue(config.monitoring, key, value);
+                    break;
+                case "urlRewrite":
+                    if (config.urlRewrite == null) config.urlRewrite = new LuceeServerConfig.UrlRewriteConfig();
+                    setUrlRewriteConfigValue(config.urlRewrite, key, value);
                     break;
             }
         } else if (keyPath.length == 3) {
@@ -277,6 +291,29 @@ public class ServerConfigHelper {
                 } catch (NumberFormatException e) { 
                     System.err.println("Invalid JMX port number: " + value); 
                 }
+                break;
+        }
+    }
+    
+    private String getUrlRewriteConfigValue(LuceeServerConfig.UrlRewriteConfig urlRewrite, String key) {
+        if (urlRewrite == null) return null;
+        switch (key) {
+            case "enabled":
+                return String.valueOf(urlRewrite.enabled);
+            case "routerFile":
+                return urlRewrite.routerFile;
+            default:
+                return null;
+        }
+    }
+    
+    private void setUrlRewriteConfigValue(LuceeServerConfig.UrlRewriteConfig urlRewrite, String key, String value) {
+        switch (key) {
+            case "enabled":
+                urlRewrite.enabled = Boolean.parseBoolean(value);
+                break;
+            case "routerFile":
+                urlRewrite.routerFile = value;
                 break;
         }
     }
