@@ -69,10 +69,19 @@ public class ServerCommand implements Callable<Integer> {
                 description = "Force replace existing server with same name")
         private boolean force = false;
 
+
+        // @picocli.CommandLine.Unmatched
+        // private java.util.List<String> serverArgs = new java.util.ArrayList<>();
+
         @Parameters(paramLabel = "[PROJECT_DIR]", 
                     description = "Project directory (defaults to current directory)",
                     arity = "0..1")
+
         private String projectDir;
+
+        @picocli.CommandLine.Unmatched
+        private java.util.List<String> serverArgs = new java.util.ArrayList<>();
+
 
         @Override
         public Integer call() throws Exception {
@@ -80,6 +89,8 @@ public class ServerCommand implements Callable<Integer> {
             Path currentDir = projectDir != null ? 
                 Paths.get(projectDir) : 
                 Paths.get(System.getProperty("user.dir"));
+
+            System.out.println(serverArgs);    
 
             // Create UnifiedCommandExecutor for CLI mode
             UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, currentDir);
@@ -105,6 +116,10 @@ public class ServerCommand implements Callable<Integer> {
             }
             if (projectDir != null) {
                 args.add(projectDir);
+            }
+
+            if(serverArgs.size() > 0) {
+                args.addAll(serverArgs);
             }
 
             // Execute the server start command

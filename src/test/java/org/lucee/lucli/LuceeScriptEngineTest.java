@@ -50,6 +50,11 @@ public class LuceeScriptEngineTest {
         assertEquals(parsed.argsMap.get("arg1"), "2");
         assertTrue(parsed.argsMap.containsKey("arg2"));
 
+        args = new String[] { "--no-clean", "--verbose", "--debug", "arg1=value1", "arg2=value2" };
+        parsed = engine.parseArguments(args);
+        assertEquals(parsed.subCommand, "main");
+        assertTrue(parsed.argsMap.containsKey("clean"));
+        assertEquals(parsed.argsMap.get("clean"), "false");
     } 
 
     @Test

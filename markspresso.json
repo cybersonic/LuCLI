@@ -1,0 +1,22 @@
+{
+  "build": {
+    "prettyUrls": true,
+    "defaultLayout": "page",
+    "includeDrafts": false
+  },
+  "collections": {
+    "posts": {
+      "permalink": "/posts/:slug/",
+      "path": "posts",
+      "layout": "post"
+    }
+  },
+  "name": "Markspresso Site",
+  "baseUrl": "http://localhost:8080",
+  "paths": {
+    "content": "docs",
+    "output": "public",
+    "layouts": "docs/layouts",
+    "assets": "docs/assets"
+  }
+}

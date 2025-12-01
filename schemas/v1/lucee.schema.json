@@ -107,6 +107,11 @@
         }
       }
     },
+    "enableLucee": {
+      "type": "boolean",
+      "description": "Enable Lucee CFML engine and servlet mappings. When false, Tomcat serves only static content (e.g. HTML/HTM).",
+      "default": true
+    },
     "agents": {
       "type": "object",
       "description": "Named Java agents that can be toggled per server start.",

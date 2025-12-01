@@ -7,7 +7,6 @@ target/
 
 TODO.md
 POTENTIALS.md
-docs/
 LuCLI.code-workspace
 demo_servers/
 no_commit/
@@ -18,3 +17,7 @@ no_commit/
 TEST_RESULTS.md
 express_demo/
 documentation/todo/
+public/
+docs/
+oldsite/
+target_test-classes/

@@ -1,5 +1,5 @@
         
-component {
+component extends="modules.BaseModule" {
     /**
      * {{MODULE_NAME}} Module
      * 
@@ -13,7 +13,8 @@ component {
         cwd="",
         timer=nullValue()
         ) {
-            variables.verbose = arguments.verbose;
+            // Map CLI verbosity flag into module-scoped verbose flag
+            variables.verbose = arguments.verboseEnabled;
             variables.timingEnabled = arguments.timingEnabled;
             variables.cwd = arguments.cwd;
             variables.timer = arguments.timer ?: {};
@@ -33,26 +34,5 @@ component {
         return "Module executed successfully";
     }
     
-    // Helper Functions
-    function out(any message){
-        if(!isSimpleValue(message)){
-            message = serializeJson(var=message, compact=false);
-        }
-        writeOutput(message & chr(10));
-    }
-
-    function getEnv(String envKeyName, String defaultValue=""){
-        var envValue = SERVER.system.environment[envKeyName];
-        if(isNull(envValue)){
-            return defaultValue;
-        }
-        return envValue;
-    }
-
-    function verbose(any message){
-        if(variables.verbose){
-            out(message);
-        }
-    }
 }
         

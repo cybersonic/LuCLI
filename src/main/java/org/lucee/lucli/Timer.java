@@ -14,6 +14,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public class Timer {
     
     private static Timer instance;
+
+    private static final int MAX_OPERATION_NAME_LENGTH = 100;
+    private static final int MIN_OPERATION_NAME_LENGTH = 20;
+    private static final int BASE_LINE_WIDTH = 60;
     
     // Instance fields (non-static so each instance has its own state)
     private final Map<String, TimerEntry> timers = new ConcurrentHashMap<>();
@@ -144,8 +148,24 @@ public class Timer {
             return;
         }
         
+        // Determine the column width based on the longest operation name,
+        // but cap it so excessively long names don't break the layout.
+        int longestName = timers.values().stream()
+            .filter(timer -> timer.duration != null)
+            .mapToInt(timer -> timer.operationName.length())
+            .max()
+            .orElse(0);
+
+        int nameColumnWidth = Math.min(
+            MAX_OPERATION_NAME_LENGTH,
+            Math.max(longestName, MIN_OPERATION_NAME_LENGTH)
+        );
+
+        int lineWidth = Math.max(BASE_LINE_WIDTH, nameColumnWidth + 15);
+        String format = "%s%-" + nameColumnWidth + "." + nameColumnWidth + "s %8s%n";
+        
         System.out.println("\n⏱️  Timing Results:");
-        System.out.println("─".repeat(60));
+        System.out.println("─".repeat(lineWidth));
         
         // Sort by operation name for consistent output
         timers.entrySet().stream()
@@ -154,15 +174,16 @@ public class Timer {
                 TimerEntry timer = entry.getValue();
                 if (timer.duration != null) {
                     String indent = getIndentForOperation(entry.getKey());
-                    System.out.printf("%s%-40s %8s%n", 
+                    System.out.printf(
+                        format,
                         indent,
-                        timer.operationName, 
+                        timer.operationName,
                         formatDuration(timer.duration)
                     );
                 }
             });
             
-        System.out.println("─".repeat(60));
+        System.out.println("─".repeat(lineWidth));
     }
     
     /**

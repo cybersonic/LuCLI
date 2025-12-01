@@ -105,6 +105,7 @@ public class UnifiedCommandExecutor {
         Path projectDir = currentWorkingDirectory; // Default to current directory
         
         LuceeServerManager.AgentOverrides agentOverrides = new LuceeServerManager.AgentOverrides();
+        java.util.List<String> configOverrides = new java.util.ArrayList<>();
         
         // Parse additional arguments (skip "start")
         for (int i = 1; i < args.length; i++) {
@@ -141,10 +142,34 @@ public class UnifiedCommandExecutor {
                 }
                 agentOverrides.disableAgents.add(args[i + 1]);
                 i++; // Skip next argument
-            } else if (!args[i].startsWith("-") && i == 1) {
-                // If the first non-option argument after "start" is provided, use it as project directory
+            } else if (!args[i].startsWith("-") && i == 1 && !args[i].contains("=")) {
+                // If the first non-option argument after "start" is provided and does not
+                // look like a key=value override, treat it as the project directory.
                 projectDir = Paths.get(args[i]);
+            } else if (!args[i].startsWith("-") && args[i].contains("=")) {
+                // Treat bare key=value arguments as configuration overrides that should
+                // be applied to lucee.json before starting the server.
+                configOverrides.add(args[i]);
             }
+        }
+        
+        // Apply any configuration overrides to lucee.json before starting the server.
+        if (!configOverrides.isEmpty()) {
+            LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(projectDir);
+            ServerConfigHelper configHelper = new ServerConfigHelper();
+            for (String kv : configOverrides) {
+                if (kv == null || !kv.contains("=")) {
+                    continue;
+                }
+                String[] parts = kv.split("=", 2);
+                String key = parts[0].trim();
+                String value = parts.length > 1 ? parts[1].trim() : "";
+                if (!key.isEmpty()) {
+                    configHelper.setConfigValue(config, key, value);
+                }
+            }
+            Path configFile = projectDir.resolve("lucee.json");
+            LuceeServerConfig.saveConfig(config, configFile);
         }
         
         // If no agent-related flags were actually set, avoid passing a non-null overrides object
@@ -173,7 +198,7 @@ public class UnifiedCommandExecutor {
             result.append("   Server Name:   ").append(instance.getServerName()).append("\n");
             result.append("   Process ID:    ").append(instance.getPid()).append("\n");
             result.append("   HTTP Port:     ").append(instance.getPort()).append("\n");
-            result.append("   Shutdown Port: ").append(LuceeServerConfig.getShutdownPort(instance.getPort())).append("\n");
+            result.append("   Shutdown Port: ").append(LuceeServerConfig.getEffectiveShutdownPort(config)).append("\n");
             
             if (config.monitoring != null && config.monitoring.enabled && config.monitoring.jmx != null) {
                 result.append("   JMX Port:      ").append(config.monitoring.jmx.port).append("\n");

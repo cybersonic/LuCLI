@@ -10,7 +10,7 @@ A LuCLI module that does amazing things.
 lucli {{MODULE_NAME}}
 
 # or using the modules command:
-lucli modules run {{MODULE_NAME}}
+lucli {{MODULE_NAME}}
 
 # Execute with arguments
 lucli {{MODULE_NAME}} arg1 arg2 arg3

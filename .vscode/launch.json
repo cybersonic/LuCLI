@@ -128,6 +128,17 @@
     
     {
       "type": "java",
+      "name": "🚀 Server Start wth params",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["server", "start", "--port=8888", "--enableLucee=false"],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}/demo_servers/test_server_01",
+      "console": "integratedTerminal"
+    },
+    
+    {
+      "type": "java",
       "name": "⏱️ Lucli Module Timing ",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",
@@ -138,10 +149,10 @@
     },
     {
       "type": "java",
-      "name": "🔌💡 LucCLI Module Subcommand",
+      "name": "🔌💡 LucCLI Module unmatched subcommand",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",
-      "args": ["--verbose", "modules", "run", "hello-world", "subCommand", "thefirstargument", "arg2=value2"],
+      "args": ["--verbose", "modules", "run", "hello-world", "--no-value", "--verbose", "arg1=value1"],
       "projectName": "lucli",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal"

@@ -58,9 +58,12 @@ public class TomcatServerXmlPatcher {
 
 
             // Apply minimal config-driven mutations.
-            // set the HTTP connector port to match the LuceeServerConfig
-            // port for the primary HTTP/1.1 connector.
+            // 1) Set the HTTP connector port to match the LuceeServerConfig
+            //    port for the primary HTTP/1.1 connector.
             applyHttpConnectorPort(document, config);
+            // 2) Set the <Server> shutdown port to the effective shutdown port
+            //    from LuceeServerConfig (explicit shutdownPort or HTTP+1000).
+            applyShutdownPort(document, config);
 
             // Ensure there is a ROOT Context whose docBase matches the
             // resolved webroot for this server configuration.
@@ -86,7 +89,7 @@ public class TomcatServerXmlPatcher {
         }
     }
 
-    /**
+/**
      * Set the port on the primary HTTP connector to match the Lucee
      * ServerConfig port.
      *
@@ -125,6 +128,34 @@ public class TomcatServerXmlPatcher {
                 connector.setAttribute("port", String.valueOf(config.port));
                 // Only update the first matching HTTP connector for now.
                 break;
+            }
+        }
+    }
+
+    /**
+     * Update the top-level <Server> shutdown port to match the effective
+     * shutdown port from LuceeServerConfig (explicit shutdownPort or
+     * HTTP+1000 when unset).
+     */
+    private void applyShutdownPort(Document document, LuceeServerConfig.ServerConfig config) {
+        if (document == null || config == null) {
+            return;
+        }
+
+        NodeList servers = document.getElementsByTagName("Server");
+        if (servers == null || servers.getLength() == 0) {
+            return;
+        }
+
+        for (int i = 0; i < servers.getLength(); i++) {
+            if (!(servers.item(i) instanceof Element)) {
+                continue;
+            }
+            Element server = (Element) servers.item(i);
+            if (server.hasAttribute("port")) {
+                int shutdownPort = LuceeServerConfig.getEffectiveShutdownPort(config);
+                server.setAttribute("port", String.valueOf(shutdownPort));
+                break; // only patch the first <Server> element
             }
         }
     }

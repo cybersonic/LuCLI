@@ -22,13 +22,14 @@ import org.lucee.lucli.cli.completion.DynamicArgumentCompletion;
         aliases = {"module"},
         description = "Manage LuCLI modules",
         subcommands = {
-        ModulesCommand.ListCommand.class,
-        ModulesCommand.InitCommand.class,
-        ModulesCommand.RunCommand.class,
-        ModulesCommand.InstallCommand.class,
-        ModulesCommand.UninstallCommand.class,
-        ModulesCommand.UpdateCommand.class
-    }
+            ModulesCommand.ListCommand.class,
+            ModulesCommand.InitCommand.class,
+            ModulesCommand.RunCommand.class,
+            ModulesCommand.InstallCommand.class,
+            ModulesCommand.UninstallCommand.class,
+            ModulesCommand.UpdateCommand.class
+        }
+
 )
 public class ModulesCommand implements Callable<Integer> {
 
@@ -221,12 +222,9 @@ public class ModulesCommand implements Callable<Integer> {
                     description = "Name of the module to run")
         private String moduleName;
 
-        @Parameters(index = "1..*",
-                    paramLabel = "ARGS", 
-                    description = "Arguments to pass to the module",
-                    arity = "0..*",
-                    completionCandidates = DynamicArgumentCompletion.class)
-        private String[] moduleArgs = new String[0];
+        // Collect all remaining args, including unknown options, and pass them through to the module
+        @picocli.CommandLine.Unmatched
+        private java.util.List<String> moduleArgs = new java.util.ArrayList<>();
 
         @Override
         public Integer call() throws Exception {

@@ -5,6 +5,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -58,6 +62,14 @@ public class TomcatWebXmlPatcher {
 
             // Ensure that lucee.json cannot be served by the web application.
             ensureLuceeJsonProtected(document);
+
+            // Optionally strip Lucee servlets, mappings, and CFML welcome files
+            // when the configuration explicitly disables Lucee. This allows
+            // Tomcat to act purely as a static file server (e.g. for markpresso)
+            // while still reusing the same template web.xml.
+            if (config != null && !config.enableLucee) {
+                disableLuceeEngine(document);
+            }
 
             TransformerFactory tf = TransformerFactory.newInstance();
             Transformer transformer = tf.newTransformer();
@@ -138,5 +150,130 @@ public class TomcatWebXmlPatcher {
         securityConstraint.appendChild(authConstraint);
 
         root.appendChild(securityConstraint);
+    }
+
+    /**
+     * Remove Lucee-specific servlets, servlet-mappings and CFML welcome files
+     * so that Tomcat behaves as a plain static file server.
+     */
+    private void disableLuceeEngine(Document document) {
+        if (document == null) {
+            return;
+        }
+
+        Element root = document.getDocumentElement();
+        if (root == null) {
+            return;
+        }
+
+        // 1) Remove Lucee servlets and remember their servlet-names so that we
+        //    can also remove corresponding <servlet-mapping> entries.
+        Set<String> luceeServletNames = new HashSet<>();
+        NodeList servletNodes = root.getElementsByTagName("servlet");
+        for (int i = 0; i < servletNodes.getLength(); i++) {
+            Node node = servletNodes.item(i);
+            if (!(node instanceof Element)) {
+                continue;
+            }
+            Element servlet = (Element) node;
+
+            String servletName = getChildText(servlet, "servlet-name");
+            String servletClass = getChildText(servlet, "servlet-class");
+
+            boolean isLuceeServlet =
+                (servletClass != null && servletClass.startsWith("lucee.loader.servlet")) ||
+                "CFMLServlet".equals(servletName) ||
+                "RESTServlet".equals(servletName);
+
+            if (isLuceeServlet) {
+                if (servletName != null) {
+                    luceeServletNames.add(servletName);
+                }
+                root.removeChild(servlet);
+                i--; // Adjust index because NodeList is live
+            }
+        }
+
+        // 2) Remove servlet-mappings for Lucee servlets and CFML/REST/admin
+        //    URL patterns.
+        NodeList mappingNodes = root.getElementsByTagName("servlet-mapping");
+        for (int i = 0; i < mappingNodes.getLength(); i++) {
+            Node node = mappingNodes.item(i);
+            if (!(node instanceof Element)) {
+                continue;
+            }
+            Element mapping = (Element) node;
+
+            String name = getChildText(mapping, "servlet-name");
+            String pattern = getChildText(mapping, "url-pattern");
+
+            boolean isCfmlPattern = pattern != null && (
+                pattern.endsWith("*.cfm") ||
+                pattern.endsWith("*.cfml") ||
+                pattern.endsWith("*.cfc") ||
+                pattern.endsWith("*.cfs") ||
+                "/index.cfm/*".equals(pattern) ||
+                pattern.startsWith("/lucee/") ||
+                pattern.startsWith("/rest/")
+            );
+
+            if ((name != null && luceeServletNames.contains(name)) || isCfmlPattern) {
+                root.removeChild(mapping);
+                i--; // Adjust index because NodeList is live
+            }
+        }
+
+        // 3) Remove CFML welcome files (index.cfm/index.cfml) so that HTML/HTM
+        //    welcome files take precedence.
+        NodeList welcomeLists = root.getElementsByTagName("welcome-file-list");
+        for (int i = 0; i < welcomeLists.getLength(); i++) {
+            Node listNode = welcomeLists.item(i);
+            if (!(listNode instanceof Element)) {
+                continue;
+            }
+            Element list = (Element) listNode;
+
+            NodeList welcomeFiles = list.getElementsByTagName("welcome-file");
+            List<Element> toRemove = new ArrayList<>();
+            for (int j = 0; j < welcomeFiles.getLength(); j++) {
+                Node wfNode = welcomeFiles.item(j);
+                if (!(wfNode instanceof Element)) {
+                    continue;
+                }
+                Element wf = (Element) wfNode;
+                String name = wf.getTextContent() != null ? wf.getTextContent().trim() : "";
+                if (name.endsWith(".cfm") || name.endsWith(".cfml")) {
+                    toRemove.add(wf);
+                }
+            }
+
+            for (Element wf : toRemove) {
+                list.removeChild(wf);
+            }
+        }
+    }
+
+    /**
+     * Helper to read the text content of the first direct child element whose
+     * (local) name matches the provided name. This is tolerant of XML
+     * namespaces by checking both the raw nodeName and any localName suffix.
+     */
+    private String getChildText(Element parent, String childLocalName) {
+        if (parent == null) {
+            return null;
+        }
+        NodeList children = parent.getChildNodes();
+        for (int i = 0; i < children.getLength(); i++) {
+            Node node = children.item(i);
+            if (!(node instanceof Element)) {
+                continue;
+            }
+            Element el = (Element) node;
+            String nodeName = el.getNodeName();
+            if (childLocalName.equals(nodeName) || nodeName.endsWith(":" + childLocalName)) {
+                return el.getTextContent();
+            }
+        }
+        return null;
     }
 }

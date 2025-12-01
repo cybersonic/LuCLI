@@ -1,4 +1,4 @@
-package org.lucee.lucli.server;
+    package org.lucee.lucli.server;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -22,12 +22,28 @@ public class LuceeServerConfig {
     public static class ServerConfig {
         public String name;
         public String version = "6.2.2.91";
+        /**
+         * Primary HTTP port for Tomcat.
+         */
         public int port = 8080;
+        /**
+         * Optional explicit shutdown port. When null, the effective shutdown
+         * port is derived from the HTTP port using getShutdownPort(port).
+         * This field exists so users can pin a specific shutdown port in
+         * lucee.json while preserving the current default behaviour.
+         */
+        public Integer shutdownPort;
         public String webroot = "./";
         public MonitoringConfig monitoring = new MonitoringConfig();
         public JvmConfig jvm = new JvmConfig();
         public UrlRewriteConfig urlRewrite = new UrlRewriteConfig();
         public AdminConfig admin = new AdminConfig();
+        /**
+         * When false, Lucee CFML servlets and CFML-specific mappings are removed
+         * from web.xml so that Tomcat behaves as a static file server for the
+         * configured webroot.
+         */
+        public boolean enableLucee = true;
         // Agent configurations by name
         public Map<String, AgentConfig> agents = new HashMap<>();
 
@@ -155,11 +171,16 @@ public class LuceeServerConfig {
         
         // Find available HTTP port, avoiding existing server definitions
         config.port = findAvailablePortAvoidingExisting(8080, 8000, 8999, existingPorts);
+
+        // Default shutdown port follows the traditional pattern of HTTP+1000.
+        // This value can be overridden explicitly in lucee.json via
+        // "shutdownPort" when users need a fixed, non-derived port.
+        config.shutdownPort = getShutdownPort(config.port);
         
-        // Find available JMX port, avoiding existing server definitions and the chosen HTTP port
+        // Find available JMX port, avoiding existing server definitions and the chosen HTTP/shutdown ports
         Set<Integer> portsToAvoid = new HashSet<>(existingPorts);
-        portsToAvoid.add(config.port);  // Don't use same as HTTP port
-        portsToAvoid.add(getShutdownPort(config.port));  // Don't use same as shutdown port
+        portsToAvoid.add(config.port);              // Don't use same as HTTP port
+        portsToAvoid.add(config.shutdownPort);      // Don't use same as shutdown port
         config.monitoring.jmx.port = findAvailablePortAvoidingExisting(8999, 8000, 8999, portsToAvoid);
         
         return config;
@@ -333,7 +354,7 @@ public class LuceeServerConfig {
                         .append(") cannot be the same. Please use different ports in your lucee.json file.\n");
             }
             
-            int shutdownPort = getShutdownPort(config.port);
+            int shutdownPort = getEffectiveShutdownPort(config);
             if (shutdownPort == config.monitoring.jmx.port) {
                 hasConflicts = true;
                 conflictMessages.append("Shutdown port (").append(shutdownPort)
@@ -358,8 +379,8 @@ public class LuceeServerConfig {
             conflictMessages.append("\n");
         }
         
-        // Check shutdown port
-        int shutdownPort = getShutdownPort(config.port);
+        // Check shutdown port (either explicit or derived from HTTP port)
+        int shutdownPort = getEffectiveShutdownPort(config);
         if (!isPortAvailable(shutdownPort)) {
             hasConflicts = true;
             conflictMessages.append("Shutdown port ").append(shutdownPort).append(" (HTTP port + 1000) is already in use");
@@ -417,10 +438,31 @@ public class LuceeServerConfig {
     }
     
     /**
-     * Get the shutdown port for a given HTTP port
+     * Get the shutdown port for a given HTTP port.
+     *
+     * This helper preserves the legacy convention used throughout the codebase
+     * and in existing server directories where only the HTTP port is recorded.
      */
     public static int getShutdownPort(int httpPort) {
         return httpPort + 1000;
+    }
+
+    /**
+     * Get the effective shutdown port for a given server configuration.
+     *
+     * Precedence:
+     *  1. Explicit shutdownPort value from lucee.json when present.
+     *  2. Derived value using getShutdownPort(config.port) for backward
+     *     compatibility when shutdownPort is absent.
+     */
+    public static int getEffectiveShutdownPort(ServerConfig config) {
+        if (config == null) {
+            throw new IllegalArgumentException("ServerConfig must not be null");
+        }
+        if (config.shutdownPort != null) {
+            return config.shutdownPort.intValue();
+        }
+        return getShutdownPort(config.port);
     }
     
     /**

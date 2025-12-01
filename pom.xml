@@ -6,17 +6,16 @@
 
   <groupId>org.lucee</groupId>
   <artifactId>lucli</artifactId>
-  <version>0.1.124-SNAPSHOT</version>
+  <version>0.1.157-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>LuCLI</name>
   <description>A CLI for Lucee</description>
   <properties>
-    <maven.compiler.source>17</maven.compiler.source>
-    <maven.compiler.target>17</maven.compiler.target>
+    <maven.compiler.source>21</maven.compiler.source>
+    <maven.compiler.target>21</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <jline.version>3.26.3</jline.version>
-    <!-- <lucee.version>7.0.0.392-RC</lucee.version> -->
-    <lucee.version>7.0.1.51-SNAPSHOT</lucee.version>
+    <lucee.version>7.0.1.93-SNAPSHOT</lucee.version>
     <lucee.classifier>zero</lucee.classifier>
   </properties>
 

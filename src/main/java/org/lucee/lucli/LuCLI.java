@@ -52,6 +52,13 @@ public class LuCLI {
                 boolean shortcutVerbose = java.util.Arrays.asList(args).contains("--verbose") || java.util.Arrays.asList(args).contains("-v");
                 boolean shortcutTiming = java.util.Arrays.asList(args).contains("--timing") || java.util.Arrays.asList(args).contains("-t");
                 
+                // set the defaults
+                LuCLI.verbose = shortcutVerbose;
+                LuCLI.debug = shortcutDebug;
+                LuCLI.timing = shortcutTiming;
+                // We should clean them up before we send the rest along
+
+                Timer.setEnabled(LuCLI.timing);
                 // Check if this might be a shortcut (module or CFML file)
                 // BUT ONLY if it's not a recognized subcommand
                 if (ex instanceof CommandLine.UnmatchedArgumentException && args.length >= 1) {
@@ -86,7 +93,10 @@ public class LuCLI {
                         // Check if it's a LuCLI script file
                         if (file.exists() && firstArg.endsWith(".lucli")) {
                             try {
-                                return executeLucliScript(firstArg, shortcutVerbose, shortcutDebug, shortcutTiming);
+                                 Timer.start("LuCLI Script Shortcut Execution (" + firstArg + ")");
+                                 int ret = executeLucliScript(firstArg, shortcutVerbose, shortcutDebug, shortcutTiming);
+                                 Timer.stop("LuCLI Script Shortcut Execution (" + firstArg + ")");
+                                 return ret;
                             } catch (Exception scriptEx) {
                                 // If script execution fails, fall through to normal error handling
                                 if (shortcutVerbose || shortcutDebug) {
@@ -97,7 +107,10 @@ public class LuCLI {
                         // Check if it's an existing CFML file
                         else if (file.exists() && (firstArg.endsWith(".cfs") || firstArg.endsWith(".cfm") || firstArg.endsWith(".cfml"))) {
                             try {
-                                return executeCfmlFileShortcut(firstArg, remainingArgs, shortcutVerbose, shortcutDebug, shortcutTiming);
+                                Timer.start("CFML File Shortcut Execution");
+                                int ret = executeCfmlFileShortcut(firstArg, remainingArgs, shortcutVerbose, shortcutDebug, shortcutTiming);
+                                Timer.stop("CFML File Shortcut Execution");
+                                return ret;
                             } catch (Exception cfmlEx) {
                                 // If CFML file execution fails, fall through to normal error handling
                                 if (shortcutVerbose || shortcutDebug) {
@@ -145,6 +158,8 @@ public class LuCLI {
         
         // Execute the command and exit with the returned code
         int exitCode = cmd.execute(args);
+        
+        Timer.printResults();
         System.exit(exitCode);
     }
     
@@ -383,6 +398,12 @@ public class LuCLI {
         
         // Create a new CommandLine instance with the same configuration
         CommandLine cmd = new CommandLine(new org.lucee.lucli.cli.LuCLICommand());
+
+        // Allow unknown options (like module-specific flags) to be treated as positional
+        // arguments so they can be forwarded to the module implementation instead of
+        // causing an "Unknown option" error at the LuCLI level.
+        // cmd.setUnmatchedArgumentsAllowed(true);
+        
         
         // Configure the same exception handlers
         cmd.setExecutionExceptionHandler(new CommandLine.IExecutionExceptionHandler() {
