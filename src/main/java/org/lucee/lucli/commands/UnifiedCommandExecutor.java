@@ -376,6 +376,11 @@ public class UnifiedCommandExecutor {
             String status = server.isRunning() ? "RUNNING" : "STOPPED";
             String pid = server.getPid() > 0 ? String.valueOf(server.getPid()) : "-";
             String port = server.getPort() > 0 ? String.valueOf(server.getPort()) : "-";
+
+            if(args.length > 1 && (args[1].equals("--running") || args[1].equals("-r")) && !server.isRunning()) {
+                // Skip non-running servers if --running flag is set
+                continue;
+            }
             
             String webroot = server.getProjectDir() != null ? server.getProjectDir().toString() : "<unknown>";
             if (isTerminalMode) {

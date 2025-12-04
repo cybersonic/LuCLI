@@ -15,6 +15,8 @@ All notable changes to this project will be documented in this file.
 - Adding output and backgound colours to the BaseModule for output. 
 - Removed BaseModule functions from the Module.cfc template
 - updated tests/test.sh test script
+- Added name to the terminal!
+- added `server list --running` option to list only running servers.
 
 ## 0.1.121
 

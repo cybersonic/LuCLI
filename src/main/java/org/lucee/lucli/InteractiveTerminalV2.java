@@ -68,6 +68,7 @@ public class InteractiveTerminalV2 {
         try {
             terminal = TerminalBuilder.builder()
                     .system(true)
+                    .name("LuCLI Terminal")
                     .build();
         } catch (IOException e) {
             if (LuCLI.debug) {
