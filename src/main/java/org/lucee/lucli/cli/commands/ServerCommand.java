@@ -265,13 +265,17 @@ public class ServerCommand implements Callable<Integer> {
         @ParentCommand 
         private ServerCommand parent;
 
+        @Option(names = {"-r", "--running"}, 
+        description = "List only running server instances")
+        private boolean running;
+
         @Override
         public Integer call() throws Exception {
             // Create UnifiedCommandExecutor for CLI mode
             UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, Paths.get(System.getProperty("user.dir")));
 
             // Execute the server list command
-            String result = executor.executeCommand("server", new String[]{"list"});
+            String result = executor.executeCommand("server", new String[]{"list", running ? "--running" : ""});
             if (result != null && !result.isEmpty()) {
                 System.out.println(result);
             }
