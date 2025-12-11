@@ -3,6 +3,8 @@ package org.lucee.lucli.monitoring;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.List;
 import java.util.Scanner;
 import java.util.concurrent.Executors;
@@ -27,13 +29,17 @@ public class MonitorCommand {
     
     private final CliDashboard dashboard;
     private final ScheduledExecutorService scheduler;
+    private final Deque<CliDashboard.TimelineSample> history;
     private JmxConnection jmxConnection;
     private volatile boolean running;
+    private int maxHistorySize;
     
     public MonitorCommand() {
         this.dashboard = new CliDashboard();
         this.scheduler = Executors.newSingleThreadScheduledExecutor();
+        this.history = new ArrayDeque<>();
         this.running = false;
+        this.maxHistorySize = 60; // default, will be refined based on refresh interval
     }
     
     /**
@@ -50,6 +56,8 @@ public class MonitorCommand {
             
             String serverName = host + ":" + port;
             running = true;
+            // Aim to keep roughly the last minute of data, but ensure a minimum resolution
+            this.maxHistorySize = Math.max(10, 60 / Math.max(1, refreshInterval));
             
             // Start the refresh loop
             scheduler.scheduleAtFixedRate(() -> {
@@ -85,12 +93,29 @@ public class MonitorCommand {
         OsMetrics os = jmxConnection.getOsMetrics();
         LuceeMetrics lucee = jmxConnection.getLuceeMetrics();
         
+        // Update timeline history
+        double heapPercent = memory.getHeapUsagePercent();
+        double cpuPercent = (os.processCpuLoad != null && os.processCpuLoad >= 0)
+                ? os.processCpuLoad * 100.0
+                : -1.0;
+        addHistorySample(heapPercent, cpuPercent);
+        
         // Create metrics container
         ServerMetrics metrics = new ServerMetrics(memory, threading, gcMetrics, 
                                                 runtime, os, lucee);
         
         // Render dashboard
-        dashboard.renderDashboard(serverName, metrics);
+        dashboard.renderDashboard(serverName, metrics, history);
+    }
+
+    /**
+     * Add a new sample to the in-memory history buffer
+     */
+    private void addHistorySample(double heapPercent, double cpuPercent) {
+        history.addLast(new CliDashboard.TimelineSample(heapPercent, cpuPercent));
+        while (history.size() > maxHistorySize) {
+            history.removeFirst();
+        }
     }
     
     /**

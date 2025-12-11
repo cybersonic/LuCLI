@@ -1,6 +1,7 @@
 package org.lucee.lucli.monitoring;
 
 import java.text.DecimalFormat;
+import java.util.Deque;
 import java.util.List;
 
 import org.lucee.lucli.monitoring.JmxConnection.GcMetrics;
@@ -34,9 +35,16 @@ public class CliDashboard {
     }
     
     /**
-     * Render the complete dashboard
+     * Render the complete dashboard (without timeline)
      */
     public void renderDashboard(String serverName, ServerMetrics metrics) {
+        renderDashboard(serverName, metrics, null);
+    }
+
+    /**
+     * Render the complete dashboard with optional timeline history
+     */
+    public void renderDashboard(String serverName, ServerMetrics metrics, Deque<TimelineSample> history) {
         clearScreen();
         
         renderHeader(serverName, metrics.runtime);
@@ -44,6 +52,7 @@ public class CliDashboard {
         renderThreadingSection(metrics.threading);
         renderGcSection(metrics.gcMetrics);
         renderSystemSection(metrics.os);
+        renderTimeline(history);
         renderFooter();
     }
     
@@ -156,6 +165,71 @@ public class CliDashboard {
         
         System.out.println();
     }
+
+    /**
+     * Render a simple timeline of recent heap and CPU usage
+     */
+    private void renderTimeline(Deque<TimelineSample> history) {
+        if (history == null || history.isEmpty()) {
+            return;
+        }
+
+        System.out.println(BOLD + "Timeline (recent)" + RESET);
+
+        // Build sparkline lines with per-bar coloring
+        String heapLine = renderTimelineLine(history, true);
+        String cpuLine = renderTimelineLine(history, false);
+
+        // Each bar in the timeline is already colorized based on its own value,
+        // so we don't recolor the entire line based on the most recent sample.
+        System.out.printf("Heap: %s%s%n", heapLine, RESET);
+        System.out.printf("CPU : %s%s%n", cpuLine, RESET);
+        System.out.println();
+    }
+
+    private static final int TIMELINE_WIDTH = 30;
+
+    /**
+     * Convert recent samples into a compact sparkline-style timeline.
+     * Each bar is colorized individually using the same green/yellow/red
+     * banding as the main progress bars, so colors are stable over time.
+     */
+    private String renderTimelineLine(Deque<TimelineSample> history, boolean heap) {
+        TimelineSample[] samples = history.toArray(new TimelineSample[0]);
+        int size = samples.length;
+        int width = Math.min(TIMELINE_WIDTH, size);
+
+        StringBuilder sb = new StringBuilder(width * 8); // extra space for ANSI codes
+        for (int i = size - width; i < size; i++) {
+            double value = heap ? samples[i].heapPercent : samples[i].cpuPercent;
+            if (value < 0) {
+                // No data for this sample
+                sb.append(' ');
+            } else {
+                String color = getColorForPercentage(value);
+                sb.append(color).append(valueToBlockChar(value));
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Map a percentage to a block character for the timeline
+     * Uses increasing-height block elements so higher values appear "taller".
+     */
+    private char valueToBlockChar(double percent) {
+        if (percent < 0) {
+            return ' ';
+        }
+        // Unicode block elements from low to high
+        if (percent < 10) return '\u2581'; // ▁
+        if (percent < 30) return '\u2582'; // ▂
+        if (percent < 50) return '\u2583'; // ▃
+        if (percent < 70) return '\u2584'; // ▄
+        if (percent < 85) return '\u2585'; // ▅
+        if (percent < 95) return '\u2586'; // ▆
+        return '\u2587'; // ▇
+    }
     
     /**
      * Render footer with controls
@@ -258,6 +332,19 @@ public class CliDashboard {
             this.runtime = runtime;
             this.os = os;
             this.lucee = lucee;
+        }
+    }
+
+    /**
+     * Sample used for timeline history (heap and CPU percentages)
+     */
+    public static class TimelineSample {
+        public final double heapPercent;
+        public final double cpuPercent;
+
+        public TimelineSample(double heapPercent, double cpuPercent) {
+            this.heapPercent = heapPercent;
+            this.cpuPercent = cpuPercent;
         }
     }
 }
