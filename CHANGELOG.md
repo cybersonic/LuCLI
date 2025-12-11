@@ -17,6 +17,11 @@ All notable changes to this project will be documented in this file.
 - updated tests/test.sh test script
 - Added name to the terminal!
 - added `server list --running` option to list only running servers.
+- Protect development modules under `~/.lucli/modules/<name>` from being overwritten by `lucli modules install` and `lucli modules update` when a `.git` directory is present.
+- Enhance `lucli module(s) init` to optionally initialize a Git repository in the new module directory (via `--git` / `--no-git` flags and an interactive prompt), so dev modules are automatically marked and protected.
+- Add a bundled local module repository index at `src/main/resources/repository/local.json` and use it to augment `lucli modules list` output with modules that are available but not yet installed, marking installed modules with a success indicator.
+- Add support for external module repositories configured in `~/.lucli/settings.json` under `moduleRepositories`, which are merged into the `lucli modules list` view.
+- Improve CFConfig handling in `lucee.json`: `configurationFile` (external JSON file) is now loaded first as a base configuration, and inline `configuration` values override/extend it. This enables shared base CFConfigs with per-project customization via deep JSON merging.
 
 ## 0.1.121
 
