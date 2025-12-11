@@ -44,6 +44,14 @@ public class LuceeServerConfig {
          * configured webroot.
          */
         public boolean enableLucee = true;
+
+        
+        /**
+         * When true, the Lucee REST servlet is enabled in web.xml.
+         */
+        public boolean enableREST = false;
+
+
         // Agent configurations by name
         public Map<String, AgentConfig> agents = new HashMap<>();
 
@@ -479,23 +487,20 @@ public class LuceeServerConfig {
     /**
      * Resolve the effective CFConfig JSON for a server configuration.
      *
-     * Precedence:
-     *  1. Inline {@code configuration} object in lucee.json, when present.
-     *  2. External JSON file referenced by {@code configurationFile}, if it exists.
+     * Merges configurations with the following precedence (lowest to highest):
+     *  1. External JSON file referenced by {@code configurationFile}, if it exists (base config).
+     *  2. Inline {@code configuration} object in lucee.json (overrides).
      *
-     * Returns null when no configuration is defined.
+     * Returns null when no configuration is defined anywhere.
      */
     public static JsonNode resolveConfigurationNode(ServerConfig config, Path projectDir) throws IOException {
         if (config == null) {
             return null;
         }
 
-        // Inline configuration in lucee.json takes precedence
-        if (config.configuration != null && !config.configuration.isNull()) {
-            return config.configuration;
-        }
+        JsonNode result = null;
 
-        // Fall back to external configuration file if specified
+        // Start with external configuration file as base (if specified and exists)
         if (config.configurationFile != null && !config.configurationFile.trim().isEmpty()) {
             Path cfConfigPath = Paths.get(config.configurationFile);
             if (!cfConfigPath.isAbsolute()) {
@@ -503,11 +508,52 @@ public class LuceeServerConfig {
             }
 
             if (Files.exists(cfConfigPath)) {
-                return objectMapper.readTree(cfConfigPath.toFile());
+                result = objectMapper.readTree(cfConfigPath.toFile());
             }
         }
 
-        return null;
+        // Merge inline configuration (if present) as overrides
+        if (config.configuration != null && !config.configuration.isNull()) {
+            if (result == null) {
+                // No base config file; use inline config directly
+                result = config.configuration;
+            } else {
+                // Merge inline config into the base; inline values override file values
+                result = mergeJsonNodes(result, config.configuration);
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Deep merge two JSON nodes, with {@code overrides} taking precedence over {@code base}.
+     * Modifies {@code base} in place and returns it.
+     */
+    private static JsonNode mergeJsonNodes(JsonNode base, JsonNode overrides) {
+        if (!(base instanceof com.fasterxml.jackson.databind.node.ObjectNode)) {
+            // If base is not an object, overrides replaces it entirely
+            return overrides;
+        }
+
+        com.fasterxml.jackson.databind.node.ObjectNode baseObj = (com.fasterxml.jackson.databind.node.ObjectNode) base;
+
+        if (overrides.isObject()) {
+            overrides.fields().forEachRemaining(entry -> {
+                String key = entry.getKey();
+                JsonNode overrideValue = entry.getValue();
+
+                if (baseObj.has(key) && baseObj.get(key).isObject() && overrideValue.isObject()) {
+                    // Recursively merge nested objects
+                    mergeJsonNodes(baseObj.get(key), overrideValue);
+                } else {
+                    // Override or add the value
+                    baseObj.set(key, overrideValue);
+                }
+            });
+        }
+
+        return baseObj;
     }
 
     /**
