@@ -37,7 +37,7 @@ public static void executeModule(String[] args) {
                 listModules();
                 break;
             case INIT:
-                initModule(options.moduleName);
+                initModule(options.moduleName, options.gitInit, options.noGitInit);
                 break;
             case RUN:
                 runModule(options.moduleName, options.moduleArgs);
@@ -67,48 +67,87 @@ public static void executeModule(String[] args) {
 }
     
     /**
-     * List all available modules in ~/.lucli/modules
+     * List installed modules under ~/.lucli/modules and known modules from
+     * the bundled repository index.
      */
     private static void listModules() throws IOException {
         Path modulesDir = getModulesDirectory();
-        
+
         if (!Files.exists(modulesDir)) {
             StringOutput.getInstance().println("${EMOJI_INFO} No modules directory found at: " + modulesDir);
             StringOutput.getInstance().println("${EMOJI_BULB} Use 'lucli modules init <module-name>' to create your first module.");
             return;
         }
-        
+
         System.out.println("LuCLI Modules");
         System.out.println("=============");
         System.out.println();
         System.out.println("Module directory: " + modulesDir);
         System.out.println();
-        
-        if (Files.list(modulesDir).count() == 0) {
+
+        // Build map of installed modules (name -> description/status)
+        java.util.Map<String, Path> installed = new java.util.TreeMap<>();
+        try (java.util.stream.Stream<Path> stream = Files.list(modulesDir)) {
+            stream.filter(Files::isDirectory).forEach(dir -> {
+                installed.put(dir.getFileName().toString(), dir);
+            });
+        }
+
+        // Load repository index (bundled local.json for now)
+        ModuleRepositoryIndex repoIndex = ModuleRepositoryIndex.loadDefault();
+        java.util.Map<String, ModuleRepositoryIndex.RepoModule> repoModules = repoIndex.getModulesByName();
+
+        if (installed.isEmpty() && repoModules.isEmpty()) {
             System.out.println("No modules found.");
             System.out.println("Use 'lucli modules init <module-name>' to create a new module.");
             return;
         }
-        
-        System.out.printf("%-20s %-10s %-50s%n", "NAME", "STATUS", "DESCRIPTION");
-        System.out.println("─".repeat(80));
-        
-        Files.list(modulesDir)
-            .filter(Files::isDirectory)
-            .sorted()
-            .forEach(moduleDir -> {
-                String moduleName = moduleDir.getFileName().toString();
-                String status = getModuleStatus(moduleDir);
-                String description = getModuleDescription(moduleDir);
-                
-                System.out.printf("%-20s %-10s %-50s%n", moduleName, status, description);
-            });
+
+        // Union of names from installed modules and repository modules
+        java.util.Set<String> allNames = new java.util.TreeSet<>();
+        allNames.addAll(installed.keySet());
+        allNames.addAll(repoModules.keySet());
+
+        StringOutput.getInstance().printf("%-20s %-10s %-10s %-50s%n", "NAME", "INSTALLED", "STATUS", "DESCRIPTION");
+        System.out.println("─".repeat(100));
+
+        for (String name : allNames) {
+            boolean isInstalled = installed.containsKey(name);
+            String installedMarker = isInstalled ? "${EMOJI_SUCCESS}" : "";
+
+            String status;
+            String description;
+
+            Path moduleDir = installed.get(name);
+            if (moduleDir != null) {
+                status = getModuleStatus(moduleDir);
+                description = getModuleDescription(moduleDir);
+            } else {
+                status = "AVAILABLE";
+                ModuleRepositoryIndex.RepoModule repoMod = repoModules.get(name);
+                if (repoMod != null && repoMod.getDescription() != null && !repoMod.getDescription().isEmpty()) {
+                    description = repoMod.getDescription();
+                } else {
+                    description = "No description available";
+                }
+            }
+
+            // If we have repo metadata and no local description, prefer repo description
+            if (moduleDir != null) {
+                ModuleRepositoryIndex.RepoModule repoMod = repoModules.get(name);
+                if (repoMod != null && (description == null || description.equals("No description available"))) {
+                    description = repoMod.getDescription();
+                }
+            }
+
+            StringOutput.getInstance().printf("%-20s %-10s %-10s %-50s%n", name, installedMarker, status, description);
+        }
     }
     
     /**
      * Initialize a new module with the given name
      */
-    private static void initModule(String moduleName) throws IOException {
+    private static void initModule(String moduleName, boolean gitInit, boolean noGitInit) throws IOException {
         if (moduleName == null || moduleName.trim().isEmpty()) {
             // Interactive mode - ask for module name
             Scanner scanner = new Scanner(System.in);
@@ -144,8 +183,11 @@ public static void executeModule(String[] args) {
         // Create module.json metadata file
         createModuleMetadata(moduleDir, moduleName);
         
-        // Create README.md
+        // Create module README.md
         createModuleReadme(moduleDir, moduleName);
+
+        // Optionally initialize git for this module directory
+        maybeInitializeGitRepository(moduleDir, gitInit, noGitInit);
         
         StringOutput.Quick.success("Successfully created module: " + moduleName);
         StringOutput.getInstance().println("${EMOJI_FOLDER} Module directory: " + moduleDir);
@@ -154,6 +196,45 @@ public static void executeModule(String[] args) {
         System.out.println("  1. Edit " + moduleDir.resolve("Module.cfc") + " to implement your module");
         System.out.println("  2. Update " + moduleDir.resolve("module.json") + " with module metadata");
         System.out.println("  3. Test your module with: lucli " + moduleDir.resolve("Module.cfc"));
+    }
+
+    /**
+     * Optionally initialize a git repository in the new module directory.
+     * Uses flags from CLI (gitInit / noGitInit) and falls back to an
+     * interactive prompt when appropriate.
+     */
+    private static void maybeInitializeGitRepository(Path moduleDir, boolean gitInit, boolean noGitInit) {
+        // Explicit opt-out wins
+        if (noGitInit) {
+            return;
+        }
+
+        // Require git to be available
+        if (!isGitAvailable()) {
+            return;
+        }
+
+        boolean interactive = System.console() != null;
+        boolean shouldInit = gitInit;
+
+        if (!gitInit && interactive) {
+            System.out.print("Initialize a git repository in this module directory? (Y/n): ");
+            Scanner scanner = new Scanner(System.in);
+            String answer = scanner.nextLine().trim();
+            shouldInit = answer.isEmpty() || answer.equalsIgnoreCase("y") || answer.equalsIgnoreCase("yes");
+        }
+
+        if (!shouldInit) {
+            return;
+        }
+
+        try {
+            runGitCommand(moduleDir, new String[] { "git", "init" });
+        } catch (Exception e) {
+            if (LuCLI.verbose || LuCLI.debug) {
+                System.err.println("Warning: Failed to initialize git in module directory '" + moduleDir + "': " + e.getMessage());
+            }
+        }
     }
     
     /**
@@ -413,8 +494,16 @@ private static ModuleOptions parseArguments(String[] args) {
                     }
                     break;
 
-                case "--force":
+            case "--force":
                     options.force = true;
+                    break;
+
+            case "--git":
+                    options.gitInit = true;
+                    break;
+
+            case "--no-git":
+                    options.noGitInit = true;
                     break;
                 
             default:
@@ -556,6 +645,13 @@ private static void installModule(String moduleName, String gitUrl, boolean forc
 
             Path modulesDir = getModulesDirectory();
             Path targetDir = modulesDir.resolve(moduleName);
+
+            // Protect development modules (those with a .git directory) from being overwritten
+            if (Files.exists(targetDir) && Files.isDirectory(targetDir.resolve(".git"))) {
+                System.err.println("Module '" + moduleName + "' appears to be a local Git working copy at: " + targetDir);
+                System.err.println("Refusing to overwrite a development module. Update it via git or remove the directory explicitly before reinstalling.");
+                System.exit(1);
+            }
 
             // Handle existing module directory depending on --force
             if (Files.exists(targetDir)) {
@@ -811,6 +907,15 @@ private static void installModule(String moduleName, String gitUrl, boolean forc
             System.exit(1);
         }
 
+        // Protect development modules (those with a .git directory) from being overwritten
+        Path modulesDir = getModulesDirectory();
+        Path moduleDir = modulesDir.resolve(moduleName);
+        if (Files.isDirectory(moduleDir.resolve(".git"))) {
+            System.err.println("Module '" + moduleName + "' is a Git working copy at: " + moduleDir);
+            System.err.println("Please update it using git (e.g. git pull) instead of 'lucli modules update'.");
+            System.exit(1);
+        }
+
         String effectiveUrl = gitUrl;
 
         if (effectiveUrl == null || effectiveUrl.trim().isEmpty()) {
@@ -875,6 +980,8 @@ private static class ModuleOptions {
     boolean verbose = false;
     String gitUrl = null;
     boolean force = false;
+    boolean gitInit = false;
+    boolean noGitInit = false;
 }
 
 /**

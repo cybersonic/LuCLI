@@ -3,7 +3,7 @@ LuCLI Module Management
 Usage: lucli modules [command] [options]
 
 Commands:
-  list                       List all installed modules (default)
+  list                       List installed modules and show additional modules from bundled and external repositories (default)
   init [module-name]         Initialize a new module
   run <module-name> [args]   Run a specific module with arguments
   install [name] [options]   Install a module from git

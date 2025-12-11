@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "repository": "local",
+  "modules": [
+    {
+      "name": "example-module",
+      "description": "Example LuCLI module entry in the bundled local repository.",
+      "url": "https://example.com/lucli/example-module.git"
+    }
+  ]
+}
