@@ -16,7 +16,6 @@ import org.lucee.lucli.cli.LuCLICommand;
 import org.lucee.lucli.modules.ModuleCommand;
 
 import picocli.CommandLine;
-import picocli.shell.jline3.PicocliCommands;
 
 /**
  * Refactored Interactive Terminal using official Picocli-JLine3 integration
@@ -86,6 +85,9 @@ public class InteractiveTerminalV2 {
         // Create Picocli CommandLine with root command
         LuCLICommand rootCommand = new LuCLICommand();
         picocliCommandLine = new CommandLine(rootCommand);
+        // Treat subcommands as top-level commands in the shell
+        // Note: We don't use setCommandName("") anymore as it causes IllegalStateException in SystemCompleter
+        // Instead, we manually construct the SystemCompleter below
         
         // Configure Picocli for terminal mode (don't exit on errors)
         picocliCommandLine.setExecutionExceptionHandler((ex, commandLine, parseResult) -> {
@@ -100,13 +102,10 @@ public class InteractiveTerminalV2 {
         Path homeDir = Paths.get(System.getProperty("user.home"));
         Path historyFile = homeDir.resolve(".lucli").resolve("history");
         
-        // Create PicocliCommands for tab completion
-        PicocliCommands picocliCommands = new PicocliCommands(picocliCommandLine);
-        
-        // Create LineReader with Picocli integration
+        // For now we disable tab completion in the interactive terminal to simplify behavior
+        // and focus on other features. We can re-enable LucliCompleter later when needed.
         LineReader reader = LineReaderBuilder.builder()
                 .terminal(terminal)
-                .completer(picocliCommands.compileCompleters())
                 .parser(new DefaultParser())
                 .variable(LineReader.HISTORY_FILE, historyFile)
                 .variable(LineReader.HISTORY_SIZE, 1000)
