@@ -11,6 +11,8 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
+import picocli.CommandLine.Spec;
+import picocli.CommandLine.Model.CommandSpec;
 
 /**
  * Server management command using Picocli
@@ -46,12 +48,16 @@ public class ServerCommand implements Callable<Integer> {
      */
     @Command(
         name = "start", 
+        aliases = {"tart"},
         description = "Start a Lucee server instance"
     )
     static class StartCommand implements Callable<Integer> {
 
         @ParentCommand 
         private ServerCommand parent;
+
+        @Spec
+        private CommandSpec spec;
 
         @Option(names = {"-v", "--version"}, 
                 description = "Lucee version to use (e.g., 6.2.2.91)")
@@ -85,6 +91,31 @@ public class ServerCommand implements Callable<Integer> {
 
         @Override
         public Integer call() throws Exception {
+            boolean invokedAsTart = false;
+            try {
+                if (spec != null && spec.commandLine() != null && spec.commandLine().getParseResult() != null) {
+                    for (String arg : spec.commandLine().getParseResult().originalArgs()) {
+                        if ("tart".equals(arg)) {
+                            invokedAsTart = true;
+                            break;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                // Ignore and fall back to normal behavior
+            }
+
+            if (invokedAsTart) {
+                System.out.println("Tip: 'lucli server tart' also starts a server. Sweet.");
+                System.out.println("       .-\"\"-.");
+                System.out.println("     .'  .-.  '.");
+                System.out.println("    /   (   )   \\");
+                System.out.println("   |  .-`-'-`-.  |");
+                System.out.println("   |  |  pie  |  |");
+                System.out.println("    \\ '.___.' /");
+                System.out.println("     '.___ __.'");
+            }
+
             // Get current working directory
             Path currentDir = projectDir != null ? 
                 Paths.get(projectDir) : 
