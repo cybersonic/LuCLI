@@ -1,25 +1,34 @@
 {
   "name" : "LuCLI",
   "version" : "6.2.2.91",
-  "port" : 8000,
+  "port" : 8010,
+  "shutdownPort" : 9010,
   "webroot" : "./",
   "monitoring" : {
-    "enabled" : true,
+    "enabled" : false,
     "jmx" : {
       "port" : 8001
     }
   },
   "jvm" : {
-    "maxMemory" : "512m",
+    "maxMemory" : "5g",
     "minMemory" : "128m",
     "additionalArgs" : [ ]
   },
   "urlRewrite" : {
-    "enabled" : true,
+    "enabled" : false,
     "routerFile" : "index.cfm"
   },
   "admin" : {
-    "enabled" : true
+    "enabled" : false
   },
-  "agents" : { }
+  "agents" : { },
+
+  "configuration": {
+    "datasources": { },
+    "mappings": { }
+  },
+  "enableLucee": true,
+  "enableREST": false
+
 }
