@@ -249,8 +249,8 @@ LuCLI stores configuration in `~/.lucli/`:
 - See `documentation/SERVER_AGENTS.md` for detailed examples and startup flags.
 
 **CFConfig Integration:**
-- `configuration` (object, optional) - Inline `.CFConfig.json` content. When present, LuCLI writes this JSON to `lucee-server/context/.CFConfig.json` on `lucli server start`.
-- `configurationFile` (string, optional) - Path (relative to the project directory or absolute) to a CFConfig JSON file. Used to populate `.CFConfig.json` when `configuration` is not set.
+- `configurationFile` (string, optional) - Path (relative to the project directory or absolute) to a base CFConfig JSON file. This is loaded first as the foundation for your server's Lucee configuration.
+- `configuration` (object, optional) - Inline `.CFConfig.json` content that overrides/extends the base from `configurationFile`. The merged result is written to `lucee-server/context/.CFConfig.json` on `lucli server start`. Allows per-project customization of shared base configurations.
 
 ### Prompt Customization
 ```bash

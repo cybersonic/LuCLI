@@ -48,7 +48,7 @@ This page describes all settings currently supported in `lucee.json` for LuCLI-m
 
 - All fields are optional; sensible defaults are applied when omitted.
 - For a minimal configuration you can safely delete keys you do not need.
-- `configuration` and `configurationFile` are mutually exclusive in practice; typically you use one or the other.
+- `configurationFile` and `configuration` work together: the external file is loaded first as a base config, then inline `configuration` values override the file values. This allows shared base configs with per-project overrides.
 
 ---
 
@@ -58,23 +58,24 @@ This section expands on the basic configuration reference and documents every av
 
 ### Top-level settings
 
-| Key                | Type      | Default        | Description |
-|--------------------|-----------|----------------|-------------|
-| `name`             | string    | project folder name | Human-friendly server name. Used as the directory name under `~/.lucli/servers/` and in CLI output. |
-| `version`          | string    | `6.2.2.91`     | Lucee Express version to download and use for this server. |
-| `port`             | integer   | `8080` (auto-adjusted to avoid conflicts) | Primary HTTP port for Tomcat. |
-| `shutdownPort`     | integer   | `port + 1000`  | Tomcat shutdown port. When omitted, LuCLI derives this from `port`. |
-| `webroot`          | string    | `"./"`        | Webroot/docBase for the Tomcat context. May be relative to the project directory or absolute. |
-| `openBrowser`      | boolean   | `true`         | When `true`, LuCLI tries to open a browser after the server starts. |
-| `openBrowserURL`   | string    | (computed from `port`) | Optional custom URL to open instead of the default `http://localhost:PORT/`. Empty string means "use the default". |
-| `enableLucee`      | boolean   | `true`         | When `false`, Lucee servlets and CFML mappings are removed from `web.xml` and Tomcat acts as a static HTTP file server (HTML/HTM, assets, etc.). |
-| `configuration`    | object    | `null`         | Inline Lucee CFConfig JSON, written to `lucee-server/context/.CFConfig.json` on start when present. |
-| `configurationFile`| string    | not set        | Path to an external CFConfig JSON file. Relative paths are resolved against the project directory. Ignored when `configuration` is present. |
-| `monitoring`       | object    | see below      | JMX/monitoring configuration. |
-| `jvm`              | object    | see below      | JVM memory and extra arguments. |
-| `urlRewrite`       | object    | see below      | URL rewriting / router configuration. |
-| `admin`            | object    | see below      | Lucee administrator exposure. |
-| `agents`           | object    | `{}`           | Named Java agents (debuggers, JMX exporters, etc.), keyed by agent ID. |
+| Key                 | Type    | Default                                   | Description                                                                                                                                                                     |
+| ------------------- | ------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`              | string  | project folder name                       | Human-friendly server name. Used as the directory name under `~/.lucli/servers/` and in CLI output.                                                                             |
+| `version`           | string  | `6.2.2.91`                                | Lucee Express version to download and use for this server.                                                                                                                      |
+| `port`              | integer | `8080` (auto-adjusted to avoid conflicts) | Primary HTTP port for Tomcat.                                                                                                                                                   |
+| `shutdownPort`      | integer | `port + 1000`                             | Tomcat shutdown port. When omitted, LuCLI derives this from `port`.                                                                                                             |
+| `webroot`           | string  | `"./"`                                    | Webroot/docBase for the Tomcat context. May be relative to the project directory or absolute.                                                                                   |
+| `openBrowser`       | boolean | `true`                                    | When `true`, LuCLI tries to open a browser after the server starts.                                                                                                             |
+| `openBrowserURL`    | string  | (computed from `port`)                    | Optional custom URL to open instead of the default `http://localhost:PORT/`. Empty string means "use the default".                                                              |
+| `enableLucee`       | boolean | `true`                                    | When `false`, Lucee servlets and CFML mappings are removed from `web.xml` and Tomcat acts as a static HTTP file server (HTML/HTM, assets, etc.).                                |
+| `enableRest`        | boolean | `false`                                   | When `true`, Rest servlets are enabled. Requires `enableLucee` to be `true`.                                                                                                    |
+| `configurationFile` | string  | not set                                   | Path to an external CFConfig JSON file (base config). Relative paths are resolved against the project directory. This is loaded first as the foundation for Lucee CFConfig.     |
+| `configuration`     | object  | `null`                                    | Inline Lucee CFConfig JSON that overrides/extends values from `configurationFile`. The final merged config is written to `lucee-server/context/.CFConfig.json` on server start. |
+| `monitoring`        | object  | see below                                 | JMX/monitoring configuration.                                                                                                                                                   |
+| `jvm`               | object  | see below                                 | JVM memory and extra arguments.                                                                                                                                                 |
+| `urlRewrite`        | object  | see below                                 | URL rewriting / router configuration.                                                                                                                                           |
+| `admin`             | object  | see below                                 | Lucee administrator exposure.                                                                                                                                                   |
+| `agents`            | object  | `{}`                                      | Named Java agents (debuggers, JMX exporters, etc.), keyed by agent ID.                                                                                                          |
 
 ### `monitoring` settings
 
