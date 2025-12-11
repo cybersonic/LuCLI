@@ -4,12 +4,18 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 import org.jline.reader.Candidate;
 import org.jline.reader.Completer;
 import org.jline.reader.LineReader;
 import org.jline.reader.ParsedLine;
+import org.lucee.lucli.modules.ModuleCommand;
+
+import lucee.runtime.exp.PageException;
+import lucee.runtime.type.Array;
+import lucee.runtime.type.Struct;
 
 /**
  * Tab completion for LuCLI internal terminal commands and file paths
@@ -59,10 +65,14 @@ public class LucliCompleter implements Completer {
                 completeServerCommand(line, candidates);
             }
             // Handle lint command completion (loaded as a module)
-            else if ("lint".equals(command)) {
-                completeLintCommand(line, candidates);
-            }
+            // else if ("lint".equals(command)) {
+            //     completeLintCommand(line, candidates);
+            // }
             // Complete file paths for commands that take file arguments
+            else if (isModule(command)) {
+                completeModuleCommand(line, candidates, command);
+                // TODO: Add modules with isModule() for it and then we can get the functions and then arguments for that function
+            }
             else if (isFileCommand(command)) {
                 String partial = line.words().size() > 1 ? line.words().get(line.words().size() - 1) : "";
                 completeFilePaths(partial, candidates, command);
@@ -70,6 +80,99 @@ public class LucliCompleter implements Completer {
         }
     }
     
+
+    private void completeModuleCommand(ParsedLine line, List<Candidate> candidates, String command){
+        Array metadata = null;
+        try {
+            metadata = LuceeScriptEngine.getInstance(false, false).getComponentMetadata("modules." + command + ".Module" );
+            // System.out.println("Metadata: " + metadata.toString());lint
+      
+            if(line.toString().isEmpty() || line.words().size() == 1) {
+                // Get the module functions
+                addFunctionCandidatesFromMetadata(candidates, metadata);
+            }
+      
+            
+            return;
+        }
+        catch(Exception e) {
+            System.err.println(e.getMessage());
+            return;   // Ignore completion errors
+        }
+       // Need to be smarter here but let's start as we mean to go on. WE can get teh methods if the list is just the command. 
+        // We are 
+        // if(line.toString().isEmpty() || line.words().size() ==1) {
+        //     // Get the module functions
+        //     Map<String, Object> functions = (Map<String, Object>) getModuleFunctions(command);
+        //     for(String functionName: functions.keySet()) {
+        //         candidates.add(new Candidate(functionName, functionName, null, null, null, null, true));
+        //     }
+        // } else if(line.words().size() >=2) {
+        //     // Get the function arguments
+        //     String functionName = line.words().get(1);
+        //     Map<String, Object> arguments = (Map<String, Object>) getFunctionArguments(command, functionName);
+        //     for(String argumentName: arguments.keySet()) {
+        //         candidates.add(new Candidate(argumentName, argumentName, null, null, null, null, true));
+        //     }
+        // }
+
+        
+    }
+
+    private void addFunctionCandidatesFromMetadata(List<Candidate> candidates, Array metadata) throws PageException {
+        for (int i = 1; i <= metadata.size(); i++) {
+            Struct item = (Struct) metadata.get(i, null);
+            if (item != null) {
+                // System.out.println("Item: " + item.toString());
+                // Process each metadata item (likely a Struct containing function info)
+                candidates.add(
+                    new Candidate(
+                        item.get("name").toString(),
+                        item.get("name").toString(),
+                        "module-commands",
+                         null, null, null, true
+                    )
+                );
+            }
+        }
+    }
+
+    /**
+     * List installed modules (name -> path) in lowercase for easy lookup
+    */
+    private static Map<String, Path> listModules(){
+        // Build map of installed modules (name -> description/status)
+        Map<String, Path> installed = new java.util.TreeMap<>();
+        
+        try (Stream<Path> stream = Files.list(ModuleCommand.getModulesDirectory())) {
+            stream.filter(Files::isDirectory).forEach(dir -> {
+                installed.put(dir.getFileName().toString().toLowerCase(), dir);
+            });
+        } catch (IOException e) {
+            // Ignore errors
+        }
+        return installed;
+    }
+    /**
+     * Check if a module is installed (case-insensitive)
+     */
+    private static boolean isModule(String moduleName) {
+        Map<String, Path> modules = listModules();
+        return modules.containsKey(moduleName.toLowerCase());
+    }
+
+    public static Object getModuleFunctions(String moduleName) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'getModuleFunctions'");
+    }
+
+    public static Object getFunctionArguments(String moduleName, String functionName) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'getFunctionArguments'");
+    }
+
+
+
     private boolean isFileCommand(String command) {
         switch (command) {
             case "ls":
@@ -375,7 +478,7 @@ public class LucliCompleter implements Completer {
             String subcommand = words.get(1).toLowerCase();
             
             // For commands that support --name, complete with server names
-            if (("stop".equals(subcommand) || "status".equals(subcommand) || "prune".equals(subcommand)) && 
+            if (("stop".equals(subcommand) || "status".equals(subcommand) || "prune".equals(subcommand) || "list".equals(subcommand)) && 
                 words.size() >= 3) {
                 
                 String lastWord = words.get(words.size() - 1);
@@ -529,6 +632,9 @@ public class LucliCompleter implements Completer {
             case "prune":
                 flags = new String[]{"--name", "--all", "-n", "-a"};
                 break;
+            case "list":
+                flags = new String[]{"--running", "-r"};
+                break;
         }
         
         for (String flag : flags) {
@@ -580,6 +686,9 @@ public class LucliCompleter implements Completer {
             case "--all":
             case "-a":
                 return "Apply to all servers";
+            case "--running":
+            case "-r":
+                return "Show only running servers";
             default:
                 return "Server option";
         }

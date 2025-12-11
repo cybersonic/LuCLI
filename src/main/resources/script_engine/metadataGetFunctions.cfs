@@ -1,0 +1,16 @@
+// Gets the functions metadata for a module
+    md =  getComponentMetadata(componentPackage);
+    metadata = md.functions.filter(function(item){
+        if(item.name == "init"){
+            return false;
+        }
+        return item.access == "public";
+    });
+
+    metadata = metadata.map(function(item){
+        return {
+            "name": item.name,
+            "arguments": item.parameters,
+            "access": item.access
+        };
+    });

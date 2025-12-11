@@ -3,6 +3,25 @@
 
 server.env = __env;
 Timer.start("Execute Module Script");
+// systemOutput("executeModule: [#fileExists(expandPath( "/modules/#moduleName#/module.json" ))#]", true, false );
+
+// Setup the envuronment settings if they exists. 
+moduleConfigFilePath = expandPath( "/modules/#moduleName#/module.json" );
+if(fileExists( moduleConfigFilePath )){
+    moduleConfig = FileRead( moduleConfigFilePath );
+    moduleConfigStruct = deserializeJSON( moduleConfig );
+    if( structKeyExists( moduleConfigStruct, "configuration" ) ){
+        systemOutput("Importing module configuration for module: #moduleName#", true, false );
+        configImport(
+            data=moduleConfigStruct.configuration,
+            password=request.SERVERADMINPASSWORD,
+            type="server", 
+            flushExistingData=false
+            );
+        }
+        systemOutput("Imported module configuration for module: #moduleName#", true, false );
+}
+
 
 modules = createObject("component", "modules.#moduleName#.Module").init(
         verboseEnabled=verbose,

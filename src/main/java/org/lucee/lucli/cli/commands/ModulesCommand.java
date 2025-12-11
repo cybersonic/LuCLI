@@ -86,13 +86,29 @@ public class ModulesCommand implements Callable<Integer> {
                     description = "Name of the module to initialize")
         private String moduleName;
 
+        @Option(names = "--git", description = "Initialize a git repository in the new module directory")
+        private boolean git;
+
+        @Option(names = "--no-git", description = "Do not initialize git and do not prompt")
+        private boolean noGit;
+
         @Override
         public Integer call() throws Exception {
             // Create UnifiedCommandExecutor for CLI mode
             UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, Paths.get(System.getProperty("user.dir")));
 
+            java.util.List<String> args = new java.util.ArrayList<>();
+            args.add("init");
+            args.add(moduleName);
+            if (git) {
+                args.add("--git");
+            }
+            if (noGit) {
+                args.add("--no-git");
+            }
+
             // Execute the modules init command
-            String result = executor.executeCommand("modules", new String[]{"init", moduleName});
+            String result = executor.executeCommand("modules", args.toArray(new String[0]));
             if (result != null && !result.isEmpty()) {
                 System.out.println(result);
             }
