@@ -63,6 +63,7 @@ public class ServerConfigHelper {
         keys.add("monitoring.enabled");
         keys.add("monitoring.jmx.port");
         keys.add("enableLucee");
+        keys.add("enableREST");
         keys.add("urlRewrite.enabled");
         keys.add("urlRewrite.routerFile");
         return keys;
@@ -156,6 +157,8 @@ public class ServerConfigHelper {
                     return config.webroot;
                 case "enableLucee":
                     return String.valueOf(config.enableLucee);
+                case "enableREST":
+                    return String.valueOf(config.enableREST);
             }
         } else if (keyPath.length == 2) {
             String category = keyPath[0];

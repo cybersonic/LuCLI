@@ -60,12 +60,14 @@
       "properties": {
         "maxMemory": {
           "type": "string",
-          "description": "Maximum heap size for the JVM (e.g. '512m', '2g').",
+          "description": "Maximum heap size for the JVM (e.g. '512m', '2g'). Must match ^[1-9]\\d*(m|g)$ (e.g. '256m', '1g').",
+          "pattern": "^[1-9]\\d*(m|g)$",
           "default": "512m"
         },
         "minMemory": {
           "type": "string",
-          "description": "Initial heap size for the JVM (e.g. '128m').",
+          "description": "Initial heap size for the JVM (e.g. '128m'). Must match ^[1-9]\\d*(m|g)$ (e.g. '128m', '512m').",
+          "pattern": "^[1-9]\\d*(m|g)$",
           "default": "128m"
         },
         "additionalArgs": {
@@ -112,6 +114,11 @@
       "description": "Enable Lucee CFML engine and servlet mappings. When false, Tomcat serves only static content (e.g. HTML/HTM).",
       "default": true
     },
+    "enableREST": {
+      "type": "boolean",
+      "description": "Enable Lucee REST servlet mappings. When false, REST endpoints are disabled. Requires 'enableLucee' to be true.",
+      "default": true
+    },
     "agents": {
       "type": "object",
       "description": "Named Java agents that can be toggled per server start.",
@@ -140,14 +147,14 @@
       },
       "default": {}
     },
-    "configuration": {
-      "type": "object",
-      "description": "Inline Lucee CFConfig configuration to be written to lucee-server/context/.CFConfig.json on server start. The structure should match Lucee's .CFConfig.json format.",
-      "additionalProperties": true
-    },
     "configurationFile": {
       "type": "string",
-      "description": "Path to an external CFConfig JSON file. May be relative to the project directory or an absolute path. Used when 'configuration' is not set."
+      "description": "Path to an external CFConfig JSON file (base configuration). May be relative to the project directory or an absolute path. This is loaded first as the foundation; values are then merged with the inline 'configuration' object."
+    },
+    "configuration": {
+      "type": "object",
+      "description": "Inline Lucee CFConfig configuration that overrides/extends the base from 'configurationFile'. The final merged result is written to lucee-server/context/.CFConfig.json on server start. The structure should match Lucee's .CFConfig.json format.",
+      "additionalProperties": true
     }
   }
 }

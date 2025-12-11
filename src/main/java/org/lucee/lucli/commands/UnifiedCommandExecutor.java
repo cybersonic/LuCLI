@@ -199,21 +199,27 @@ public class UnifiedCommandExecutor {
             result.append("   Process ID:    ").append(instance.getPid()).append("\n");
             result.append("   HTTP Port:     ").append(instance.getPort()).append("\n");
             result.append("   Shutdown Port: ").append(LuceeServerConfig.getEffectiveShutdownPort(config)).append("\n");
+           
             
             if (config.monitoring != null && config.monitoring.enabled && config.monitoring.jmx != null) {
                 result.append("   JMX Port:      ").append(config.monitoring.jmx.port).append("\n");
             }
             
+            
+            
+            result.append("   URL:           http://localhost:").append(instance.getPort()).append("\n");
+            result.append("   Admin URL:     http://localhost:").append(instance.getPort()).append("/lucee/admin.cfm\n");
+            result.append("   Web Root:      ").append(projectDir).append("\n");
+            result.append("   Server Dir:    ").append(instance.getServerDir()).append("\n");
+
             // Show active agents, if any
             java.util.Set<String> activeAgents = serverManager.getActiveAgentsForConfig(config, agentOverrides);
             if (activeAgents != null && !activeAgents.isEmpty()) {
                 result.append("   Agents:        ").append(String.join(", ", activeAgents)).append("\n");
             }
+
             
-            result.append("   URL:           http://localhost:").append(instance.getPort()).append("\n");
-            result.append("   Admin URL:     http://localhost:").append(instance.getPort()).append("/lucee/admin.cfm\n");
-            result.append("   Web Root:      ").append(projectDir).append("\n");
-             result.append("✅ Server started successfully!\n");
+            result.append("✅ Server started successfully!\n");
             return formatOutput(result.toString(), false);
             
         } catch (ServerConflictException e) {

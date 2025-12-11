@@ -69,6 +69,10 @@ public class TomcatWebXmlPatcher {
             // while still reusing the same template web.xml.
             if (config != null && !config.enableLucee) {
                 disableLuceeEngine(document);
+                disableRestServlet(document);
+            } else if (config != null && !config.enableREST) {
+                // If Lucee is enabled but REST is disabled, only disable REST
+                disableRestServlet(document);
             }
 
             TransformerFactory tf = TransformerFactory.newInstance();
@@ -153,8 +157,9 @@ public class TomcatWebXmlPatcher {
     }
 
     /**
-     * Remove Lucee-specific servlets, servlet-mappings and CFML welcome files
+     * Remove Lucee CFML servlets, servlet-mappings and CFML welcome files
      * so that Tomcat behaves as a plain static file server.
+     * This does NOT remove the REST servlet - use disableRestServlet() for that.
      */
     private void disableLuceeEngine(Document document) {
         if (document == null) {
@@ -166,8 +171,7 @@ public class TomcatWebXmlPatcher {
             return;
         }
 
-        // 1) Remove Lucee servlets and remember their servlet-names so that we
-        //    can also remove corresponding <servlet-mapping> entries.
+        // 1) Remove Lucee CFML servlets (but not REST) and remember their servlet-names
         Set<String> luceeServletNames = new HashSet<>();
         NodeList servletNodes = root.getElementsByTagName("servlet");
         for (int i = 0; i < servletNodes.getLength(); i++) {
@@ -180,12 +184,12 @@ public class TomcatWebXmlPatcher {
             String servletName = getChildText(servlet, "servlet-name");
             String servletClass = getChildText(servlet, "servlet-class");
 
-            boolean isLuceeServlet =
+            // Only remove CFML servlet, not REST servlet
+            boolean isLuceeCfmlServlet =
                 (servletClass != null && servletClass.startsWith("lucee.loader.servlet")) ||
-                "CFMLServlet".equals(servletName) ||
-                "RESTServlet".equals(servletName);
+                "CFMLServlet".equals(servletName);
 
-            if (isLuceeServlet) {
+            if (isLuceeCfmlServlet) {
                 if (servletName != null) {
                     luceeServletNames.add(servletName);
                 }
@@ -194,8 +198,7 @@ public class TomcatWebXmlPatcher {
             }
         }
 
-        // 2) Remove servlet-mappings for Lucee servlets and CFML/REST/admin
-        //    URL patterns.
+        // 2) Remove servlet-mappings for Lucee CFML servlets and CFML/admin URL patterns
         NodeList mappingNodes = root.getElementsByTagName("servlet-mapping");
         for (int i = 0; i < mappingNodes.getLength(); i++) {
             Node node = mappingNodes.item(i);
@@ -213,8 +216,7 @@ public class TomcatWebXmlPatcher {
                 pattern.endsWith("*.cfc") ||
                 pattern.endsWith("*.cfs") ||
                 "/index.cfm/*".equals(pattern) ||
-                pattern.startsWith("/lucee/") ||
-                pattern.startsWith("/rest/")
+                pattern.startsWith("/lucee/")
             );
 
             if ((name != null && luceeServletNames.contains(name)) || isCfmlPattern) {
@@ -249,6 +251,60 @@ public class TomcatWebXmlPatcher {
 
             for (Element wf : toRemove) {
                 list.removeChild(wf);
+            }
+        }
+    }
+
+    /**
+     * Remove REST servlet and its mappings.
+     * This can be called independently of disableLuceeEngine().
+     */
+    private void disableRestServlet(Document document) {
+        if (document == null) {
+            return;
+        }
+
+        Element root = document.getDocumentElement();
+        if (root == null) {
+            return;
+        }
+
+        // 1) Remove REST servlet and remember its servlet-name
+        Set<String> restServletNames = new HashSet<>();
+        NodeList servletNodes = root.getElementsByTagName("servlet");
+        for (int i = 0; i < servletNodes.getLength(); i++) {
+            Node node = servletNodes.item(i);
+            if (!(node instanceof Element)) {
+                continue;
+            }
+            Element servlet = (Element) node;
+
+            String servletName = getChildText(servlet, "servlet-name");
+
+            if ("RESTServlet".equals(servletName)) {
+                restServletNames.add(servletName);
+                root.removeChild(servlet);
+                i--; // Adjust index because NodeList is live
+            }
+        }
+
+        // 2) Remove servlet-mappings for REST servlet and /rest/* URL patterns
+        NodeList mappingNodes = root.getElementsByTagName("servlet-mapping");
+        for (int i = 0; i < mappingNodes.getLength(); i++) {
+            Node node = mappingNodes.item(i);
+            if (!(node instanceof Element)) {
+                continue;
+            }
+            Element mapping = (Element) node;
+
+            String name = getChildText(mapping, "servlet-name");
+            String pattern = getChildText(mapping, "url-pattern");
+
+            boolean isRestPattern = pattern != null && pattern.startsWith("/rest/");
+
+            if ((name != null && restServletNames.contains(name)) || isRestPattern) {
+                root.removeChild(mapping);
+                i--; // Adjust index because NodeList is live
             }
         }
     }
