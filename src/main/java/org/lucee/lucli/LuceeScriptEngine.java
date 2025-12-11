@@ -14,7 +14,7 @@ import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
 import org.lucee.lucli.modules.ModuleCommand;
-
+import lucee.runtime.type.Array;
 
 /**
  * Singleton ScriptEngine wrapper for Lucee CFML that handles all script execution responsibilities.
@@ -248,6 +248,7 @@ public class LuceeScriptEngine {
         
             // Ensure shared BaseModule.cfc in ~/.lucli/modules matches this LuCLI version
             ensureBaseModuleUpToDate();
+            // setupModuleEnvironment(moduleName);
             
             String subCommand = "main";
             ParsedArguments parsedArgs = parseArguments(scriptArgs);
@@ -284,6 +285,16 @@ public class LuceeScriptEngine {
             Timer.stop("Module Execution: " + moduleName);
     }
 
+    // /**
+    //     This reads the module.json and sets up any environment needed for the module
+    //     For the moment it reads the configuration key and directly passes it to the engine
+    //     @param moduleName
+    // **/
+    // private void setupModuleEnvironment(String moduleName) {
+        
+
+    //     throw new UnsupportedOperationException("Unimplemented method 'setupModuleEnvironment'");
+    // }
 
     /**
      * Main script execution entry point - determines file type and executes appropriately
@@ -328,6 +339,26 @@ public class LuceeScriptEngine {
         return 0;
     }
 
+
+
+    public Array getComponentMetadata(String componentPackage) throws Exception {
+        Timer.start("Get Component Metadata: " + componentPackage);
+        
+        // Ensure script context is set up
+        setupScriptContext(engine, componentPackage, new String[0]);
+        
+        engine.put("componentPackage",componentPackage);
+        
+        String script = readScriptTemplate("/script_engine/metadataGetFunctions.cfs");
+        if (isVerboseMode() || isDebugMode()) {
+            System.out.println("=== Getting Component Metadata ===");
+        }
+        engine.eval(script);
+        Array result = (Array) engine.get("metadata");
+        
+        Timer.stop("Get Component Metadata: " + componentPackage);
+        return result;
+    }
     /**
      * Execute script content directly (for .cfs files)
      */
@@ -566,6 +597,8 @@ public class LuceeScriptEngine {
         }
     }
     
+
+
  
     
     /**
