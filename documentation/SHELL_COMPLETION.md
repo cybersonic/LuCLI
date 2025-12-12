@@ -9,12 +9,57 @@ LuCLI now supports tab-completion for bash and zsh shells on macOS and Linux.
 lucli completion bash | sudo tee /etc/bash_completion.d/lucli
 ```
 
+Then reload bash or add to `.bashrc`:
+```bash
+source /etc/bash_completion.d/lucli
+```
+
 ### Install zsh completion:
 ```bash
 lucli completion zsh | sudo tee /usr/share/zsh/site-functions/_lucli
 ```
 
-Then reload your shell or source the completion file directly.
+For zsh, the completion function is auto-loaded from `site-functions`. Reload your shell:
+```bash
+exec zsh
+```
+
+Or manually source it:
+```bash
+source /usr/share/zsh/site-functions/_lucli
+```
+
+### Manual Installation (without sudo)
+
+If you don't have sudo access or prefer local installation:
+
+**Bash:**
+```bash
+# Create user completion directory if it doesn't exist
+mkdir -p ~/.bash_completion.d
+
+# Generate and save completion script
+lucli completion bash > ~/.bash_completion.d/lucli
+
+# Add to ~/.bashrc
+echo 'for file in ~/.bash_completion.d/*; do source "$file"; done' >> ~/.bashrc
+```
+
+**Zsh:**
+```bash
+# Create user completion directory if it doesn't exist
+mkdir -p ~/.zsh/completions
+
+# Generate and save completion script
+lucli completion zsh > ~/.zsh/completions/_lucli
+
+# Add to ~/.zshrc
+echo 'fpath=(~/.zsh/completions $fpath)' >> ~/.zshrc
+echo 'autoload -Uz compinit && compinit' >> ~/.zshrc
+
+# Reload zsh
+exec zsh
+```
 
 ## How It Works
 
@@ -111,9 +156,42 @@ This will output debug information to stderr while returning completions to stdo
 4. LuCLI returns: `list`
 5. Zsh completes to: `lucli modules list`
 
+## Troubleshooting
+
+### Completions not working after installation
+
+**Bash:**
+1. Verify the script is in the right location: `ls -la /etc/bash_completion.d/lucli` or `~/.bash_completion.d/lucli`
+2. Reload bash: `exec bash`
+3. Test with: `lucli <TAB>`
+
+**Zsh:**
+1. Verify the script is in the right location: `ls -la /usr/share/zsh/site-functions/_lucli` or `~/.zsh/completions/_lucli`
+2. Rebuild completion cache: `rm -f ~/.zcompdump && exec zsh`
+3. Test with: `lucli <TAB>`
+
+### Completions are slow
+
+Completions are generated on-demand by invoking `lucli __complete`. If they're slow:
+1. Check if `lucli` is in your PATH: `which lucli`
+2. Verify the JAR or binary is executable and accessible
+3. Consider pre-building the binary with `mvn package -Pbinary` for faster startup
+
+### Test completion directly
+
+Debug completions without shell integration:
+```bash
+# Enable debug output
+LUCLI_DEBUG_COMPLETION=1 lucli __complete --words="lucli server s" --current=2
+
+# Check what completions are available
+lucli __complete --words="lucli " --current=1
+```
+
 ## Future Enhancements
 
 - PowerShell completion support for Windows users
 - Improved option descriptions in completions
 - Custom completion providers for dynamic values (e.g., server names)
-- Installation helpers for system-wide completion setup
+- Installation helper script (`lucli completion install`)
+- Auto-detection of shell and installation
