@@ -40,7 +40,8 @@ fi
 # "ClassNotFoundException: org.lucee.lucli.LuCLI" when running the jar.
 # A plain `mvn clean package` produces a correct shaded jar, so we build that
 # first and then create the self-executing binary ourselves below.
-mvn clean package -Dmaven.test.skip=true
+echo "Building LuCLI JAR and binary..."
+mvn clean package -q -Dmaven.test.skip=true
 if [ $? -ne 0 ]; then
     echo "Maven build failed!"
     exit 1
@@ -108,7 +109,7 @@ fi
 
 
 if [ "$buildDockerImage" = false ] ; then
-    echo "Build and tests completed successfully."
+    echo "✅ Build and tests completed successfully."
     exit 0
 fi
 # Build Docker image
@@ -132,7 +133,7 @@ docker run --rm markdrew/lucli:${VERSION} --version
 
 # docker run -it --entrypoint /bin/bash markdrew/lucli:latest
 
-echo "Build and tests completed successfully."
+echo "✅ Build and tests completed successfully."
 echo "Multi-platform images pushed for: linux/amd64, linux/arm64/v8"
 echo "You can now run the Docker image with:"
 echo "  docker run --rm markdrew/lucli:${VERSION} [options]"

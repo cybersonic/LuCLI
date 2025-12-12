@@ -27,6 +27,7 @@ import picocli.CommandLine.Model.CommandSpec;
         ServerCommand.StatusCommand.class,
         ServerCommand.ListCommand.class,
         ServerCommand.PruneCommand.class,
+        ServerCommand.GetCommand.class,
         ServerCommand.SetCommand.class,
         ServerCommand.LogCommand.class,
         ServerCommand.MonitorCommand.class
@@ -406,6 +407,49 @@ public class ServerCommand implements Callable<Integer> {
                 args.add("--name");
                 args.add(name);
             }
+
+            String result = executor.executeCommand("server", args.toArray(new String[0]));
+            if (result != null && !result.isEmpty()) {
+                System.out.println(result);
+            }
+
+            return 0;
+        }
+    }
+
+    /**
+     * Server get subcommand for reading configuration
+     */
+    @Command(
+        name = "get",
+        description = "Get configuration values from lucee.json"
+    )
+    static class GetCommand implements Callable<Integer> {
+
+        @ParentCommand
+        private ServerCommand parent;
+
+        @Parameters(paramLabel = "KEY",
+                    description = "Configuration key to retrieve (e.g., port, admin.enabled)",
+                    arity = "1")
+        private String key;
+
+        @Option(names = {"-d", "--directory"},
+                description = "Project directory (defaults to current directory)")
+        private String projectDir;
+
+        @Override
+        public Integer call() throws Exception {
+            Path currentDir = projectDir != null ?
+                Paths.get(projectDir) :
+                Paths.get(System.getProperty("user.dir"));
+
+            UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, currentDir);
+
+            java.util.List<String> args = new java.util.ArrayList<>();
+            args.add("config");
+            args.add("get");
+            args.add(key);
 
             String result = executor.executeCommand("server", args.toArray(new String[0]));
             if (result != null && !result.isEmpty()) {

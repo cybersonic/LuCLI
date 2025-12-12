@@ -198,6 +198,16 @@
       "projectName": "lucli",
       "console": "integratedTerminal",
       "args": ["tests/cfml/Run.cfc", "sayHello", "name=Mark"]
+    },
+    {
+      "type": "java",
+      "name": "👟 Debug a timing not appearing",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "projectName": "lucli",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "args": [ "-t", "demo.lucli"]
     }
   ]
 }
