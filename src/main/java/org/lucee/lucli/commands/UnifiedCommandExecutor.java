@@ -102,6 +102,7 @@ public class UnifiedCommandExecutor {
         String versionOverride = null;
         boolean forceReplace = false;
         String customName = null;
+        boolean dryRun = false;
         Path projectDir = currentWorkingDirectory; // Default to current directory
         
         LuceeServerManager.AgentOverrides agentOverrides = new LuceeServerManager.AgentOverrides();
@@ -117,6 +118,8 @@ public class UnifiedCommandExecutor {
             } else if ((args[i].equals("--name") || args[i].equals("-n")) && i + 1 < args.length) {
                 customName = args[i + 1];
                 i++; // Skip next argument
+            } else if (args[i].equals("--dry-run")) {
+                dryRun = true;
             } else if (args[i].equals("--no-agents")) {
                 agentOverrides.disableAllAgents = true;
             } else if ((args[i].equals("--agents")) && i + 1 < args.length) {
@@ -170,6 +173,28 @@ public class UnifiedCommandExecutor {
             }
             Path configFile = projectDir.resolve("lucee.json");
             LuceeServerConfig.saveConfig(config, configFile);
+        }
+        
+        // Load final realized config for dry-run or actual startup
+        LuceeServerConfig.ServerConfig finalConfig = LuceeServerConfig.loadConfig(projectDir);
+        
+        // If dry-run, show what would happen and exit
+        if (dryRun) {
+            StringBuilder result = new StringBuilder();
+            result.append("📋 DRY RUN: Server configuration that would be used:\n\n");
+            result.append("Realized lucee.json for: ").append(projectDir).append("\n");
+            result.append("═══════════════════════════════════════════\n");
+            try {
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                mapper.enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT);
+                String jsonString = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(finalConfig);
+                result.append(jsonString).append("\n");
+            } catch (Exception e) {
+                result.append("Error serializing config: ").append(e.getMessage());
+            }
+            result.append("═══════════════════════════════════════════\n");
+            result.append("\n✅ Use without --dry-run to start the server with this config.\n");
+            return formatOutput(result.toString(), false);
         }
         
         // If no agent-related flags were actually set, avoid passing a non-null overrides object
