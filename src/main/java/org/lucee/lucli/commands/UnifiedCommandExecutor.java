@@ -561,42 +561,81 @@ public class UnifiedCommandExecutor {
     private String handleConfigSet(ServerConfigHelper configHelper, String[] args) throws Exception {
         if (args.length < 3) {
             return formatOutput("❌ config set: missing key=value\n" +
-                "💡 Usage: server config set <key=value>\n" +
-                "💡 Example: server config set version=6.2.2.91", true);
+                "💡 Usage: server config set <key=value> [<key=value>...]\n" +
+                "💡 Example: server config set version=6.2.2.91\n" +
+                "💡 Example: server config set port=8080 admin.enabled=false", true);
         }
         
-        // Handle --no-cache flag
-        boolean clearCache = false;
-        for (String arg : args) {
-            if ("--no-cache".equals(arg)) {
-                clearCache = true;
+        // Check for --dry-run flag
+        boolean dryRun = false;
+        java.util.List<String> keyValuePairs = new java.util.ArrayList<>();
+        
+        for (int i = 2; i < args.length; i++) {
+            if ("--dry-run".equals(args[i])) {
+                dryRun = true;
+            } else if ("--no-cache".equals(args[i])) {
                 configHelper.clearVersionCache();
-                break;
+            } else if (!args[i].startsWith("--")) {
+                keyValuePairs.add(args[i]);
             }
         }
         
-        if (clearCache && args.length == 3) {
-            // Only clearing cache, not setting a value
-            return formatOutput("✅ Lucee version cache cleared", false);
+        if (keyValuePairs.isEmpty()) {
+            return formatOutput("❌ config set: missing key=value\n" +
+                "💡 Usage: server config set <key=value> [<key=value>...]", true);
         }
-        
-        String keyValue = args[2];
-        if (!keyValue.contains("=")) {
-            return formatOutput("❌ Invalid format. Use key=value\n" +
-                "💡 Example: server config set version=6.2.2.91", true);
-        }
-        
-        String[] parts = keyValue.split("=", 2);
-        String key = parts[0].trim();
-        String value = parts[1].trim();
         
         try {
+            // Load current config
             LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(currentWorkingDirectory);
-            configHelper.setConfigValue(config, key, value);
+            
+            // Apply all key=value pairs
+            for (String keyValue : keyValuePairs) {
+                if (!keyValue.contains("=")) {
+                    return formatOutput("❌ Invalid format. Use key=value\n" +
+                        "💡 Example: server config set version=6.2.2.91", true);
+                }
+                
+                String[] parts = keyValue.split("=", 2);
+                String key = parts[0].trim();
+                String value = parts[1].trim();
+                configHelper.setConfigValue(config, key, value);
+            }
+            
+            // If dry-run, show the resulting config without saving
+            if (dryRun) {
+                StringBuilder result = new StringBuilder();
+                result.append("📋 DRY RUN: Configuration would be set to:\n\n");
+                result.append("Key=Value pairs:\n");
+                for (String pair : keyValuePairs) {
+                    result.append("  ✓ ").append(pair).append("\n");
+                }
+                result.append("\nResulting lucee.json:\n");
+                result.append("═══════════════════════════════════════════\n");
+                try {
+                    com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                    mapper.enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT);
+                    String jsonString = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(config);
+                    result.append(jsonString).append("\n");
+                } catch (Exception e) {
+                    result.append("Error serializing config: ").append(e.getMessage()).append("\n");
+                }
+                result.append("═══════════════════════════════════════════\n");
+                result.append("\n✅ Run without --dry-run to apply these changes.\n");
+                return formatOutput(result.toString(), false);
+            }
+            
+            // Save the config
             Path configFile = currentWorkingDirectory.resolve("lucee.json");
             LuceeServerConfig.saveConfig(config, configFile);
             
-            return formatOutput("✅ Configuration updated: " + key + "=" + value, false);
+            StringBuilder result = new StringBuilder();
+            result.append("✅ Configuration updated:\n");
+            for (String pair : keyValuePairs) {
+                result.append("  ✓ ").append(pair).append("\n");
+            }
+            
+            return formatOutput(result.toString(), false);
         } catch (Exception e) {
             return formatOutput("❌ Error setting configuration: " + e.getMessage(), true);
         }

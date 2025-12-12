@@ -27,6 +27,7 @@ import picocli.CommandLine.Model.CommandSpec;
         ServerCommand.StatusCommand.class,
         ServerCommand.ListCommand.class,
         ServerCommand.PruneCommand.class,
+        ServerCommand.SetCommand.class,
         ServerCommand.LogCommand.class,
         ServerCommand.MonitorCommand.class
     }
@@ -404,6 +405,62 @@ public class ServerCommand implements Callable<Integer> {
             if (name != null) {
                 args.add("--name");
                 args.add(name);
+            }
+
+            String result = executor.executeCommand("server", args.toArray(new String[0]));
+            if (result != null && !result.isEmpty()) {
+                System.out.println(result);
+            }
+
+            return 0;
+        }
+    }
+
+    /**
+     * Server set subcommand for configuring settings
+     */
+    @Command(
+        name = "set",
+        description = "Set configuration values in lucee.json"
+    )
+    static class SetCommand implements Callable<Integer> {
+
+        @ParentCommand
+        private ServerCommand parent;
+
+        @Option(names = {"--dry-run"},
+                description = "Show what would be set without actually saving")
+        private boolean dryRun = false;
+
+        @Parameters(paramLabel = "KEY=VALUE",
+                    description = "Configuration key=value pair (e.g., port=8080, admin.enabled=false)",
+                    arity = "1..*")
+        private String[] configPairs;
+
+        @Option(names = {"-d", "--directory"},
+                description = "Project directory (defaults to current directory)")
+        private String projectDir;
+
+        @Override
+        public Integer call() throws Exception {
+            Path currentDir = projectDir != null ?
+                Paths.get(projectDir) :
+                Paths.get(System.getProperty("user.dir"));
+
+            UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, currentDir);
+
+            java.util.List<String> args = new java.util.ArrayList<>();
+            args.add("config");
+            args.add("set");
+
+            if (configPairs != null) {
+                for (String pair : configPairs) {
+                    args.add(pair);
+                }
+            }
+
+            if (dryRun) {
+                args.add("--dry-run");
             }
 
             String result = executor.executeCommand("server", args.toArray(new String[0]));
