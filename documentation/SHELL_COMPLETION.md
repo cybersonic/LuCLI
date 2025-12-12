@@ -23,7 +23,7 @@ Then reload your shell or source the completion file directly.
 **1. Hidden `__complete` Endpoint**
 - Tests and powers shell integration
 - Can be called directly to test completions
-- Example: `lucli __complete --words="lucli server" --current=1`
+- Example: `lucli __complete --words="lucli server s" --current=2` returns `set\nstart\nstatus\nstop`
 - Returns newline-separated completion candidates
 - Testable without shell integration
 
@@ -90,7 +90,7 @@ Tests cover:
 
 To debug completion issues, set the environment variable:
 ```bash
-LUCLI_DEBUG_COMPLETION=1 lucli __complete --words="lucli server" --current=1
+LUCLI_DEBUG_COMPLETION=1 lucli __complete --words="lucli server s" --current=2
 ```
 
 This will output debug information to stderr while returning completions to stdout.
