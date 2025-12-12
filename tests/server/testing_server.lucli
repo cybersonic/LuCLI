@@ -1,0 +1,3 @@
+server prune --name testing_server
+server start --name testing_server
+cat ~/.lucli/servers/testing_server/config/web.xml
