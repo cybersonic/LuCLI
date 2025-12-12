@@ -1,0 +1,6 @@
+{
+    "name": "testing_server",
+    "port": 7999,
+    "shutdownPort": 6999
+
+}

@@ -150,6 +150,11 @@ public class LuceeServerConfig {
             config.openBrowserURL = null;
         }
 
+        // Assign a shutdown port if not explicitly set, checking for conflicts with existing servers
+        if (config.shutdownPort == null) {
+            assignShutdownPortIfNeeded(config);
+        }
+        
         // Don't resolve port conflicts here - do it just before starting server
         // This prevents race conditions where ports become unavailable between config load and server start
         
@@ -195,6 +200,41 @@ public class LuceeServerConfig {
     }
     
     /**
+     * Assign a shutdown port to config if not already set.
+     * Tries the default (HTTP port + 1000) first, but if that conflicts with
+     * existing servers, finds an available port in the 9000-9999 range.
+     */
+    private static void assignShutdownPortIfNeeded(ServerConfig config) {
+        Path lucliHome = getLucliHome();
+        Path serversDir = lucliHome.resolve("servers");
+        Set<Integer> existingPorts = getExistingServerPorts(serversDir);
+        
+        // Try default shutdown port (HTTP + 1000)
+        int preferredShutdownPort = getShutdownPort(config.port);
+        if (!existingPorts.contains(preferredShutdownPort) && isPortAvailable(preferredShutdownPort)) {
+            config.shutdownPort = preferredShutdownPort;
+            return;
+        }
+        
+        // If default is taken, find an available port in the 9000-9999 range
+        // Avoid ports being used by existing servers
+        for (int port = 9000; port <= 9999; port++) {
+            if (!existingPorts.contains(port) && isPortAvailable(port)) {
+                config.shutdownPort = port;
+                return;
+            }
+        }
+        
+        // If we exhaust the range, use system-assigned port
+        try (ServerSocket socket = new ServerSocket(0)) {
+            config.shutdownPort = socket.getLocalPort();
+        } catch (IOException e) {
+            // Fallback to HTTP + 1000 even if it might conflict
+            config.shutdownPort = preferredShutdownPort;
+        }
+    }
+    
+    /**
      * Get LuCLI home directory
      */
     private static Path getLucliHome() {
@@ -230,8 +270,8 @@ public class LuceeServerConfig {
                         // Add HTTP port
                         ports.add(existingConfig.port);
                         
-                        // Add shutdown port (HTTP + 1000)
-                        ports.add(getShutdownPort(existingConfig.port));
+                        // Add shutdown port (either explicit or derived)
+                        ports.add(getEffectiveShutdownPort(existingConfig));
                         
                         // Add JMX port if configured
                         if (existingConfig.monitoring != null && existingConfig.monitoring.jmx != null) {

@@ -281,7 +281,7 @@ public class TomcatWebXmlPatcher {
 
             String servletName = getChildText(servlet, "servlet-name");
 
-            if ("RESTServlet".equals(servletName)) {
+            if ("restservlet".equals(servletName.toLowerCase())) {
                 restServletNames.add(servletName);
                 root.removeChild(servlet);
                 i--; // Adjust index because NodeList is live
