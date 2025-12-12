@@ -109,6 +109,9 @@ public class LuceeServerConfig {
      * Load configuration from lucee.json in the specified directory
      */
     public static ServerConfig loadConfig(Path projectDir) throws IOException {
+        // Load .env file if it exists in the same directory as lucee.json
+        loadEnvFile(projectDir);
+        
         Path configFile = projectDir.resolve("lucee.json");
         
         if (!Files.exists(configFile)) {
@@ -150,6 +153,10 @@ public class LuceeServerConfig {
             config.openBrowserURL = null;
         }
 
+        // Perform environment variable substitution on string fields
+        // Supports ${VAR_NAME} and ${VAR_NAME:-default_value}
+        substituteEnvironmentVariables(config);
+        
         // Assign a shutdown port if not explicitly set, checking for conflicts with existing servers
         if (config.shutdownPort == null) {
             assignShutdownPortIfNeeded(config);
@@ -166,6 +173,203 @@ public class LuceeServerConfig {
      */
     public static void saveConfig(ServerConfig config, Path configFile) throws IOException {
         objectMapper.writeValue(configFile.toFile(), config);
+    }
+    
+    /**
+     * Load environment variables from a .env file in the project directory.
+     * The .env file should be in the same directory as lucee.json.
+     * Lines starting with # are treated as comments.
+     * Supports KEY=VALUE format, including quoted values.
+     * Environment variables in the file take precedence over system env vars.
+     */
+    private static void loadEnvFile(Path projectDir) {
+        Path envFile = projectDir.resolve(".env");
+        if (!Files.exists(envFile)) {
+            return; // No .env file, skip
+        }
+        
+        try {
+            java.util.List<String> lines = Files.readAllLines(envFile);
+            for (String line : lines) {
+                line = line.trim();
+                
+                // Skip empty lines and comments
+                if (line.isEmpty() || line.startsWith("#")) {
+                    continue;
+                }
+                
+                // Parse KEY=VALUE
+                int equalIndex = line.indexOf('=');
+                if (equalIndex <= 0) {
+                    continue; // Invalid line, skip
+                }
+                
+                String key = line.substring(0, equalIndex).trim();
+                String value = line.substring(equalIndex + 1).trim();
+                
+                // Remove quotes if present
+                if ((value.startsWith("\"" ) && value.endsWith("\"")) ||
+                    (value.startsWith("'") && value.endsWith("'"))) {
+                    value = value.substring(1, value.length() - 1);
+                }
+                
+                // Set as environment variable (will be used by System.getenv())
+                // Note: We can't actually modify System.getenv(), so we store in a custom map
+                envVariables.put(key, value);
+            }
+        } catch (IOException e) {
+            // Log warning but don't fail if .env can't be read
+            System.err.println("Warning: Could not load .env file: " + e.getMessage());
+        }
+    }
+    
+    // Map to store environment variables loaded from .env files
+    private static final Map<String, String> envVariables = new java.util.HashMap<>();
+    
+    /**
+     * Get an environment variable, checking .env loaded vars first, then system env vars
+     */
+    private static String getEnvVar(String name) {
+        // Check .env file variables first
+        if (envVariables.containsKey(name)) {
+            return envVariables.get(name);
+        }
+        // Fall back to system environment variables
+        return System.getenv(name);
+    }
+    
+    /**
+     * Substitute environment variables in all string fields.
+     * Supports:
+     *   ${VAR_NAME} - replaced with environment variable value
+     *   ${VAR_NAME:-default} - replaced with env var or default if not set
+     * 
+     * This recursively processes the configuration object and nested JSON,
+     * allowing environment variables to be used in all config values.
+     */
+    private static void substituteEnvironmentVariables(ServerConfig config) {
+        // Top-level string fields
+        if (config.version != null) {
+            config.version = replaceEnvVars(config.version);
+        }
+        if (config.name != null) {
+            config.name = replaceEnvVars(config.name);
+        }
+        if (config.webroot != null) {
+            config.webroot = replaceEnvVars(config.webroot);
+        }
+        if (config.openBrowserURL != null) {
+            config.openBrowserURL = replaceEnvVars(config.openBrowserURL);
+        }
+        if (config.configurationFile != null) {
+            config.configurationFile = replaceEnvVars(config.configurationFile);
+        }
+        
+        // Substitute in JVM config
+        if (config.jvm != null) {
+            if (config.jvm.maxMemory != null) {
+                config.jvm.maxMemory = replaceEnvVars(config.jvm.maxMemory);
+            }
+            if (config.jvm.minMemory != null) {
+                config.jvm.minMemory = replaceEnvVars(config.jvm.minMemory);
+            }
+            if (config.jvm.additionalArgs != null) {
+                for (int i = 0; i < config.jvm.additionalArgs.length; i++) {
+                    config.jvm.additionalArgs[i] = replaceEnvVars(config.jvm.additionalArgs[i]);
+                }
+            }
+        }
+        
+        // Substitute in URL Rewrite config
+        if (config.urlRewrite != null) {
+            if (config.urlRewrite.routerFile != null) {
+                config.urlRewrite.routerFile = replaceEnvVars(config.urlRewrite.routerFile);
+            }
+        }
+        
+        // Recursively substitute in the configuration JSON object
+        // This supports environment variables throughout the entire CFConfig
+        if (config.configuration != null) {
+            config.configuration = substituteInJsonNode(config.configuration);
+        }
+    }
+    
+    /**
+     * Recursively substitute environment variables in a JSON node.
+     * Handles strings, arrays, and nested objects.
+     */
+    private static JsonNode substituteInJsonNode(JsonNode node) {
+        if (node == null) {
+            return null;
+        }
+        
+        if (node.isTextual()) {
+            // Replace environment variables in text values
+            return objectMapper.getNodeFactory().textNode(replaceEnvVars(node.asText()));
+        } else if (node.isArray()) {
+            // Recursively process array elements
+            com.fasterxml.jackson.databind.node.ArrayNode arrayNode = 
+                objectMapper.getNodeFactory().arrayNode();
+            for (JsonNode element : node) {
+                arrayNode.add(substituteInJsonNode(element));
+            }
+            return arrayNode;
+        } else if (node.isObject()) {
+            // Recursively process object fields
+            com.fasterxml.jackson.databind.node.ObjectNode objNode = 
+                objectMapper.getNodeFactory().objectNode();
+            node.fields().forEachRemaining(entry -> {
+                objNode.set(entry.getKey(), substituteInJsonNode(entry.getValue()));
+            });
+            return objNode;
+        } else {
+            // Return numbers, booleans, nulls as-is
+            return node;
+        }
+    }
+    
+    /**
+     * Replace environment variables in a string using ${VAR} or ${VAR:-default} syntax
+     * Checks .env file variables first, then system environment variables
+     */
+    private static String replaceEnvVars(String value) {
+        if (value == null) {
+            return null;
+        }
+        
+        // Pattern: ${VAR_NAME} or ${VAR_NAME:-default_value}
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\\$\\{([^}]+)\\}");
+        java.util.regex.Matcher matcher = pattern.matcher(value);
+        StringBuffer sb = new StringBuffer();
+        
+        while (matcher.find()) {
+            String placeholder = matcher.group(1);
+            String replacement = null;
+            
+            // Check if it has a default value
+            if (placeholder.contains(":-")) {
+                String[] parts = placeholder.split(":-", 2);
+                String varName = parts[0].trim();
+                String defaultValue = parts[1].trim();
+                replacement = getEnvVar(varName);
+                if (replacement == null) {
+                    replacement = defaultValue;
+                }
+            } else {
+                // Just the variable name
+                replacement = getEnvVar(placeholder);
+                if (replacement == null) {
+                    // Keep the placeholder if env var doesn't exist
+                    replacement = "${" + placeholder + "}";
+                }
+            }
+            
+            // Escape backslashes and dollar signs in the replacement
+            matcher.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(replacement));
+        }
+        matcher.appendTail(sb);
+        
+        return sb.toString();
     }
     
     /**

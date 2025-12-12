@@ -99,7 +99,6 @@
         <url-pattern>/index.cfm/*</url-pattern>
     </servlet-mapping>
 
-    <!-- IF_ADMIN_ENABLED -->
     <!-- Lucee Admin Servlet Mappings -->
     <servlet-mapping>
         <servlet-name>CFMLServlet</servlet-name>
@@ -110,7 +109,6 @@
         <servlet-name>CFMLServlet</servlet-name>
         <url-pattern>/lucee/admin/*</url-pattern>
     </servlet-mapping>
-    <!-- END_IF_ADMIN_ENABLED -->
 
     <!-- REST Servlet Mappings -->
     <servlet-mapping>
