@@ -55,6 +55,7 @@ public class ServerConfigHelper {
         List<String> keys = new ArrayList<>();
         keys.add("version");
         keys.add("port");
+        keys.add("shutdownPort");
         keys.add("name");
         keys.add("webroot");
         keys.add("jvm.maxMemory");
@@ -62,11 +63,21 @@ public class ServerConfigHelper {
         keys.add("jvm.additionalArgs");
         keys.add("monitoring.enabled");
         keys.add("monitoring.jmx.port");
+        keys.add("admin.enabled");
         keys.add("enableLucee");
         keys.add("enableREST");
         keys.add("urlRewrite.enabled");
         keys.add("urlRewrite.routerFile");
+        keys.add("openBrowser");
+        keys.add("openBrowserURL");
         return keys;
+    }
+    
+    /**
+     * Check if a key is known/documented in the configuration
+     */
+    public boolean isKnownKey(String key) {
+        return getAvailableKeys().contains(key);
     }
     
     /**
