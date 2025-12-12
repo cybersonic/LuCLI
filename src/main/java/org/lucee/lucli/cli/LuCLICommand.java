@@ -7,6 +7,8 @@ import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.StringOutput;
 import org.lucee.lucli.Timer;
 import org.lucee.lucli.cli.commands.CfmlCommand;
+import org.lucee.lucli.cli.commands.CompleteCommand;
+import org.lucee.lucli.cli.commands.CompletionCommand;
 import org.lucee.lucli.cli.commands.ModulesCommand;
 import org.lucee.lucli.cli.commands.ServerCommand;
 
@@ -27,6 +29,8 @@ import picocli.CommandLine.Option;
         ServerCommand.class,
         ModulesCommand.class,
         CfmlCommand.class,
+        CompletionCommand.class,
+        CompleteCommand.class,
         CommandLine.HelpCommand.class
     },
     footer = {
