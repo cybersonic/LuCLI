@@ -208,79 +208,287 @@ public class TomcatConfigGenerator {
     }
     
     /**
-     * Apply web.xml template with conditional admin servlet mappings
+     * Generate web.xml content as a string without writing to disk.
+     * Used for dry-run preview. Loads from Lucee Express distribution and applies XML patching.
      */
-    private void applyWebXmlTemplate(String templateResourcePath, Path outputPath, Map<String, String> placeholders,
-                                    LuceeServerConfig.ServerConfig config) throws IOException {
-        // Load template from resources
-        String templateContent;
-        try (InputStream is = getClass().getClassLoader().getResourceAsStream(templateResourcePath)) {
-            if (is == null) {
-                throw new IOException("Template not found: " + templateResourcePath);
-            }
-            templateContent = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+    public String generateWebXmlContent(LuceeServerConfig.ServerConfig config, Path projectDir, 
+                                       Path serverInstanceDir, Path luceeExpressDir) throws IOException {
+        // Find web.xml from Lucee Express distribution
+        // Try webapps/ROOT/WEB-INF/web.xml first, then conf/web.xml
+        Path vendorWebXml = luceeExpressDir.resolve("webapps/ROOT/WEB-INF/web.xml");
+        if (!Files.exists(vendorWebXml)) {
+            vendorWebXml = luceeExpressDir.resolve("conf/web.xml");
+        }
+        if (!Files.exists(vendorWebXml)) {
+            throw new IOException("web.xml not found in Lucee Express distribution at " + luceeExpressDir);
         }
         
-        // Replace placeholders
-        String processedContent = templateContent;
-        for (Map.Entry<String, String> entry : placeholders.entrySet()) {
-            processedContent = processedContent.replace(entry.getKey(), entry.getValue());
-        }
+        // Load web.xml from Lucee Express
+        String webXmlContent = Files.readString(vendorWebXml, StandardCharsets.UTF_8);
         
-        // Apply simple conditional blocks (UrlRewrite, admin, etc.) based on lucee.json
-        processedContent = applyConditionalBlocks(processedContent, config);
+        // Apply XML patching using TomcatWebXmlPatcher logic
+        webXmlContent = applyWebXmlPatching(webXmlContent, config, projectDir, serverInstanceDir);
         
-        // Ensure output directory exists
-        Files.createDirectories(outputPath.getParent());
-        
-        // Write processed content to output file
-        Files.writeString(outputPath, processedContent, StandardCharsets.UTF_8);
+        return webXmlContent;
     }
     
     /**
-     * Apply conditional comment blocks in the web.xml template based on config.
-     * Currently supports:
-     *   <!-- IF_URLREWRITE_ENABLED --> ... <!-- END_IF_URLREWRITE_ENABLED -->
-     *   <!-- IF_ADMIN_ENABLED -->        ... <!-- END_IF_ADMIN_ENABLED -->
+     * Apply web.xml patching via XML DOM manipulation.
+     * Uses the same logic as TomcatWebXmlPatcher.
      */
-    private String applyConditionalBlocks(String content, LuceeServerConfig.ServerConfig config) {
-        boolean urlRewriteEnabled = config.urlRewrite != null && config.urlRewrite.enabled;
-        content = processBooleanBlock(content, "IF_URLREWRITE_ENABLED", urlRewriteEnabled);
-        
-        // Admin: default to enabled if config.admin is null (backwards compatibility)
-        boolean adminEnabled = (config.admin == null) || config.admin.enabled;
-        content = processBooleanBlock(content, "IF_ADMIN_ENABLED", adminEnabled);
-        
-        return content;
+    private String applyWebXmlPatching(String content, LuceeServerConfig.ServerConfig config, 
+                                       Path projectDir, Path serverInstanceDir) throws IOException {
+        try {
+            javax.xml.parsers.DocumentBuilderFactory factory = javax.xml.parsers.DocumentBuilderFactory.newInstance();
+            factory.setNamespaceAware(true);
+            javax.xml.parsers.DocumentBuilder builder = factory.newDocumentBuilder();
+            org.w3c.dom.Document document = builder.parse(new java.io.ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
+            
+            // Apply patching logic
+            if (!config.enableLucee) {
+                disableLuceeEngineInDocument(document);
+                disableRestServletFromDocument(document);
+            } else if (!config.enableREST) {
+                disableRestServletFromDocument(document);
+            }
+            
+            // Convert back to string
+            javax.xml.transform.TransformerFactory tf = javax.xml.transform.TransformerFactory.newInstance();
+            javax.xml.transform.Transformer transformer = tf.newTransformer();
+            transformer.setOutputProperty(javax.xml.transform.OutputKeys.INDENT, "yes");
+            transformer.setOutputProperty(javax.xml.transform.OutputKeys.ENCODING, "UTF-8");
+            
+            java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+            transformer.transform(new javax.xml.transform.dom.DOMSource(document), 
+                                new javax.xml.transform.stream.StreamResult(output));
+            return output.toString(StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            // Log error if XML patching fails
+            System.err.println("Warning: Failed to patch web.xml in preview: " + e.getMessage());
+            e.printStackTrace();
+            return content;
+        }
     }
     
     /**
-     * Process a boolean block of the form:
-     *   <!-- TAG --> ... <!-- END_TAG -->
-     * If keep == true, the inner content is kept; otherwise, the whole block is removed.
+     * Disable Lucee CFML engine from the DOM document.
+     * Mirrors the logic in TomcatWebXmlPatcher.disableLuceeEngine().
      */
-    private String processBooleanBlock(String content, String tag, boolean keep) {
-        String start = "<!-- " + tag + " -->";
-        String end = "<!-- END_" + tag + " -->";
-        int idxStart = content.indexOf(start);
-        while (idxStart != -1) {
-            int idxEnd = content.indexOf(end, idxStart);
-            if (idxEnd == -1) {
-                break; // malformed block, stop processing
+    private void disableLuceeEngineInDocument(org.w3c.dom.Document document) {
+        if (document == null) {
+            return;
+        }
+        
+        org.w3c.dom.Element root = document.getDocumentElement();
+        if (root == null) {
+            return;
+        }
+        
+        String namespace = root.getNamespaceURI();
+        
+        // 1) Remove Lucee CFML servlets (but not REST) and remember their servlet-names
+        java.util.Set<String> luceeServletNames = new java.util.HashSet<>();
+        org.w3c.dom.NodeList servletNodes = (namespace != null) ? 
+            root.getElementsByTagNameNS(namespace, "servlet") : 
+            root.getElementsByTagName("servlet");
+        for (int i = 0; i < servletNodes.getLength(); i++) {
+            org.w3c.dom.Node node = servletNodes.item(i);
+            if (!(node instanceof org.w3c.dom.Element)) {
+                continue;
             }
-            int blockEnd = idxEnd + end.length();
-            String before = content.substring(0, idxStart);
-            String inside = content.substring(idxStart + start.length(), idxEnd);
-            String after = content.substring(blockEnd);
-            if (keep) {
-                content = before + inside + after;
-                idxStart = content.indexOf(start, before.length() + inside.length());
+            org.w3c.dom.Element servlet = (org.w3c.dom.Element) node;
+            
+            String servletName = getChildTextFromDocument(servlet, "servlet-name", namespace);
+            String servletClass = getChildTextFromDocument(servlet, "servlet-class", namespace);
+            
+            // Only remove CFML servlet, not REST servlet
+            boolean isLuceeCfmlServlet = 
+                (servletClass != null && servletClass.startsWith("lucee.loader.servlet")) || 
+                "CFMLServlet".equals(servletName);
+            
+            if (isLuceeCfmlServlet) {
+                if (servletName != null) {
+                    luceeServletNames.add(servletName);
+                }
+                root.removeChild(servlet);
+                i--;
+            }
+        }
+        
+        // 2) Remove servlet-mappings for Lucee CFML servlets and CFML/admin URL patterns
+        org.w3c.dom.NodeList mappingNodes = (namespace != null) ?
+            root.getElementsByTagNameNS(namespace, "servlet-mapping") :
+            root.getElementsByTagName("servlet-mapping");
+        for (int i = 0; i < mappingNodes.getLength(); i++) {
+            org.w3c.dom.Node node = mappingNodes.item(i);
+            if (!(node instanceof org.w3c.dom.Element)) {
+                continue;
+            }
+            org.w3c.dom.Element mapping = (org.w3c.dom.Element) node;
+            
+            String name = getChildTextFromDocument(mapping, "servlet-name", namespace);
+            String pattern = getChildTextFromDocument(mapping, "url-pattern", namespace);
+            
+            boolean isCfmlPattern = pattern != null && (
+                pattern.endsWith("*.cfm") ||
+                pattern.endsWith("*.cfml") ||
+                pattern.endsWith("*.cfc") ||
+                pattern.endsWith("*.cfs") ||
+                "/index.cfm/*".equals(pattern) ||
+                pattern.startsWith("/lucee/")
+            );
+            
+            if ((name != null && luceeServletNames.contains(name)) || isCfmlPattern) {
+                root.removeChild(mapping);
+                i--;
+            }
+        }
+        
+        // 3) Remove CFML welcome files
+        org.w3c.dom.NodeList welcomeLists = (namespace != null) ?
+            root.getElementsByTagNameNS(namespace, "welcome-file-list") :
+            root.getElementsByTagName("welcome-file-list");
+        for (int i = 0; i < welcomeLists.getLength(); i++) {
+            org.w3c.dom.Node listNode = welcomeLists.item(i);
+            if (!(listNode instanceof org.w3c.dom.Element)) {
+                continue;
+            }
+            org.w3c.dom.Element list = (org.w3c.dom.Element) listNode;
+            
+            org.w3c.dom.NodeList welcomeFiles = (namespace != null) ?
+                list.getElementsByTagNameNS(namespace, "welcome-file") :
+                list.getElementsByTagName("welcome-file");
+            java.util.List<org.w3c.dom.Element> toRemove = new java.util.ArrayList<>();
+            for (int j = 0; j < welcomeFiles.getLength(); j++) {
+                org.w3c.dom.Node wfNode = welcomeFiles.item(j);
+                if (!(wfNode instanceof org.w3c.dom.Element)) {
+                    continue;
+                }
+                org.w3c.dom.Element wf = (org.w3c.dom.Element) wfNode;
+                String name = wf.getTextContent() != null ? wf.getTextContent().trim() : "";
+                if (name.endsWith(".cfm") || name.endsWith(".cfml")) {
+                    toRemove.add(wf);
+                }
+            }
+            
+            for (org.w3c.dom.Element wf : toRemove) {
+                list.removeChild(wf);
+            }
+        }
+    }
+    
+    /**
+     * Disable REST servlet and its mappings from the DOM document.
+     * Mirrors the logic in TomcatWebXmlPatcher.disableRestServlet().
+     */
+    private void disableRestServletFromDocument(org.w3c.dom.Document document) {
+        if (document == null) {
+            return;
+        }
+        
+        org.w3c.dom.Element root = document.getDocumentElement();
+        if (root == null) {
+            return;
+        }
+        
+        // Get the namespace (could be null or a specific namespace like jakarta.ee)
+        String namespace = root.getNamespaceURI();
+        
+        // 1) Remove REST servlet and remember its servlet-name
+        java.util.Set<String> restServletNames = new java.util.HashSet<>();
+        org.w3c.dom.NodeList servletNodes = (namespace != null) ? 
+            root.getElementsByTagNameNS(namespace, "servlet") : 
+            root.getElementsByTagName("servlet");
+        for (int i = 0; i < servletNodes.getLength(); i++) {
+            org.w3c.dom.Node node = servletNodes.item(i);
+            if (!(node instanceof org.w3c.dom.Element)) {
+                continue;
+            }
+            org.w3c.dom.Element servlet = (org.w3c.dom.Element) node;
+            
+            String servletName = getChildTextFromDocument(servlet, "servlet-name", namespace);
+            
+            if ("restservlet".equals(servletName != null ? servletName.toLowerCase() : "")) {
+                restServletNames.add(servletName);
+                root.removeChild(servlet);
+                i--;
+            }
+        }
+        
+        // 2) Remove servlet-mappings for REST servlet and /rest/* URL patterns
+        org.w3c.dom.NodeList mappingNodes = (namespace != null) ?
+            root.getElementsByTagNameNS(namespace, "servlet-mapping") :
+            root.getElementsByTagName("servlet-mapping");
+        for (int i = 0; i < mappingNodes.getLength(); i++) {
+            org.w3c.dom.Node node = mappingNodes.item(i);
+            if (!(node instanceof org.w3c.dom.Element)) {
+                continue;
+            }
+            org.w3c.dom.Element mapping = (org.w3c.dom.Element) node;
+            
+            String name = getChildTextFromDocument(mapping, "servlet-name", namespace);
+            String pattern = getChildTextFromDocument(mapping, "url-pattern", namespace);
+            
+            boolean isRestPattern = pattern != null && pattern.startsWith("/rest/");
+            
+            if ((name != null && restServletNames.contains(name)) || isRestPattern) {
+                root.removeChild(mapping);
+                i--;
+            }
+        }
+    }
+    
+    /**
+     * Helper to read text content of first direct child element with namespace support.
+     */
+    private String getChildTextFromDocument(org.w3c.dom.Element parent, String childLocalName, String namespace) {
+        if (parent == null) {
+            return null;
+        }
+        org.w3c.dom.NodeList children = parent.getChildNodes();
+        for (int i = 0; i < children.getLength(); i++) {
+            org.w3c.dom.Node node = children.item(i);
+            if (!(node instanceof org.w3c.dom.Element)) {
+                continue;
+            }
+            org.w3c.dom.Element el = (org.w3c.dom.Element) node;
+            
+            // Check both with and without namespace
+            if (namespace != null) {
+                if (childLocalName.equals(el.getLocalName())) {
+                    return el.getTextContent();
+                }
             } else {
-                content = before + after;
-                idxStart = content.indexOf(start, before.length());
+                String nodeName = el.getNodeName();
+                if (childLocalName.equals(nodeName) || nodeName.endsWith(":" + childLocalName)) {
+                    return el.getTextContent();
+                }
             }
         }
-        return content;
+        return null;
+    }
+    
+    /**
+     * Helper to read text content of first direct child element (no namespace).
+     */
+    private String getChildTextFromDocument(org.w3c.dom.Element parent, String childLocalName) {
+        return getChildTextFromDocument(parent, childLocalName, null);
+    }
+    
+    /**
+     * Generate server.xml content as a string without writing to disk.
+     * Used for dry-run preview. Loads from Lucee Express distribution.
+     */
+    public String generateServerXmlContent(LuceeServerConfig.ServerConfig config, 
+                                          Path serverInstanceDir, Path luceeExpressDir) throws IOException {
+        // Find server.xml from Lucee Express distribution
+        Path vendorServerXml = luceeExpressDir.resolve("conf/server.xml");
+        if (!Files.exists(vendorServerXml)) {
+            throw new IOException("server.xml not found in Lucee Express distribution at " + luceeExpressDir);
+        }
+        
+        // Load server.xml from Lucee Express
+        return Files.readString(vendorServerXml, StandardCharsets.UTF_8);
     }
     
     /**

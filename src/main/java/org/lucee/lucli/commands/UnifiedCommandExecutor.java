@@ -13,6 +13,7 @@ import org.lucee.lucli.server.LogCommand;
 import org.lucee.lucli.server.LuceeServerConfig;
 import org.lucee.lucli.server.LuceeServerManager;
 import org.lucee.lucli.server.ServerConflictException;
+import org.lucee.lucli.server.TomcatConfigGenerator;
 
 /**
  * Unified command executor that provides single implementation for all commands
@@ -103,6 +104,8 @@ public class UnifiedCommandExecutor {
         boolean forceReplace = false;
         String customName = null;
         boolean dryRun = false;
+        boolean includeTomcatWeb = false;
+        boolean includeTomcatServer = false;
         Path projectDir = currentWorkingDirectory; // Default to current directory
         
         LuceeServerManager.AgentOverrides agentOverrides = new LuceeServerManager.AgentOverrides();
@@ -120,6 +123,10 @@ public class UnifiedCommandExecutor {
                 i++; // Skip next argument
             } else if (args[i].equals("--dry-run")) {
                 dryRun = true;
+            } else if (args[i].equals("--include-tomcat-web")) {
+                includeTomcatWeb = true;
+            } else if (args[i].equals("--include-tomcat-server")) {
+                includeTomcatServer = true;
             } else if (args[i].equals("--no-agents")) {
                 agentOverrides.disableAllAgents = true;
             } else if ((args[i].equals("--agents")) && i + 1 < args.length) {
@@ -193,6 +200,47 @@ public class UnifiedCommandExecutor {
                 result.append("Error serializing config: ").append(e.getMessage());
             }
             result.append("═══════════════════════════════════════════\n");
+            
+            // Display Tomcat configuration files if requested
+            if (includeTomcatWeb || includeTomcatServer) {
+                result.append("\nGenerated Tomcat Configuration Files:\n");
+                result.append("═══════════════════════════════════════════\n");
+                
+                try {
+                    // Get the Lucee Express directory
+                    Path luceeExpressDir = serverManager.ensureLuceeExpress(finalConfig.version);
+                    TomcatConfigGenerator tomcatGen = new TomcatConfigGenerator();
+                    
+                    if (includeTomcatServer) {
+                        result.append("\n📄 server.xml (Tomcat server configuration):\n");
+                        result.append("─────────────────────────────────────────\n");
+                        try {
+                            String serverXmlContent = tomcatGen.generateServerXmlContent(finalConfig, serverManager.getServersDir().resolve(finalConfig.name), luceeExpressDir);
+                            result.append(serverXmlContent).append("\n");
+                        } catch (Exception e) {
+                            result.append("❌ Error generating server.xml: ").append(e.getMessage()).append("\n");
+                        }
+                        result.append("─────────────────────────────────────────\n");
+                    }
+                    
+                    if (includeTomcatWeb) {
+                        result.append("\n📄 web.xml (Servlet and filter configuration):\n");
+                        result.append("─────────────────────────────────────────\n");
+                        try {
+                            String webXmlContent = tomcatGen.generateWebXmlContent(finalConfig, projectDir, serverManager.getServersDir().resolve(finalConfig.name), luceeExpressDir);
+                            result.append(webXmlContent).append("\n");
+                        } catch (Exception e) {
+                            result.append("❌ Error generating web.xml: ").append(e.getMessage()).append("\n");
+                        }
+                        result.append("─────────────────────────────────────────\n");
+                    }
+                    
+                    result.append("\n═══════════════════════════════════════════\n");
+                } catch (Exception e) {
+                    result.append("\n❌ Error accessing Lucee Express distribution: ").append(e.getMessage()).append("\n");
+                }
+            }
+            
             result.append("\n✅ Use without --dry-run to start the server with this config.\n");
             return formatOutput(result.toString(), false);
         }
@@ -539,19 +587,48 @@ public class UnifiedCommandExecutor {
     
     private String handleConfigGet(ServerConfigHelper configHelper, String[] args) throws Exception {
         if (args.length < 3) {
-            return formatOutput("❌ config get: missing key\n💡 Usage: server config get <key>", true);
+            return formatOutput("❌ config get: missing key\n💡 Usage: server config get <key>\n" +
+                "💡 Example: server config get port\n" +
+                "💡 Example: server config get admin.enabled\n" +
+                "💡 Example: server config get serverDir (virtual key - shows Tomcat instance location)", true);
         }
         
         String key = args[2];
         try {
             LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(currentWorkingDirectory);
-            String value = configHelper.getConfigValue(config, key);
+            String value = null;
+            
+            // Handle virtual keys that don't exist in config but are computed
+            if ("serverDir".equals(key)) {
+                // serverDir is a virtual key that returns the server instance directory path
+                Path lucliHome = Paths.get(System.getProperty("user.home"), ".lucli");
+                Path serverInstanceDir = lucliHome.resolve("servers").resolve(config.name);
+                value = serverInstanceDir.toString();
+            } else {
+                value = configHelper.getConfigValue(config, key);
+            }
+            
+            StringBuilder result = new StringBuilder();
+            
+            // Warn if key is unknown but might still exist in the config
+            if (!configHelper.isKnownKey(key) && !"serverDir".equals(key)) {
+                result.append("⚠️  Unknown configuration key (may not be officially supported):\n");
+                result.append("  ⚠️  ").append(key).append("\n\n");
+            }
             
             if (value != null) {
-                return formatOutput(key + "=" + value, false);
+                result.append("✅ ").append(key).append("=\n");
+                result.append("   Value: ").append(value);
+                return formatOutput(result.toString(), false);
             } else {
-                return formatOutput("❌ Configuration key '" + key + "' not found\n" +
-                    "💡 Available keys: " + String.join(", ", configHelper.getAvailableKeys()), true);
+                result.append("❌ Configuration key '" + key + "' not found\n\n");
+                result.append("Available keys:\n");
+                for (String availKey : configHelper.getAvailableKeys()) {
+                    result.append("  • ").append(availKey).append("\n");
+                }
+                result.append("\nVirtual keys (read-only, computed values):\n");
+                result.append("  • serverDir - Location of Tomcat server instance (~/.lucli/servers/<name>)\n");
+                return formatOutput(result.toString(), true);
             }
         } catch (Exception e) {
             return formatOutput("❌ Error reading configuration: " + e.getMessage(), true);
@@ -602,6 +679,12 @@ public class UnifiedCommandExecutor {
                 String[] parts = keyValue.split("=", 2);
                 String key = parts[0].trim();
                 String value = parts[1].trim();
+                
+                // Check for virtual/read-only keys
+                if ("serverDir".equals(key)) {
+                    return formatOutput("❌ Cannot set 'serverDir' - it is a virtual read-only key computed from the server name\n" +
+                        "💡 serverDir is always: ~/.lucli/servers/<server-name>", true);
+                }
                 
                 // Warn if key is not known, but set it anyway
                 if (!configHelper.isKnownKey(key)) {
