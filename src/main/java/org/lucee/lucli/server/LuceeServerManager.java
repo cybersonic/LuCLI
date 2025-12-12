@@ -56,6 +56,13 @@ public class LuceeServerManager {
     }
     
     /**
+     * Get the servers directory where all server instances are stored
+     */
+    public Path getServersDir() {
+        return serversDir;
+    }
+    
+    /**
      * Get the LuCLI home directory
      */
     private static Path getLucliHome() {
@@ -719,7 +726,7 @@ public class LuceeServerManager {
     /**
      * Ensure Lucee Express for the specified version is available
      */
-    private Path ensureLuceeExpress(String version) throws Exception {
+    public Path ensureLuceeExpress(String version) throws Exception {
         Path versionDir = expressDir.resolve(version);
         
         if (Files.exists(versionDir)) {
