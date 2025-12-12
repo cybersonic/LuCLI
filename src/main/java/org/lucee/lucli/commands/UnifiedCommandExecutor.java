@@ -589,6 +589,9 @@ public class UnifiedCommandExecutor {
             // Load current config
             LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(currentWorkingDirectory);
             
+            // Track unknown keys for warnings
+            java.util.List<String> unknownKeys = new java.util.ArrayList<>();
+            
             // Apply all key=value pairs
             for (String keyValue : keyValuePairs) {
                 if (!keyValue.contains("=")) {
@@ -599,6 +602,12 @@ public class UnifiedCommandExecutor {
                 String[] parts = keyValue.split("=", 2);
                 String key = parts[0].trim();
                 String value = parts[1].trim();
+                
+                // Warn if key is not known, but set it anyway
+                if (!configHelper.isKnownKey(key)) {
+                    unknownKeys.add(key);
+                }
+                
                 configHelper.setConfigValue(config, key, value);
             }
             
@@ -606,6 +615,16 @@ public class UnifiedCommandExecutor {
             if (dryRun) {
                 StringBuilder result = new StringBuilder();
                 result.append("📋 DRY RUN: Configuration would be set to:\n\n");
+                
+                // Show warnings for unknown keys
+                if (!unknownKeys.isEmpty()) {
+                    result.append("⚠️  Unknown configuration keys (will be set anyway):\n");
+                    for (String unknownKey : unknownKeys) {
+                        result.append("  ⚠️  ").append(unknownKey).append("\n");
+                    }
+                    result.append("\n");
+                }
+                
                 result.append("Key=Value pairs:\n");
                 for (String pair : keyValuePairs) {
                     result.append("  ✓ ").append(pair).append("\n");
@@ -630,6 +649,16 @@ public class UnifiedCommandExecutor {
             LuceeServerConfig.saveConfig(config, configFile);
             
             StringBuilder result = new StringBuilder();
+            
+            // Show warnings for unknown keys
+            if (!unknownKeys.isEmpty()) {
+                result.append("⚠️  Unknown configuration keys (set anyway):\n");
+                for (String unknownKey : unknownKeys) {
+                    result.append("  ⚠️  ").append(unknownKey).append("\n");
+                }
+                result.append("\n");
+            }
+            
             result.append("✅ Configuration updated:\n");
             for (String pair : keyValuePairs) {
                 result.append("  ✓ ").append(pair).append("\n");
