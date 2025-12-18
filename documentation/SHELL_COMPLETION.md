@@ -15,18 +15,20 @@ source /etc/bash_completion.d/lucli
 ```
 
 ### Install zsh completion:
-```bash
-lucli completion zsh | sudo tee /usr/share/zsh/site-functions/_lucli
-```
 
-For zsh, the completion function is auto-loaded from `site-functions`. Reload your shell:
+The generated zsh completion script is a **bash-style completion script** that works in zsh via `bashcompinit`.
+It must be **sourced** (zsh will not auto-load it via `site-functions`).
+
 ```bash
+# Save the script
+mkdir -p ~/.zsh
+lucli completion zsh > ~/.zsh/lucli_completion
+
+# Source it from ~/.zshrc
+echo 'source ~/.zsh/lucli_completion' >> ~/.zshrc
+
+# Reload zsh
 exec zsh
-```
-
-Or manually source it:
-```bash
-source /usr/share/zsh/site-functions/_lucli
 ```
 
 ### Manual Installation (without sudo)
@@ -47,15 +49,12 @@ echo 'for file in ~/.bash_completion.d/*; do source "$file"; done' >> ~/.bashrc
 
 **Zsh:**
 ```bash
-# Create user completion directory if it doesn't exist
-mkdir -p ~/.zsh/completions
+# Save the script somewhere stable
+mkdir -p ~/.zsh
+lucli completion zsh > ~/.zsh/lucli_completion
 
-# Generate and save completion script
-lucli completion zsh > ~/.zsh/completions/_lucli
-
-# Add to ~/.zshrc
-echo 'fpath=(~/.zsh/completions $fpath)' >> ~/.zshrc
-echo 'autoload -Uz compinit && compinit' >> ~/.zshrc
+# Source it from ~/.zshrc
+echo 'source ~/.zsh/lucli_completion' >> ~/.zshrc
 
 # Reload zsh
 exec zsh
@@ -63,47 +62,42 @@ exec zsh
 
 ## How It Works
 
-### Two-Part System
+### Dynamic Version Completion
 
-**1. Hidden `__complete` Endpoint**
-- Tests and powers shell integration
-- Can be called directly to test completions
-- Example: `lucli __complete --words="lucli server s" --current=2` returns `set\nstart\nstatus\nstop`
-- Returns newline-separated completion candidates
-- Testable without shell integration
+LuCLI uses a **dynamic completion system** for Lucee versions that automatically stays up-to-date:
 
-**2. Public `completion` Subcommand**
-- Generates shell-specific completion scripts
-- Scripts source the `__complete` endpoint
-- Subcommands:
-  - `lucli completion bash` - generates bash completion script
-  - `lucli completion zsh` - generates zsh completion script
+**1. Hidden `versions-list` Command**
+- Fetches available Lucee versions from `https://update.lucee.org/rest/update/provider/list`
+- Caches results in `~/.lucli/lucee-versions.json` for 24 hours
+- Falls back to cache if API is unavailable
+- Called automatically by shell completion scripts
+
+**2. Completion Script Generation**
+- When you run `lucli completion bash` or `lucli completion zsh`, picocli generates a completion script
+- LuCLI post-processes the script to replace hardcoded version arrays with: 
+  ```bash
+  local version_option_args=($(lucli versions-list 2>/dev/null))
+  ```
+- This means **you never need to regenerate the completion script** when new Lucee versions are released
+- Versions are fetched dynamically at completion time and cached for performance
+
+**3. Cache Management**
+- Cache refreshes automatically every 24 hours
+- To force refresh: `rm ~/.lucli/lucee-versions.json`
+- To view cached versions: `lucli versions-list`
 
 ## Architecture
 
 ### Java Components
 
-**CompletionProvider** (`cli/completion/CompletionProvider.java`)
-- Introspects Picocli's CommandSpec model
-- Extracts available commands, subcommands, and options
-- Navigates command hierarchy
-
-**DynamicCompleter** (`cli/completion/DynamicCompleter.java`)
-- Parses shell completion context
-- Resolves command paths
-- Filters candidates by prefix
-- Formats output for shell consumption
-
-**CompleteCommand** (`cli/commands/CompleteCommand.java`)
-- Hidden Picocli command (`__complete`)
-- Receives `--words` and `--current` arguments
-- Returns completion candidates
-- Supports debug mode via `LUCLI_DEBUG_COMPLETION` environment variable
-
 **CompletionCommand** (`cli/commands/CompletionCommand.java`)
-- Public subcommand for script generation
-- Nested commands: `bash`, `zsh`
-- Generates appropriate shell-specific completion functions
+- Generates bash completion scripts using picocli's built-in `AutoComplete` generator
+- For zsh, we reuse the same bash completion script (it includes `bashcompinit` glue)
+- LuCLI post-processes the generated script to make `--version` completion dynamic via `lucli versions-list`
+
+**VersionsListCommand** (`cli/commands/VersionsListCommand.java`)
+- Hidden command used by completion scripts to fetch Lucee versions
+- Fetches from `https://update.lucee.org/rest/update/provider/list` and caches results for 24 hours
 
 ## Testing
 
@@ -113,11 +107,9 @@ Run the completion test suite:
 ```
 
 Tests cover:
-- Dynamic completion endpoint functionality
 - Completion script generation
-- Syntax validation (bash and zsh)
-- Edge cases and error handling
-- 16 tests, 100% pass rate
+- Syntax validation (bash)
+- Dynamic Lucee version listing (`versions-list`)
 
 ## Supported Shells
 
@@ -133,28 +125,16 @@ Tests cover:
 
 ## Debugging
 
-To debug completion issues, set the environment variable:
-```bash
-LUCLI_DEBUG_COMPLETION=1 lucli __complete --words="lucli server s" --current=2
-```
+If completions look wrong after you upgrade LuCLI:
+1. Regenerate your completion script: `lucli completion bash` or `lucli completion zsh`
+2. Re-source your shell config (or restart your shell)
+3. For zsh, rebuild the completion cache if needed: `rm -f ~/.zcompdump* && exec zsh`
 
-This will output debug information to stderr while returning completions to stdout.
+## Integration Notes
 
-## Integration Examples
+The generated completion script is a bash-style completion function (`_lucli_completion`) that also works in zsh via `bashcompinit`.
 
-### Bash Integration Flow
-1. User types `lucli server st<TAB>` in bash
-2. Bash calls the `_lucli_completion` function
-3. Function invokes: `lucli __complete --words="lucli server st" --current=2`
-4. LuCLI returns: `start`
-5. Bash completes to: `lucli server start`
-
-### Zsh Integration Flow
-1. User types `lucli modules li<TAB>` in zsh
-2. Zsh calls the `_lucli` function
-3. Function invokes: `lucli __complete --words="lucli modules li" --current=2`
-4. LuCLI returns: `list`
-5. Zsh completes to: `lucli modules list`
+Dynamic Lucee version completion is handled by calling `lucli versions-list` on demand (with caching).
 
 ## Troubleshooting
 
@@ -166,27 +146,19 @@ This will output debug information to stderr while returning completions to stdo
 3. Test with: `lucli <TAB>`
 
 **Zsh:**
-1. Verify the script is in the right location: `ls -la /usr/share/zsh/site-functions/_lucli` or `~/.zsh/completions/_lucli`
-2. Rebuild completion cache: `rm -f ~/.zcompdump && exec zsh`
-3. Test with: `lucli <TAB>`
+1. Verify the script exists: `ls -la ~/.zsh/lucli_completion`
+2. Verify it is sourced from your `~/.zshrc`: `grep 'source ~/.zsh/lucli_completion' ~/.zshrc`
+3. Reload zsh: `exec zsh`
+4. Test with: `lucli <TAB>`
 
 ### Completions are slow
 
-Completions are generated on-demand by invoking `lucli __complete`. If they're slow:
-1. Check if `lucli` is in your PATH: `which lucli`
-2. Verify the JAR or binary is executable and accessible
-3. Consider pre-building the binary with `mvn package -Pbinary` for faster startup
+Most completion suggestions are handled locally by the generated shell script. The main time you may notice is when completing `--version`, because it calls `lucli versions-list` (with a 24h cache).
 
-### Test completion directly
-
-Debug completions without shell integration:
-```bash
-# Enable debug output
-LUCLI_DEBUG_COMPLETION=1 lucli __complete --words="lucli server s" --current=2
-
-# Check what completions are available
-lucli __complete --words="lucli " --current=1
-```
+If completions feel slow:
+1. Consider building and using the self-executing binary (`mvn package -Pbinary`) to reduce startup time
+2. Verify your completion script is being loaded only once (avoid sourcing it multiple times)
+3. Ensure `lucli versions-list` is working and the cache file exists (`~/.lucli/lucee-versions.json`)
 
 ## Future Enhancements
 
