@@ -5,6 +5,7 @@ import java.nio.file.Paths;
 import java.util.concurrent.Callable;
 
 import org.lucee.lucli.cli.LuCLICommand;
+import org.lucee.lucli.cli.completion.LuceeVersionCandidates;
 import org.lucee.lucli.commands.UnifiedCommandExecutor;
 
 import picocli.CommandLine.Command;
@@ -20,6 +21,7 @@ import picocli.CommandLine.Model.CommandSpec;
     @Command(
         name = "server",
         description = "Manage Lucee server instances",
+        mixinStandardHelpOptions = true,
         subcommands = {
         ServerCommand.StartCommand.class,
         ServerCommand.StopCommand.class,
@@ -61,8 +63,11 @@ public class ServerCommand implements Callable<Integer> {
         @Spec
         private CommandSpec spec;
 
-        @Option(names = {"-v", "--version"}, 
-                description = "Lucee version to use (e.g., 6.2.2.91)")
+        @Option(
+                names = {"-v", "--version"},
+                description = "Lucee version to use (e.g., 6.2.2.91)",
+                completionCandidates = LuceeVersionCandidates.class
+        )
         private String version;
 
         @Option(names = {"-n", "--name"}, 
@@ -119,25 +124,24 @@ public class ServerCommand implements Callable<Integer> {
             }
 
             // Get current working directory
-            Path currentDir = projectDir != null ? 
-                Paths.get(projectDir) : 
+            Path currentDir = projectDir != null ?
+                Paths.get(projectDir) :
                 Paths.get(System.getProperty("user.dir"));
-
-            System.out.println(serverArgs);    
 
             // Create UnifiedCommandExecutor for CLI mode
             UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, currentDir);
 
             // Build arguments array for the unified executor
+            // NOTE: do not pass projectDir as an argument; the executor already has the correct working directory.
             java.util.List<String> args = new java.util.ArrayList<>();
             args.add("start");
-            
+
             if (version != null) {
                 args.add("--version");
                 args.add(version);
             }
             if (name != null) {
-                args.add("--name"); 
+                args.add("--name");
                 args.add(name);
             }
             if (port != null) {
@@ -147,11 +151,8 @@ public class ServerCommand implements Callable<Integer> {
             if (force) {
                 args.add("--force");
             }
-            if (projectDir != null) {
-                args.add(projectDir);
-            }
 
-            if(serverArgs.size() > 0) {
+            if (serverArgs != null && !serverArgs.isEmpty()) {
                 args.addAll(serverArgs);
             }
 
@@ -308,7 +309,8 @@ public class ServerCommand implements Callable<Integer> {
             UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, Paths.get(System.getProperty("user.dir")));
 
             // Execute the server list command
-            String result = executor.executeCommand("server", new String[]{"list", running ? "--running" : ""});
+            String[] args = running ? new String[]{"list", "--running"} : new String[]{"list"};
+            String result = executor.executeCommand("server", args);
             if (result != null && !result.isEmpty()) {
                 System.out.println(result);
             }

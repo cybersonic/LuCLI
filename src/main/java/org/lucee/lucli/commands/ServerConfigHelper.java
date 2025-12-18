@@ -57,6 +57,7 @@ public class ServerConfigHelper {
         keys.add("port");
         keys.add("shutdownPort");
         keys.add("name");
+        keys.add("host");
         keys.add("webroot");
         keys.add("jvm.maxMemory");
         keys.add("jvm.minMemory");
@@ -70,6 +71,9 @@ public class ServerConfigHelper {
         keys.add("urlRewrite.routerFile");
         keys.add("openBrowser");
         keys.add("openBrowserURL");
+        keys.add("https.enabled");
+        keys.add("https.port");
+        keys.add("https.redirect");
         return keys;
     }
     
@@ -164,6 +168,8 @@ public class ServerConfigHelper {
                     return String.valueOf(config.port);
                 case "name":
                     return config.name;
+                case "host":
+                    return config.host;
                 case "webroot":
                     return config.webroot;
                 case "enableLucee":
@@ -182,6 +188,8 @@ public class ServerConfigHelper {
                     return getMonitoringConfigValue(config.monitoring, key);
                 case "urlRewrite":
                     return getUrlRewriteConfigValue(config.urlRewrite, key);
+                case "https":
+                    return getHttpsConfigValue(config.https, key);
             }
         } else if (keyPath.length == 3) {
             String category = keyPath[0];
@@ -216,6 +224,9 @@ public class ServerConfigHelper {
                 case "name":
                     config.name = value;
                     break;
+                case "host":
+                    config.host = value;
+                    break;
                 case "enableLucee":
                     config.enableLucee = Boolean.parseBoolean(value);
                     break;
@@ -236,6 +247,10 @@ public class ServerConfigHelper {
                 case "urlRewrite":
                     if (config.urlRewrite == null) config.urlRewrite = new LuceeServerConfig.UrlRewriteConfig();
                     setUrlRewriteConfigValue(config.urlRewrite, key, value);
+                    break;
+                case "https":
+                    if (config.https == null) config.https = new LuceeServerConfig.HttpsConfig();
+                    setHttpsConfigValue(config.https, key, value);
                     break;
             }
         } else if (keyPath.length == 3) {
@@ -331,6 +346,38 @@ public class ServerConfigHelper {
                 break;
         }
     }
+
+    private String getHttpsConfigValue(LuceeServerConfig.HttpsConfig https, String key) {
+        if (https == null) return null;
+        switch (key) {
+            case "enabled":
+                return String.valueOf(https.enabled);
+            case "port":
+                return https.port != null ? String.valueOf(https.port) : null;
+            case "redirect":
+                return https.redirect != null ? String.valueOf(https.redirect) : null;
+            default:
+                return null;
+        }
+    }
+
+    private void setHttpsConfigValue(LuceeServerConfig.HttpsConfig https, String key, String value) {
+        switch (key) {
+            case "enabled":
+                https.enabled = Boolean.parseBoolean(value);
+                break;
+            case "port":
+                try {
+                    https.port = Integer.parseInt(value);
+                } catch (NumberFormatException e) {
+                    System.err.println("Invalid HTTPS port number: " + value);
+                }
+                break;
+            case "redirect":
+                https.redirect = Boolean.parseBoolean(value);
+                break;
+        }
+    }
     
     /**
      * Get the path to the version cache file
@@ -381,12 +428,7 @@ public class ServerConfigHelper {
                 JsonNode versionNode = item.get("version");
                 if (versionNode != null && versionNode.isTextual()) {
                     String version = versionNode.asText();
-                    
-                    // Filter out snapshot and RC versions for cleaner completion
-                    // Only include stable releases (no -SNAPSHOT or -RC suffix)
-                    if (!version.contains("-SNAPSHOT") && !version.contains("-RC")) {
-                        versionSet.add(version);
-                    }
+                    versionSet.add(version);
                 }
             }
         }
