@@ -1,5 +1,6 @@
 package org.lucee.lucli;
 
+import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -29,6 +30,11 @@ public class LuCLI {
         // Create Picocli CommandLine with our main command
         CommandLine cmd = new CommandLine(new LuCLICommand());
         
+        // Ensure help/usage output goes to the expected streams.
+        // (This also keeps `--help | grep ...` style usage working.)
+        cmd.setOut(new PrintWriter(System.out, true));
+        cmd.setErr(new PrintWriter(System.err, true));
+
         // Configure CommandLine behavior
         cmd.setExecutionExceptionHandler(new CommandLine.IExecutionExceptionHandler() {
             @Override

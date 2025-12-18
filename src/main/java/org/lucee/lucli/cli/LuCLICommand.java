@@ -7,10 +7,10 @@ import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.StringOutput;
 import org.lucee.lucli.Timer;
 import org.lucee.lucli.cli.commands.CfmlCommand;
-import org.lucee.lucli.cli.commands.CompleteCommand;
 import org.lucee.lucli.cli.commands.CompletionCommand;
 import org.lucee.lucli.cli.commands.ModulesCommand;
 import org.lucee.lucli.cli.commands.ServerCommand;
+import org.lucee.lucli.cli.commands.VersionsListCommand;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -30,7 +30,7 @@ import picocli.CommandLine.Option;
         ModulesCommand.class,
         CfmlCommand.class,
         CompletionCommand.class,
-        CompleteCommand.class,
+        VersionsListCommand.class,
         CommandLine.HelpCommand.class
     },
     footer = {
@@ -62,6 +62,11 @@ public class LuCLICommand implements Callable<Integer> {
     @Option(names = {"-t", "--timing"}, 
             description = "Enable timing output for performance analysis")
     private boolean timing = false;
+
+    @Option(names = {"-h", "--help"},
+            usageHelp = true,
+            description = "Show this help message and exit")
+    private boolean helpRequested = false;
 
     @Option(names = {"--version"}, 
             description = "Show application version",
