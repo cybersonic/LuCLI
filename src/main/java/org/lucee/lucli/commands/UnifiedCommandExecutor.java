@@ -603,7 +603,11 @@ public class UnifiedCommandExecutor {
             
             if (serverInfo.isRunning()) {
                 result.append("✅ Server is RUNNING\n");
-                result.append("   Server Name:   ").append(serverInfo.getServerName()).append("\n");
+                result.append("   Server Name:   ").append(serverInfo.getServerName());
+                if (serverInfo.getEnvironment() != null) {
+                    result.append(" [env: ").append(serverInfo.getEnvironment()).append("]");
+                }
+                result.append("\n");
                 result.append("   Process ID:    ").append(serverInfo.getPid()).append("\n");
                 result.append("   Port:          ").append(serverInfo.getPort()).append("\n");
                 result.append("   URL:           http://localhost:").append(serverInfo.getPort()).append("\n");
@@ -668,11 +672,16 @@ public class UnifiedCommandExecutor {
                 continue;
             }
             
+            String serverNameDisplay = server.getServerName();
+            if (server.getEnvironment() != null) {
+                serverNameDisplay += " [" + server.getEnvironment() + "]";
+            }
+            
             String webroot = server.getProjectDir() != null ? server.getProjectDir().toString() : "<unknown>";
             if (isTerminalMode) {
                 // Condensed format
                 result.append(String.format("%-20s %-10s %-8s %-10s %s\n", 
-                    server.getServerName(), status, pid, port, webroot));
+                    serverNameDisplay, status, pid, port, webroot));
             } else {
                 // Full format
                 
@@ -682,7 +691,7 @@ public class UnifiedCommandExecutor {
                 }
                 
                 result.append(String.format("%-20s %-10s %-8s %-10s %-40s %s\n", 
-                    server.getServerName(), status, pid, port, webroot, server.getServerDir()));
+                    serverNameDisplay, status, pid, port, webroot, server.getServerDir()));
             }
         }
         
