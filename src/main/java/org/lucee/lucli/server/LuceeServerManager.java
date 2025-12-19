@@ -266,7 +266,7 @@ public class LuceeServerManager {
         LuceeServerConfig.writeCfConfigIfPresent(config, projectDir, serverInstanceDir);
         
         // Start the server process
-        ServerInstance instance = launchServerProcess(serverInstanceDir, config, projectDir, luceeExpressDir, agentOverrides);
+        ServerInstance instance = launchServerProcess(serverInstanceDir, config, projectDir, luceeExpressDir, agentOverrides, environment);
         
         // Wait for server to start
         waitForServerStartup(instance, 30); // 30 second timeout
@@ -386,7 +386,10 @@ public class LuceeServerManager {
                     }
                 }
                 
-                servers.add(new ServerInfo(serverName, pid, port, isRunning, serverDir, projectDir));
+                // Read environment if present
+                String environment = readEnvironment(serverDir);
+                
+                servers.add(new ServerInfo(serverName, pid, port, isRunning, serverDir, projectDir, environment));
             }
         }
         
@@ -425,6 +428,21 @@ public class LuceeServerManager {
         } catch (Exception e) {
             return null;
         }
+    }
+    
+    /**
+     * Read environment name from .environment file in server directory
+     */
+    private String readEnvironment(Path serverDir) {
+        Path envFile = serverDir.resolve(".environment");
+        if (Files.exists(envFile)) {
+            try {
+                return Files.readString(envFile).trim();
+            } catch (Exception e) {
+                // Ignore invalid environment file
+            }
+        }
+        return null;
     }
     
     /**
@@ -507,7 +525,10 @@ public class LuceeServerManager {
                         }
                     }
                     
-                    return new ServerInfo(serverName, pid, port, isRunning, serverDir, storedPath);
+                    // Read environment if present
+                    String environment = readEnvironment(serverDir);
+                    
+                    return new ServerInfo(serverName, pid, port, isRunning, serverDir, storedPath, environment);
                 }
             } catch (Exception e) {
                 // Ignore invalid project path file
@@ -562,7 +583,10 @@ public class LuceeServerManager {
             }
         }
         
-        return new ServerInfo(serverName, pid, port, isRunning, serverDir, projectDir);
+        // Read environment if present
+        String environment = readEnvironment(serverDir);
+        
+        return new ServerInfo(serverName, pid, port, isRunning, serverDir, projectDir, environment);
     }
     
     /**
@@ -931,7 +955,7 @@ public class LuceeServerManager {
      */
     private ServerInstance launchServerProcess(Path serverInstanceDir, LuceeServerConfig.ServerConfig config, 
                                              Path projectDir, Path luceeExpressDir,
-                                             AgentOverrides agentOverrides) throws Exception {
+                                             AgentOverrides agentOverrides, String environment) throws Exception {
         
         // Choose the appropriate startup script based on OS
         boolean isWindows = System.getProperty("os.name", "").toLowerCase().contains("win");
@@ -980,6 +1004,11 @@ public class LuceeServerManager {
         
         // Write project path marker file to track which project this server belongs to
         Files.writeString(serverInstanceDir.resolve(".project-path"), projectDir.toAbsolutePath().toString());
+        
+        // Write environment marker file if environment was specified
+        if (environment != null && !environment.trim().isEmpty()) {
+            Files.writeString(serverInstanceDir.resolve(".environment"), environment.trim());
+        }
         
         return new ServerInstance(config.name, process.pid(), config.port, serverInstanceDir, projectDir);
     }
@@ -1197,14 +1226,16 @@ public class LuceeServerManager {
         private final boolean running;
         private final Path serverDir;
         private final Path projectDir;
+        private final String environment;
         
-        public ServerInfo(String serverName, long pid, int port, boolean running, Path serverDir, Path projectDir) {
+        public ServerInfo(String serverName, long pid, int port, boolean running, Path serverDir, Path projectDir, String environment) {
             this.serverName = serverName;
             this.pid = pid;
             this.port = port;
             this.running = running;
             this.serverDir = serverDir;
             this.projectDir = projectDir;
+            this.environment = environment;
         }
         
         public String getServerName() { return serverName; }
@@ -1213,6 +1244,7 @@ public class LuceeServerManager {
         public boolean isRunning() { return running; }
         public Path getServerDir() { return serverDir; }
         public Path getProjectDir() { return projectDir; }
+        public String getEnvironment() { return environment; }
     }
     
     /**
