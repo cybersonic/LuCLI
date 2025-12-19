@@ -947,6 +947,10 @@ public class LuceeServerManager {
         // Set other Tomcat environment variables
         env.put("CATALINA_PID", serverInstanceDir.resolve("server.pid").toString());
         env.put("CATALINA_OUT", serverInstanceDir.resolve("logs/catalina.out").toString());
+
+        if(config.admin.password == null && config.admin.password.length() > 0){
+            env.put("LUCEE_ADMIN_PASSWORD", config.admin.password);
+        }
         
         Process process = pb.start();
         

@@ -111,6 +111,11 @@
           "type": "boolean",
           "description": "Whether the Lucee administrator is accessible.",
           "default": true
+        },
+        "password": {
+          "type": "string",
+          "description": "Administrator password. SECURITY WARNING: Using plain text passwords is strongly discouraged. Use environment variable syntax like ${LUCEE_ADMIN_PASSWORD} or ${LUCEE_ADMIN_PASSWORD:-defaultValue} instead to avoid committing secrets to version control.",
+          "default": ""
         }
       }
     },
