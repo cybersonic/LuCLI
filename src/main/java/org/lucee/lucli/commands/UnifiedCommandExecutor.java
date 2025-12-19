@@ -1,9 +1,18 @@
 package org.lucee.lucli.commands;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
 
 import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.Timer;
@@ -106,6 +115,8 @@ public class UnifiedCommandExecutor {
         boolean dryRun = false;
         boolean includeTomcatWeb = false;
         boolean includeTomcatServer = false;
+        boolean includeHttpsKeystorePlan = false;
+        boolean includeHttpsRedirectRules = false;
         Path projectDir = currentWorkingDirectory; // Default to current directory
         
         LuceeServerManager.AgentOverrides agentOverrides = new LuceeServerManager.AgentOverrides();
@@ -127,6 +138,16 @@ public class UnifiedCommandExecutor {
                 includeTomcatWeb = true;
             } else if (args[i].equals("--include-tomcat-server")) {
                 includeTomcatServer = true;
+            } else if (args[i].equals("--include-https-keystore-plan")) {
+                includeHttpsKeystorePlan = true;
+            } else if (args[i].equals("--include-https-redirect-rules")) {
+                includeHttpsRedirectRules = true;
+            } else if (args[i].equals("--include-all")) {
+                // Convenience flag for debugging: show all available dry-run previews.
+                includeTomcatWeb = true;
+                includeTomcatServer = true;
+                includeHttpsKeystorePlan = true;
+                includeHttpsRedirectRules = true;
             } else if (args[i].equals("--no-agents")) {
                 agentOverrides.disableAllAgents = true;
             } else if ((args[i].equals("--agents")) && i + 1 < args.length) {
@@ -202,42 +223,57 @@ public class UnifiedCommandExecutor {
             result.append("═══════════════════════════════════════════\n");
             
             // Display Tomcat configuration files if requested
-            if (includeTomcatWeb || includeTomcatServer) {
-                result.append("\nGenerated Tomcat Configuration Files:\n");
+            if (includeTomcatWeb || includeTomcatServer || includeHttpsKeystorePlan || includeHttpsRedirectRules) {
+                result.append("\nGenerated Server Preview:\n");
                 result.append("═══════════════════════════════════════════\n");
-                
+
                 try {
                     // Get the Lucee Express directory
                     Path luceeExpressDir = serverManager.ensureLuceeExpress(finalConfig.version);
                     TomcatConfigGenerator tomcatGen = new TomcatConfigGenerator();
-                    
+                    Path serverInstanceDir = serverManager.getServersDir().resolve(finalConfig.name);
+
                     if (includeTomcatServer) {
-                        result.append("\n📄 server.xml (Tomcat server configuration):\n");
+                        result.append("\n📄 server.xml (patched, from lucee.json):\n");
                         result.append("─────────────────────────────────────────\n");
                         try {
-                            String serverXmlContent = tomcatGen.generateServerXmlContent(finalConfig, serverManager.getServersDir().resolve(finalConfig.name), luceeExpressDir);
+                            String serverXmlContent = tomcatGen.generatePatchedServerXmlContent(finalConfig, projectDir, serverInstanceDir, luceeExpressDir);
                             result.append(serverXmlContent).append("\n");
                         } catch (Exception e) {
-                            result.append("❌ Error generating server.xml: ").append(e.getMessage()).append("\n");
+                            result.append("❌ Error generating patched server.xml preview: ").append(e.getMessage()).append("\n");
                         }
                         result.append("─────────────────────────────────────────\n");
                     }
-                    
+
                     if (includeTomcatWeb) {
-                        result.append("\n📄 web.xml (Servlet and filter configuration):\n");
+                        result.append("\n📄 web.xml (project view, with LuCLI patching):\n");
                         result.append("─────────────────────────────────────────\n");
                         try {
-                            String webXmlContent = tomcatGen.generateWebXmlContent(finalConfig, projectDir, serverManager.getServersDir().resolve(finalConfig.name), luceeExpressDir);
+                            String webXmlContent = tomcatGen.generateWebXmlContent(finalConfig, projectDir, serverInstanceDir, luceeExpressDir);
                             result.append(webXmlContent).append("\n");
                         } catch (Exception e) {
-                            result.append("❌ Error generating web.xml: ").append(e.getMessage()).append("\n");
+                            result.append("❌ Error generating web.xml preview: ").append(e.getMessage()).append("\n");
                         }
                         result.append("─────────────────────────────────────────\n");
                     }
-                    
+
+                    if (includeHttpsKeystorePlan) {
+                        appendHttpsKeystorePlan(result, finalConfig, serverInstanceDir);
+                    }
+
+                    if (includeHttpsRedirectRules) {
+                        String vendorServerXml = null;
+                        try {
+                            vendorServerXml = tomcatGen.generateServerXmlContent(finalConfig, serverInstanceDir, luceeExpressDir);
+                        } catch (Exception e) {
+                            // fall through; we'll still print a sensible default
+                        }
+                        appendHttpsRedirectRulesPlan(result, finalConfig, serverInstanceDir, vendorServerXml);
+                    }
+
                     result.append("\n═══════════════════════════════════════════\n");
                 } catch (Exception e) {
-                    result.append("\n❌ Error accessing Lucee Express distribution: ").append(e.getMessage()).append("\n");
+                    result.append("\n❌ Error building preview: ").append(e.getMessage()).append("\n");
                 }
             }
             
@@ -321,6 +357,134 @@ public class UnifiedCommandExecutor {
         }
     }
     
+    private void appendHttpsKeystorePlan(StringBuilder result, LuceeServerConfig.ServerConfig config, Path serverInstanceDir) {
+        result.append("\n🔐 HTTPS keystore plan:\n");
+        result.append("─────────────────────────────────────────\n");
+
+        if (!LuceeServerConfig.isHttpsEnabled(config)) {
+            result.append("HTTPS is disabled (https.enabled=false)\n");
+            result.append("─────────────────────────────────────────\n");
+            return;
+        }
+
+        String host = LuceeServerConfig.getEffectiveHost(config);
+        int httpsPort = LuceeServerConfig.getEffectiveHttpsPort(config);
+
+        Path certsDir = serverInstanceDir.resolve("certs");
+        Path keystorePath = certsDir.resolve("keystore.p12");
+        Path passwordPath = certsDir.resolve("keystore.pass");
+
+        result.append("Host:        ").append(host).append("\n");
+        result.append("HTTPS port:   ").append(httpsPort).append("\n");
+        result.append("Keystore:     ").append(keystorePath).append("\n");
+        result.append("Password file:").append(passwordPath).append("\n");
+        result.append("Alias:        lucli\n");
+
+        // SANs must include localhost and the custom host to avoid browser name mismatch.
+        result.append("SANs:\n");
+        result.append("  - DNS:localhost\n");
+        if (!"localhost".equalsIgnoreCase(host)) {
+            result.append("  - DNS:").append(host).append("\n");
+        }
+        result.append("  - IP:127.0.0.1\n");
+
+        result.append("Note: This is a plan only. Files are generated only when starting (no side effects in --dry-run).\n");
+        result.append("─────────────────────────────────────────\n");
+    }
+
+    private void appendHttpsRedirectRulesPlan(StringBuilder result,
+                                              LuceeServerConfig.ServerConfig config,
+                                              Path serverInstanceDir,
+                                              String vendorServerXml) {
+        result.append("\n↪️  HTTPS redirect rules plan:\n");
+        result.append("─────────────────────────────────────────\n");
+
+        if (!LuceeServerConfig.isHttpsEnabled(config)) {
+            result.append("HTTPS is disabled (https.enabled=false)\n");
+            result.append("─────────────────────────────────────────\n");
+            return;
+        }
+
+        if (!LuceeServerConfig.isHttpsRedirectEnabled(config)) {
+            result.append("Redirect is disabled (https.redirect=false)\n");
+            result.append("─────────────────────────────────────────\n");
+            return;
+        }
+
+        String host = LuceeServerConfig.getEffectiveHost(config);
+        int httpsPort = LuceeServerConfig.getEffectiveHttpsPort(config);
+
+        String tomcatHostName = extractTomcatHostNameFromServerXml(vendorServerXml);
+        Path rewriteConfigPath = serverInstanceDir
+            .resolve("conf")
+            .resolve("Catalina")
+            .resolve(tomcatHostName)
+            .resolve("rewrite.config");
+
+        result.append("Rewrite config path: ").append(rewriteConfigPath).append("\n");
+        result.append("Valve: org.apache.catalina.valves.rewrite.RewriteValve\n\n");
+
+        String rules = "RewriteCond %{HTTPS} !=on\n" +
+                       "RewriteRule ^/(.*)$ https://" + host + ":" + httpsPort + "/$1 [R=302,L]\n";
+
+        result.append("rewrite.config contents:\n");
+        result.append(rules);
+        result.append("─────────────────────────────────────────\n");
+    }
+
+    private String extractTomcatHostNameFromServerXml(String serverXml) {
+        if (serverXml == null || serverXml.trim().isEmpty()) {
+            return "localhost";
+        }
+
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setNamespaceAware(true);
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document document = builder.parse(new ByteArrayInputStream(serverXml.getBytes(StandardCharsets.UTF_8)));
+
+            NodeList engines = document.getElementsByTagName("Engine");
+            if (engines == null || engines.getLength() == 0 || !(engines.item(0) instanceof Element)) {
+                return "localhost";
+            }
+
+            Element engine = (Element) engines.item(0);
+            String defaultHost = engine.getAttribute("defaultHost");
+
+            NodeList hosts = engine.getElementsByTagName("Host");
+            if (hosts == null || hosts.getLength() == 0) {
+                return (defaultHost != null && !defaultHost.isEmpty()) ? defaultHost : "localhost";
+            }
+
+            // Prefer the Host matching defaultHost.
+            if (defaultHost != null && !defaultHost.isEmpty()) {
+                for (int i = 0; i < hosts.getLength(); i++) {
+                    if (hosts.item(i) instanceof Element) {
+                        Element host = (Element) hosts.item(i);
+                        if (defaultHost.equals(host.getAttribute("name"))) {
+                            return defaultHost;
+                        }
+                    }
+                }
+            }
+
+            // Fall back to the first Host name.
+            for (int i = 0; i < hosts.getLength(); i++) {
+                if (hosts.item(i) instanceof Element) {
+                    Element host = (Element) hosts.item(i);
+                    String name = host.getAttribute("name");
+                    if (name != null && !name.trim().isEmpty()) {
+                        return name.trim();
+                    }
+                }
+            }
+
+            return (defaultHost != null && !defaultHost.isEmpty()) ? defaultHost : "localhost";
+        } catch (Exception e) {
+            return "localhost";
+        }
+    }
+
     private String handleServerStop(LuceeServerManager serverManager, String[] args) throws Exception {
         String serverName = null;
         

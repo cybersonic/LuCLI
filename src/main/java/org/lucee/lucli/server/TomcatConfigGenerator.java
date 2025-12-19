@@ -490,6 +490,21 @@ public class TomcatConfigGenerator {
         // Load server.xml from Lucee Express
         return Files.readString(vendorServerXml, StandardCharsets.UTF_8);
     }
+
+    /**
+     * Generate the patched server.xml content (what LuCLI would write into the
+     * server instance), without any filesystem side effects.
+     *
+     * This is intended for `lucli server start --dry-run --include-tomcat-server`.
+     */
+    public String generatePatchedServerXmlContent(LuceeServerConfig.ServerConfig config,
+                                                 Path projectDir,
+                                                 Path serverInstanceDir,
+                                                 Path luceeExpressDir) throws IOException {
+        String vendor = generateServerXmlContent(config, serverInstanceDir, luceeExpressDir);
+        // Side-effect-free patching: do not create keystores or rewrite.config in dry-run.
+        return serverXmlPatcher.patchContent(vendor, config, projectDir, serverInstanceDir, false);
+    }
     
     /**
      * Copy the entire Lucee Express distribution to the server instance directory

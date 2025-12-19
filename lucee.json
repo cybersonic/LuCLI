@@ -2,6 +2,9 @@
   "name" : "LuCLI",
   "version" : "6.2.2.91",
   "port" : 8010,
+  "https" : {
+    "enabled" : true
+  },
   "shutdownPort" : 9010,
   "webroot" : "./",
   "monitoring" : {
@@ -22,13 +25,12 @@
   "admin" : {
     "enabled" : false
   },
+  "enableLucee" : true,
+  "enableREST" : false,
   "agents" : { },
-
-  "configuration": {
-    "datasources": { },
-    "mappings": { }
-  },
-  "enableLucee": true,
-  "enableREST": false
-
+  "openBrowser" : true,
+  "configuration" : {
+    "datasources" : { },
+    "mappings" : { }
+  }
 }
