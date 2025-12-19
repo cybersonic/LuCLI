@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.194
+- **Dry-Run Enhancements:** Added `--include-lucee` flag to `server start --dry-run` for previewing resolved `.CFConfig.json` before deployment. Shows merged configuration from `configurationFile` and inline `configuration` with environment variable substitution applied.
+- **Documentation:** New comprehensive guides for [Dry-Run Preview System](documentation/DRY_RUN_PREVIEW.md) and [Environment Variables](documentation/ENVIRONMENT_VARIABLES.md). Updated main documentation index with quick-start links.
+- **Testing:** Enhanced test suite with dry-run validation tests for configuration preview functionality.
+
 ## 0.1.192
 - **Lucee Admin Password** Added lucee admin configuration in `admin.enabled` and `admin.password` keys of lucee.json
 - **HTTPS Support:** Added full HTTPS support with per-server keystores, automatic certificate generation, and HTTP→HTTPS redirect. Fixed Tomcat configuration to use modern `SSLHostConfig` nested element structure. Includes optional `host` field for custom domains and `--dry-run` preview flags (`--include-https-keystore-plan`, `--include-https-redirect-rules`, `--include-all`).
