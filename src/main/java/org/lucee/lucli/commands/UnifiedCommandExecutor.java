@@ -113,6 +113,7 @@ public class UnifiedCommandExecutor {
         boolean forceReplace = false;
         String customName = null;
         boolean dryRun = false;
+        boolean includeLuceeConfig = false;
         boolean includeTomcatWeb = false;
         boolean includeTomcatServer = false;
         boolean includeHttpsKeystorePlan = false;
@@ -136,6 +137,8 @@ public class UnifiedCommandExecutor {
                 dryRun = true;
             } else if (args[i].equals("--include-tomcat-web")) {
                 includeTomcatWeb = true;
+            } else if (args[i].equals("--include-lucee")) {
+                includeLuceeConfig = true;
             } else if (args[i].equals("--include-tomcat-server")) {
                 includeTomcatServer = true;
             } else if (args[i].equals("--include-https-keystore-plan")) {
@@ -148,6 +151,7 @@ public class UnifiedCommandExecutor {
                 includeTomcatServer = true;
                 includeHttpsKeystorePlan = true;
                 includeHttpsRedirectRules = true;
+                includeLuceeConfig=true;
             } else if (args[i].equals("--no-agents")) {
                 agentOverrides.disableAllAgents = true;
             } else if ((args[i].equals("--agents")) && i + 1 < args.length) {
@@ -223,7 +227,7 @@ public class UnifiedCommandExecutor {
             result.append("═══════════════════════════════════════════\n");
             
             // Display Tomcat configuration files if requested
-            if (includeTomcatWeb || includeTomcatServer || includeHttpsKeystorePlan || includeHttpsRedirectRules) {
+            if (includeTomcatWeb || includeTomcatServer || includeHttpsKeystorePlan || includeHttpsRedirectRules || includeLuceeConfig) {
                 result.append("\nGenerated Server Preview:\n");
                 result.append("═══════════════════════════════════════════\n");
 
@@ -232,6 +236,25 @@ public class UnifiedCommandExecutor {
                     Path luceeExpressDir = serverManager.ensureLuceeExpress(finalConfig.version);
                     TomcatConfigGenerator tomcatGen = new TomcatConfigGenerator();
                     Path serverInstanceDir = serverManager.getServersDir().resolve(finalConfig.name);
+
+                    if(includeLuceeConfig) {
+                        result.append("\n📄 .CFConfig.json (patched, from lucee.json):\n");
+                        result.append("────────────────────────────────────────────\n");
+                        try {
+                            com.fasterxml.jackson.databind.JsonNode cfConfig = LuceeServerConfig.resolveConfigurationNode(finalConfig, projectDir);
+                            if (cfConfig == null || cfConfig.isNull()) {
+                                result.append("No Lucee configuration defined (no configuration or configurationFile in lucee.json)\n");
+                            } else {
+                                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                                mapper.enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT);
+                                String cfConfigJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(cfConfig);
+                                result.append(cfConfigJson).append("\n");
+                            }
+                        } catch (Exception e) {
+                            result.append("❌ Error generating .CFConfig.json preview: ").append(e.getMessage()).append("\n");
+                        }
+                        result.append("─────────────────────────────────────────\n");
+                    }
 
                     if (includeTomcatServer) {
                         result.append("\n📄 server.xml (patched, from lucee.json):\n");

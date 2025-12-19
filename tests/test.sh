@@ -320,6 +320,16 @@ run_test "Server start command exists" "java -jar ../$LUCLI_JAR server start --h
 run_test "Server stop command exists" "java -jar ../$LUCLI_JAR server stop --help > /dev/null 2>&1 || true"
 run_test "Server status command exists" "java -jar ../$LUCLI_JAR server status --help > /dev/null 2>&1 || true"
 
+# Test dry-run preview flags
+echo -e "${BLUE}=== Dry-Run Preview Flag Tests ===${NC}"
+run_test_with_output "Dry-run basic works" "java -jar ../$LUCLI_JAR server start --dry-run test_project 2>&1" "DRY RUN"
+run_test_with_output "Dry-run --include-lucee shows CFConfig" "java -jar ../$LUCLI_JAR server start --dry-run --include-lucee test_project 2>&1" ".CFConfig.json"
+run_test_with_output "Dry-run --include-tomcat-server shows server.xml" "java -jar ../$LUCLI_JAR server start --dry-run --include-tomcat-server test_project 2>&1" "server.xml"
+run_test_with_output "Dry-run --include-tomcat-web shows web.xml" "java -jar ../$LUCLI_JAR server start --dry-run --include-tomcat-web test_project 2>&1" "web.xml"
+run_test_with_output "Dry-run --include-https-keystore-plan shows keystore" "java -jar ../$LUCLI_JAR server start --dry-run --include-https-keystore-plan test_project 2>&1" "keystore"
+run_test_with_output "Dry-run --include-https-redirect-rules shows redirect" "java -jar ../$LUCLI_JAR server start --dry-run --include-https-redirect-rules test_project 2>&1" "redirect"
+run_test_with_output "Dry-run --include-all shows all previews" "java -jar ../$LUCLI_JAR server start --dry-run --include-all test_project 2>&1" ".CFConfig.json.*server.xml.*web.xml"
+
 # Clean up test project
 rm -rf test_project
 

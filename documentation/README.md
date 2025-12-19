@@ -39,6 +39,12 @@ Framework-style URL routing and rewriting configuration. Essential for building 
 **[Configuration (lucee.json)](CONFIGURATION.md)**  
 Full reference for `lucee.json` server configuration, including all available settings, defaults, and examples.
 
+**[Dry-Run Preview System](DRY_RUN_PREVIEW.md)**  
+Learn how to preview server configurations before deployment using `--dry-run` and `--include-*` flags. Essential for validating Lucee settings, Tomcat connectors, HTTPS setup, and catching configuration errors early.
+
+**[Environment Variables](ENVIRONMENT_VARIABLES.md)**  
+Comprehensive guide to using environment variables in `lucee.json` for flexible configuration across environments.
+
 **[Server Agents](SERVER_AGENTS.md)**  
 Configure and use Java agents with LuCLI servers, including the Lucee step debugger and custom JVM agents. Learn about agent configuration, JVM arguments, and debugging setup.
 
@@ -55,6 +61,9 @@ Developer guide for extending and customizing server commands. Covers the server
 - **Learn command-line syntax** → [Executing Commands](EXECUTING_COMMANDS.md)
 - **Use the help system** → [Help System Guide](HELP_SYSTEM.md)
 - **Execute CFML files** → [Shortcuts Guide](SHORTCUTS.md)
+- **Configure server settings** → [Configuration (lucee.json)](CONFIGURATION.md)
+- **Preview configuration before starting** → [Dry-Run Preview System](DRY_RUN_PREVIEW.md)
+- **Use environment variables** → [Environment Variables](ENVIRONMENT_VARIABLES.md)
 - **Manage Lucee servers** → [Server Command Development](SERVER_COMMAND_DEVELOPMENT.md)
 - **Configure URL routing** → [URL Rewriting Guide](URL_REWRITING.md)
 - **Debug Lucee applications** → [Server Agents](SERVER_AGENTS.md)
