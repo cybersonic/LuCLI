@@ -948,7 +948,7 @@ public class LuceeServerManager {
         env.put("CATALINA_PID", serverInstanceDir.resolve("server.pid").toString());
         env.put("CATALINA_OUT", serverInstanceDir.resolve("logs/catalina.out").toString());
 
-        if(config.admin.password == null && config.admin.password.length() > 0){
+        if(config.admin.password != null && config.admin.password.length() > 0){
             env.put("LUCEE_ADMIN_PASSWORD", config.admin.password);
         }
         
