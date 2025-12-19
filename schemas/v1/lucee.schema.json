@@ -15,6 +15,11 @@
       "description": "Lucee engine version to use for this server instance.",
       "default": "6.2.2.91"
     },
+    "host": {
+      "type": "string",
+      "description": "Hostname to use when generating default URLs and (when https.enabled=true) the self-signed certificate SANs. Defaults to 'localhost' when omitted.",
+      "default": "localhost"
+    },
     "port": {
       "type": "integer",
       "description": "HTTP port for the server.",
@@ -106,6 +111,28 @@
           "type": "boolean",
           "description": "Whether the Lucee administrator is accessible.",
           "default": true
+        }
+      }
+    },
+    "https": {
+      "type": "object",
+      "description": "Optional HTTPS configuration. When enabled, LuCLI adds an HTTPS Tomcat connector and generates a per-server PKCS12 keystore under the server instance directory.",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable HTTPS.",
+          "default": false
+        },
+        "port": {
+          "type": "integer",
+          "description": "HTTPS port (defaults to 8443 when omitted).",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "redirect": {
+          "type": "boolean",
+          "description": "Redirect HTTP to HTTPS (defaults to true when https.enabled=true)."
         }
       }
     },

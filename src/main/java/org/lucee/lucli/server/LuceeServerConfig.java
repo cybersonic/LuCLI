@@ -10,6 +10,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -21,11 +22,22 @@ public class LuceeServerConfig {
     
     public static class ServerConfig {
         public String name;
+        /**
+         * Optional hostname used when constructing default URLs and when generating
+         * self-signed HTTPS certificates. Defaults to "localhost" when omitted.
+         */
+        public String host;
         public String version = "6.2.2.91";
         /**
          * Primary HTTP port for Tomcat.
          */
         public int port = 8080;
+
+        /**
+         * Optional HTTPS configuration. When omitted or when enabled=false, LuCLI
+         * will not configure an HTTPS connector.
+         */
+        public HttpsConfig https;
         /**
          * Optional explicit shutdown port. When null, the effective shutdown
          * port is derived from the HTTP port using getShutdownPort(port).
@@ -72,6 +84,19 @@ public class LuceeServerConfig {
         public String configurationFile;
     }
     
+    public static class HttpsConfig {
+        public boolean enabled = false;
+        /**
+         * Optional HTTPS port. When null, defaults to 8443.
+         */
+        public Integer port;
+        /**
+         * When true, LuCLI configures Tomcat to redirect HTTP requests to HTTPS.
+         * When null, defaults to true when HTTPS is enabled.
+         */
+        public Boolean redirect;
+    }
+
     public static class AdminConfig {
         public boolean enabled = true;
     }
@@ -103,7 +128,9 @@ public class LuceeServerConfig {
     }
     
     private static final ObjectMapper objectMapper = new ObjectMapper()
-            .enable(SerializationFeature.INDENT_OUTPUT);
+            .enable(SerializationFeature.INDENT_OUTPUT)
+            // Keep lucee.json as small as possible by omitting null keys.
+            .setSerializationInclusion(JsonInclude.Include.NON_NULL);
     
     /**
      * Load configuration from lucee.json in the specified directory
@@ -144,7 +171,6 @@ public class LuceeServerConfig {
         if (config.agents == null) {
             config.agents = new HashMap<>();
         }
-        
 
         // Ensure browser config has sensible defaults for older configs
         // (Jackson will leave primitive boolean as false when field is absent,
@@ -166,6 +192,46 @@ public class LuceeServerConfig {
         // This prevents race conditions where ports become unavailable between config load and server start
         
         return config;
+    }
+
+    /**
+     * Effective hostname (defaults to "localhost").
+     */
+    public static String getEffectiveHost(ServerConfig config) {
+        if (config == null || config.host == null || config.host.trim().isEmpty()) {
+            return "localhost";
+        }
+        return config.host.trim();
+    }
+
+    /**
+     * Whether HTTPS is enabled for this server.
+     */
+    public static boolean isHttpsEnabled(ServerConfig config) {
+        return config != null && config.https != null && config.https.enabled;
+    }
+
+    /**
+     * Effective HTTPS port (defaults to 8443).
+     */
+    public static int getEffectiveHttpsPort(ServerConfig config) {
+        if (config == null || config.https == null || config.https.port == null) {
+            return 8443;
+        }
+        return config.https.port.intValue();
+    }
+
+    /**
+     * Whether HTTP->HTTPS redirect is enabled (defaults to true when HTTPS is enabled).
+     */
+    public static boolean isHttpsRedirectEnabled(ServerConfig config) {
+        if (!isHttpsEnabled(config)) {
+            return false;
+        }
+        if (config.https.redirect == null) {
+            return true;
+        }
+        return config.https.redirect.booleanValue();
     }
     
     /**
@@ -254,6 +320,9 @@ public class LuceeServerConfig {
         }
         if (config.name != null) {
             config.name = replaceEnvVars(config.name);
+        }
+        if (config.host != null) {
+            config.host = replaceEnvVars(config.host);
         }
         if (config.webroot != null) {
             config.webroot = replaceEnvVars(config.webroot);
@@ -481,6 +550,11 @@ public class LuceeServerConfig {
                         if (existingConfig.monitoring != null && existingConfig.monitoring.jmx != null) {
                             ports.add(existingConfig.monitoring.jmx.port);
                         }
+
+                        // Add HTTPS port if enabled
+                        if (isHttpsEnabled(existingConfig)) {
+                            ports.add(getEffectiveHttpsPort(existingConfig));
+                        }
                     }
                 } catch (Exception e) {
                     // Skip servers with invalid configurations
@@ -598,6 +672,9 @@ public class LuceeServerConfig {
         int originalJmxPort = config.monitoring != null && config.monitoring.jmx != null ? config.monitoring.jmx.port : -1;
         
         // Check for internal port conflicts within the same configuration
+        int shutdownPort = getEffectiveShutdownPort(config);
+        int httpsPort = isHttpsEnabled(config) ? getEffectiveHttpsPort(config) : -1;
+
         if (config.monitoring != null && config.monitoring.jmx != null) {
             if (config.port == config.monitoring.jmx.port) {
                 hasConflicts = true;
@@ -605,14 +682,34 @@ public class LuceeServerConfig {
                         .append(") and JMX port (").append(config.monitoring.jmx.port)
                         .append(") cannot be the same. Please use different ports in your lucee.json file.\n");
             }
-            
-            int shutdownPort = getEffectiveShutdownPort(config);
+
             if (shutdownPort == config.monitoring.jmx.port) {
                 hasConflicts = true;
                 conflictMessages.append("Shutdown port (").append(shutdownPort)
                         .append(") and JMX port (").append(config.monitoring.jmx.port)
                         .append(") cannot be the same. The shutdown port is calculated as HTTP port + 1000. ");
                 conflictMessages.append("Please choose a different HTTP port or JMX port in your lucee.json file.\n");
+            }
+        }
+
+        if (httpsPort > 0) {
+            if (httpsPort == config.port) {
+                hasConflicts = true;
+                conflictMessages.append("HTTPS port (").append(httpsPort)
+                        .append(") and HTTP port (").append(config.port)
+                        .append(") cannot be the same. Please use different ports in your lucee.json file.\n");
+            }
+            if (httpsPort == shutdownPort) {
+                hasConflicts = true;
+                conflictMessages.append("HTTPS port (").append(httpsPort)
+                        .append(") and Shutdown port (").append(shutdownPort)
+                        .append(") cannot be the same.\n");
+            }
+            if (config.monitoring != null && config.monitoring.jmx != null && httpsPort == config.monitoring.jmx.port) {
+                hasConflicts = true;
+                conflictMessages.append("HTTPS port (").append(httpsPort)
+                        .append(") and JMX port (").append(config.monitoring.jmx.port)
+                        .append(") cannot be the same.\n");
             }
         }
         
@@ -632,7 +729,6 @@ public class LuceeServerConfig {
         }
         
         // Check shutdown port (either explicit or derived from HTTP port)
-        int shutdownPort = getEffectiveShutdownPort(config);
         if (!isPortAvailable(shutdownPort)) {
             hasConflicts = true;
             conflictMessages.append("Shutdown port ").append(shutdownPort).append(" (HTTP port + 1000) is already in use");
@@ -671,6 +767,25 @@ public class LuceeServerConfig {
                     config.monitoring.jmx.port = newJmxPort;
                 } else {
                     conflictMessages.append(". Please stop the service using this port or choose a different JMX port.");
+                }
+                conflictMessages.append("\n");
+            }
+        }
+
+        // Check HTTPS port
+        if (httpsPort > 0) {
+            if (!isPortAvailable(httpsPort)) {
+                hasConflicts = true;
+                conflictMessages.append("HTTPS port ").append(httpsPort).append(" is already in use");
+
+                if (allowPortReassignment) {
+                    int newHttpsPort = findAvailablePort(httpsPort, 8000, 8999);
+                    conflictMessages.append(", reassigning to port ").append(newHttpsPort);
+                    if (config.https != null) {
+                        config.https.port = newHttpsPort;
+                    }
+                } else {
+                    conflictMessages.append(". Please stop the service using this port or choose a different HTTPS port.");
                 }
                 conflictMessages.append("\n");
             }

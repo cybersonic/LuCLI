@@ -202,17 +202,29 @@ public class LuceeServerManager {
                             .append("  Or change the JMX port in your lucee.json file\n\n");
                 }
             }
+
+            if (LuceeServerConfig.isHttpsEnabled(config) && !LuceeServerConfig.isPortAvailable(LuceeServerConfig.getEffectiveHttpsPort(config))) {
+                int httpsPort = LuceeServerConfig.getEffectiveHttpsPort(config);
+                errorMessage.append("• HTTPS port ").append(httpsPort)
+                        .append(" is already in use by another process\n")
+                        .append("  Use: lsof -i :").append(httpsPort).append(" (to see what's using the port)\n")
+                        .append("  Or change https.port in your lucee.json file (or disable https)\n\n");
+            }
             
             throw new IllegalStateException(errorMessage.toString().trim());
         }
         
         // Build port information message
         StringBuilder portInfo = new StringBuilder();
-        portInfo.append("Starting server '").append(config.name).append("' on:");
+        portInfo.append("Starting server '\"").append(config.name).append("\' on:");
         portInfo.append("\n  HTTP port:     ").append(config.port);
         portInfo.append("\n  Shutdown port: ").append(LuceeServerConfig.getEffectiveShutdownPort(config));
         if (config.monitoring != null && config.monitoring.enabled && config.monitoring.jmx != null) {
             portInfo.append("\n  JMX port:      ").append(config.monitoring.jmx.port);
+        }
+        if (LuceeServerConfig.isHttpsEnabled(config)) {
+            portInfo.append("\n  HTTPS port:    ").append(LuceeServerConfig.getEffectiveHttpsPort(config));
+            portInfo.append("\n  HTTPS redirect:").append(LuceeServerConfig.isHttpsRedirectEnabled(config) ? " enabled" : " disabled");
         }
         
         System.out.println(portInfo.toString());
@@ -694,7 +706,12 @@ public class LuceeServerManager {
 
         String url = config.openBrowserURL;
         if (url == null || url.trim().isEmpty()) {
-            url = "http://localhost:" + instance.getPort() + "/";
+            String host = (config.host == null || config.host.trim().isEmpty()) ? "localhost" : config.host.trim();
+            if (LuceeServerConfig.isHttpsEnabled(config)) {
+                url = "https://" + host + ":" + LuceeServerConfig.getEffectiveHttpsPort(config) + "/";
+            } else {
+                url = "http://" + host + ":" + instance.getPort() + "/";
+            }
         }
 
         try {

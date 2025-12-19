@@ -208,6 +208,26 @@
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
       "args": [ "-t", "demo.lucli"]
+    },
+    {
+      "type": "java",
+      "name": "👍 Lucli Completion (generate bash script)",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "projectName": "lucli",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "args": [ "completion", "bash" ]
+    },
+    {
+      "type": "java",
+      "name": "👍 Lucli Completion (versions-list)",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "projectName": "lucli",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "args": [ "versions-list" ]
     }
   ]
 }
