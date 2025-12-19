@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
-
+- **Lucee Admin Password** Added lucee admin configuration in `admin.enabled` and `admin.password` keys of lucee.json
 - **HTTPS Support:** Added full HTTPS support with per-server keystores, automatic certificate generation, and HTTP→HTTPS redirect. Fixed Tomcat configuration to use modern `SSLHostConfig` nested element structure. Includes optional `host` field for custom domains and `--dry-run` preview flags (`--include-https-keystore-plan`, `--include-https-redirect-rules`, `--include-all`).
 - **Configuration Management:** New `server get` and `server set` commands with dot notation support for reading/writing configuration values. Includes `--dry-run` flag for previewing changes. Added environment variable substitution with `${VAR_NAME}` and `${VAR_NAME:-default}` syntax, automatic `.env` file loading, and virtual read-only `serverDir` key.
 - **Server Management Improvements:** Smart shutdown port auto-assignment (HTTP port + 1000 with conflict detection), comprehensive port conflict checking (HTTP, HTTPS, JMX, shutdown), `server list --running` filter, and enhanced startup output with server directory path.
