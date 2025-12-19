@@ -99,6 +99,7 @@ public class LuceeServerConfig {
 
     public static class AdminConfig {
         public boolean enabled = true;
+        public String password = "";
     }
     
     public static class UrlRewriteConfig {
@@ -354,6 +355,14 @@ public class LuceeServerConfig {
             if (config.urlRewrite.routerFile != null) {
                 config.urlRewrite.routerFile = replaceEnvVars(config.urlRewrite.routerFile);
             }
+        }
+        
+        // Substitute in Admin config
+        if (config.admin != null) {
+            if (config.admin.password != null) {
+                config.admin.password = replaceEnvVars(config.admin.password);
+            }
+            
         }
         
         // Recursively substitute in the configuration JSON object
