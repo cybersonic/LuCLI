@@ -82,6 +82,14 @@ public class LuceeServerConfig {
          * against the project directory when starting the server.
          */
         public String configurationFile;
+        
+        /**
+         * Optional environment-specific configuration overrides.
+         * Each key is an environment name (e.g., "prod", "dev", "staging") and
+         * the value is a ServerConfig object containing overrides for that environment.
+         * Use `lucli server start --env prod` to apply the "prod" environment overrides.
+         */
+        public Map<String, ServerConfig> environments = new HashMap<>();
     }
     
     public static class HttpsConfig {
@@ -924,6 +932,76 @@ public class LuceeServerConfig {
         return baseObj;
     }
 
+    /**
+     * Apply environment-specific overrides to a base ServerConfig.
+     * 
+     * @param base The base ServerConfig loaded from lucee.json
+     * @param envName The environment name to apply (e.g., "prod", "dev", "staging")
+     * @return A new ServerConfig with environment overrides deep-merged into the base
+     * @throws IllegalArgumentException if the environment name is not found
+     */
+    public static ServerConfig applyEnvironment(ServerConfig base, String envName) {
+        if (envName == null || envName.trim().isEmpty()) {
+            return base; // No environment specified
+        }
+        
+        if (base.environments == null || !base.environments.containsKey(envName)) {
+            // Build a helpful error message listing available environments
+            StringBuilder errorMsg = new StringBuilder();
+            errorMsg.append("Environment '").append(envName).append("' not found in lucee.json");
+            
+            if (base.environments != null && !base.environments.isEmpty()) {
+                errorMsg.append("\nAvailable environments: ");
+                errorMsg.append(String.join(", ", base.environments.keySet()));
+            } else {
+                errorMsg.append("\nNo environments are defined in lucee.json");
+            }
+            
+            throw new IllegalArgumentException(errorMsg.toString());
+        }
+        
+        ServerConfig envOverrides = base.environments.get(envName);
+        
+        // Prevent recursive environment definitions
+        if (envOverrides.environments != null && !envOverrides.environments.isEmpty()) {
+            throw new IllegalArgumentException(
+                "Environment '" + envName + "' cannot contain nested 'environments' definitions"
+            );
+        }
+        
+        try {
+            return deepMergeConfigs(base, envOverrides);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to merge environment configuration: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Deep merge two ServerConfig objects using Jackson's ObjectMapper.
+     * Uses JSON serialization/deserialization to perform the merge, which handles
+     * all nested objects automatically.
+     * 
+     * @param base The base configuration
+     * @param overrides The override configuration  
+     * @return A new ServerConfig with overrides merged into base
+     */
+    private static ServerConfig deepMergeConfigs(ServerConfig base, ServerConfig overrides) throws IOException {
+        // Convert both configs to JSON
+        JsonNode baseNode = objectMapper.valueToTree(base);
+        JsonNode overrideNode = objectMapper.valueToTree(overrides);
+        
+        // Remove 'environments' from the override node to prevent copying
+        if (overrideNode.isObject()) {
+            ((com.fasterxml.jackson.databind.node.ObjectNode) overrideNode).remove("environments");
+        }
+        
+        // Merge the JSON nodes
+        JsonNode merged = mergeJsonNodes(baseNode.deepCopy(), overrideNode);
+        
+        // Convert back to ServerConfig
+        return objectMapper.treeToValue(merged, ServerConfig.class);
+    }
+    
     /**
      * When a CFConfig definition is present in the server configuration, write it to
      * the Lucee context directory as .CFConfig.json. This is a pure side-effect method

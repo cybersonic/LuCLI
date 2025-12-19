@@ -81,23 +81,43 @@ public class LuceeServerManager {
      * Start a Lucee server for the current project directory
      */
     public ServerInstance startServer(Path projectDir, String versionOverride) throws Exception {
-        return startServer(projectDir, versionOverride, false, null, null);
+        return startServer(projectDir, versionOverride, false, null, null, null);
     }
     
     /**
      * Start a Lucee server with options for handling existing servers
      */
     public ServerInstance startServer(Path projectDir, String versionOverride, boolean forceReplace, String customName) throws Exception {
-        return startServer(projectDir, versionOverride, forceReplace, customName, null);
+        return startServer(projectDir, versionOverride, forceReplace, customName, null, null);
     }
     
     /**
-     * Core server startup method that also accepts agent overrides.
+     * Start a Lucee server with agent overrides (no environment)
      */
     public ServerInstance startServer(Path projectDir, String versionOverride, boolean forceReplace, String customName,
                                       AgentOverrides agentOverrides) throws Exception {
+        return startServer(projectDir, versionOverride, forceReplace, customName, agentOverrides, null);
+    }
+    
+    /**
+     * Core server startup method that also accepts agent overrides and environment name.
+     * 
+     * @param projectDir The project directory
+     * @param versionOverride Optional version override (can be null)
+     * @param forceReplace Whether to force replace an existing server
+     * @param customName Optional custom name (can be null)
+     * @param agentOverrides Optional agent overrides (can be null)
+     * @param environment Optional environment name to apply (can be null)
+     */
+    public ServerInstance startServer(Path projectDir, String versionOverride, boolean forceReplace, String customName,
+                                      AgentOverrides agentOverrides, String environment) throws Exception {
         // Load configuration
         LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(projectDir);
+        
+        // Apply environment overrides if specified
+        if (environment != null && !environment.trim().isEmpty()) {
+            config = LuceeServerConfig.applyEnvironment(config, environment);
+        }
         
         // Override version if specified
         if (versionOverride != null && !versionOverride.trim().isEmpty()) {

@@ -112,6 +112,7 @@ public class UnifiedCommandExecutor {
         String versionOverride = null;
         boolean forceReplace = false;
         String customName = null;
+        String environment = null;
         boolean dryRun = false;
         boolean includeLuceeConfig = false;
         boolean includeTomcatWeb = false;
@@ -133,6 +134,13 @@ public class UnifiedCommandExecutor {
             } else if ((args[i].equals("--name") || args[i].equals("-n")) && i + 1 < args.length) {
                 customName = args[i + 1];
                 i++; // Skip next argument
+            } else if ((args[i].equals("--env") || args[i].equals("--environment")) && i + 1 < args.length) {
+                environment = args[i + 1];
+                i++; // Skip next argument
+            } else if (args[i].startsWith("--env=")) {
+                environment = args[i].substring("--env=".length());
+            } else if (args[i].startsWith("--environment=")) {
+                environment = args[i].substring("--environment=".length());
             } else if (args[i].equals("--dry-run")) {
                 dryRun = true;
             } else if (args[i].equals("--include-tomcat-web")) {
@@ -210,12 +218,24 @@ public class UnifiedCommandExecutor {
         // Load final realized config for dry-run or actual startup
         LuceeServerConfig.ServerConfig finalConfig = LuceeServerConfig.loadConfig(projectDir);
         
+        // Apply environment overrides if --env flag was provided
+        if (environment != null && !environment.trim().isEmpty()) {
+            try {
+                finalConfig = LuceeServerConfig.applyEnvironment(finalConfig, environment);
+            } catch (IllegalArgumentException e) {
+                return formatOutput("❌ " + e.getMessage(), true);
+            }
+        }
+        
         // If dry-run, show what would happen and exit
         if (dryRun) {
             StringBuilder result = new StringBuilder();
             result.append("📋 DRY RUN: Server configuration that would be used:\n\n");
-            result.append("Realized lucee.json for: ").append(projectDir).append("\n");
-            result.append("═══════════════════════════════════════════\n");
+            result.append("Realized lucee.json for: ").append(projectDir);
+            if (environment != null && !environment.trim().isEmpty()) {
+                result.append(" (with environment: ").append(environment).append(")");
+            }
+            result.append("\n═══════════════════════════════════════════\n");
             try {
                 com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
                 mapper.enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT);
@@ -321,7 +341,7 @@ public class UnifiedCommandExecutor {
                 result.append("Starting Lucee server in: ").append(projectDir).append("\n");
             }
             
-            LuceeServerManager.ServerInstance instance = serverManager.startServer(projectDir, versionOverride, forceReplace, customName, agentOverrides);
+            LuceeServerManager.ServerInstance instance = serverManager.startServer(projectDir, versionOverride, forceReplace, customName, agentOverrides, environment);
             
             // Load configuration to get monitoring/JMX port and agent info
             LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(projectDir);
