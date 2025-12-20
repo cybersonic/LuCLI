@@ -2,8 +2,8 @@ package org.lucee.lucli.cli;
 
 import java.util.concurrent.Callable;
 
-import org.lucee.lucli.InteractiveTerminalV2;
 import org.lucee.lucli.LuCLI;
+import org.lucee.lucli.Terminal;
 import org.lucee.lucli.StringOutput;
 import org.lucee.lucli.Timer;
 import org.lucee.lucli.cli.commands.CfmlCommand;
@@ -110,7 +110,7 @@ public class LuCLICommand implements Callable<Integer> {
             // Use the Picocli-integrated terminal so CLI and terminal share the same
             // command definitions, options, and autocomplete.
             Timer.start("Terminal Mode");
-            InteractiveTerminalV2.main(new String[0]);
+            Terminal.main(new String[0]);
             Timer.stop("Terminal Mode");
 
             return 0;
@@ -137,8 +137,8 @@ public class LuCLICommand implements Callable<Integer> {
             // This logic should be moved to a shared utility class eventually
             System.out.println("Initializing Lucee CFML engine...");
             
-            // For now, delegate to InteractiveTerminal's implementation
-            InteractiveTerminalV2.main(new String[]{"--lucee-version"});
+            // For now, delegate to Terminal's implementation
+            Terminal.main(new String[]{"--lucee-version"});
             
         } catch (Exception e) {
             System.err.println("Error getting Lucee version: " + e.getMessage());

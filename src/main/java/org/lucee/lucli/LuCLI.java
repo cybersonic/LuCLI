@@ -320,14 +320,14 @@ public class LuCLI {
            
         }
         
-        // Execute using InteractiveTerminal's script mode
+        // Execute using Terminal's script mode
         // This redirects stdin to feed the processed script lines
         String content = String.join("\n", processedLines) + "\n";
 
         java.io.InputStream originalIn = System.in;
         try {
             System.setIn(new java.io.ByteArrayInputStream(content.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
-            InteractiveTerminal.main(new String[0]);
+            Terminal.main(new String[0]);
             return 0; // Success if no exception thrown
         } catch (Exception e) {
             StringOutput.Quick.error("Error executing script: " + e.getMessage());
