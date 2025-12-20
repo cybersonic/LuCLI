@@ -10,7 +10,6 @@ import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.UserInterruptException;
 import org.jline.reader.impl.DefaultParser;
-import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 import org.lucee.lucli.cli.LuCLICommand;
 import org.lucee.lucli.modules.ModuleCommand;
@@ -18,19 +17,18 @@ import org.lucee.lucli.modules.ModuleCommand;
 import picocli.CommandLine;
 
 /**
- * Refactored Interactive Terminal using official Picocli-JLine3 integration
+ * Terminal - Interactive REPL for LuCLI
  * 
- * This version uses the picocli-shell-jline3 library to integrate Picocli commands
- * directly with JLine, ensuring that CLI and terminal modes use the same command
- * implementations without code duplication.
+ * Integrates PicocLI commands with JLine3 for a full-featured terminal experience.
+ * CLI and terminal modes use the same command implementations.
  * 
- * Terminal-specific commands (cd, ls, pwd, etc.) are handled separately via
- * CommandProcessor, while all Picocli commands are automatically available.
+ * Terminal-specific commands (cd, ls, pwd, etc.) are handled via CommandProcessor.
+ * All PicocLI commands are automatically available.
  */
-public class InteractiveTerminalV2 {
+public class Terminal {
     
     private static LuceeScriptEngine luceeEngine;
-    private static Terminal terminal;
+    private static org.jline.terminal.Terminal terminal;
     private static CommandProcessor commandProcessor;
     private static ExternalCommandProcessor externalCommandProcessor;
     private static CommandLine picocliCommandLine;
@@ -388,7 +386,7 @@ public class InteractiveTerminalV2 {
      * Read a script template from resources
      */
     private static String readScriptTemplate(String templatePath) throws Exception {
-        try (java.io.InputStream is = InteractiveTerminalV2.class.getResourceAsStream(templatePath)) {
+        try (java.io.InputStream is = Terminal.class.getResourceAsStream(templatePath)) {
             if (is == null) {
                 throw new java.io.FileNotFoundException("Script template not found: " + templatePath);
             }
