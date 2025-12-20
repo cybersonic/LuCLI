@@ -330,6 +330,110 @@ run_test_with_output "Dry-run --include-https-keystore-plan shows keystore" "jav
 run_test_with_output "Dry-run --include-https-redirect-rules shows redirect" "java -jar ../$LUCLI_JAR server start --dry-run --include-https-redirect-rules test_project 2>&1" "redirect"
 run_test_with_output "Dry-run --include-all shows all previews" "java -jar ../$LUCLI_JAR server start --dry-run --include-all test_project 2>&1" ".CFConfig.json.*server.xml.*web.xml"
 
+# Test environment-based configuration
+echo -e "${BLUE}=== Environment-Based Configuration Tests ===${NC}"
+
+# Create test project with environments
+mkdir -p env_test_project
+cat > env_test_project/lucee.json << 'EOF'
+{
+  "name": "env-test",
+  "port": 8080,
+  "version": "6.2.2.91",
+  "jvm": {
+    "maxMemory": "512m",
+    "minMemory": "128m"
+  },
+  "admin": {
+    "enabled": true,
+    "password": ""
+  },
+  "monitoring": {
+    "enabled": true,
+    "jmx": {
+      "port": 8999
+    }
+  },
+  "environments": {
+    "prod": {
+      "port": 8090,
+      "jvm": {
+        "maxMemory": "2048m"
+      },
+      "admin": {
+        "password": "secret123"
+      },
+      "monitoring": {
+        "enabled": false
+      },
+      "openBrowser": false
+    },
+    "dev": {
+      "port": 8091,
+      "monitoring": {
+        "enabled": true,
+        "jmx": {
+          "port": 9000
+        }
+      }
+    },
+    "staging": {
+      "port": 8092,
+      "jvm": {
+        "maxMemory": "1024m"
+      }
+    }
+  }
+}
+EOF
+
+# Test 1: Base configuration without environment
+run_test_with_output "Dry-run base config shows port 8080" "java -jar ../$LUCLI_JAR server start --dry-run env_test_project 2>&1" '\"port\" : 8080'
+run_test_with_output "Dry-run base config shows 512m memory" "java -jar ../$LUCLI_JAR server start --dry-run env_test_project 2>&1" '\"maxMemory\" : \"512m\"'
+
+# Test 2: Production environment overrides
+run_test_with_output "Dry-run prod env shows port 8090" "java -jar ../$LUCLI_JAR server start --env=prod --dry-run env_test_project 2>&1" '\"port\" : 8090'
+run_test_with_output "Dry-run prod env shows 2048m memory" "java -jar ../$LUCLI_JAR server start --env=prod --dry-run env_test_project 2>&1" '\"maxMemory\" : \"2048m\"'
+run_test_with_output "Dry-run prod env shows password" "java -jar ../$LUCLI_JAR server start --env=prod --dry-run env_test_project 2>&1" '\"password\" : \"secret123\"'
+run_test_with_output "Dry-run prod env disables monitoring" "java -jar ../$LUCLI_JAR server start --env=prod --dry-run env_test_project 2>&1" 'with environment: prod'
+
+# Test 3: Development environment overrides
+run_test_with_output "Dry-run dev env shows port 8091" "java -jar ../$LUCLI_JAR server start --env=dev --dry-run env_test_project 2>&1" '\"port\" : 8091'
+run_test_with_output "Dry-run dev env shows JMX port 9000" "java -jar ../$LUCLI_JAR server start --env=dev --dry-run env_test_project 2>&1" 'with environment: dev'
+run_test_with_output "Dry-run dev env keeps base maxMemory" "java -jar ../$LUCLI_JAR server start --env=dev --dry-run env_test_project 2>&1" '\"maxMemory\" : \"512m\"'
+
+# Test 4: Staging environment partial overrides
+run_test_with_output "Dry-run staging env shows port 8092" "java -jar ../$LUCLI_JAR server start --env=staging --dry-run env_test_project 2>&1" '\"port\" : 8092'
+run_test_with_output "Dry-run staging env shows 1024m memory" "java -jar ../$LUCLI_JAR server start --env=staging --dry-run env_test_project 2>&1" '\"maxMemory\" : \"1024m\"'
+run_test_with_output "Dry-run staging env keeps base minMemory" "java -jar ../$LUCLI_JAR server start --env=staging --dry-run env_test_project 2>&1" '\"minMemory\" : \"128m\"'
+
+# Test 5: Invalid environment error handling
+if java -jar ../$LUCLI_JAR server start --env=invalid --dry-run env_test_project 2>&1 | grep -q "not found in lucee.json"; then
+    echo -e "${GREEN}✅ PASSED - Invalid environment error handled correctly${NC}"
+else
+    echo -e "${RED}❌ FAILED - Invalid environment should show error${NC}"
+    FAILED_TESTS=$((FAILED_TESTS + 1))
+fi
+TOTAL_TESTS=$((TOTAL_TESTS + 1))
+echo ""
+
+# Test 6: Environment display shows available environments
+if java -jar ../$LUCLI_JAR server start --env=nonexistent --dry-run env_test_project 2>&1 | grep -q "Available environments:"; then
+    echo -e "${GREEN}✅ PASSED - Error message lists available environments${NC}"
+else
+    echo -e "${RED}❌ FAILED - Should list available environments${NC}"
+    FAILED_TESTS=$((FAILED_TESTS + 1))
+fi
+TOTAL_TESTS=$((TOTAL_TESTS + 1))
+echo ""
+
+# Test 7: Deep merge preserves nested values
+run_test_with_output "Deep merge keeps base admin.enabled" "java -jar ../$LUCLI_JAR server start --env=prod --dry-run env_test_project 2>&1" 'enabled.*true'
+run_test_with_output "Deep merge overrides nested jvm.maxMemory" "java -jar ../$LUCLI_JAR server start --env=prod --dry-run env_test_project 2>&1" '2048m'
+
+# Clean up environment test project
+rm -rf env_test_project
+
 # Clean up test project
 rm -rf test_project
 
