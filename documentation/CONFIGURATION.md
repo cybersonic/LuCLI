@@ -42,7 +42,36 @@ This page describes all settings currently supported in `lucee.json` for LuCLI-m
   "openBrowser": true,
   "openBrowserURL": "",
   "configuration": {},
-  "configurationFile": ""
+  "configurationFile": "",
+  "environments": {
+    "prod": {
+      "port": 80,
+      "jvm": {
+        "maxMemory": "2048m"
+      },
+      "admin": {
+        "password": "secure_password"
+      },
+      "monitoring": {
+        "enabled": false
+      },
+      "openBrowser": false
+    },
+    "dev": {
+      "port": 8081,
+      "monitoring": {
+        "jmx": {
+          "port": 9000
+        }
+      }
+    },
+    "staging": {
+      "port": 8082,
+      "jvm": {
+        "maxMemory": "1024m"
+      }
+    }
+  }
 }
 ```
 
@@ -66,6 +95,138 @@ Optional custom hostname (used for default URLs and certificate SANs):
   "https": { "enabled": true }
 }
 ```
+
+## Environment-Based Configuration
+
+LuCLI supports environment-specific configuration overrides, allowing you to define different settings for production, development, staging, etc. within a single `lucee.json` file.
+
+### Quick Start
+
+```bash
+# Start server with production environment
+lucli server start --env=prod
+
+# Start with development environment
+lucli server start --env dev
+
+# Preview merged configuration without starting
+lucli server start --env=prod --dry-run
+```
+
+### Configuration Load Order
+
+When using environments, configuration is loaded and merged in this order:
+
+1. **LuCLI defaults** (built-in defaults)
+2. **Configuration file** (if `"configurationFile"` is specified)
+3. **Base configuration** (top-level settings in `lucee.json`)
+4. **Environment overrides** (when `--env` flag is used)
+
+### Deep Merge Behavior
+
+Environment configurations are deep-merged with the base configuration:
+
+- **Nested objects** are merged recursively (e.g., `jvm.maxMemory` can be overridden while keeping `jvm.minMemory`)
+- **Array values** are replaced entirely (not merged)
+- **Null values** in environments remove the corresponding base value
+- **Scalar values** (strings, numbers, booleans) replace base values
+
+### Example with Environments
+
+```json
+{
+  "name": "my-app",
+  "port": 8080,
+  "jvm": {
+    "maxMemory": "512m",
+    "minMemory": "128m"
+  },
+  "monitoring": {
+    "enabled": true,
+    "jmx": { "port": 8999 }
+  },
+  "environments": {
+    "prod": {
+      "port": 80,
+      "jvm": {
+        "maxMemory": "2048m"
+      },
+      "admin": {
+        "password": "secure_password"
+      },
+      "monitoring": {
+        "enabled": false
+      },
+      "openBrowser": false
+    },
+    "dev": {
+      "port": 8081,
+      "monitoring": {
+        "jmx": { "port": 9000 }
+      }
+    },
+    "staging": {
+      "port": 8082,
+      "jvm": {
+        "maxMemory": "1024m"
+      }
+    }
+  }
+}
+```
+
+**With this configuration:**
+
+- **Base** (no `--env`): port 8080, maxMemory 512m, monitoring enabled
+- **`--env=prod`**: port 80, maxMemory 2048m, minMemory 128m (inherited), monitoring disabled, password set, browser disabled
+- **`--env=dev`**: port 8081, maxMemory 512m (inherited), JMX port 9000, monitoring enabled
+- **`--env=staging`**: port 8082, maxMemory 1024m, minMemory 128m (inherited), other settings from base
+
+### Environment Persistence
+
+When a server starts with an environment, it's saved to `~/.lucli/servers/{name}/.environment` and displayed in server listings:
+
+```bash
+$ lucli server list
+my-app [prod]    RUNNING    12345    80
+other-app        RUNNING    12346    8080
+```
+
+```bash
+$ lucli server status my-app
+Server Name:   my-app [env: prod]
+Status:        RUNNING
+PID:           12345
+Port:          80
+```
+
+### Error Handling
+
+If you specify an invalid environment name, LuCLI will show an error with available options:
+
+```bash
+$ lucli server start --env=invalid
+❌ Environment 'invalid' not found in lucee.json
+Available environments: prod, dev, staging
+```
+
+### Use Cases
+
+**Development vs. Production:**
+- Lower memory limits for dev, higher for production
+- Different ports to avoid conflicts
+- JMX monitoring enabled in dev, disabled in production
+- Browser auto-open in dev, disabled in production
+
+**Security:**
+- Admin passwords set only in production environments
+- Debug agents enabled only in development
+- HTTPS enforced in production, optional in dev
+
+**Resource Management:**
+- Different JVM heap sizes per environment
+- Staging environment with moderate resources
+- Production-like staging for realistic testing
 
 ---
 
@@ -93,8 +254,9 @@ This section expands on the basic configuration reference and documents every av
 | `jvm`               | object  | see below                                 | JVM memory and extra arguments.                                                                                                                                                 |
 | `urlRewrite`        | object  | see below                                 | URL rewriting / router configuration.                                                                                                                                           |
 | `admin`             | object  | see below                                 | Lucee administrator exposure.                                                                                                                                                   |
-| `https`             | object  | disabled                                 | Optional HTTPS configuration. When enabled, LuCLI adds an HTTPS connector and generates a per-server PKCS12 keystore under the server instance directory.                        |
-| `agents`            | object  | `{}`                                      | Named Java agents (debuggers, JMX exporters, etc.), keyed by agent ID.                                                                                                          |
+|| `https`             | object  | disabled                                 | Optional HTTPS configuration. When enabled, LuCLI adds an HTTPS connector and generates a per-server PKCS12 keystore under the server instance directory.                        |
+|| `agents`            | object  | `{}`                                      | Named Java agents (debuggers, JMX exporters, etc.), keyed by agent ID.                                                                                                          |
+|| `environments`      | object  | `{}`                                      | Named environment configurations that can override base settings. See [Environment-Based Configuration](#environment-based-configuration) section above for details.            |
 
 ### `monitoring` settings
 

@@ -177,8 +177,89 @@ Each project can have a `lucee.json` file defining server settings:
   "jvm": {
     "maxMemory": "512m",
     "minMemory": "128m"
+  },
+  "environments": {
+    "prod": {
+      "port": 80,
+      "jvm": {
+        "maxMemory": "2048m"
+      },
+      "admin": {
+        "password": "secure_password"
+      },
+      "monitoring": {
+        "enabled": false
+      },
+      "openBrowser": false
+    },
+    "dev": {
+      "port": 8081,
+      "monitoring": {
+        "jmx": {
+          "port": 9000
+        }
+      }
+    },
+    "staging": {
+      "port": 8082,
+      "jvm": {
+        "maxMemory": "1024m"
+      }
+    }
   }
 }
+```
+
+#### Environment-Based Configuration
+
+LuCLI supports environment-specific configuration overrides, allowing you to define different settings for production, development, staging, etc.
+
+**Configuration Load Order:**
+1. LuCLI defaults (built-in defaults)
+2. Configuration file referenced in `"configurationFile"` (if present)
+3. Base configuration in `lucee.json`
+4. Environment-specific overrides (when `--env` flag is used)
+
+**Using Environments:**
+
+```bash
+# Start server with production environment
+lucli server start --env=prod
+
+# Start with development environment
+lucli server start --env dev
+
+# Preview merged configuration without starting (dry-run)
+lucli server start --env=prod --dry-run
+```
+
+**Deep Merge Behavior:**
+
+Environment configurations are deep-merged with the base configuration:
+- Nested objects are merged recursively (e.g., `jvm.maxMemory` can be overridden while keeping `jvm.minMemory`)
+- Array values are replaced entirely (not merged)
+- `null` values in environments remove the corresponding base value
+- Scalar values (strings, numbers, booleans) replace base values
+
+**Example:**
+With the configuration above:
+- Base config: port 8080, maxMemory 512m, monitoring enabled
+- `--env=prod`: port 80, maxMemory 2048m, monitoring disabled, password set, browser disabled
+- `--env=dev`: port 8081, maxMemory 512m (inherited), JMX port 9000, monitoring enabled
+- `--env=staging`: port 8082, maxMemory 1024m, other settings inherited
+
+**Environment Persistence:**
+
+When a server starts with an environment, it's saved to `~/.lucli/servers/{name}/.environment` and displayed in:
+- Server list: `my-server [prod]    RUNNING    12345    80`
+- Server status: `Server Name:   my-server [env: prod]`
+
+**Error Handling:**
+
+If an invalid environment is specified, LuCLI shows available environments:
+```
+❌ Environment 'invalid' not found in lucee.json
+Available environments: prod, dev, staging
 ```
 
 ### Global Configuration
@@ -205,6 +286,7 @@ The test suite (`tests/test.sh`) covers:
 - CFML script execution
 - File system operations
 - Server management commands
+- Environment-based configuration (deep merge, persistence, error handling)
 - JMX monitoring integration
 - Command consistency between modes
 - Binary executable functionality
