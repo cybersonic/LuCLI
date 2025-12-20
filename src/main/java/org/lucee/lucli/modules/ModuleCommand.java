@@ -22,7 +22,11 @@ public class ModuleCommand {
     
 /**
  * Execute the module command with the given arguments
+ * 
+ * @deprecated This method has been replaced by direct PicocLI implementations.
+ *             Only used by UnifiedCommandExecutor/Terminal (old code path).
  */
+@Deprecated
 public static void executeModule(String[] args) {
     ModuleOptions options = parseArguments(args);
     
@@ -34,10 +38,16 @@ public static void executeModule(String[] args) {
     try {
         switch (options.action) {
             case LIST:
-                listModules();
+                // LIST has been migrated to ModulesListCommandImpl
+                System.err.println("ERROR: modules list should be handled by PicocLI ModulesListCommandImpl");
+                System.err.println("This code path should not be reached anymore.");
+                System.exit(1);
                 break;
             case INIT:
-                initModule(options.moduleName, options.gitInit, options.noGitInit);
+                // INIT has been migrated to ModulesInitCommandImpl
+                System.err.println("ERROR: modules init should be handled by PicocLI ModulesInitCommandImpl");
+                System.err.println("This code path should not be reached anymore.");
+                System.exit(1);
                 break;
             case RUN:
                 runModule(options.moduleName, options.moduleArgs);
@@ -69,7 +79,11 @@ public static void executeModule(String[] args) {
     /**
      * List installed modules under ~/.lucli/modules and known modules from
      * the bundled repository index.
+     * 
+     * @deprecated This method has been migrated to ModulesListCommandImpl.
+     *             This code path should not be reached anymore.
      */
+    @Deprecated
     private static void listModules() throws IOException {
         Path modulesDir = getModulesDirectory();
 
@@ -146,7 +160,11 @@ public static void executeModule(String[] args) {
     
     /**
      * Initialize a new module with the given name
+     * 
+     * @deprecated This method has been migrated to ModulesInitCommandImpl.
+     *             This code path should not be reached anymore.
      */
+    @Deprecated
     private static void initModule(String moduleName, boolean gitInit, boolean noGitInit) throws IOException {
         if (moduleName == null || moduleName.trim().isEmpty()) {
             // Interactive mode - ask for module name
@@ -569,7 +587,7 @@ private static ModuleOptions parseArguments(String[] args) {
      *  2) Git URL via `git clone` when git is available
      *  3) GitHub HTTPS URL fallback to archive download when git is not available
      */
-private static void installModule(String moduleName, String gitUrl, boolean force) throws Exception {
+public static void installModule(String moduleName, String gitUrl, boolean force) throws Exception {
         // Phase 1: require explicit URL
         if (gitUrl == null || gitUrl.trim().isEmpty()) {
             System.err.println("modules install currently requires --url=<url> (registry-based installs are not implemented yet).");
@@ -901,7 +919,7 @@ private static void installModule(String moduleName, String gitUrl, boolean forc
      * Update a module by reinstalling it from the given git URL.
      * If no URL is provided, attempts to use the last stored repository/ref from settings.json.
      */
-    private static void updateModule(String moduleName, String gitUrl, boolean force) throws Exception {
+    public static void updateModule(String moduleName, String gitUrl, boolean force) throws Exception {
         if (moduleName == null || moduleName.trim().isEmpty()) {
             System.err.println("Module name is required for update command.");
             System.exit(1);

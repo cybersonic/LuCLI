@@ -32,7 +32,7 @@ import picocli.CommandLine.Model.CommandSpec;
         ServerCommand.GetCommand.class,
         ServerCommand.SetCommand.class,
         ServerCommand.LogCommand.class,
-        ServerCommand.MonitorCommand.class
+        ServerMonitorCommandImpl.class
     }
 )
 public class ServerCommand implements Callable<Integer> {
@@ -518,43 +518,4 @@ public class ServerCommand implements Callable<Integer> {
         }
     }
 
-    /**
-     * Server monitor subcommand
-     */
-    @Command(
-        name = "monitor", 
-        description = "Monitor server performance via JMX"
-    )
-    static class MonitorCommand implements Callable<Integer> {
-
-        @ParentCommand 
-        private ServerCommand parent;
-
-        @Option(names = {"-n", "--name"}, 
-                description = "Name of server instance to monitor")
-        private String name;
-
-        @Override
-        public Integer call() throws Exception {
-            // Create UnifiedCommandExecutor for CLI mode  
-            UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, Paths.get(System.getProperty("user.dir")));
-
-            // Build arguments array
-            java.util.List<String> args = new java.util.ArrayList<>();
-            args.add("monitor");
-            
-            if (name != null) {
-                args.add("--name");
-                args.add(name);
-            }
-
-            // Execute the server monitor command
-            String result = executor.executeCommand("server", args.toArray(new String[0]));
-            if (result != null && !result.isEmpty()) {
-                System.out.println(result);
-            }
-
-            return 0;
-        }
-    }
 }
