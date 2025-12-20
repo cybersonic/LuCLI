@@ -16,6 +16,64 @@ public class LuCLI {
     private static boolean lucliScript = false;
 
     public static Map<String, String> scriptEnvironment = new HashMap<>(System.getenv());
+    
+    /**
+     * Print a message only if verbose mode is enabled
+     * @param message The message to print
+     */
+    public static void printVerbose(String message) {
+        if (verbose) {
+            System.out.println(message);
+        }
+    }
+    
+    /**
+     * Print a debug message only if debug mode is enabled
+     * Debug messages go to stderr with [DEBUG] prefix
+     * @param message The message to print
+     */
+    public static void printDebug(String message) {
+        if (debug) {
+            System.err.println("[DEBUG] " + message);
+        }
+    }
+    
+    /**
+     * Print a debug message with context only if debug mode is enabled
+     * @param context The context (e.g., class name or method name)
+     * @param message The message to print
+     */
+    public static void printDebug(String context, String message) {
+        if (debug) {
+            System.err.println("[DEBUG " + context + "] " + message);
+        }
+    }
+    
+    /**
+     * Print an info message (always shown, but can be used for consistency)
+     * @param message The message to print
+     */
+    public static void printInfo(String message) {
+        System.out.println(message);
+    }
+    
+    /**
+     * Print an error message
+     * @param message The error message
+     */
+    public static void printError(String message) {
+        System.err.println(message);
+    }
+    
+    /**
+     * Print a stack trace only if debug mode is enabled
+     * @param e The exception to print
+     */
+    public static void printDebugStackTrace(Exception e) {
+        if (debug) {
+            e.printStackTrace();
+        }
+    }
 
     
     /**
@@ -169,37 +227,29 @@ public class LuCLI {
         System.exit(exitCode);
     }
     
-	public static String getVersionInfo() {
-        String version = getVersion();
-        return "LuCLI " + version;
-    }
-    
-    /**
-     * Get both LuCLI and Lucee version information
+	/**
+     * Get formatted version information
+     * @param includeLucee Whether to include Lucee version
+     * @return Formatted version string with labels
+     * 
+     * Examples:
+     *   getVersionInfo(false) -> "LuCLI 0.1.207-SNAPSHOT"
+     *   getVersionInfo(true)  -> "LuCLI 0.1.207-SNAPSHOT\nLucee Version: 6.2.2.91"
      */
-    public static String getFullVersionInfo() {
-        StringBuilder versionInfo = new StringBuilder();
-        versionInfo.append(getVersionInfo());
+    public static String getVersionInfo(boolean includeLucee) {
+        StringBuilder info = new StringBuilder();
+        info.append("LuCLI ").append(getVersion());
         
-        try {
-            String luceeVersion = getLuceeVersionInfo();
-            if (luceeVersion != null) {
-                versionInfo.append("\n").append(luceeVersion);
+        if (includeLucee) {
+            try {
+                String luceeVersion = LuceeScriptEngine.getInstance(false, false).getVersion();
+                info.append("\nLucee Version: ").append(luceeVersion);
+            } catch (Exception e) {
+                info.append("\nLucee Version: Error - ").append(e.getMessage());
             }
-        } catch (Exception e) {
-            versionInfo.append("\nLucee Version: Error retrieving version - ").append(e.getMessage());
         }
         
-        return versionInfo.toString();
-    }
-    
-    /**
-     * Get Lucee version information
-     * @return the version of lucee the lucli is running by default
-     */
-    public static String getLuceeVersionInfo() throws Exception {
-    	String lucee_version = LuceeScriptEngine.getInstance(false,false).getVersion();
-        return "Lucee Version: " + lucee_version;
+        return info.toString();
     }
     
     /**
@@ -252,16 +302,12 @@ public class LuCLI {
             return 1;
         }
 
-        if (verbose) {
-            StringOutput.Quick.info("Executing LuCLI script: " + scriptPath);
-        }
+        printVerbose("Executing LuCLI script: " + scriptPath);
 
         // Read all lines from the script file
         java.util.List<String> lines = java.nio.file.Files.readAllLines(path, java.nio.charset.StandardCharsets.UTF_8);
         if (lines.isEmpty()) {
-            if (verbose) {
-                StringOutput.Quick.info("Script is empty: " + scriptPath);
-            }
+            printVerbose("Script is empty: " + scriptPath);
             return 0;
         }
 
@@ -304,9 +350,7 @@ public class LuCLI {
                         }
                     }
                     
-                    if (debug) {
-                        System.err.println("[DEBUG] SET directive: " + key + " = " + value);
-                    }
+                    printDebug("SET directive: " + key + " = " + value);
                     
                     scriptEnvironment.put(key, value);
                     stringOutput.addPlaceholder(key, value);
@@ -331,9 +375,7 @@ public class LuCLI {
             return 0; // Success if no exception thrown
         } catch (Exception e) {
             StringOutput.Quick.error("Error executing script: " + e.getMessage());
-            if (debug) {
-                e.printStackTrace();
-            }
+            printDebugStackTrace(e);
             return 1;
         } finally {
             System.setIn(originalIn);
@@ -343,17 +385,14 @@ public class LuCLI {
     
     /**
      * Check if the given string is a known subcommand
+     * Uses PicocLI's API to query registered subcommands dynamically
      * @param command The command to check
      * @return true if it's a known subcommand, false otherwise
      */
     private static boolean isKnownSubcommand(String command) {
-        // List of known subcommands that should not be treated as shortcuts
-        return "server".equals(command) || 
-               "modules".equals(command) || 
-               "module".equals(command) || 
-               "cfml".equals(command) || 
-               "help".equals(command) ||
-               "terminal".equals(command);
+        // Query PicocLI for registered subcommands instead of maintaining a manual list
+        CommandLine cmd = new CommandLine(new LuCLICommand());
+        return cmd.getSubcommands().containsKey(command);
     }
     
     /**
@@ -371,10 +410,8 @@ public class LuCLI {
         LuCLI.debug = debug;
         LuCLI.timing = timing;
         
-        if (verbose || debug) {
-            StringOutput.Quick.info("Executing module shortcut: " + moduleName + 
-                " (equivalent to 'lucli modules run " + moduleName + "')");
-        }
+        printVerbose("Executing module shortcut: " + moduleName + 
+            " (equivalent to 'lucli modules run " + moduleName + "')");
         
         // Build the new arguments array: [flags..., "modules", "run", moduleName, ...additionalArgs]
         // Flags must come BEFORE the subcommand, not after
@@ -418,9 +455,7 @@ public class LuCLI {
                                                 CommandLine commandLine,
                                                 CommandLine.ParseResult parseResult) throws Exception {
                 StringOutput.Quick.error("Error: " + ex.getMessage());
-                if (verbose || debug) {
-                    ex.printStackTrace();
-                }
+                printDebugStackTrace(ex);
                 return 1;
             }
         });
@@ -448,9 +483,7 @@ public class LuCLI {
         Timer.setEnabled(timing);
         Timer.start("CFML File Execution");
         
-        if (verbose || debug) {
-            StringOutput.Quick.info("Executing CFML file: " + filePath);
-        }
+        printVerbose("Executing CFML file: " + filePath);
         
         // Check if file exists and is a CFML file
         java.nio.file.Path path = java.nio.file.Paths.get(filePath);
@@ -493,9 +526,7 @@ public class LuCLI {
                     scriptWithArgs.append(builtinSetup);
                     scriptWithArgs.append("\n");
                 } catch (Exception e) {
-                    if (debug) {
-                        System.err.println("Warning: Failed to inject built-in variables: " + e.getMessage());
-                    }
+                    printDebug("Warning: Failed to inject built-in variables: " + e.getMessage());
                 }
                 
                 // Add ARGS array setup for backward compatibility
@@ -510,11 +541,7 @@ public class LuCLI {
                 scriptWithArgs.append(fileContent);
                 Timer.stop("Script Preparation");
                 
-                if (debug) {
-                    System.err.println("[DEBUG] Script with ARGS setup:");
-                    System.err.println(scriptWithArgs.toString());
-                    System.err.println("[DEBUG] End of script");
-                }
+                printDebug("Script with ARGS setup:\n" + scriptWithArgs.toString() + "\n[DEBUG] End of script");
                 
                 // Execute the wrapped script content with built-in variables
                 Timer.start("Script Execution");
@@ -532,9 +559,7 @@ public class LuCLI {
             
         } catch (Exception e) {
             StringOutput.Quick.error("Error executing CFML script '" + filePath + "': " + e.getMessage());
-            if (debug) {
-                e.printStackTrace();
-            }
+            printDebugStackTrace(e);
             return 1;
         } finally {
             // Always stop total timer and show results before exit (if timing enabled)

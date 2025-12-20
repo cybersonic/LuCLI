@@ -11,6 +11,6 @@ public class LuCLIVersionProvider implements IVersionProvider {
     
     @Override
     public String[] getVersion() throws Exception {
-        return new String[]{ LuCLI.getFullVersionInfo() };
+        return new String[]{ LuCLI.getVersionInfo(true) };
     }
 }
