@@ -16,7 +16,6 @@ import org.w3c.dom.NodeList;
 
 import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.Timer;
-import org.lucee.lucli.modules.ModuleCommand;
 import org.lucee.lucli.monitoring.MonitorCommand;
 import org.lucee.lucli.server.LogCommand;
 import org.lucee.lucli.server.LuceeServerConfig;
@@ -48,8 +47,6 @@ public class UnifiedCommandExecutor {
             switch (command.toLowerCase()) {
                 case "server":
                     return executeServerCommand(args);
-                case "modules":
-                    return executeModulesCommand(args);
                 case "monitor":
                     return executeMonitorCommand(args);
                 default:
@@ -1015,40 +1012,6 @@ public class UnifiedCommandExecutor {
         }
     }
     
-    /**
-     * Execute modules commands - Full feature parity between CLI and terminal modes
-     */
-    private String executeModulesCommand(String[] args) throws Exception {
-        if (isTerminalMode) {
-            // In terminal mode, capture output from ModuleCommand and return it
-            // This provides full feature parity with CLI mode
-            java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
-            java.io.PrintStream originalOut = System.out;
-            java.io.PrintStream originalErr = System.err;
-            
-            try {
-                // Redirect System.out/err to capture ModuleCommand output
-                System.setOut(new java.io.PrintStream(baos));
-                System.setErr(new java.io.PrintStream(baos));
-                
-                // Execute the full module command
-                ModuleCommand.executeModule(args);
-                
-                // Get captured output
-                String output = baos.toString().trim();
-                return formatOutput(output.isEmpty() ? "✅ Module command completed" : output, false);
-                
-            } finally {
-                // Always restore original streams
-                System.setOut(originalOut);
-                System.setErr(originalErr);
-            }
-        } else {
-            // In CLI mode, execute the full module command directly
-            ModuleCommand.executeModule(args);
-            return null; // ModuleCommand handles its own output and doesn't return
-        }
-    }
     
     /**
      * Execute monitor command directly
