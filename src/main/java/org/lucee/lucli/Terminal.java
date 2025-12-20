@@ -195,7 +195,7 @@ public class Terminal {
                     
                 case "version":
                 case "--version":
-                    return LuCLI.getFullVersionInfo();
+                    return LuCLI.getVersionInfo(true);
                     
                 case "lucee-version":
                 case "--lucee-version":
@@ -399,15 +399,8 @@ public class Terminal {
      */
     private static String showLuceeVersion() {
         try {
-            LuceeScriptEngine engine = LuceeScriptEngine.getInstance(true, false);
-            
-            if (engine == null) {
-                return "LuceeScriptEngine instance is null. Lucee may not be properly initialized.";
-            }
-            
-            engine.eval("version = SERVER.LUCEE.version");
-            return "Lucee Version: " + engine.getEngine().get("version");
-            
+            String luceeVersion = LuceeScriptEngine.getInstance(false, false).getVersion();
+            return "Lucee Version: " + luceeVersion;
         } catch (Exception e) {
             return WindowsSupport.Symbols.ERROR + " Error getting Lucee version: " + e.getMessage();
         }

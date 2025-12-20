@@ -64,10 +64,8 @@ public class CfmlCommand implements Callable<Integer> {
             String cfmlCode = String.join(" ", cfmlParts);
             
             // Debug output
-            if (LuCLI.debug) {
-                System.err.println("[DEBUG CfmlCommand] cfmlParts: " + java.util.Arrays.toString(cfmlParts));
-                System.err.println("[DEBUG CfmlCommand] cfmlCode: '" + cfmlCode + "'");
-            }
+            LuCLI.printDebug("CfmlCommand", "cfmlParts: " + java.util.Arrays.toString(cfmlParts));
+            LuCLI.printDebug("CfmlCommand", "cfmlCode: '" + cfmlCode + "'");
             
             // Execute the CFML code
             executeCFMLNonInteractive(cfmlCode);
@@ -91,14 +89,10 @@ public class CfmlCommand implements Callable<Integer> {
             
             // Initialize Lucee engine
             Timer.start("Lucee Engine Initialization");
-            if (LuCLI.verbose) {
-                System.out.println("Initializing Lucee CFML engine...");
-            }
+            LuCLI.printVerbose("Initializing Lucee CFML engine...");
             
             luceeEngine = LuceeScriptEngine.getInstance(LuCLI.verbose, LuCLI.debug);
-            if (LuCLI.verbose) {
-                System.out.println("Lucee engine ready.");
-            }
+            LuCLI.printVerbose("Lucee engine ready.");
             Timer.stop("Lucee Engine Initialization");
             
             // Wrap the expression to capture and return the result
@@ -106,11 +100,7 @@ public class CfmlCommand implements Callable<Integer> {
             String wrappedScript = createOutputScript(cfmlCode);
             
             // Debug output
-            if (LuCLI.debug) {
-                System.err.println("[DEBUG CfmlCommand] Wrapped script:");
-                System.err.println(wrappedScript);
-                System.err.println("[DEBUG CfmlCommand] End wrapped script");
-            }
+            LuCLI.printDebug("CfmlCommand", "Wrapped script:\n" + wrappedScript + "\n[DEBUG CfmlCommand] End wrapped script");
             
             Timer.stop("Script Generation");
             
@@ -121,18 +111,14 @@ public class CfmlCommand implements Callable<Integer> {
             
             // The output should already be printed by writeOutput in the script
             // but we can also handle direct results if needed
-            if (result != null && !result.toString().trim().isEmpty() && LuCLI.debug) {
-                System.out.println(result.toString());
-            }
+            LuCLI.printDebug("CfmlCommand", "Result: " + (result != null ? result.toString() : "null"));
 
         } catch (Exception e) {
             System.err.println("Error executing CFML: " + e.getMessage());
             if (e.getCause() != null && (LuCLI.verbose || LuCLI.debug)) {
                 System.err.println("Cause: " + e.getCause().getMessage());
             }
-            if (LuCLI.debug) {
-                e.printStackTrace();
-            }
+            LuCLI.printDebugStackTrace(e);
         } finally {
             Timer.stop("CFML Execution");
         }
@@ -160,9 +146,7 @@ public class CfmlCommand implements Callable<Integer> {
                 // Post-process through StringOutput for emoji and placeholder handling
                 return org.lucee.lucli.StringOutput.getInstance().process(result);
             } catch (Exception e) {
-                if (LuCLI.debug) {
-                    System.err.println("Warning: Failed to inject built-in variables in CfmlCommand createOutputScript: " + e.getMessage());
-                }
+                LuCLI.printDebug("CfmlCommand", "Warning: Failed to inject built-in variables: " + e.getMessage());
                 // Fallback: just replace the expression without built-in variables
                 String result = scriptTemplate.replace("${cfmlExpression}", cfmlExpression);
                 return org.lucee.lucli.StringOutput.getInstance().process(result);
@@ -170,9 +154,7 @@ public class CfmlCommand implements Callable<Integer> {
             
         } catch (Exception e) {
             // Fallback to inline generation if reading external script fails
-            if (LuCLI.debug) {
-                System.err.println("Warning: Failed to read external script template, using fallback: " + e.getMessage());
-            }
+            LuCLI.printDebug("CfmlCommand", "Warning: Failed to read external script template, using fallback: " + e.getMessage());
             
             StringBuilder script = new StringBuilder();
             script.append("try {\\n");

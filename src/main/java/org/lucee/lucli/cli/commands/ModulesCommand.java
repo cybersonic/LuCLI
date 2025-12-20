@@ -6,7 +6,7 @@ import java.util.concurrent.Callable;
 import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.Timer;
 import org.lucee.lucli.cli.LuCLICommand;
-import org.lucee.lucli.commands.UnifiedCommandExecutor;
+import org.lucee.lucli.commands.UnifiedCommandExecutor; // Still used by other subcommands
 
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -22,7 +22,7 @@ import org.lucee.lucli.cli.completion.DynamicArgumentCompletion;
         aliases = {"module"},
         description = "Manage LuCLI modules",
         subcommands = {
-            ModulesCommand.ListCommand.class,
+            ModulesListCommandImpl.class,
             ModulesCommand.InitCommand.class,
             ModulesCommand.RunCommand.class,
             ModulesCommand.InstallCommand.class,
@@ -43,32 +43,7 @@ public class ModulesCommand implements Callable<Integer> {
         return 0;
     }
 
-    /**
-     * Modules list subcommand
-     */
-    @Command(
-        name = "list", 
-        description = "List available modules"
-    )
-    static class ListCommand implements Callable<Integer> {
-
-        @ParentCommand 
-        private ModulesCommand parent;
-
-        @Override
-        public Integer call() throws Exception {
-            // Create UnifiedCommandExecutor for CLI mode
-            UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, Paths.get(System.getProperty("user.dir")));
-
-            // Execute the modules list command
-            String result = executor.executeCommand("modules", new String[]{"list"});
-            if (result != null && !result.isEmpty()) {
-                System.out.println(result);
-            }
-
-            return 0;
-        }
-    }
+    // Modules list subcommand now in ModulesListCommandImpl
 
     /**
      * Modules init subcommand
