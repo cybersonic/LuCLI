@@ -22,3 +22,12 @@ docs/
 oldsite/
 target_test-classes/
 WEB-INF/
+
+# AppCDS artifacts (can be regenerated)
+*.classlist
+*.jsa
+
+# Test scripts (keep in repo: profile-startup.sh, test-appcds.sh)
+test_*.sh
+examples/
+test-deps/
