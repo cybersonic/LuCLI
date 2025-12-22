@@ -279,6 +279,175 @@ public class LuceeServerManager {
     }
     
     /**
+     * Run a Lucee server in foreground mode (similar to catalina.sh run).
+     * This starts Tomcat in-process with console output streaming.
+     * When the process is stopped (Ctrl+C), the server stops.
+     * 
+     * @param projectDir The project directory
+     * @param versionOverride Optional version override (can be null)
+     * @param forceReplace Whether to force replace an existing server
+     * @param customName Optional custom name (can be null)
+     * @param agentOverrides Optional agent overrides (can be null)
+     * @param environment Optional environment name to apply (can be null)
+     */
+    public void runServerForeground(Path projectDir, String versionOverride, boolean forceReplace, String customName,
+                                    AgentOverrides agentOverrides, String environment) throws Exception {
+        // Load configuration
+        LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(projectDir);
+        
+        // Apply environment overrides if specified
+        if (environment != null && !environment.trim().isEmpty()) {
+            config = LuceeServerConfig.applyEnvironment(config, environment);
+        }
+        
+        // Override version if specified
+        if (versionOverride != null && !versionOverride.trim().isEmpty()) {
+            config.version = versionOverride;
+        }
+        
+        // Use custom name if provided
+        if (customName != null && !customName.trim().isEmpty()) {
+            config.name = customName.trim();
+        }
+        
+        // Disable browser opening for foreground mode
+        config.openBrowser = false;
+        
+        // Check if server with this name already exists
+        Path existingServerDir = serversDir.resolve(config.name);
+        if (Files.exists(existingServerDir)) {
+            // Check if the existing server is running
+            boolean isRunning = isServerRunning(config.name);
+            
+            if (isRunning) {
+                throw new IllegalStateException("Server '" + config.name + "' is already running. Please stop it first or use a different name.");
+            }
+            
+            // Check if the existing server was created for this project directory
+            ServerInfo existingServerInfo = getExistingServerForProject(projectDir, config.name);
+            
+            if (existingServerInfo != null) {
+                // This server exists and matches the current project directory, just restart it
+                System.out.println("Restarting existing server '" + config.name + "' for this project...");
+                // Don't throw an exception - continue with server startup
+            } else if (!forceReplace) {
+                // Server exists but doesn't match this project directory
+                String suggestedName = LuceeServerConfig.getUniqueServerName(config.name, serversDir);
+                throw new ServerConflictException(config.name, suggestedName, false);
+            } else {
+                // Force replace: delete existing server directory
+                deleteServerDirectory(existingServerDir);
+            }
+        }
+        
+        // Check if there's a running server for this project directory
+        ServerInstance existingInstance = getRunningServer(projectDir);
+        if (existingInstance != null) {
+            throw new IllegalStateException("Server already running for project: " + existingInstance.getServerName() + 
+                                          " (PID: " + existingInstance.getPid() + ", Port: " + existingInstance.getPort() + ")");
+        }
+        
+        // Ensure Lucee Express is available
+        Path luceeExpressDir = ensureLuceeExpress(config.version);
+        
+        // Resolve port conflicts right before starting server to avoid race conditions
+        LuceeServerConfig.PortConflictResult portResult = LuceeServerConfig.resolvePortConflicts(config, false, this);
+        
+        if (portResult.hasConflicts) {
+            // Check for specific server conflicts and provide helpful messages
+            String httpPortServer = getServerUsingPort(config.port);
+            String shutdownPortServer = getServerUsingPort(LuceeServerConfig.getShutdownPort(config.port));
+            String jmxPortServer = null;
+            if (config.monitoring != null && config.monitoring.jmx != null) {
+                jmxPortServer = getServerUsingPort(config.monitoring.jmx.port);
+            }
+            
+            StringBuilder errorMessage = new StringBuilder("Cannot start server - port conflicts detected:\n\n");
+            
+            if (!LuceeServerConfig.isPortAvailable(config.port)) {
+                if (httpPortServer != null) {
+                    errorMessage.append("• HTTP port ").append(config.port)
+                            .append(" is being used by Lucee server '").append(httpPortServer).append("'\n")
+                            .append("  Use: lucli server stop ").append(httpPortServer).append(" (to stop the server)\n")
+                            .append("  Or change the port in your lucee.json file\n\n");
+                } else {
+                    errorMessage.append("• HTTP port ").append(config.port)
+                            .append(" is already in use by another process\n")
+                            .append("  Use: lsof -i :").append(config.port).append(" (to see what's using the port)\n")
+                            .append("  Or change the port in your lucee.json file\n\n");
+                }
+            }
+            
+            int shutdownPort = LuceeServerConfig.getShutdownPort(config.port);
+            if (!LuceeServerConfig.isPortAvailable(shutdownPort)) {
+                if (shutdownPortServer != null) {
+                    errorMessage.append("• Shutdown port ").append(shutdownPort)
+                            .append(" is being used by Lucee server '").append(shutdownPortServer).append("'\n")
+                            .append("  Use: lucli server stop ").append(shutdownPortServer).append(" (to stop the server)\n")
+                            .append("  Or change the HTTP port in your lucee.json file (shutdown port is automatically calculated)\n\n");
+                } else {
+                    errorMessage.append("• Shutdown port ").append(shutdownPort)
+                            .append(" is already in use by another process\n")
+                            .append("  Use: lsof -i :").append(shutdownPort).append(" (to see what's using the port)\n")
+                            .append("  Or change the HTTP port in your lucee.json file (shutdown port is automatically calculated)\n\n");
+                }
+            }
+            
+            if (config.monitoring != null && config.monitoring.enabled && config.monitoring.jmx != null && 
+                !LuceeServerConfig.isPortAvailable(config.monitoring.jmx.port)) {
+                if (jmxPortServer != null) {
+                    errorMessage.append("• JMX port ").append(config.monitoring.jmx.port)
+                            .append(" is being used by Lucee server '").append(jmxPortServer).append("'\n")
+                            .append("  Use: lucli server stop ").append(jmxPortServer).append(" (to stop the server)\n")
+                            .append("  Or change the JMX port in your lucee.json file\n\n");
+                } else {
+                    errorMessage.append("• JMX port ").append(config.monitoring.jmx.port)
+                            .append(" is already in use by another process\n")
+                            .append("  Use: lsof -i :").append(config.monitoring.jmx.port).append(" (to see what's using the port)\n")
+                            .append("  Or change the JMX port in your lucee.json file\n\n");
+                }
+            }
+            
+            throw new IllegalStateException(errorMessage.toString().trim());
+        }
+        
+        // Build port information message
+        StringBuilder portInfo = new StringBuilder();
+        portInfo.append("Running server '\"").append(config.name).append("\' in foreground mode:");
+        portInfo.append("\n  HTTP port:     ").append(config.port);
+        portInfo.append("\n  Shutdown port: ").append(LuceeServerConfig.getEffectiveShutdownPort(config));
+        if (config.monitoring != null && config.monitoring.enabled && config.monitoring.jmx != null) {
+            portInfo.append("\n  JMX port:      ").append(config.monitoring.jmx.port);
+        }
+        if (LuceeServerConfig.isHttpsEnabled(config)) {
+            portInfo.append("\n  HTTPS port:    ").append(LuceeServerConfig.getEffectiveHttpsPort(config));
+            portInfo.append("\n  HTTPS redirect:").append(LuceeServerConfig.isHttpsRedirectEnabled(config) ? " enabled" : " disabled");
+        }
+        portInfo.append("\n\nPress Ctrl+C to stop the server\n");
+        
+        System.out.println(portInfo.toString());
+        
+        // Create server instance directory
+        Path serverInstanceDir = serversDir.resolve(config.name);
+        Files.createDirectories(serverInstanceDir);
+        
+        // Generate Tomcat configuration
+        TomcatConfigGenerator configGenerator = new TomcatConfigGenerator();
+        // When forceReplace is true (e.g. --force), also allow overwriting project-level
+        // WEB-INF config files (web.xml, urlrewrite.xml, UrlRewriteFilter JAR). Without
+        // --force, we preserve any existing project configuration files.
+        boolean overwriteProjectConfig = forceReplace;
+        configGenerator.generateConfiguration(serverInstanceDir, config, projectDir, luceeExpressDir, overwriteProjectConfig);
+
+        // Write CFConfig (.CFConfig.json) into the Lucee context if configured in lucee.json.
+        // This treats lucee.json as the source of truth and .CFConfig.json as a derived file.
+        LuceeServerConfig.writeCfConfigIfPresent(config, projectDir, serverInstanceDir);
+        
+        // Launch server process in foreground mode
+        launchServerProcessForeground(serverInstanceDir, config, projectDir, luceeExpressDir, agentOverrides, environment);
+    }
+    
+    /**
      * Stop a server for the given project directory
      */
     public boolean stopServer(Path projectDir) throws IOException {
@@ -1011,6 +1180,109 @@ public class LuceeServerManager {
         }
         
         return new ServerInstance(config.name, process.pid(), config.port, serverInstanceDir, projectDir);
+    }
+    
+    /**
+     * Launch the server process in foreground mode using catalina.sh run.
+     * This starts Tomcat attached to the current process, streaming output directly to the console.
+     * The process will block until the server shuts down (via Ctrl+C or other signal).
+     */
+    private void launchServerProcessForeground(Path serverInstanceDir, LuceeServerConfig.ServerConfig config, 
+                                              Path projectDir, Path luceeExpressDir,
+                                              AgentOverrides agentOverrides, String environment) throws Exception {
+        
+        // Choose the appropriate catalina script based on OS
+        boolean isWindows = System.getProperty("os.name", "").toLowerCase().contains("win");
+        String scriptName = isWindows ? "catalina.bat" : "catalina.sh";
+        
+        // Use the Lucee Express bin/catalina script
+        Path catalinaScript = luceeExpressDir.resolve("bin").resolve(scriptName);
+        if (!Files.exists(catalinaScript) || (!isWindows && !Files.isExecutable(catalinaScript))) {
+            throw new Exception("Lucee Express catalina script not found or not executable: " + catalinaScript);
+        }
+        
+        // Build command to run catalina in foreground mode
+        List<String> command = new ArrayList<>();
+        command.add(catalinaScript.toString());
+        command.add("run"); // Use 'run' instead of 'start' to run in foreground
+        
+        // Create process
+        ProcessBuilder pb = new ProcessBuilder(command);
+        pb.directory(luceeExpressDir.toFile());
+        
+        // Inherit I/O streams so output goes directly to console
+        pb.inheritIO();
+        
+        // Set environment variables for Tomcat configuration
+        Map<String, String> env = pb.environment();
+        env.put("CATALINA_BASE", serverInstanceDir.toString());
+        env.put("CATALINA_HOME", serverInstanceDir.toString());
+        
+        // Set JVM options through CATALINA_OPTS
+        List<String> catalinaOpts = buildCatalinaOpts(config, agentOverrides);
+        env.put("CATALINA_OPTS", String.join(" ", catalinaOpts));
+        
+        // Set other Tomcat environment variables
+        env.put("CATALINA_PID", serverInstanceDir.resolve("server.pid").toString());
+        env.put("CATALINA_OUT", serverInstanceDir.resolve("logs/catalina.out").toString());
+
+        if(config.admin.password != null && config.admin.password.length() > 0){
+            env.put("LUCEE_ADMIN_PASSWORD", config.admin.password);
+        }
+        
+        // Write project path marker file to track which project this server belongs to
+        Files.writeString(serverInstanceDir.resolve(".project-path"), projectDir.toAbsolutePath().toString());
+        
+        // Write environment marker file if environment was specified
+        if (environment != null && !environment.trim().isEmpty()) {
+            Files.writeString(serverInstanceDir.resolve(".environment"), environment.trim());
+        }
+        
+        // Add shutdown hook to cleanup PID file on exit
+        Path pidFile = serverInstanceDir.resolve("server.pid");
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try {
+                Files.deleteIfExists(pidFile);
+            } catch (IOException e) {
+                // Ignore cleanup errors
+            }
+        }));
+        
+        // Start the process and wait for it to complete
+        // This blocks the current thread until the server shuts down
+        Process process = pb.start();
+        
+        // Write PID file after process starts
+        String pidContent = process.pid() + ":" + config.port;
+        Files.writeString(pidFile, pidContent);
+        
+        try {
+            // Wait for the process to exit (blocks until Ctrl+C or server stops)
+            int exitCode = process.waitFor();
+            
+            if (exitCode != 0) {
+                System.err.println("\nServer exited with code: " + exitCode);
+            } else {
+                System.out.println("\nServer stopped successfully.");
+            }
+        } catch (InterruptedException e) {
+            // Handle interruption (Ctrl+C)
+            System.out.println("\nShutting down server...");
+            process.destroy();
+            
+            // Wait a bit for graceful shutdown
+            try {
+                if (!process.waitFor(10, TimeUnit.SECONDS)) {
+                    // Force kill if not shut down within 10 seconds
+                    process.destroyForcibly();
+                }
+            } catch (InterruptedException ex) {
+                process.destroyForcibly();
+            }
+        } finally {
+            // Cleanup PID file
+            Files.deleteIfExists(pidFile);
+        }
     }
     
     /**
