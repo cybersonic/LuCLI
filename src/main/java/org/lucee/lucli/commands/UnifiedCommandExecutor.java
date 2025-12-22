@@ -66,7 +66,7 @@ public class UnifiedCommandExecutor {
      */
     private String executeServerCommand(String[] args) throws Exception {
         if (args.length == 0) {
-        return formatOutput("❌ server: missing subcommand\n💡 Usage: server [start|stop|restart|status|list|prune|monitor|log|debug] [options]", true);
+        return formatOutput("❌ server: missing subcommand\n💡 Usage: server [start|run|stop|restart|status|list|prune|monitor|log|debug] [options]", true);
         }
         
         String subCommand = args[0];
@@ -78,6 +78,8 @@ public class UnifiedCommandExecutor {
             switch (subCommand) {
                 case "start":
                     return handleServerStart(serverManager, args);
+                case "run":
+                    return handleServerRun(serverManager, args);
                 case "stop":  
                     return handleServerStop(serverManager, args);
                 case "restart":
@@ -98,7 +100,7 @@ public class UnifiedCommandExecutor {
                     return handleServerDebug(Arrays.copyOfRange(args, 1, args.length));
                 default:
                     return formatOutput("❌ Unknown server command: " + subCommand + 
-                        "\n💡 Available commands: start, stop, restart, status, list, prune, config, monitor, log, debug", true);
+                        "\n💡 Available commands: start, run, stop, restart, status, list, prune, config, monitor, log, debug", true);
             }
         } finally {
             Timer.stop("Server " + subCommand + " Command");
@@ -389,6 +391,124 @@ public class UnifiedCommandExecutor {
                 result.append("     lucli server start --name ").append(e.getSuggestedName()).append("\n\n");
                 result.append("  3. Create server with custom name:\n");
                 result.append("     lucli server start --name <your-name>\n\n");
+            }
+            
+            result.append("💡 Use --force to replace existing servers, or --name to specify a different name.");
+            
+            return formatOutput(result.toString(), true);
+        }
+    }
+    
+    /**
+     * Handle server run command - starts server in foreground mode with log streaming
+     */
+    private String handleServerRun(LuceeServerManager serverManager, String[] args) throws Exception {
+        String versionOverride = null;
+        boolean forceReplace = false;
+        String customName = null;
+        String environment = null;
+        Path projectDir = currentWorkingDirectory; // Default to current directory
+        
+        LuceeServerManager.AgentOverrides agentOverrides = new LuceeServerManager.AgentOverrides();
+        java.util.List<String> configOverrides = new java.util.ArrayList<>();
+        
+        // Parse additional arguments (skip "run")
+        for (int i = 1; i < args.length; i++) {
+            if ((args[i].equals("--version") || args[i].equals("-v")) && i + 1 < args.length) {
+                versionOverride = args[i + 1];
+                i++; // Skip next argument
+            } else if (args[i].equals("--force") || args[i].equals("-f")) {
+                forceReplace = true;
+            } else if ((args[i].equals("--name") || args[i].equals("-n")) && i + 1 < args.length) {
+                customName = args[i + 1];
+                i++; // Skip next argument
+            } else if ((args[i].equals("--env") || args[i].equals("--environment")) && i + 1 < args.length) {
+                environment = args[i + 1];
+                i++; // Skip next argument
+            } else if (args[i].startsWith("--env=")) {
+                environment = args[i].substring("--env=".length());
+            } else if (args[i].startsWith("--environment=")) {
+                environment = args[i].substring("--environment=".length());
+            } else if (args[i].equals("--no-agents")) {
+                agentOverrides.disableAllAgents = true;
+            } else if ((args[i].equals("--agents")) && i + 1 < args.length) {
+                String value = args[i + 1];
+                java.util.Set<String> ids = new java.util.HashSet<>();
+                for (String part : value.split(",")) {
+                    String trimmed = part.trim();
+                    if (!trimmed.isEmpty()) {
+                        ids.add(trimmed);
+                    }
+                }
+                agentOverrides.includeAgents = ids;
+                i++; // Skip next argument
+            } else if (args[i].equals("--enable-agent") && i + 1 < args.length) {
+                if (agentOverrides.enableAgents == null) {
+                    agentOverrides.enableAgents = new java.util.HashSet<>();
+                }
+                agentOverrides.enableAgents.add(args[i + 1]);
+                i++; // Skip next argument
+            } else if (args[i].equals("--disable-agent") && i + 1 < args.length) {
+                if (agentOverrides.disableAgents == null) {
+                    agentOverrides.disableAgents = new java.util.HashSet<>();
+                }
+                agentOverrides.disableAgents.add(args[i + 1]);
+                i++; // Skip next argument
+            } else if (!args[i].startsWith("-") && i == 1 && !args[i].contains("=")) {
+                // If the first non-option argument after "run" is provided and does not
+                // look like a key=value override, treat it as the project directory.
+                projectDir = Paths.get(args[i]);
+            } else if (!args[i].startsWith("-") && args[i].contains("=")) {
+                // Treat bare key=value arguments as configuration overrides that should
+                // be applied to lucee.json before starting the server.
+                configOverrides.add(args[i]);
+            }
+        }
+        
+        // Apply any configuration overrides to lucee.json before starting the server.
+        if (!configOverrides.isEmpty()) {
+            LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(projectDir);
+            ServerConfigHelper configHelper = new ServerConfigHelper();
+            for (String kv : configOverrides) {
+                String[] parts = kv.split("=", 2);
+                if (parts.length == 2) {
+                    configHelper.setConfigValue(config, parts[0], parts[1]);
+                }
+            }
+            LuceeServerConfig.saveConfig(config, projectDir.resolve("lucee.json"));
+        }
+        
+        // If no agent-related flags were actually set, avoid passing a non-null overrides object
+        if (!agentOverrides.disableAllAgents &&
+            (agentOverrides.includeAgents == null || agentOverrides.includeAgents.isEmpty()) &&
+            (agentOverrides.enableAgents == null || agentOverrides.enableAgents.isEmpty()) &&
+            (agentOverrides.disableAgents == null || agentOverrides.disableAgents.isEmpty())) {
+            agentOverrides = null;
+        }
+        
+        try {
+            // Run server in foreground mode - this method blocks until server is stopped
+            serverManager.runServerForeground(projectDir, versionOverride, forceReplace, customName, agentOverrides, environment);
+            return ""; // Return empty string since output is streamed to console
+            
+        } catch (ServerConflictException e) {
+            StringBuilder result = new StringBuilder();
+            result.append("⚠️  ").append(e.getMessage()).append("\n\n");
+            result.append("Choose an option:\n");
+            result.append("  1. Replace the existing server (delete and recreate):\n");
+            
+            if (isTerminalMode) {
+                result.append("     server run --force\n\n");
+                result.append("  2. Create server with suggested name '").append(e.getSuggestedName()).append("':\n");
+                result.append("     server run --name ").append(e.getSuggestedName()).append("\n\n");
+                result.append("  3. Create server with custom name:\n");
+                result.append("     server run --name <your-name>\n\n");
+            } else {
+                result.append("     lucli server run --force\n\n");
+                result.append("  2. Create server with suggested name '").append(e.getSuggestedName()).append("':\n");
+                result.append("     lucli server run --name ").append(e.getSuggestedName()).append("\n\n");
+                result.append("  3. Create server with custom name:\n");
+                result.append("     lucli server run --name <your-name>\n\n");
             }
             
             result.append("💡 Use --force to replace existing servers, or --name to specify a different name.");
