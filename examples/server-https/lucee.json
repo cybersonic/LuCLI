@@ -1,0 +1,9 @@
+{
+  "name": "server-https-example",
+  "port": 8893,
+  "https": {
+    "enabled": true,
+    "port": 8843
+   
+  }
+}
