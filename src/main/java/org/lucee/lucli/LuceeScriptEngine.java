@@ -100,13 +100,23 @@ public class LuceeScriptEngine {
      * @throws Exception 
      */
     private ScriptEngine initializeEngine() throws Exception {
+        Timer.start("Configure Lucee Directories");
         configureLuceeDirectories();
+        Timer.stop("Configure Lucee Directories");
+        
+        Timer.start("Create ScriptEngineManager");
         ScriptEngineManager manager = new ScriptEngineManager();
+        Timer.stop("Create ScriptEngineManager");
+        
+        Timer.start("Get CFML Engine by Name");
         ScriptEngine engine = manager.getEngineByName(ENGINE_NAME);
+        Timer.stop("Get CFML Engine by Name");
+        
         if (engine == null) {
             throw new IllegalStateException("CFML ScriptEngine not found. Make sure Lucee is properly configured.");
         }
 
+        Timer.start("Setup Engine Variables");
         // Get the path to modules. 
         Path modulepath = ModuleCommand.getModulesDirectory();
 
@@ -114,9 +124,13 @@ public class LuceeScriptEngine {
         engine.put("lucli_home_path", getLucliHomeDirectory().toString());
         engine.put("__verboseMode", verbose);
         engine.put("__debugMode", debug);
+        Timer.stop("Setup Engine Variables");
         
+        Timer.start("Execute Initialization Script");
         String script = readScriptTemplate("/script_engine/initializeEngine.cfs");
         engine.eval(script);
+        Timer.stop("Execute Initialization Script");
+        
         return engine;
     }
     
@@ -1410,6 +1424,24 @@ public class LuceeScriptEngine {
         // Ensure Lucee doesn't try to create default directories in system paths
         System.setProperty("lucee.controller.disabled", "true");
         System.setProperty("lucee.use.lucee.configs", "false");
+        
+        // Minimize Log4j overhead for faster startup
+        System.setProperty("log4j2.level", "ERROR"); // Only show errors
+        System.setProperty("log4j2.formatMsgNoLookups", "true"); // Disable message lookups
+        System.setProperty("log4j.skipJansi", "true"); // Skip JANSI (console coloring) loading
+        System.setProperty("log4j2.disableJmx", "true"); // Disable JMX (reduces class loading)
+        System.setProperty("log4j2.is.webapp", "false"); // Not a web app
+        System.setProperty("log4j2.enable.threadlocals", "false"); // Disable thread locals for simpler operation
+        
+        // Optimize Felix OSGi framework (from Lucee source analysis)
+        System.setProperty("felix.log.level", "1"); // Error only (1=error, 2=warning, 3=info, 4=debug)
+        System.setProperty("felix.cache.locking", "false"); // Disable bundle cache locking (faster startup)
+        System.setProperty("lucee.cli.call", "true"); // Indicate this is CLI usage (already set by Lucee but ensure it's early)
+        System.setProperty("felix.startlevel.framework", "1"); // Minimal start level
+        
+        // Disable Lucee features not needed for CLI
+        System.setProperty("lucee.enable.warmup", "false"); // Skip warmup routines
+        System.setProperty("lucee.check.for.changes", "false"); // Don't check for file changes
     }
 
     public static String testFunction() {

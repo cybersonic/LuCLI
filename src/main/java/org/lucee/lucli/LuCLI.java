@@ -85,6 +85,10 @@ public class LuCLI {
     }
 
     public static void main(String[] args) throws Exception {
+        // Check for timing flag early and enable Timer singleton
+        timing = java.util.Arrays.asList(args).contains("--timing") || java.util.Arrays.asList(args).contains("-t");
+        Timer.setEnabled(timing);
+        
         // Create Picocli CommandLine with our main command
         CommandLine cmd = new CommandLine(new LuCLICommand());
         
@@ -92,6 +96,9 @@ public class LuCLI {
         // (This also keeps `--help | grep ...` style usage working.)
         cmd.setOut(new PrintWriter(System.out, true));
         cmd.setErr(new PrintWriter(System.err, true));
+        
+        // Set custom execution strategy to automatically time all commands
+        cmd.setExecutionStrategy(new TimingExecutionStrategy());
 
         // Configure CommandLine behavior
         cmd.setExecutionExceptionHandler(new CommandLine.IExecutionExceptionHandler() {
