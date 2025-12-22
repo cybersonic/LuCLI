@@ -1,0 +1,23 @@
+# LuCLI generated files
+lucee-lock.json
+.environment
+
+# Installed dependencies
+packages/
+framework/
+node_modules/
+
+# Server deployment artifacts
+WEB-INF/
+
+# Lucee/CFML
+lucee-server/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.iml
