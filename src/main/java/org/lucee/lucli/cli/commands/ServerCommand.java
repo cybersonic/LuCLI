@@ -24,6 +24,7 @@ import picocli.CommandLine.Model.CommandSpec;
         mixinStandardHelpOptions = true,
         subcommands = {
         ServerCommand.StartCommand.class,
+        ServerCommand.RunCommand.class,
         ServerCommand.StopCommand.class,
         ServerCommand.RestartCommand.class,
         ServerCommand.StatusCommand.class,
@@ -82,18 +83,71 @@ public class ServerCommand implements Callable<Integer> {
                 description = "Force replace existing server with same name")
         private boolean force = false;
 
+        @Option(names = {"--env", "--environment"}, 
+                description = "Environment to use (e.g., prod, dev, staging)")
+        private String environment;
 
-        // @picocli.CommandLine.Unmatched
-        // private java.util.List<String> serverArgs = new java.util.ArrayList<>();
+        @Option(names = {"--dry-run"}, 
+                description = "Show configuration without starting the server")
+        private boolean dryRun = false;
+
+        @Option(names = {"--include-lucee"}, 
+                description = "Include Lucee CFConfig in dry-run output")
+        private boolean includeLucee = false;
+
+        @Option(names = {"--include-tomcat-web"}, 
+                description = "Include Tomcat web.xml in dry-run output")
+        private boolean includeTomcatWeb = false;
+
+        @Option(names = {"--include-tomcat-server"}, 
+                description = "Include Tomcat server.xml in dry-run output")
+        private boolean includeTomcatServer = false;
+
+        @Option(names = {"--include-https-keystore-plan"}, 
+                description = "Include HTTPS keystore plan in dry-run output")
+        private boolean includeHttpsKeystorePlan = false;
+
+        @Option(names = {"--include-https-redirect-rules"}, 
+                description = "Include HTTPS redirect rules in dry-run output")
+        private boolean includeHttpsRedirectRules = false;
+
+        @Option(names = {"--include-all"}, 
+                description = "Include all available dry-run previews")
+        private boolean includeAll = false;
+
+        @Option(names = {"--no-agents"}, 
+                description = "Disable all Java agents")
+        private boolean noAgents = false;
+
+        @Option(names = {"--agents"}, 
+                description = "Comma-separated list of agent IDs to include")
+        private String agents;
+
+        @Option(names = {"--enable-agent"}, 
+                description = "Enable a specific agent by ID (repeatable)")
+        private java.util.List<String> enableAgents;
+
+        @Option(names = {"--disable-agent"}, 
+                description = "Disable a specific agent by ID (repeatable)")
+        private java.util.List<String> disableAgents;
+
+        @Option(names = {"--open-browser"}, 
+                description = "Open browser after server starts (default: true)",
+                arity = "0..1",
+                fallbackValue = "true")
+        private String openBrowser;
+
+        @Option(names = {"--disable-open-browser"}, 
+                description = "Disable automatic browser opening")
+        private boolean disableOpenBrowser = false;
 
         @Parameters(paramLabel = "[PROJECT_DIR]", 
                     description = "Project directory (defaults to current directory)",
                     arity = "0..1")
-
         private String projectDir;
 
         @picocli.CommandLine.Unmatched
-        private java.util.List<String> serverArgs = new java.util.ArrayList<>();
+        private java.util.List<String> configOverrides = new java.util.ArrayList<>();
 
 
         @Override
@@ -151,12 +205,195 @@ public class ServerCommand implements Callable<Integer> {
             if (force) {
                 args.add("--force");
             }
+            if (environment != null) {
+                args.add("--env");
+                args.add(environment);
+            }
+            if (dryRun) {
+                args.add("--dry-run");
+            }
+            if (includeLucee) {
+                args.add("--include-lucee");
+            }
+            if (includeTomcatWeb) {
+                args.add("--include-tomcat-web");
+            }
+            if (includeTomcatServer) {
+                args.add("--include-tomcat-server");
+            }
+            if (includeHttpsKeystorePlan) {
+                args.add("--include-https-keystore-plan");
+            }
+            if (includeHttpsRedirectRules) {
+                args.add("--include-https-redirect-rules");
+            }
+            if (includeAll) {
+                args.add("--include-all");
+            }
+            if (noAgents) {
+                args.add("--no-agents");
+            }
+            if (agents != null) {
+                args.add("--agents");
+                args.add(agents);
+            }
+            if (enableAgents != null) {
+                for (String agent : enableAgents) {
+                    args.add("--enable-agent");
+                    args.add(agent);
+                }
+            }
+            if (disableAgents != null) {
+                for (String agent : disableAgents) {
+                    args.add("--disable-agent");
+                    args.add(agent);
+                }
+            }
+            
+            // Handle browser opening
+            if (disableOpenBrowser) {
+                args.add("openBrowser=false");
+            } else if (openBrowser != null) {
+                args.add("openBrowser=" + openBrowser);
+            }
 
-            if (serverArgs != null && !serverArgs.isEmpty()) {
-                args.addAll(serverArgs);
+            // Add any config overrides (key=value pairs)
+            if (configOverrides != null && !configOverrides.isEmpty()) {
+                args.addAll(configOverrides);
             }
 
             // Execute the server start command
+            String result = executor.executeCommand("server", args.toArray(new String[0]));
+            if (result != null && !result.isEmpty()) {
+                System.out.println(result);
+            }
+
+            return 0;
+        }
+    }
+
+    /**
+     * Server run subcommand - starts server in foreground with log streaming
+     */
+    @Command(
+        name = "run", 
+        description = "Run a Lucee server in foreground (Ctrl+C to stop)"
+    )
+    static class RunCommand implements Callable<Integer> {
+
+        @ParentCommand 
+        private ServerCommand parent;
+
+        @Spec
+        private CommandSpec spec;
+
+        @Option(
+                names = {"-v", "--version"},
+                description = "Lucee version to use (e.g., 6.2.2.91)",
+                completionCandidates = LuceeVersionCandidates.class
+        )
+        private String version;
+
+        @Option(names = {"-n", "--name"}, 
+                description = "Custom name for the server instance")
+        private String name;
+
+        @Option(names = {"-p", "--port"}, 
+                description = "Port number for the server (e.g., 8080)")
+        private Integer port;
+
+        @Option(names = {"-f", "--force"}, 
+                description = "Force replace existing server with same name")
+        private boolean force = false;
+
+        @Option(names = {"--env", "--environment"}, 
+                description = "Environment to use (e.g., prod, dev, staging)")
+        private String environment;
+
+        @Option(names = {"--no-agents"}, 
+                description = "Disable all Java agents")
+        private boolean noAgents = false;
+
+        @Option(names = {"--agents"}, 
+                description = "Comma-separated list of agent IDs to include")
+        private String agents;
+
+        @Option(names = {"--enable-agent"}, 
+                description = "Enable a specific agent by ID (repeatable)")
+        private java.util.List<String> enableAgents;
+
+        @Option(names = {"--disable-agent"}, 
+                description = "Disable a specific agent by ID (repeatable)")
+        private java.util.List<String> disableAgents;
+
+        @Parameters(paramLabel = "[PROJECT_DIR]", 
+                    description = "Project directory (defaults to current directory)",
+                    arity = "0..1")
+        private String projectDir;
+
+        @picocli.CommandLine.Unmatched
+        private java.util.List<String> configOverrides = new java.util.ArrayList<>();
+
+
+        @Override
+        public Integer call() throws Exception {
+            // Get current working directory
+            Path currentDir = projectDir != null ?
+                Paths.get(projectDir) :
+                Paths.get(System.getProperty("user.dir"));
+
+            // Create UnifiedCommandExecutor for CLI mode
+            UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, currentDir);
+
+            // Build arguments array for the unified executor
+            java.util.List<String> args = new java.util.ArrayList<>();
+            args.add("run");
+
+            if (version != null) {
+                args.add("--version");
+                args.add(version);
+            }
+            if (name != null) {
+                args.add("--name");
+                args.add(name);
+            }
+            if (port != null) {
+                args.add("--port");
+                args.add(port.toString());
+            }
+            if (force) {
+                args.add("--force");
+            }
+            if (environment != null) {
+                args.add("--env");
+                args.add(environment);
+            }
+            if (noAgents) {
+                args.add("--no-agents");
+            }
+            if (agents != null) {
+                args.add("--agents");
+                args.add(agents);
+            }
+            if (enableAgents != null) {
+                for (String agent : enableAgents) {
+                    args.add("--enable-agent");
+                    args.add(agent);
+                }
+            }
+            if (disableAgents != null) {
+                for (String agent : disableAgents) {
+                    args.add("--disable-agent");
+                    args.add(agent);
+                }
+            }
+
+            // Add any config overrides (key=value pairs)
+            if (configOverrides != null && !configOverrides.isEmpty()) {
+                args.addAll(configOverrides);
+            }
+
+            // Execute the server run command
             String result = executor.executeCommand("server", args.toArray(new String[0]));
             if (result != null && !result.isEmpty()) {
                 System.out.println(result);
