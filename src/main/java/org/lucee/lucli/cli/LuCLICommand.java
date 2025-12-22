@@ -12,6 +12,8 @@ import org.lucee.lucli.cli.commands.ModulesCommand;
 import org.lucee.lucli.cli.commands.ParrotCommand;
 import org.lucee.lucli.cli.commands.ServerCommand;
 import org.lucee.lucli.cli.commands.VersionsListCommand;
+import org.lucee.lucli.cli.commands.deps.DepsCommand;
+import org.lucee.lucli.cli.commands.deps.InstallCommand;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -29,6 +31,8 @@ import picocli.CommandLine.Option;
     subcommands = {
         ServerCommand.class,
         ModulesCommand.class,
+        DepsCommand.class,
+        InstallCommand.class,  // Shortcut for deps install
         CfmlCommand.class,
         CompletionCommand.class,
         VersionsListCommand.class,
