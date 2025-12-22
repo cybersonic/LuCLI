@@ -1,0 +1,49 @@
+{
+  "name": "server-environments-example",
+  "version": "6.2.2.91",
+  "port": 8890,
+  "webroot": "./",
+  "monitoring": {
+    "enabled": true,
+    "jmx": {
+      "port": 9001
+    }
+  },
+  "jvm": {
+    "maxMemory": "512m",
+    "minMemory": "128m"
+  },
+  "environments": {
+    "prod": {
+      "port": 8080,
+      "jvm": {
+        "maxMemory": "2048m"
+      },
+      "admin": {
+        "password": "secure_prod_password"
+      },
+      "monitoring": {
+        "enabled": false
+      },
+      "openBrowser": false
+    },
+    "dev": {
+      "port": 8891,
+      "monitoring": {
+        "jmx": {
+          "port": 9002
+        }
+      },
+      "openBrowser": true
+    },
+    "staging": {
+      "port": 8892,
+      "jvm": {
+        "maxMemory": "1024m"
+      },
+      "admin": {
+        "password": "staging_password"
+      }
+    }
+  }
+}
