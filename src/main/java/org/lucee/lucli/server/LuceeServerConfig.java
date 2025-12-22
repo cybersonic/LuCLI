@@ -10,6 +10,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,6 +21,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
  */
 public class LuceeServerConfig {
     
+    @JsonIgnoreProperties({"dependencies", "devDependencies", "packages", "dependencySettings"})
     public static class ServerConfig {
         public String name;
         /**
@@ -866,6 +868,8 @@ public class LuceeServerConfig {
      * Merges configurations with the following precedence (lowest to highest):
      *  1. External JSON file referenced by {@code configurationFile}, if it exists (base config).
      *  2. Inline {@code configuration} object in lucee.json (overrides).
+     *  3. Environment-specific configuration (if applied via applyEnvironment).
+     *  4. Dependency mappings from lucee-lock.json (highest precedence).
      *
      * Returns null when no configuration is defined anywhere.
      */
@@ -897,6 +901,16 @@ public class LuceeServerConfig {
                 // Merge inline config into the base; inline values override file values
                 result = mergeJsonNodes(result, config.configuration);
             }
+        }
+        
+        // Add dependency mappings as final layer (highest precedence)
+        JsonNode dependencyMappings = generateDependencyMappings(projectDir);
+        if (dependencyMappings != null) {
+            if (result == null) {
+                // No other config; create new object with just mappings
+                result = objectMapper.createObjectNode();
+            }
+            result = mergeMappings(result, dependencyMappings);
         }
 
         return result;
@@ -1000,6 +1014,136 @@ public class LuceeServerConfig {
         
         // Convert back to ServerConfig
         return objectMapper.treeToValue(merged, ServerConfig.class);
+    }
+    
+    /**
+     * Generate CFConfig mappings from installed dependencies in lucee-lock.json.
+     * Returns a JsonNode with a "mappings" object containing dependency mappings.
+     */
+    private static JsonNode generateDependencyMappings(Path projectDir) throws IOException {
+        Path lockFilePath = projectDir.resolve("lucee-lock.json");
+        if (!Files.exists(lockFilePath)) {
+            return null; // No lock file, no dependencies
+        }
+        
+        // Read lock file
+        JsonNode lockFile = objectMapper.readTree(lockFilePath.toFile());
+        JsonNode dependencies = lockFile.get("dependencies");
+        JsonNode devDependencies = lockFile.get("devDependencies");
+        
+        if ((dependencies == null || dependencies.size() == 0) && 
+            (devDependencies == null || devDependencies.size() == 0)) {
+            return null; // No dependencies with mappings
+        }
+        
+        // Build mappings object
+        com.fasterxml.jackson.databind.node.ObjectNode mappingsNode = objectMapper.createObjectNode();
+        
+        // Process production dependencies
+        if (dependencies != null && dependencies.isObject()) {
+            dependencies.fields().forEachRemaining(entry -> {
+                String depName = entry.getKey();
+                JsonNode dep = entry.getValue();
+                addDependencyMapping(mappingsNode, depName, dep, projectDir);
+            });
+        }
+        
+        // Process dev dependencies
+        if (devDependencies != null && devDependencies.isObject()) {
+            devDependencies.fields().forEachRemaining(entry -> {
+                String depName = entry.getKey();
+                JsonNode dep = entry.getValue();
+                addDependencyMapping(mappingsNode, depName, dep, projectDir);
+            });
+        }
+        
+        if (mappingsNode.size() == 0) {
+            return null; // No mappings to add
+        }
+        
+        // Wrap in a configuration object
+        com.fasterxml.jackson.databind.node.ObjectNode configNode = objectMapper.createObjectNode();
+        configNode.set("mappings", mappingsNode);
+        return configNode;
+    }
+    
+    /**
+     * Add a single dependency mapping to the mappings node
+     */
+    private static void addDependencyMapping(
+            com.fasterxml.jackson.databind.node.ObjectNode mappingsNode, 
+            String depName, 
+            JsonNode dep,
+            Path projectDir) {
+        
+        JsonNode mappingNode = dep.get("mapping");
+        JsonNode installPathNode = dep.get("installPath");
+        
+        if (mappingNode == null || mappingNode.isNull() || 
+            installPathNode == null || installPathNode.isNull()) {
+            return; // No mapping defined for this dependency
+        }
+        
+        String virtualPath = mappingNode.asText();
+        String installPath = installPathNode.asText();
+        
+        // Resolve to absolute path
+        Path physicalPath = Paths.get(installPath);
+        if (!physicalPath.isAbsolute()) {
+            physicalPath = projectDir.resolve(installPath).toAbsolutePath().normalize();
+        }
+        
+        // Create CFConfig mapping object
+        com.fasterxml.jackson.databind.node.ObjectNode mappingObj = objectMapper.createObjectNode();
+        mappingObj.put("physical", physicalPath.toString());
+        mappingObj.put("archive", "");
+        mappingObj.put("primary", "physical");
+        mappingObj.put("inspectTemplate", "once");
+        mappingObj.put("readonly", "no");
+        mappingObj.put("listenerMode", "modern");
+        mappingObj.put("listenerType", "curr2root");
+        
+        // Add to mappings with virtual path as key
+        // Ensure virtual path ends with / for consistency
+        String mappingKey = virtualPath.endsWith("/") ? virtualPath : virtualPath + "/";
+        mappingsNode.set(mappingKey, mappingObj);
+    }
+    
+    /**
+     * Merge dependency mappings into existing configuration.
+     * Dependency mappings override any existing mappings with the same virtual path.
+     */
+    private static JsonNode mergeMappings(JsonNode base, JsonNode dependencyConfig) {
+        if (!(base instanceof com.fasterxml.jackson.databind.node.ObjectNode)) {
+            return dependencyConfig; // Can't merge into non-object
+        }
+        
+        com.fasterxml.jackson.databind.node.ObjectNode baseObj = 
+            (com.fasterxml.jackson.databind.node.ObjectNode) base;
+        
+        JsonNode depMappings = dependencyConfig.get("mappings");
+        if (depMappings == null || !depMappings.isObject()) {
+            return base; // Nothing to merge
+        }
+        
+        // Get or create mappings node in base
+        JsonNode baseMappings = baseObj.get("mappings");
+        com.fasterxml.jackson.databind.node.ObjectNode mappingsObj;
+        
+        if (baseMappings == null || !baseMappings.isObject()) {
+            // Create new mappings node
+            mappingsObj = objectMapper.createObjectNode();
+            baseObj.set("mappings", mappingsObj);
+        } else {
+            mappingsObj = (com.fasterxml.jackson.databind.node.ObjectNode) baseMappings;
+        }
+        
+        // Add/override with dependency mappings
+        depMappings.fields().forEachRemaining(entry -> {
+            mappingsObj.set(entry.getKey(), entry.getValue());
+        });
+        
+        return baseObj;
     }
     
     /**
