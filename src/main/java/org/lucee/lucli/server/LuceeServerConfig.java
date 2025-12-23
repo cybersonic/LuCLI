@@ -147,10 +147,19 @@ public class LuceeServerConfig {
      * Load configuration from lucee.json in the specified directory
      */
     public static ServerConfig loadConfig(Path projectDir) throws IOException {
+        return loadConfig(projectDir, "lucee.json");
+    }
+    
+    /**
+     * Load configuration from a specified file in the directory
+     * @param projectDir The project directory
+     * @param configFileName The configuration file name (e.g., "lucee.json", "lucee-simple.json")
+     */
+    public static ServerConfig loadConfig(Path projectDir, String configFileName) throws IOException {
         // Load .env file if it exists in the same directory as lucee.json
         loadEnvFile(projectDir);
         
-        Path configFile = projectDir.resolve("lucee.json");
+        Path configFile = projectDir.resolve(configFileName);
         
         if (!Files.exists(configFile)) {
             // Create default configuration
