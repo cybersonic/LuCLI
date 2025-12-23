@@ -111,6 +111,7 @@ public class UnifiedCommandExecutor {
         String versionOverride = null;
         boolean forceReplace = false;
         String customName = null;
+        String configFileName = null;
         String environment = null;
         boolean dryRun = false;
         boolean includeLuceeConfig = false;
@@ -132,6 +133,9 @@ public class UnifiedCommandExecutor {
                 forceReplace = true;
             } else if ((args[i].equals("--name") || args[i].equals("-n")) && i + 1 < args.length) {
                 customName = args[i + 1];
+                i++; // Skip next argument
+            } else if ((args[i].equals("--config") || args[i].equals("-c")) && i + 1 < args.length) {
+                configFileName = args[i + 1];
                 i++; // Skip next argument
             } else if ((args[i].equals("--env") || args[i].equals("--environment")) && i + 1 < args.length) {
                 environment = args[i + 1];
@@ -197,7 +201,8 @@ public class UnifiedCommandExecutor {
         
         // Apply any configuration overrides to lucee.json before starting the server.
         if (!configOverrides.isEmpty()) {
-            LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(projectDir);
+            String cfgFile = configFileName != null ? configFileName : "lucee.json";
+            LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(projectDir, cfgFile);
             ServerConfigHelper configHelper = new ServerConfigHelper();
             for (String kv : configOverrides) {
                 if (kv == null || !kv.contains("=")) {
@@ -210,12 +215,13 @@ public class UnifiedCommandExecutor {
                     configHelper.setConfigValue(config, key, value);
                 }
             }
-            Path configFile = projectDir.resolve("lucee.json");
+            Path configFile = projectDir.resolve(configFileName != null ? configFileName : "lucee.json");
             LuceeServerConfig.saveConfig(config, configFile);
         }
         
         // Load final realized config for dry-run or actual startup
-        LuceeServerConfig.ServerConfig finalConfig = LuceeServerConfig.loadConfig(projectDir);
+        String cfgFile = configFileName != null ? configFileName : "lucee.json";
+        LuceeServerConfig.ServerConfig finalConfig = LuceeServerConfig.loadConfig(projectDir, cfgFile);
         
         // Apply environment overrides if --env flag was provided
         if (environment != null && !environment.trim().isEmpty()) {
@@ -647,18 +653,49 @@ public class UnifiedCommandExecutor {
 
     private String handleServerStop(LuceeServerManager serverManager, String[] args) throws Exception {
         String serverName = null;
+        boolean stopAll = false;
         
-        // Parse --name flag (skip "stop")
+        // Parse --name and --all flags (skip "stop")
         for (int i = 1; i < args.length; i++) {
             if ((args[i].equals("--name") || args[i].equals("-n")) && i + 1 < args.length) {
                 serverName = args[i + 1];
+                break;
+            } else if (args[i].equals("--all")) {
+                stopAll = true;
                 break;
             }
         }
         
         StringBuilder result = new StringBuilder();
         
-        if (serverName != null) {
+        if (stopAll) {
+            // Stop all running servers
+            List<LuceeServerManager.ServerInfo> servers = serverManager.listServers();
+            List<LuceeServerManager.ServerInfo> runningServers = servers.stream()
+                .filter(LuceeServerManager.ServerInfo::isRunning)
+                .collect(java.util.stream.Collectors.toList());
+            
+            if (runningServers.isEmpty()) {
+                result.append("ℹ️  No running servers found.");
+            } else {
+                result.append("Stopping all running servers...\n");
+                int stopped = 0;
+                for (LuceeServerManager.ServerInfo server : runningServers) {
+                    try {
+                        boolean success = serverManager.stopServerByName(server.getServerName());
+                        if (success) {
+                            result.append("✅ Stopped: ").append(server.getServerName()).append("\n");
+                            stopped++;
+                        } else {
+                            result.append("❌ Failed to stop: ").append(server.getServerName()).append("\n");
+                        }
+                    } catch (Exception e) {
+                        result.append("❌ Error stopping ").append(server.getServerName()).append(": ").append(e.getMessage()).append("\n");
+                    }
+                }
+                result.append("\n✅ Stopped ").append(stopped).append(" of ").append(runningServers.size()).append(" servers.");
+            }
+        } else if (serverName != null) {
             // Stop server by name
             if (!isTerminalMode) {
                 result.append("Stopping server: ").append(serverName).append("\n");
