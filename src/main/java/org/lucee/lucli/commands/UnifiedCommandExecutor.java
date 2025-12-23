@@ -855,6 +855,7 @@ public class UnifiedCommandExecutor {
     private String handleServerPrune(LuceeServerManager serverManager, String[] args) throws Exception {
         boolean pruneAll = false;
         String serverName = null;
+        boolean force = false;
         
         // Parse arguments (skip "prune")
         for (int i = 1; i < args.length; i++) {
@@ -863,6 +864,8 @@ public class UnifiedCommandExecutor {
             } else if ((args[i].equals("--name") || args[i].equals("-n")) && i + 1 < args.length) {
                 serverName = args[i + 1];
                 i++; // Skip next argument
+            } else if (args[i].equals("--force") || args[i].equals("-f")) {
+                force = true;
             } else if (!args[i].startsWith("-")) {
                 // Treat non-option argument as server name
                 serverName = args[i];
@@ -872,6 +875,37 @@ public class UnifiedCommandExecutor {
         StringBuilder result = new StringBuilder();
         
         if (pruneAll) {
+            // Get list of stopped servers before confirming
+            java.util.List<LuceeServerManager.ServerInfo> servers = serverManager.listServers();
+            java.util.List<LuceeServerManager.ServerInfo> stoppedServers = servers.stream()
+                .filter(s -> !s.isRunning())
+                .collect(java.util.stream.Collectors.toList());
+            
+            if (stoppedServers.isEmpty()) {
+                return formatOutput("ℹ️  No stopped servers found to prune.", false);
+            }
+            
+            // Show confirmation prompt unless --force is used
+            if (!force) {
+                result.append("⚠️  You are about to prune ").append(stoppedServers.size()).append(" stopped server(s):\n");
+                for (LuceeServerManager.ServerInfo server : stoppedServers) {
+                    result.append("   • ").append(server.getServerName()).append("\n");
+                }
+                result.append("\nThis will permanently delete server files and cannot be undone.\n");
+                result.append("Are you sure? (y/N): ");
+                
+                // In CLI mode, we need user input
+                System.out.print(result.toString());
+                java.util.Scanner scanner = new java.util.Scanner(System.in);
+                String response = scanner.nextLine().trim().toLowerCase();
+                
+                if (!response.equals("y") && !response.equals("yes")) {
+                    return formatOutput("❌ Prune operation cancelled.", false);
+                }
+                
+                result.setLength(0); // Clear the buffer for the actual result
+            }
+            
             // Prune all stopped servers
             LuceeServerManager.PruneAllResult pruneResult = serverManager.pruneAllStoppedServers();
             
@@ -900,6 +934,23 @@ public class UnifiedCommandExecutor {
                 result.append("\n📊 Summary: ").append(prunedCount).append(" pruned, ").append(skippedCount).append(" skipped");
             }
         } else if (serverName != null) {
+            // Show confirmation prompt unless --force is used
+            if (!force) {
+                result.append("⚠️  You are about to prune server: ").append(serverName).append("\n");
+                result.append("This will permanently delete server files and cannot be undone.\n");
+                result.append("Are you sure? (y/N): ");
+                
+                System.out.print(result.toString());
+                java.util.Scanner scanner = new java.util.Scanner(System.in);
+                String response = scanner.nextLine().trim().toLowerCase();
+                
+                if (!response.equals("y") && !response.equals("yes")) {
+                    return formatOutput("❌ Prune operation cancelled.", false);
+                }
+                
+                result.setLength(0);
+            }
+            
             // Prune specific server by name
             LuceeServerManager.PruneResult pruneResult = serverManager.pruneServerByName(serverName);
             
@@ -910,6 +961,32 @@ public class UnifiedCommandExecutor {
                 return formatOutput(result.toString(), true);
             }
         } else {
+            // Get server name from config for confirmation prompt
+            String serverNameFromConfig = null;
+            try {
+                LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(currentWorkingDirectory);
+                serverNameFromConfig = config.name;
+            } catch (Exception e) {
+                return formatOutput("❌ No server configuration found for current directory.", true);
+            }
+            
+            // Show confirmation prompt unless --force is used
+            if (!force) {
+                result.append("⚠️  You are about to prune server: ").append(serverNameFromConfig).append("\n");
+                result.append("This will permanently delete server files and cannot be undone.\n");
+                result.append("Are you sure? (y/N): ");
+                
+                System.out.print(result.toString());
+                java.util.Scanner scanner = new java.util.Scanner(System.in);
+                String response = scanner.nextLine().trim().toLowerCase();
+                
+                if (!response.equals("y") && !response.equals("yes")) {
+                    return formatOutput("❌ Prune operation cancelled.", false);
+                }
+                
+                result.setLength(0);
+            }
+            
             // Prune server for current directory
             LuceeServerManager.PruneResult pruneResult = serverManager.pruneServer(currentWorkingDirectory);
             

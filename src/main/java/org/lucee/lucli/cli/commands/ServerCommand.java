@@ -653,6 +653,10 @@ public class ServerCommand implements Callable<Integer> {
                 description = "Remove a specific stopped server by name")
         private String name;
 
+        @Option(names = {"-f", "--force"},
+                description = "Skip confirmation prompt")
+        private boolean force;
+
         @Override
         public Integer call() throws Exception {
             // Use UnifiedCommandExecutor in CLI mode (non-terminal)
@@ -667,6 +671,9 @@ public class ServerCommand implements Callable<Integer> {
             if (name != null) {
                 args.add("--name");
                 args.add(name);
+            }
+            if (force) {
+                args.add("--force");
             }
 
             String result = executor.executeCommand("server", args.toArray(new String[0]));
