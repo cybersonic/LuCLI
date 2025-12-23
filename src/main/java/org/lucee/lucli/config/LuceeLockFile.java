@@ -8,6 +8,7 @@ import org.lucee.lucli.LuCLI;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
@@ -16,7 +17,7 @@ import java.util.Map;
 /**
  * Represents the lucee-lock.json file structure
  */
-public class LuceLockFile {
+public class LuceeLockFile {
     
     private static final String LOCK_FILE_NAME = "lucee-lock.json";
     private static final ObjectMapper MAPPER = new ObjectMapper()
@@ -38,7 +39,7 @@ public class LuceLockFile {
     @JsonProperty("devDependencies")
     private Map<String, LockedDependency> devDependencies;
     
-    public LuceLockFile() {
+    public LuceeLockFile() {
         this.generatedAt = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
         this.lucliVersion = LuCLI.getVersion();
         this.dependencies = new LinkedHashMap<>();
@@ -47,30 +48,39 @@ public class LuceLockFile {
     
     /**
      * Read existing lock file from current directory
-     * @return LuceLockFile instance or empty one if file doesn't exist
+     * @return LuceeLockFile instance or empty one if file doesn't exist
      */
-    public static LuceLockFile read() {
+    public static LuceeLockFile read() {
         return read(new File("."));
+    }
+    
+    /**
+     * Read existing lock file from specified Path
+     * @param projectDir Project directory containing lucee-lock.json
+     * @return LuceeLockFile instance or empty one if file doesn't exist
+     */
+    public static LuceeLockFile read(Path projectDir) {
+        return read(projectDir.toFile());
     }
     
     /**
      * Read existing lock file from specified directory
      * @param projectDir Project directory containing lucee-lock.json
-     * @return LuceLockFile instance or empty one if file doesn't exist
+     * @return LuceeLockFile instance or empty one if file doesn't exist
      */
-    public static LuceLockFile read(File projectDir) {
+    public static LuceeLockFile read(File projectDir) {
         File lockFile = new File(projectDir, LOCK_FILE_NAME);
         
         if (!lockFile.exists()) {
-            return new LuceLockFile();
+            return new LuceeLockFile();
         }
         
         try {
-            return MAPPER.readValue(lockFile, LuceLockFile.class);
+            return MAPPER.readValue(lockFile, LuceeLockFile.class);
         } catch (IOException e) {
             // If lock file is corrupted, return empty one
             System.err.println("Warning: Could not read " + LOCK_FILE_NAME + ": " + e.getMessage());
-            return new LuceLockFile();
+            return new LuceeLockFile();
         }
     }
     

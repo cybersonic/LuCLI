@@ -39,6 +39,9 @@ public class LockedDependency {
     @JsonProperty("subPath")
     private String subPath;   // If used
     
+    @JsonProperty("id")
+    private String id;        // For extension type - Lucee extension ID
+    
     public LockedDependency() {
         this.installedAt = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
     }
@@ -123,5 +126,13 @@ public class LockedDependency {
     
     public void setSubPath(String subPath) {
         this.subPath = subPath;
+    }
+    
+    public String getId() {
+        return id;
+    }
+    
+    public void setId(String id) {
+        this.id = id;
     }
 }

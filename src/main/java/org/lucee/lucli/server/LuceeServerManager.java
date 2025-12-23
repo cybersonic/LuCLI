@@ -22,6 +22,8 @@ import java.net.URI;
 import java.awt.Desktop;
 import java.awt.GraphicsEnvironment;
 
+import org.lucee.lucli.deps.ExtensionDependencyInstaller;
+
 /**
  * Manages Lucee server instances - downloading, configuring, starting, and stopping servers
  */
@@ -442,6 +444,9 @@ public class LuceeServerManager {
         // Write CFConfig (.CFConfig.json) into the Lucee context if configured in lucee.json.
         // This treats lucee.json as the source of truth and .CFConfig.json as a derived file.
         LuceeServerConfig.writeCfConfigIfPresent(config, projectDir, serverInstanceDir);
+        
+        // Deploy extension dependencies to lucee-server/deploy folder
+        deployExtensionsForServer(projectDir, serverInstanceDir);
         
         // Launch server process in foreground mode
         launchServerProcessForeground(serverInstanceDir, config, projectDir, luceeExpressDir, agentOverrides, environment);
@@ -1120,6 +1125,72 @@ public class LuceeServerManager {
     }
     
     /**
+     * Deploy extension dependencies (.lex files) to server's lucee-server/deploy folder.
+     * Called before server startup.
+     */
+    private void deployExtensionsForServer(Path projectDir, Path serverInstanceDir) {
+        try {
+            // Load lock file to get installed extension dependencies
+            org.lucee.lucli.config.LuceeLockFile lockFile = org.lucee.lucli.config.LuceeLockFile.read(projectDir);
+            
+            java.util.List<org.lucee.lucli.deps.LockedDependency> allExtensions = new java.util.ArrayList<>();
+            
+            // Collect extension dependencies from both prod and dev
+            for (org.lucee.lucli.deps.LockedDependency dep : lockFile.getDependencies().values()) {
+                if ("extension".equals(dep.getType())) {
+                    allExtensions.add(dep);
+                }
+            }
+            
+            for (org.lucee.lucli.deps.LockedDependency dep : lockFile.getDevDependencies().values()) {
+                if ("extension".equals(dep.getType())) {
+                    allExtensions.add(dep);
+                }
+            }
+            
+            if (!allExtensions.isEmpty()) {
+                // Deploy extensions that have URL or path
+                ExtensionDependencyInstaller.deployExtensions(allExtensions, serverInstanceDir);
+            }
+        } catch (Exception e) {
+            // Log but don't fail server startup if extension deployment fails
+            System.err.println("Warning: Failed to deploy extensions: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Build LUCEE_EXTENSIONS environment variable from extension dependencies.
+     * Returns comma-separated list of extension IDs.
+     */
+    private String buildLuceeExtensions(Path projectDir) {
+        try {
+            // Load lock file to get installed dependencies
+            org.lucee.lucli.config.LuceeLockFile lockFile = org.lucee.lucli.config.LuceeLockFile.read(projectDir);
+            
+            java.util.List<String> extensionIds = new java.util.ArrayList<>();
+            
+            // Check production dependencies
+            for (org.lucee.lucli.deps.LockedDependency dep : lockFile.getDependencies().values()) {
+                if ("extension".equals(dep.getType()) && dep.getId() != null && !dep.getId().trim().isEmpty()) {
+                    extensionIds.add(dep.getId().trim());
+                }
+            }
+            
+            // Check dev dependencies
+            for (org.lucee.lucli.deps.LockedDependency dep : lockFile.getDevDependencies().values()) {
+                if ("extension".equals(dep.getType()) && dep.getId() != null && !dep.getId().trim().isEmpty()) {
+                    extensionIds.add(dep.getId().trim());
+                }
+            }
+            
+            return String.join(",", extensionIds);
+        } catch (Exception e) {
+            // If we can't read lock file or it doesn't exist, return empty string
+            return "";
+        }
+    }
+    
+    /**
      * Launch the server process using Lucee Express startup script
      */
     private ServerInstance launchServerProcess(Path serverInstanceDir, LuceeServerConfig.ServerConfig config, 
@@ -1228,6 +1299,12 @@ public class LuceeServerManager {
 
         if(config.admin.password != null && config.admin.password.length() > 0){
             env.put("LUCEE_ADMIN_PASSWORD", config.admin.password);
+        }
+        
+        // Set LUCEE_EXTENSIONS environment variable if extensions are configured
+        String luceeExtensions = buildLuceeExtensions(projectDir);
+        if (luceeExtensions != null && !luceeExtensions.isEmpty()) {
+            env.put("LUCEE_EXTENSIONS", luceeExtensions);
         }
         
         // Write project path marker file to track which project this server belongs to
