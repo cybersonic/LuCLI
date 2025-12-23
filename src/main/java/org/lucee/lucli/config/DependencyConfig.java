@@ -57,6 +57,10 @@ public class DependencyConfig {
     @JsonProperty("repository")
     private String repository;
     
+    // Extension specific (Lucee .lex files)
+    @JsonProperty("id")
+    private String id;
+    
     // Constructors
     public DependencyConfig() {
     }
@@ -242,6 +246,30 @@ public class DependencyConfig {
     
     public void setRepository(String repository) {
         this.repository = repository;
+    }
+    
+    /**
+     * Get the extension ID, resolving from name/slug if necessary.
+     * For extensions, this will resolve friendly names like "redis" or "h2" to their UUID.
+     */
+    public String getId() {
+        if (id != null && "extension".equals(type)) {
+            // Try to resolve the ID from registry if it's not already a UUID
+            String resolved = org.lucee.lucli.deps.ExtensionRegistry.resolveId(id);
+            return resolved != null ? resolved : id;
+        }
+        return id;
+    }
+    
+    /**
+     * Get the raw ID value without resolution (useful for debugging).
+     */
+    public String getRawId() {
+        return id;
+    }
+    
+    public void setId(String id) {
+        this.id = id;
     }
     
     @Override

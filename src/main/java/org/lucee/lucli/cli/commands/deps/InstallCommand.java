@@ -11,7 +11,7 @@ import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.StringOutput;
 import org.lucee.lucli.config.DependencyConfig;
 import org.lucee.lucli.config.LuceeJsonConfig;
-import org.lucee.lucli.config.LuceLockFile;
+import org.lucee.lucli.config.LuceeLockFile;
 import org.lucee.lucli.deps.GitDependencyInstaller;
 import org.lucee.lucli.deps.LockedDependency;
 
@@ -111,7 +111,7 @@ public class InstallCommand implements Callable<Integer> {
             }
             
             // 7. Read existing lock file for verification
-            LuceLockFile existingLockFile = LuceLockFile.read();
+            LuceeLockFile existingLockFile = LuceeLockFile.read();
             
             System.out.println("\n📥 Installing dependencies...");
             GitDependencyInstaller gitInstaller = new GitDependencyInstaller(Paths.get("."));
@@ -170,7 +170,7 @@ public class InstallCommand implements Callable<Integer> {
             
             // 8. Write lock file
             if (successCount > 0 || unchangedCount > 0) {
-                LuceLockFile lockFile = new LuceLockFile();
+                LuceeLockFile lockFile = new LuceeLockFile();
                 lockFile.setDependencies(installedProd);
                 lockFile.setDevDependencies(installedDev);
                 
@@ -216,6 +216,15 @@ public class InstallCommand implements Callable<Integer> {
         // For git sources, compare ref/version
         if ("git".equals(requested.getSource())) {
             return requested.getRef().equals(locked.getVersion());
+        }
+        // For extensions, compare ID and source
+        if ("extension".equals(requested.getType())) {
+            boolean idMatches = (requested.getId() == null && locked.getId() == null) ||
+                               (requested.getId() != null && requested.getId().equals(locked.getId()));
+            boolean sourceMatches = (requested.getUrl() == null && requested.getPath() == null && locked.getSource() != null && locked.getSource().equals("extension-provider")) ||
+                                   (requested.getUrl() != null && requested.getUrl().equals(locked.getSource())) ||
+                                   (requested.getPath() != null && ("path:" + requested.getPath()).equals(locked.getSource()));
+            return idMatches && sourceMatches;
         }
         return false;
     }
