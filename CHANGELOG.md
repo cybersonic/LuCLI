@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+- **Lucee Extension Support:** Added comprehensive extension dependency management with name-based resolution via extension registry. Extensions can be defined in `lucee.json` dependencies using friendly names (e.g., "h2", "redis", "postgres") instead of UUIDs. Supports both automatic ID-based installation via `LUCEE_EXTENSIONS` environment variable and direct .lex file deployment to server deploy folder.
+- **Extension Registry:** Created `ExtensionRegistry` with JSON-based mapping of 24+ common extensions (databases, cache, core utilities) from friendly names/slugs to UUIDs. Registry located at `src/main/resources/extensions/lucee-extensions.json` with comprehensive documentation.
+- **Dependency Installer:** New `ExtensionDependencyInstaller` handles extension installation and deployment. Extensions with URL/path are deployed to `{serverDir}/lucee-server/deploy/` folder. Lock file tracks extension IDs and sources.
+- **Alternate Configuration Files:** Added `-c`/`--config` option to `server start` and `server run` commands for using alternate configuration files (e.g., `lucli server start -c lucee-prod.json`).
+- **Stop All Servers:** Added `--all` flag to `server stop` command to stop all running servers at once: `lucli server stop --all`. Displays progress and summary of stopped servers.
+- **Bug Fixes:** Renamed `LuceLockFile` to `LuceeLockFile` (corrected spelling).
+- **Examples:** New `examples/dependency-extensions/` demonstrating extension usage with comprehensive README and working demo.
+
 ## 0.1.194
 - **Dry-Run Enhancements:** Added `--include-lucee` flag to `server start --dry-run` for previewing resolved `.CFConfig.json` before deployment. Shows merged configuration from `configurationFile` and inline `configuration` with environment variable substitution applied.
 - **Documentation:** New comprehensive guides for [Dry-Run Preview System](documentation/DRY_RUN_PREVIEW.md) and [Environment Variables](documentation/ENVIRONMENT_VARIABLES.md). Updated main documentation index with quick-start links.
