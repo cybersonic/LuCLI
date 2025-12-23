@@ -1,0 +1,150 @@
+{
+  "version": "1.0",
+  "lastUpdated": "2025-12-23",
+  "extensions": [
+    {
+      "id": "465E1E35-2425-4F4E-8B3FAB638BD7280A",
+      "slug": "h2",
+      "name": "H2 Embedded Database",
+      "aliases": ["h2-database"]
+    },
+    {
+      "id": "CD5C93C8-00B0-4F84-9B4F1C3B0A78E69A",
+      "slug": "mysql",
+      "name": "MySQL Driver",
+      "aliases": ["mysql-jdbc", "mysql-connector"]
+    },
+    {
+      "id": "79AB06C5-67EE-49BB-802C2D1C8E475965",
+      "slug": "postgres",
+      "name": "PostgreSQL JDBC Driver",
+      "aliases": ["postgresql", "pgsql"]
+    },
+    {
+      "id": "CD4F2CA5-88BE-4A90-810E1F23C3B89E74",
+      "slug": "mssql",
+      "name": "Microsoft SQL Server JDBC Driver",
+      "aliases": ["sqlserver", "ms-sql"]
+    },
+    {
+      "id": "A2C2D8A3-DEAE-4BE2-B9A3-0E63A6D9DBF5",
+      "slug": "oracle",
+      "name": "Oracle Database Driver",
+      "aliases": ["oracle-jdbc"]
+    },
+    {
+      "id": "F71B8FCA-B98C-4EEE-A2F1-AEF1D0FA52BF",
+      "slug": "mariadb",
+      "name": "MariaDB Connector/J",
+      "aliases": ["maria"]
+    },
+    {
+      "id": "ECC268AA-4B25-4DBC-A57CA2E7A929A83E",
+      "slug": "redis",
+      "name": "Redis Cache",
+      "aliases": ["redis-cache"]
+    },
+    {
+      "id": "B3E1C8D2-F4A5-4C7E-9D8A1B2C3D4E5F6A",
+      "slug": "memcached",
+      "name": "Memcached Cache",
+      "aliases": []
+    },
+    {
+      "id": "C4F2D9E3-G5B6-5D8F-AE9B2C3D4E5F6G7B",
+      "slug": "ehcache",
+      "name": "EHCache",
+      "aliases": []
+    },
+    {
+      "id": "8DDDC9DE-8B2F-4550-891FA8AFDFE13A5C",
+      "slug": "mongodb",
+      "name": "MongoDB Cache",
+      "aliases": ["mongo"]
+    },
+    {
+      "id": "B737ABC4-D43F-4D91-8E8E973E37C40D1B",
+      "slug": "image",
+      "name": "Image Extension",
+      "aliases": ["cfimage"]
+    },
+    {
+      "id": "4753BAD1-2E27-4964-B370-0F2418F5ABF7",
+      "slug": "pdf",
+      "name": "PDF Extension",
+      "aliases": ["cfdocument", "cfpdf"]
+    },
+    {
+      "id": "D54B86E9-5DFF-4A49-949F55CFBF9EC684",
+      "slug": "spreadsheet",
+      "name": "Spreadsheet Extension",
+      "aliases": ["poi", "excel"]
+    },
+    {
+      "id": "EFDEB172-F52E-4D84-9CD1A1F561B3DCC8",
+      "slug": "search",
+      "name": "Lucee Search Extension",
+      "aliases": ["lucene"]
+    },
+    {
+      "id": "FB90B08D-D1AC-4D19-8857C1903EB6CF82",
+      "slug": "video",
+      "name": "Video Extension",
+      "aliases": ["cfvideo"]
+    },
+    {
+      "id": "17DCCC2E-96A8-47DF-895EC64D9B3B5B7F",
+      "slug": "compress",
+      "name": "Compress Extension",
+      "aliases": ["zip"]
+    },
+    {
+      "id": "99C70B4C-5B5A-48A7-BD15A6B0C6F7A3A5",
+      "slug": "ftp",
+      "name": "FTP Extension",
+      "aliases": ["cfftp"]
+    },
+    {
+      "id": "D1BEE6B0-224A-4687-89DC4D49A86D4C82",
+      "slug": "mail",
+      "name": "Mail Extension",
+      "aliases": ["cfmail", "smtp"]
+    },
+    {
+      "id": "5F0B3B98-8E6E-4FEB-961E2E7F7F9C2A3C",
+      "slug": "esapi",
+      "name": "OWASP ESAPI Extension",
+      "aliases": ["owasp"]
+    },
+    {
+      "id": "09E51B93-0C53-4846-98FDD092B056C5D9",
+      "slug": "orm",
+      "name": "ORM Extension (Hibernate)",
+      "aliases": ["hibernate"]
+    },
+    {
+      "id": "A91DB5B1-18EB-4D57-AD87E36ED44649FE",
+      "slug": "axis",
+      "name": "Axis Web Service Extension",
+      "aliases": ["webservice"]
+    },
+    {
+      "id": "BFD4D045-49AF-43E7-A5B79A0D52F7C9C1",
+      "slug": "s3",
+      "name": "Amazon S3 Resource",
+      "aliases": ["aws-s3"]
+    },
+    {
+      "id": "EFDEB172-F52E-4D84-9CD1A1F561B3DCC8",
+      "slug": "admin",
+      "name": "Lucee Administrator Extension",
+      "aliases": []
+    },
+    {
+      "id": "D56C1E8B-9A65-4B0A-B33A2D333E95E948",
+      "slug": "documentation",
+      "name": "Lucee Documentation Extension",
+      "aliases": ["docs"]
+    }
+  ]
+}
