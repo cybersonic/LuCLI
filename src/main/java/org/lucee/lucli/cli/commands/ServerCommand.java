@@ -83,6 +83,10 @@ public class ServerCommand implements Callable<Integer> {
                 description = "Force replace existing server with same name")
         private boolean force = false;
 
+        @Option(names = {"-c", "--config"}, 
+                description = "Configuration file to use (defaults to lucee.json)")
+        private String configFile;
+
         @Option(names = {"--env", "--environment"}, 
                 description = "Environment to use (e.g., prod, dev, staging)")
         private String environment;
@@ -205,6 +209,10 @@ public class ServerCommand implements Callable<Integer> {
             if (force) {
                 args.add("--force");
             }
+            if (configFile != null) {
+                args.add("--config");
+                args.add(configFile);
+            }
             if (environment != null) {
                 args.add("--env");
                 args.add(environment);
@@ -306,11 +314,15 @@ public class ServerCommand implements Callable<Integer> {
                 description = "Force replace existing server with same name")
         private boolean force = false;
 
+        @Option(names = {"-c", "--config"}, 
+                description = "Configuration file to use (defaults to lucee.json)")
+        private String configFile;
+
         @Option(names = {"--env", "--environment"}, 
                 description = "Environment to use (e.g., prod, dev, staging)")
         private String environment;
 
-        @Option(names = {"--no-agents"}, 
+        @Option(names = {"--no-agents"},
                 description = "Disable all Java agents")
         private boolean noAgents = false;
 
@@ -363,6 +375,10 @@ public class ServerCommand implements Callable<Integer> {
             }
             if (force) {
                 args.add("--force");
+            }
+            if (configFile != null) {
+                args.add("--config");
+                args.add(configFile);
             }
             if (environment != null) {
                 args.add("--env");
@@ -419,6 +435,10 @@ public class ServerCommand implements Callable<Integer> {
                 description = "Name of the server instance to stop")
         private String name;
 
+        @Option(names = {"--all"}, 
+                description = "Stop all running servers")
+        private boolean all = false;
+
         @Override
         public Integer call() throws Exception {
             // Create UnifiedCommandExecutor for CLI mode
@@ -428,7 +448,9 @@ public class ServerCommand implements Callable<Integer> {
             java.util.List<String> args = new java.util.ArrayList<>();
             args.add("stop");
             
-            if (name != null) {
+            if (all) {
+                args.add("--all");
+            } else if (name != null) {
                 args.add("--name");
                 args.add(name);
             }
