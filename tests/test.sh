@@ -434,15 +434,59 @@ run_test_with_output "Deep merge overrides nested jvm.maxMemory" "java -jar ../$
 # Clean up environment test project
 rm -rf env_test_project
 
+# Test 15: Computed Dependency Mappings Tests
+echo -e "${BLUE}=== Computed Dependency Mappings Tests ===${NC}"
+
+# Create test project with dependencies but no lock file (dry-run scenario)
+mkdir -p dependency_test_project
+cat > dependency_test_project/lucee.json << 'EOF'
+{
+  "name": "dependency-mapping-test",
+  "webroot": "./",
+  "dependencies": {
+    "fw1": {
+      "source": "git",
+      "url": "https://github.com/framework-one/fw1",
+      "ref": "v4.3.0",
+      "subPath": "framework",
+      "installPath": "dependencies/fw1",
+      "mapping": "/framework"
+    },
+    "testlib": {
+      "source": "git",
+      "url": "https://github.com/example/testlib",
+      "installPath": "dependencies/testlib",
+      "mapping": "/lib"
+    }
+  }
+}
+EOF
+
+# Test that computed mappings appear in CFConfig even without lock file (dry-run scenario)
+run_test_with_output "Dry-run with dependencies shows CFConfig" "java -jar ../$LUCLI_JAR server start --dry-run --include-lucee dependency_test_project 2>&1" ".CFConfig.json"
+
+# Test that the computed mappings include the dependency virtual paths
+run_test_with_output "Computed mappings include /framework/ mapping" "java -jar ../$LUCLI_JAR server start --dry-run --include-lucee dependency_test_project 2>&1" '/framework/'
+
+run_test_with_output "Computed mappings include /lib/ mapping" "java -jar ../$LUCLI_JAR server start --dry-run --include-lucee dependency_test_project 2>&1" '/lib/'
+
+# Test that physical paths are computed correctly
+run_test_with_output "Computed mapping has physical path for fw1" "java -jar ../$LUCLI_JAR server start --dry-run --include-lucee dependency_test_project 2>&1" 'dependencies/fw1'
+
+run_test_with_output "Computed mapping has physical path for testlib" "java -jar ../$LUCLI_JAR server start --dry-run --include-lucee dependency_test_project 2>&1" 'dependencies/testlib'
+
+# Clean up dependency test project
+rm -rf dependency_test_project
+
 # Clean up test project
 rm -rf test_project
 
-# Test 15: JMX Monitoring Tests
+# Test 16: JMX Monitoring Tests
 echo -e "${BLUE}=== JMX Monitoring Tests ===${NC}"
 run_test "Monitor command exists" "java -jar ../$LUCLI_JAR server monitor --help > /dev/null 2>&1 || true"
 run_test "JMX classes included" "jar -tf ../$LUCLI_JAR | grep -q 'monitoring' || echo 'Monitoring classes found'"
 
-# Test 16: Configuration Tests
+# Test 17: Configuration Tests
 echo -e "${BLUE}=== Configuration Tests ===${NC}"
 # Test lucee.json generation and handling
 mkdir -p config_test
@@ -451,18 +495,18 @@ run_test "Config file created" "test -f config_test/lucee.json"
 run_test "Config file has expected content" "grep -q 'test-config' config_test/lucee.json"
 rm -rf config_test
 
-# Test 17: Command Consistency Tests
+# Test 18: Command Consistency Tests
 echo -e "${BLUE}=== Command Consistency Tests ===${NC}"
 run_test_with_output "CLI version works" "java -jar ../$LUCLI_JAR --version" "LuCLI"
 run_test_with_output "CLI Lucee version works" "java -jar ../$LUCLI_JAR --lucee-version" "Lucee"
 
-# Test 18: Template System Tests
+# Test 19: Template System Tests
 echo -e "${BLUE}=== Template System Tests ===${NC}"
 # Test that templates exist in resources
 run_test "Template resources exist" "jar -tf ../$LUCLI_JAR | grep -q 'tomcat_template/conf/server.xml'"
 run_test "Web.xml template exists" "jar -tf ../$LUCLI_JAR | grep -q 'tomcat_template/webapps/ROOT/WEB-INF/web.xml'"
 
-# Test 19: Version Bumping System Tests
+# Test 20: Version Bumping System Tests
 echo -e "${BLUE}=== Version Bumping System Tests ===${NC}"
 run_test_with_output "Version command returns LuCLI banner" "java -jar ../$LUCLI_JAR --version" "LuCLI "
 # Check that binary and JAR versions match
@@ -477,13 +521,13 @@ fi
 TOTAL_TESTS=$((TOTAL_TESTS + 1))
 echo ""
 
-# Test 20: Performance and Stress Tests
+# Test 21: Performance and Stress Tests
 echo -e "${BLUE}=== Performance Tests ===${NC}"
 run_test "Multiple quick commands" "for i in {1..3}; do java -jar ../$LUCLI_JAR --version > /dev/null; done"
 run_test "Binary performance" "../$LUCLI_BINARY --version > /dev/null"
 run_test "JAR file size reasonable" "test $(stat -f%z ../$LUCLI_JAR) -lt 100000000"
 
-# Test 21: Server CFML Integration Tests
+# Test 22: Server CFML Integration Tests
 echo -e "${BLUE}=== Server CFML Integration Tests ===${NC}"
 if command -v curl &> /dev/null; then
     echo -e "${CYAN}Running comprehensive server and CFML tests...${NC}"
@@ -499,7 +543,7 @@ else
     run_test "Server functionality test (basic)" "java -jar ../$LUCLI_JAR server --help > /dev/null"
 fi
 
-# Test 22: URL Rewrite Integration Tests
+# Test 23: URL Rewrite Integration Tests
 echo -e "${BLUE}=== URL Rewrite Integration Tests ===${NC}"
 if command -v curl &> /dev/null; then
     echo -e "${CYAN}Running URL rewrite and framework routing tests...${NC}"
