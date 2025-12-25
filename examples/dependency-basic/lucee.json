@@ -1,0 +1,19 @@
+{
+  "name": "dependency-git-subpath-example",
+  "webroot": "./webroot",
+  "version": "7.0.1.100",
+  "admin": {
+    "enabled": true,
+    "password": "admin123"
+  },
+  "dependencies": {
+    "fw1": {
+      "source": "git",
+      "url": "https://github.com/framework-one/fw1",
+      "ref": "v4.3.0",
+      "subPath": "framework",
+      "installPath": "dependencies/fw1",
+      "mapping": "/framework"
+    }
+  }
+}

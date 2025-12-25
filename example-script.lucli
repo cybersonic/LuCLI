@@ -1,9 +1,0 @@
-#!/usr/bin/env lucli
-# Example executable LuCLI script
-# Make executable with: chmod +x example-script.lucli
-# Run with: ./example-script.lucli
-
-echo "Starting script..."
-hello-world
-modules list
-echo "Script complete!"

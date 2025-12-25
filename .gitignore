@@ -29,6 +29,7 @@ WEB-INF/
 
 # Test scripts (keep in repo: profile-startup.sh, test-appcds.sh)
 test_*.sh
-examples/
+examples/archive
+examples/to-check
 test-deps/
 test_output/
