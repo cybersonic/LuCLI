@@ -1,0 +1,58 @@
+{
+  "name" : "docker",
+  "version" : "7.0.1.100",
+  "port" : 8080,
+  "webroot" : "./webroot",
+  "monitoring" : {
+    "enabled" : false
+  },
+  "jvm" : {
+    "maxMemory" : "512m",
+    "minMemory" : "128m",
+    "additionalArgs" : [ ]
+  },
+  "urlRewrite" : {
+    "enabled" : false,
+    "routerFile" : "index.cfm"
+  },
+  "admin" : {
+    "enabled" : true,
+    "password" : "admin123"
+  },
+  "configuration": {
+    "dataSources": {
+    "preserveSingleQuote": "yes",
+    "blogdb": {
+      "class": "com.mysql.cj.jdbc.Driver",
+      "dsn": "jdbc:mysql://{host}:{port}/{database}",
+      "id": "mysql",
+      "username": "root",
+      "password": "root",
+      "host": "mysql",
+      "database": "lucli_demo",
+      "port": "3306",
+      "connectionLimit": "5",
+      "connectionTimeout": "1",
+      "liveTimeout": "15",
+      "metaCacheTimeout": "60000",
+      "blob": "false",
+      "clob": "false",
+      "validate": "false",
+      "storage": "false",
+      "allow": "511",
+      "custom": {
+        "characterEncoding": "UTF-8",
+        "serverTimezone": "Europe/Madrid",
+        "maxReconnects": "3"
+      },
+      "dbdriver": "MySQL",
+      "paramDelimiter": "&",
+      "paramLeadingDelimiter": "?",
+      "paramSeparator": "=",
+      "alwaysSetTimeout": "true"
+    }
+  }
+  },
+  "enableLucee" : true,
+  "openBrowser" : false
+}
