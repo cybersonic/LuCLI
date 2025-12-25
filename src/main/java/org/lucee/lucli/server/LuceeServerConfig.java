@@ -48,6 +48,11 @@ public class LuceeServerConfig {
          */
         public Integer shutdownPort;
         public String webroot = "./";
+        /**
+         * Optional AJP (Apache JServ Protocol) connector configuration.
+         * When omitted or when enabled=false, LuCLI will not configure an AJP connector.
+         */
+        public AjpConfig ajp = new AjpConfig();
         public MonitoringConfig monitoring = new MonitoringConfig();
         public JvmConfig jvm = new JvmConfig();
         public UrlRewriteConfig urlRewrite = new UrlRewriteConfig();
@@ -106,6 +111,14 @@ public class LuceeServerConfig {
          */
         public Boolean redirect;
     }
+    
+    public static class AjpConfig {
+        public boolean enabled = false;
+        /**
+         * Optional AJP port. When null, defaults to 8009.
+         */
+        public Integer port;
+    }
 
     public static class AdminConfig {
         public boolean enabled = true;
@@ -118,7 +131,7 @@ public class LuceeServerConfig {
     }
     
     public static class MonitoringConfig {
-        public boolean enabled = true;
+        public boolean enabled = false;
         public JmxConfig jmx = new JmxConfig();
     }
     
@@ -203,10 +216,18 @@ public class LuceeServerConfig {
         // Supports ${VAR_NAME} and ${VAR_NAME:-default_value}
         substituteEnvironmentVariables(config);
         
-        // Assign a shutdown port if not explicitly set, checking for conflicts with existing servers
-        if (config.shutdownPort == null) {
-            assignShutdownPortIfNeeded(config);
+        // Ensure monitoring is initialized
+        if (config.monitoring == null) {
+            config.monitoring = new MonitoringConfig();
         }
+        
+        // Ensure AJP is initialized for backward compatibility with older configs
+        if (config.ajp == null) {
+            config.ajp = new AjpConfig();
+        }
+        
+        // Assign default ports if not explicitly set, checking for conflicts with existing servers
+        assignDefaultPortsIfNeeded(config);
         
         // Don't resolve port conflicts here - do it just before starting server
         // This prevents race conditions where ports become unavailable between config load and server start
@@ -491,11 +512,9 @@ public class LuceeServerConfig {
         // "shutdownPort" when users need a fixed, non-derived port.
         config.shutdownPort = getShutdownPort(config.port);
         
-        // Find available JMX port, avoiding existing server definitions and the chosen HTTP/shutdown ports
-        Set<Integer> portsToAvoid = new HashSet<>(existingPorts);
-        portsToAvoid.add(config.port);              // Don't use same as HTTP port
-        portsToAvoid.add(config.shutdownPort);      // Don't use same as shutdown port
-        config.monitoring.jmx.port = findAvailablePortAvoidingExisting(8999, 8000, 8999, portsToAvoid);
+        // Note: JMX port is not assigned here because monitoring.enabled defaults to false.
+        // If user explicitly enables monitoring in lucee.json, the JMX port (8999 by default)
+        // will be available. We avoid assigning JMX port by default to prevent port conflicts.
         
         return config;
     }
@@ -532,6 +551,27 @@ public class LuceeServerConfig {
         } catch (IOException e) {
             // Fallback to HTTP + 1000 even if it might conflict
             config.shutdownPort = preferredShutdownPort;
+        }
+    }
+    
+    /**
+     * Assign default ports to config if not already set.
+     * This ensures HTTP and shutdown ports are always available, even if not explicitly configured.
+     * This is called during config load to guarantee ports are assigned before conflict checking.
+     */
+    private static void assignDefaultPortsIfNeeded(ServerConfig config) {
+        Path lucliHome = getLucliHome();
+        Path serversDir = lucliHome.resolve("servers");
+        Set<Integer> existingPorts = getExistingServerPorts(serversDir);
+        
+        // Try default HTTP port (8080) first
+        if (config.port == 0 || !isPortAvailable(config.port)) {
+            config.port = findAvailablePortAvoidingExisting(8080, 8000, 8999, existingPorts);
+        }
+        
+        // Assign shutdown port if not explicitly set
+        if (config.shutdownPort == null) {
+            assignShutdownPortIfNeeded(config);
         }
     }
     
@@ -1026,27 +1066,87 @@ public class LuceeServerConfig {
     }
     
     /**
-     * Generate CFConfig mappings from installed dependencies in lucee-lock.json.
+     * Generate CFConfig mappings from both declared (lucee.json) and installed (lucee-lock.json) dependencies.
      * Returns a JsonNode with a "mappings" object containing dependency mappings.
+     * 
+     * Mapping precedence (lowest to highest):
+     * 1. Declared dependencies in lucee.json (computed mappings)
+     * 2. Installed dependencies in lucee-lock.json (actual mappings, overrides declared)
      */
     private static JsonNode generateDependencyMappings(Path projectDir) throws IOException {
+        com.fasterxml.jackson.databind.node.ObjectNode mappingsNode = objectMapper.createObjectNode();
+        
+        // First, compute mappings from declared dependencies in lucee.json
+        addDeclaredDependencyMappings(projectDir, mappingsNode);
+        
+        // Then, add/override with installed dependencies from lucee-lock.json
+        addInstalledDependencyMappings(projectDir, mappingsNode);
+        
+        if (mappingsNode.size() == 0) {
+            return null; // No mappings to add
+        }
+        
+        // Wrap in a configuration object
+        com.fasterxml.jackson.databind.node.ObjectNode configNode = objectMapper.createObjectNode();
+        configNode.set("mappings", mappingsNode);
+        return configNode;
+    }
+    
+    /**
+     * Add computed mappings from declared dependencies in lucee.json.
+     * These are the expected mappings based on the dependency configuration,
+     * even if the dependencies haven't been installed yet.
+     */
+    private static void addDeclaredDependencyMappings(
+            Path projectDir, 
+            com.fasterxml.jackson.databind.node.ObjectNode mappingsNode) throws IOException {
+        
+        Path luceeJsonPath = projectDir.resolve("lucee.json");
+        if (!Files.exists(luceeJsonPath)) {
+            return; // No lucee.json to read from
+        }
+        
+        try {
+            // Parse lucee.json and extract dependencies
+            org.lucee.lucli.config.LuceeJsonConfig config = 
+                org.lucee.lucli.config.LuceeJsonConfig.load(projectDir);
+            
+            // Process production dependencies
+            for (org.lucee.lucli.config.DependencyConfig dep : config.parseDependencies()) {
+                if (dep.getMapping() != null && dep.getInstallPath() != null) {
+                    addComputedMapping(mappingsNode, dep, projectDir);
+                }
+            }
+            
+            // Process dev dependencies
+            for (org.lucee.lucli.config.DependencyConfig dep : config.parseDevDependencies()) {
+                if (dep.getMapping() != null && dep.getInstallPath() != null) {
+                    addComputedMapping(mappingsNode, dep, projectDir);
+                }
+            }
+        } catch (Exception e) {
+            // If we can't parse lucee.json, just skip declared mappings
+            // This is not a fatal error - we can still work with lock file mappings
+        }
+    }
+    
+    /**
+     * Add mappings from installed dependencies in lucee-lock.json.
+     * These override any declared mappings from lucee.json.
+     */
+    private static void addInstalledDependencyMappings(
+            Path projectDir,
+            com.fasterxml.jackson.databind.node.ObjectNode mappingsNode) throws IOException {
+        
         Path lockFilePath = projectDir.resolve("lucee-lock.json");
         if (!Files.exists(lockFilePath)) {
-            return null; // No lock file, no dependencies
+            return; // No lock file, skip installed mappings
         }
         
         // Read lock file
         JsonNode lockFile = objectMapper.readTree(lockFilePath.toFile());
         JsonNode dependencies = lockFile.get("dependencies");
         JsonNode devDependencies = lockFile.get("devDependencies");
-        
-        if ((dependencies == null || dependencies.size() == 0) && 
-            (devDependencies == null || devDependencies.size() == 0)) {
-            return null; // No dependencies with mappings
-        }
-        
-        // Build mappings object
-        com.fasterxml.jackson.databind.node.ObjectNode mappingsNode = objectMapper.createObjectNode();
         
         // Process production dependencies
         if (dependencies != null && dependencies.isObject()) {
@@ -1065,15 +1165,44 @@ public class LuceeServerConfig {
                 addDependencyMapping(mappingsNode, depName, dep, projectDir);
             });
         }
+    }
+    
+    /**
+     * Add a computed mapping from a DependencyConfig object.
+     * Used for declared dependencies in lucee.json.
+     */
+    private static void addComputedMapping(
+            com.fasterxml.jackson.databind.node.ObjectNode mappingsNode,
+            org.lucee.lucli.config.DependencyConfig dep,
+            Path projectDir) {
         
-        if (mappingsNode.size() == 0) {
-            return null; // No mappings to add
+        String virtualPath = dep.getMapping();
+        String installPath = dep.getInstallPath();
+        
+        if (virtualPath == null || installPath == null) {
+            return;
         }
         
-        // Wrap in a configuration object
-        com.fasterxml.jackson.databind.node.ObjectNode configNode = objectMapper.createObjectNode();
-        configNode.set("mappings", mappingsNode);
-        return configNode;
+        // Resolve to absolute path
+        Path physicalPath = Paths.get(installPath);
+        if (!physicalPath.isAbsolute()) {
+            physicalPath = projectDir.resolve(installPath).toAbsolutePath().normalize();
+        }
+        
+        // Create CFConfig mapping object
+        com.fasterxml.jackson.databind.node.ObjectNode mappingObj = objectMapper.createObjectNode();
+        mappingObj.put("physical", physicalPath.toString());
+        mappingObj.put("archive", "");
+        mappingObj.put("primary", "physical");
+        mappingObj.put("inspectTemplate", "once");
+        mappingObj.put("readonly", "no");
+        mappingObj.put("listenerMode", "modern");
+        mappingObj.put("listenerType", "curr2root");
+        
+        // Add to mappings with virtual path as key
+        // Ensure virtual path ends with / for consistency
+        String mappingKey = virtualPath.endsWith("/") ? virtualPath : virtualPath + "/";
+        mappingsNode.set(mappingKey, mappingObj);
     }
     
     /**
