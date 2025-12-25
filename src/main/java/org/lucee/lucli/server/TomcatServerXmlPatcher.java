@@ -88,6 +88,7 @@ public class TomcatServerXmlPatcher {
             applyShutdownPort(document, config);
             applyRootContext(document, config, projectDir, serverInstanceDir);
             applyHttpsConfiguration(document, config, serverInstanceDir, writeFiles);
+            removeDisabledConnectors(document, config);
 
             TransformerFactory tf = TransformerFactory.newInstance();
             Transformer transformer = tf.newTransformer();
@@ -630,5 +631,61 @@ public class TomcatServerXmlPatcher {
                        "RewriteRule ^/(.*)$ https://" + redirectHost + ":" + httpsPort + "/$1 [R=302,L]\n";
 
         Files.writeString(rewriteDir.resolve("rewrite.config"), rules, StandardCharsets.UTF_8);
+    }
+    
+    /**
+     * Remove disabled connectors from the document.
+     * When AJP is disabled, removes any AJP connectors to prevent port binding errors.
+     */
+    private void removeDisabledConnectors(Document document, LuceeServerConfig.ServerConfig config) {
+        if (document == null || config == null) {
+            return;
+        }
+        
+        // If AJP is disabled, remove AJP connectors
+        if (config.ajp == null || !config.ajp.enabled) {
+            removeAjpConnectors(document);
+        }
+    }
+    
+    /**
+     * Remove all AJP connectors from the document
+     */
+    private void removeAjpConnectors(Document document) {
+        if (document == null) {
+            return;
+        }
+        
+        NodeList connectors = document.getElementsByTagName("Connector");
+        if (connectors == null || connectors.getLength() == 0) {
+            return;
+        }
+        
+        // Iterate backwards to safely remove elements during iteration
+        for (int i = connectors.getLength() - 1; i >= 0; i--) {
+            if (!(connectors.item(i) instanceof Element)) {
+                continue;
+            }
+            
+            Element connector = (Element) connectors.item(i);
+            String protocol = connector.getAttribute("protocol");
+            
+            // Check if this is an AJP connector
+            boolean isAjpConnector = 
+                protocol != null && (
+                    protocol.contains("AJP") || 
+                    protocol.contains("ajp") ||
+                    "AJP/1.3".equals(protocol) ||
+                    "org.apache.coyote.ajp.AjpNioProtocol".equals(protocol)
+                );
+            
+            if (isAjpConnector) {
+                // Remove the connector from its parent
+                Node parent = connector.getParentNode();
+                if (parent != null) {
+                    parent.removeChild(connector);
+                }
+            }
+        }
     }
 }

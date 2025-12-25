@@ -31,3 +31,4 @@ WEB-INF/
 test_*.sh
 examples/
 test-deps/
+test_output/
