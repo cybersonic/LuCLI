@@ -98,5 +98,4 @@ Server files are stored in `~/.lucli/servers/server-basic-example/` and can be r
 
 ## Learn More
 
-- [Server Management Documentation](../../WARP.md#server-management)
 - [lucee.json Schema](../../schemas/v1/lucee.schema.json)

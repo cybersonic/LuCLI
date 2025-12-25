@@ -152,6 +152,6 @@ lucli server stop
     </ul>
 
     <hr style="margin: 40px 0;">
-    <p><small>Part of <a href="https://github.com/Ortus-Solutions/lucee-cli">LuCLI Examples</a></small></p>
+    <p><small>Part of <a href="https://github.com/cybersonic/lucli">LuCLI Examples</a></small></p>
 </body>
 </html>
