@@ -48,7 +48,7 @@ public class TomcatConfigGenerator {
 
         // Generate Tomcat setenv scripts that persist JVM configuration derived
         // from lucee.json into a Tomcat-consumable format (setenv.sh / setenv.bat).
-        writeSetenvScripts(serverInstanceDir, config);
+        writeSetenvScripts(serverInstanceDir, config, projectDir);
     }
     
     /**
@@ -606,7 +606,7 @@ public class TomcatConfigGenerator {
      * already set, so that LuCLI can continue to override CATALINA_OPTS via the
      * ProcessBuilder environment when starting servers programmatically.
      */
-    private void writeSetenvScripts(Path serverInstanceDir, LuceeServerConfig.ServerConfig config) throws IOException {
+    private void writeSetenvScripts(Path serverInstanceDir, LuceeServerConfig.ServerConfig config, Path projectDir) throws IOException {
         Path binDir = serverInstanceDir.resolve("bin");
         if (!Files.exists(binDir)) {
             // Unexpected, but don't fail server creation if bin does not exist.
@@ -619,7 +619,7 @@ public class TomcatConfigGenerator {
         List<String> opts;
         try {
             LuceeServerManager manager = new LuceeServerManager();
-            opts = manager.buildCatalinaOpts(config, null);
+            opts = manager.buildCatalinaOpts(config, null, projectDir);
         } catch (Exception e) {
             throw new IOException("Failed to build JVM options for setenv scripts: " + e.getMessage(), e);
         }

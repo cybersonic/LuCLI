@@ -22,7 +22,8 @@ public class LuceeServerManagerAgentsTest {
     private List<String> invokeBuildCatalinaOpts(LuceeServerConfig.ServerConfig config,
                                                 LuceeServerManager.AgentOverrides overrides) throws Exception {
         LuceeServerManager manager = new LuceeServerManager();
-        return manager.buildCatalinaOpts(config, overrides);
+        // Pass null projectDir for tests that don't need extension handling
+        return manager.buildCatalinaOpts(config, overrides, null);
     }
 
     @SuppressWarnings("unchecked")

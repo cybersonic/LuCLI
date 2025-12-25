@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Minimal Log4j2 configuration for LuCLI
+  This reduces Log4j class loading during startup by:
+  - Using minimal appenders
+  - Disabling JMX and monitoring
+  - Setting root level to ERROR (minimal logging)
+-->
+<Configuration status="ERROR" monitorInterval="0" shutdownHook="disable">
+    <!-- 
+      status="ERROR" - Only show Log4j internal errors
+      monitorInterval="0" - Don't monitor config file for changes
+    -->
+    
+    <Properties>
+        <!-- Minimal pattern for performance -->
+        <Property name="pattern">%d{HH:mm:ss.SSS} %-5level - %msg%n</Property>
+    </Properties>
+    
+    <Appenders>
+        <!-- Null appender - discard all logs (fastest) -->
+        <Null name="null"/>
+        
+        <!-- Console appender only for critical errors -->
+        <Console name="console" target="SYSTEM_ERR">
+            <PatternLayout pattern="${pattern}"/>
+            <ThresholdFilter level="FATAL" onMatch="ACCEPT" onMismatch="DENY"/>
+        </Console>
+    </Appenders>
+    
+    <Loggers>
+        <!-- Disable Lucee's verbose logging -->
+        <Logger name="lucee" level="ERROR" additivity="false">
+            <AppenderRef ref="null"/>
+        </Logger>
+        
+        <!-- Disable HTTP client logging -->
+        <Logger name="org.apache.http" level="ERROR" additivity="false">
+            <AppenderRef ref="null"/>
+        </Logger>
+        
+        <!-- Disable other common verbose loggers -->
+        <Logger name="org.eclipse.jetty" level="ERROR" additivity="false">
+            <AppenderRef ref="null"/>
+        </Logger>
+        
+        <!-- Root logger - only fatal errors to console -->
+        <Root level="FATAL">
+            <AppenderRef ref="console"/>
+        </Root>
+    </Loggers>
+</Configuration>
