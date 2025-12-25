@@ -3,13 +3,24 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+
+## 0.1.229
+- **Dependency Management:** Added `deps` and `install` CLI commands for managing project dependencies. New dependency infrastructure with `dependencySettings` configuration.
+- **Server Run Command:** New `server run` command for running Lucee server in foreground mode (non-daemon), useful for Docker containers and debugging.
+- **Server Configuration Improvements:** Added AJP connector configuration support with ability to disable via `ajp.enabled=false`. Enhanced mapping computation for server startup. Additional server start command options now available.
+- **Docker Support:** Added Docker documentation and examples with improved default user configuration in Dockerfile.
+- **Server Prune Enhancement:** Added confirmation prompt and `--force` flag to `server prune` command for safer cleanup operations.
+- **Version Display:** Enhanced version message output with improved formatting.
+- **Architecture Refactoring:** Major refactoring to simplify architecture - consolidated terminal implementations, migrated commands to direct Picocli implementation, improved code quality. Added naming conventions documentation.
+- **Command Timing:** Added execution timing information to all Picocli commands for performance monitoring.
 - **Lucee Extension Support:** Added comprehensive extension dependency management with name-based resolution via extension registry. Extensions can be defined in `lucee.json` dependencies using friendly names (e.g., "h2", "redis", "postgres") instead of UUIDs. Supports both automatic ID-based installation via `LUCEE_EXTENSIONS` environment variable and direct .lex file deployment to server deploy folder.
 - **Extension Registry:** Created `ExtensionRegistry` with JSON-based mapping of 24+ common extensions (databases, cache, core utilities) from friendly names/slugs to UUIDs. Registry located at `src/main/resources/extensions/lucee-extensions.json` with comprehensive documentation.
 - **Dependency Installer:** New `ExtensionDependencyInstaller` handles extension installation and deployment. Extensions with URL/path are deployed to `{serverDir}/lucee-server/deploy/` folder. Lock file tracks extension IDs and sources.
 - **Alternate Configuration Files:** Added `-c`/`--config` option to `server start` and `server run` commands for using alternate configuration files (e.g., `lucli server start -c lucee-prod.json`).
 - **Stop All Servers:** Added `--all` flag to `server stop` command to stop all running servers at once: `lucli server stop --all`. Displays progress and summary of stopped servers.
 - **Bug Fixes:** Renamed `LuceLockFile` to `LuceeLockFile` (corrected spelling).
-- **Examples:** New `examples/dependency-extensions/` demonstrating extension usage with comprehensive README and working demo.
+- **Examples:** New `examples/dependency-extensions/` and `examples/server-environments/` demonstrating extension usage and environment configurations. Added `examples/dependency-git-subpath/` for dependency documentation. Archived old examples.
+- **Testing:** Removed obsolete test scripts and updated .gitignore.
 
 ## 0.1.194
 - **Dry-Run Enhancements:** Added `--include-lucee` flag to `server start --dry-run` for previewing resolved `.CFConfig.json` before deployment. Shows merged configuration from `configurationFile` and inline `configuration` with environment variable substitution applied.
