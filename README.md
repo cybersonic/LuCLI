@@ -304,7 +304,7 @@ writeOutput('[ERROR] CFML Error: ' & e.message);
 
 ### Global Commands
 | Command | Description | Example |
-|---------|-------------|---------||
+|---------|-------------|---------|
 | `--version` | Show version information | `lucli --version` |
 | `--lucee-version` | Show Lucee engine version | `lucli --lucee-version` |
 | `--help` | Show help information | `lucli --help` |
