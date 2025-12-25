@@ -1,0 +1,45 @@
+services:
+  lucli:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./:/app
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - lucli-network
+
+  mysql:
+    image: mysql:8.0
+    container_name: lucli-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: lucli_demo
+      MYSQL_USER: lucli
+      MYSQL_PASSWORD: lucli123
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./backend-services/mysql:/docker-entrypoint-initdb.d:ro
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - lucli-network
+
+volumes:
+  lucli_home:
+    driver: local
+  mysql_data:
+    driver: local
+
+networks:
+  lucli-network:
+    driver: bridge
