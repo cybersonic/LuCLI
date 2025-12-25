@@ -234,7 +234,7 @@ public class LuCLI {
         System.exit(exitCode);
     }
     
-	/**
+    /**
      * Get formatted version information
      * @param includeLucee Whether to include Lucee version
      * @return Formatted version string with labels
@@ -245,16 +245,32 @@ public class LuCLI {
      */
     public static String getVersionInfo(boolean includeLucee) {
         StringBuilder info = new StringBuilder();
-        info.append("LuCLI ").append(getVersion());
+        
+        // ASCII art banner
+        info.append("\n");
+        info.append(" _           ____ _     ___ \n");
+        info.append("| |   _   _ / ___| |   |_ _|\n");
+        info.append("| |  | | | | |   | |    | | \n");
+        info.append("| |__| |_| | |___| |___ | | \n");
+        info.append("|_____\\__,_|\\____|_____|___|\n");
+        info.append("\n");
+        
+        // Version information
+        info.append("Version: ").append(getVersion()).append("\n");
         
         if (includeLucee) {
             try {
                 String luceeVersion = LuceeScriptEngine.getInstance(false, false).getVersion();
-                info.append("\nLucee Version: ").append(luceeVersion);
+                info.append("Lucee Version: ").append(luceeVersion).append("\n");
             } catch (Exception e) {
-                info.append("\nLucee Version: Error - ").append(e.getMessage());
+                info.append("Lucee Version: Error - ").append(e.getMessage()).append("\n");
             }
         }
+        
+        // Copyright and repository information
+        info.append("\n");
+        info.append("Copyright (c) Mark Drew https://github.com/cybersonic\n");
+        info.append("Repository: https://github.com/cybersonic/lucli\n");
         
         return info.toString();
     }
