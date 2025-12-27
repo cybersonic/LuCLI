@@ -7,6 +7,8 @@ Commands:
     --version VERSION        Specify Lucee version
     --name NAME              Specify custom server name
     --force                  Replace existing server
+    --disable-lucee          Start as static server (enableLucee=false for this start)
+    --enable-lucee           Explicitly enable Lucee CFML engine for this start
     --agents LIST            Comma-separated agent IDs to enable for this start
     --enable-agent NAME      Enable a specific agent for this start
     --disable-agent NAME     Disable a specific agent for this start
