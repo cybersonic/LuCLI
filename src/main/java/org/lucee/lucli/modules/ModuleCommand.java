@@ -588,10 +588,24 @@ private static ModuleOptions parseArguments(String[] args) {
      *  3) GitHub HTTPS URL fallback to archive download when git is not available
      */
 public static void installModule(String moduleName, String gitUrl, boolean force) throws Exception {
+
+
+
+
         // Phase 1: require explicit URL
         if (gitUrl == null || gitUrl.trim().isEmpty()) {
-            System.err.println("modules install currently requires --url=<url> (registry-based installs are not implemented yet).");
-            System.exit(1);
+
+
+            ModuleRepositoryIndex repoIndex = ModuleRepositoryIndex.loadDefault();
+            ModuleRepositoryIndex.RepoModule repoMod =
+                repoIndex.getModulesByName().get(moduleName);
+
+            if (repoMod != null && repoMod.getUrl() != null && !repoMod.getUrl().isBlank()) {
+                gitUrl = repoMod.getUrl().trim();
+            } else {
+                System.err.println("modules install currently requires --url=<url> or a known repository entry for '" + moduleName + "'.");
+                System.exit(1);
+            }
         }
 
         // Support #ref syntax in URL (e.g. https://github.com/user/repo.git#v1.2.0)
