@@ -140,11 +140,19 @@ public class ServerCommand implements Callable<Integer> {
                 arity = "0..1",
                 fallbackValue = "true")
         private String openBrowser;
-
+        
         @Option(names = {"--disable-open-browser"}, 
                 description = "Disable automatic browser opening")
         private boolean disableOpenBrowser = false;
-
+        
+        @Option(names = {"--disable-lucee"}, 
+                description = "Disable Lucee CFML engine for this start (static server)")
+        private boolean disableLucee = false;
+        
+        @Option(names = {"--enable-lucee"}, 
+                description = "Explicitly enable Lucee CFML engine for this start")
+        private boolean enableLucee = false;
+        
         @Parameters(paramLabel = "[PROJECT_DIR]", 
                     description = "Project directory (defaults to current directory)",
                     arity = "0..1")
@@ -179,6 +187,11 @@ public class ServerCommand implements Callable<Integer> {
                 System.out.println("   |  |  pie  |  |");
                 System.out.println("    \\ '.___.' /");
                 System.out.println("     '.___ __.'");
+            }
+
+            if (disableLucee && enableLucee) {
+                System.err.println("Cannot combine --enable-lucee and --disable-lucee in a single command.");
+                return 1;
             }
 
             // Get current working directory
@@ -265,6 +278,13 @@ public class ServerCommand implements Callable<Integer> {
                 args.add("openBrowser=" + openBrowser);
             }
 
+            // Handle Lucee engine toggles
+            if (disableLucee) {
+                args.add("--disable-lucee");
+            } else if (enableLucee) {
+                args.add("--enable-lucee");
+            }
+            
             // Add any config overrides (key=value pairs)
             if (configOverrides != null && !configOverrides.isEmpty()) {
                 args.addAll(configOverrides);

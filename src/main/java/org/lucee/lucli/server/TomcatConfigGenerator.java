@@ -112,7 +112,8 @@ public class TomcatConfigGenerator {
         webXmlPatcher.patch(projectWebXml, config, projectDir, serverInstanceDir);
         
         // Apply urlrewrite.xml template to PROJECT directory only if URL rewrite is enabled
-        if (config.urlRewrite != null && config.urlRewrite.enabled) {
+        // and the Lucee engine is enabled (static servers do not need CFML URL rewriting).
+        if (config.enableLucee && config.urlRewrite != null && config.urlRewrite.enabled) {
             Path projectUrlRewriteXml = webrootWebInf.resolve("urlrewrite.xml");
             if (overwriteProjectConfig || !Files.exists(projectUrlRewriteXml)) {
                 applyTemplate("tomcat_template/webapps/ROOT/WEB-INF/urlrewrite.xml", projectUrlRewriteXml, placeholders);
@@ -124,7 +125,8 @@ public class TomcatConfigGenerator {
         // Deploy UrlRewriteFilter JAR to PROJECT directory's WEB-INF/lib
         // CRITICAL: When docBase points to the project directory, Tomcat's classloader
         // loads JARs from docBase/WEB-INF/lib, NOT from CATALINA_BASE/webapps/ROOT/WEB-INF/lib
-        if (config.urlRewrite != null && config.urlRewrite.enabled) {
+        // Only deploy when Lucee and URL rewrite are both enabled.
+        if (config.enableLucee && config.urlRewrite != null && config.urlRewrite.enabled) {
             try {
                 Path projectWebInfLib = webrootWebInf.resolve("lib");
                 Files.createDirectories(projectWebInfLib);

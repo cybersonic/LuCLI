@@ -1,6 +1,7 @@
 package org.lucee.lucli.commands;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -119,6 +120,7 @@ public class UnifiedCommandExecutor {
         boolean includeTomcatServer = false;
         boolean includeHttpsKeystorePlan = false;
         boolean includeHttpsRedirectRules = false;
+        Boolean enableLuceeOverride = null;
         Path projectDir = currentWorkingDirectory; // Default to current directory
         
         LuceeServerManager.AgentOverrides agentOverrides = new LuceeServerManager.AgentOverrides();
@@ -163,6 +165,10 @@ public class UnifiedCommandExecutor {
                 includeHttpsKeystorePlan = true;
                 includeHttpsRedirectRules = true;
                 includeLuceeConfig=true;
+            } else if (args[i].equals("--disable-lucee")) {
+                enableLuceeOverride = Boolean.FALSE;
+            } else if (args[i].equals("--enable-lucee")) {
+                enableLuceeOverride = Boolean.TRUE;
             } else if (args[i].equals("--no-agents")) {
                 agentOverrides.disableAllAgents = true;
             } else if ((args[i].equals("--agents")) && i + 1 < args.length) {
@@ -229,6 +235,17 @@ public class UnifiedCommandExecutor {
                 finalConfig = LuceeServerConfig.applyEnvironment(finalConfig, environment);
             } catch (IllegalArgumentException e) {
                 return formatOutput("❌ " + e.getMessage(), true);
+            }
+        }
+        
+        // Apply explicit Lucee enable/disable override, if provided
+        if (enableLuceeOverride != null) {
+            finalConfig.enableLucee = enableLuceeOverride.booleanValue();
+            try {
+                Path configPath = projectDir.resolve(cfgFile);
+                LuceeServerConfig.saveConfig(finalConfig, configPath);
+            } catch (IOException e) {
+                System.err.println("Warning: Failed to persist enableLucee override to " + cfgFile + ": " + e.getMessage());
             }
         }
         
@@ -339,18 +356,37 @@ public class UnifiedCommandExecutor {
         
         try {
             StringBuilder result = new StringBuilder();
+            boolean isLuceeEnabledForStartup = finalConfig.enableLucee;
             if (isTerminalMode) {
                 // Shorter output for terminal mode
-                result.append("Starting Lucee server...\n");
+                if (isLuceeEnabledForStartup) {
+                    result.append("Starting Lucee server...\n");
+                } else {
+                    result.append("Starting static server...\n");
+                }
             } else {
-                result.append("Starting Lucee server in: ").append(projectDir).append("\n");
+                if (isLuceeEnabledForStartup) {
+                    result.append("Starting Lucee server in: ").append(projectDir).append("\n");
+                } else {
+                    result.append("Starting static server in: ").append(projectDir).append("\n");
+                }
             }
             
-            LuceeServerManager.ServerInstance instance = serverManager.startServer(projectDir, versionOverride, forceReplace, customName, agentOverrides, environment);
+            LuceeServerManager.ServerInstance instance = serverManager.startServer(
+                projectDir,
+                versionOverride,
+                forceReplace,
+                customName,
+                agentOverrides,
+                environment,
+                cfgFile
+            );
             
-            // Load configuration to get monitoring/JMX port and agent info
-            LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(projectDir);
+            // Use the realized configuration (including environment and overrides) for summary output
+            LuceeServerConfig.ServerConfig config = finalConfig;
             
+            // Compute effective webroot for display
+            java.nio.file.Path effectiveWebroot = LuceeServerConfig.resolveWebroot(config, projectDir);
            
             result.append("   Server Name:   ").append(instance.getServerName()).append("\n");
             result.append("   Process ID:    ").append(instance.getPid()).append("\n");
@@ -365,8 +401,12 @@ public class UnifiedCommandExecutor {
             
             
             result.append("   URL:           http://localhost:").append(instance.getPort()).append("\n");
-            result.append("   Admin URL:     http://localhost:").append(instance.getPort()).append("/lucee/admin.cfm\n");
-            result.append("   Web Root:      ").append(projectDir).append("\n");
+            if (config.enableLucee && config.admin != null && config.admin.enabled) {
+                result.append("   Admin URL:     http://localhost:")
+                      .append(instance.getPort())
+                      .append("/lucee/admin.cfm\n");
+            }
+            result.append("   Web Root:      ").append(effectiveWebroot).append("\n");
             result.append("   Server Dir:    ").append(instance.getServerDir()).append("\n");
 
             // Show active agents, if any
@@ -412,6 +452,7 @@ public class UnifiedCommandExecutor {
         String versionOverride = null;
         boolean forceReplace = false;
         String customName = null;
+        String configFileName = null;
         String environment = null;
         Path projectDir = currentWorkingDirectory; // Default to current directory
         
@@ -427,6 +468,9 @@ public class UnifiedCommandExecutor {
                 forceReplace = true;
             } else if ((args[i].equals("--name") || args[i].equals("-n")) && i + 1 < args.length) {
                 customName = args[i + 1];
+                i++; // Skip next argument
+            } else if ((args[i].equals("--config") || args[i].equals("-c")) && i + 1 < args.length) {
+                configFileName = args[i + 1];
                 i++; // Skip next argument
             } else if ((args[i].equals("--env") || args[i].equals("--environment")) && i + 1 < args.length) {
                 environment = args[i + 1];
@@ -466,14 +510,15 @@ public class UnifiedCommandExecutor {
                 projectDir = Paths.get(args[i]);
             } else if (!args[i].startsWith("-") && args[i].contains("=")) {
                 // Treat bare key=value arguments as configuration overrides that should
-                // be applied to lucee.json before starting the server.
+                // be applied to the configuration file before starting the server.
                 configOverrides.add(args[i]);
             }
         }
         
-        // Apply any configuration overrides to lucee.json before starting the server.
+        // Apply any configuration overrides to the selected configuration file before starting the server.
         if (!configOverrides.isEmpty()) {
-            LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(projectDir);
+            String cfgFile = configFileName != null ? configFileName : "lucee.json";
+            LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(projectDir, cfgFile);
             ServerConfigHelper configHelper = new ServerConfigHelper();
             for (String kv : configOverrides) {
                 String[] parts = kv.split("=", 2);
@@ -481,7 +526,8 @@ public class UnifiedCommandExecutor {
                     configHelper.setConfigValue(config, parts[0], parts[1]);
                 }
             }
-            LuceeServerConfig.saveConfig(config, projectDir.resolve("lucee.json"));
+            Path configFile = projectDir.resolve(cfgFile);
+            LuceeServerConfig.saveConfig(config, configFile);
         }
         
         // If no agent-related flags were actually set, avoid passing a non-null overrides object
@@ -494,7 +540,8 @@ public class UnifiedCommandExecutor {
         
         try {
             // Run server in foreground mode - this method blocks until server is stopped
-            serverManager.runServerForeground(projectDir, versionOverride, forceReplace, customName, agentOverrides, environment);
+            String cfgFile = configFileName != null ? configFileName : "lucee.json";
+            serverManager.runServerForeground(projectDir, versionOverride, forceReplace, customName, agentOverrides, environment, cfgFile);
             return ""; // Return empty string since output is streamed to console
             
         } catch (ServerConflictException e) {
