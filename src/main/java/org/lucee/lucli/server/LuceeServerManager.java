@@ -83,14 +83,14 @@ public class LuceeServerManager {
      * Start a Lucee server for the current project directory
      */
     public ServerInstance startServer(Path projectDir, String versionOverride) throws Exception {
-        return startServer(projectDir, versionOverride, false, null, null, null);
+        return startServer(projectDir, versionOverride, false, null, null, null, null);
     }
     
     /**
      * Start a Lucee server with options for handling existing servers
      */
     public ServerInstance startServer(Path projectDir, String versionOverride, boolean forceReplace, String customName) throws Exception {
-        return startServer(projectDir, versionOverride, forceReplace, customName, null, null);
+        return startServer(projectDir, versionOverride, forceReplace, customName, null, null, null);
     }
     
     /**
@@ -98,7 +98,7 @@ public class LuceeServerManager {
      */
     public ServerInstance startServer(Path projectDir, String versionOverride, boolean forceReplace, String customName,
                                       AgentOverrides agentOverrides) throws Exception {
-        return startServer(projectDir, versionOverride, forceReplace, customName, agentOverrides, null);
+        return startServer(projectDir, versionOverride, forceReplace, customName, agentOverrides, null, null);
     }
     
     /**
@@ -114,7 +114,24 @@ public class LuceeServerManager {
      */
     public ServerInstance startServer(Path projectDir, String versionOverride, boolean forceReplace, String customName,
                                       AgentOverrides agentOverrides, String environment) throws Exception {
-        return startServerInternal(projectDir, versionOverride, forceReplace, customName, agentOverrides, environment, false);
+        return startServer(projectDir, versionOverride, forceReplace, customName, agentOverrides, environment, null);
+    }
+    
+    /**
+     * Core server startup method that also accepts an explicit configuration file name.
+     *
+     * @param projectDir The project directory
+     * @param versionOverride Optional version override (can be null)
+     * @param forceReplace Whether to force replace an existing server
+     * @param customName Optional custom name (can be null)
+     * @param agentOverrides Optional agent overrides (can be null)
+     * @param environment Optional environment name to apply (can be null)
+     * @param configFileName Optional configuration file name (e.g., "lucee-static.json"). When null, uses "lucee.json".
+     * @return ServerInstance for the started server
+     */
+    public ServerInstance startServer(Path projectDir, String versionOverride, boolean forceReplace, String customName,
+                                      AgentOverrides agentOverrides, String environment, String configFileName) throws Exception {
+        return startServerInternal(projectDir, versionOverride, forceReplace, customName, agentOverrides, environment, configFileName, false);
     }
     
     /**
@@ -131,7 +148,25 @@ public class LuceeServerManager {
      */
     public void runServerForeground(Path projectDir, String versionOverride, boolean forceReplace, String customName,
                                     AgentOverrides agentOverrides, String environment) throws Exception {
-        startServerInternal(projectDir, versionOverride, forceReplace, customName, agentOverrides, environment, true);
+        runServerForeground(projectDir, versionOverride, forceReplace, customName, agentOverrides, environment, null);
+    }
+    
+    /**
+     * Run a Lucee server in foreground mode (similar to catalina.sh run) with an explicit config file.
+     * This starts Tomcat in-process with console output streaming.
+     * When the process is stopped (Ctrl+C), the server stops.
+     *
+     * @param projectDir The project directory
+     * @param versionOverride Optional version override (can be null)
+     * @param forceReplace Whether to force replace an existing server
+     * @param customName Optional custom name (can be null)
+     * @param agentOverrides Optional agent overrides (can be null)
+     * @param environment Optional environment name to apply (can be null)
+     * @param configFileName Optional configuration file name (e.g., "lucee-static.json"). When null, uses "lucee.json".
+     */
+    public void runServerForeground(Path projectDir, String versionOverride, boolean forceReplace, String customName,
+                                    AgentOverrides agentOverrides, String environment, String configFileName) throws Exception {
+        startServerInternal(projectDir, versionOverride, forceReplace, customName, agentOverrides, environment, configFileName, true);
     }
     
     /**
@@ -143,13 +178,18 @@ public class LuceeServerManager {
      * @param customName Optional custom name (can be null)
      * @param agentOverrides Optional agent overrides (can be null)
      * @param environment Optional environment name to apply (can be null)
+     * @param configFileName Optional configuration file name (e.g., "lucee-static.json"). When null, uses "lucee.json".
      * @param foreground If true, runs in foreground mode (blocks); if false, runs in background
      * @return ServerInstance (only when foreground=false; returns null when foreground=true)
      */
     private ServerInstance startServerInternal(Path projectDir, String versionOverride, boolean forceReplace, String customName,
-                                      AgentOverrides agentOverrides, String environment, boolean foreground) throws Exception {
+                                      AgentOverrides agentOverrides, String environment, String configFileName, boolean foreground) throws Exception {
+        // Determine which configuration file to load
+        String cfgFile = (configFileName != null && !configFileName.trim().isEmpty())
+                ? configFileName
+                : "lucee.json";
         // Load configuration
-        LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(projectDir);
+        LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(projectDir, cfgFile);
         
         // Apply environment overrides if specified
         if (environment != null && !environment.trim().isEmpty()) {
