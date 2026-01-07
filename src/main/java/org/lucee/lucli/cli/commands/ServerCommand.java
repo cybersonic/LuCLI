@@ -7,6 +7,7 @@ import java.util.concurrent.Callable;
 import org.lucee.lucli.cli.LuCLICommand;
 import org.lucee.lucli.cli.completion.LuceeVersionCandidates;
 import org.lucee.lucli.commands.UnifiedCommandExecutor;
+import org.lucee.lucli.server.LuceeServerManager;
 
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -33,6 +34,7 @@ import picocli.CommandLine.Model.CommandSpec;
         ServerCommand.GetCommand.class,
         ServerCommand.SetCommand.class,
         ServerCommand.LogCommand.class,
+        ServerCommand.OpenCommand.class,
         ServerMonitorCommandImpl.class
     }
 )
@@ -152,6 +154,10 @@ public class ServerCommand implements Callable<Integer> {
         @Option(names = {"--enable-lucee"}, 
                 description = "Explicitly enable Lucee CFML engine for this start")
         private boolean enableLucee = false;
+
+        @Option(names = {"--webroot"},
+                description = "Override webroot (relative to project directory, like lucee.json)")
+        private String webroot;
         
         @Parameters(paramLabel = "[PROJECT_DIR]", 
                     description = "Project directory (defaults to current directory)",
@@ -235,6 +241,10 @@ public class ServerCommand implements Callable<Integer> {
             }
             if (includeLucee) {
                 args.add("--include-lucee");
+            }
+            if (webroot != null) {
+                args.add("--webroot");
+                args.add(webroot);
             }
             if (includeTomcatWeb) {
                 args.add("--include-tomcat-web");
@@ -337,10 +347,14 @@ public class ServerCommand implements Callable<Integer> {
         @Option(names = {"-c", "--config"}, 
                 description = "Configuration file to use (defaults to lucee.json)")
         private String configFile;
-
+        
         @Option(names = {"--env", "--environment"}, 
                 description = "Environment to use (e.g., prod, dev, staging)")
         private String environment;
+
+        @Option(names = {"--webroot"},
+                description = "Override webroot (relative to project directory, like lucee.json)")
+        private String webroot;
 
         @Option(names = {"--no-agents"},
                 description = "Disable all Java agents")
@@ -403,6 +417,10 @@ public class ServerCommand implements Callable<Integer> {
             if (environment != null) {
                 args.add("--env");
                 args.add(environment);
+            }
+            if (webroot != null) {
+                args.add("--webroot");
+                args.add(webroot);
             }
             if (noAgents) {
                 args.add("--no-agents");
@@ -798,6 +816,42 @@ public class ServerCommand implements Callable<Integer> {
             String result = executor.executeCommand("server", args.toArray(new String[0]));
             if (result != null && !result.isEmpty()) {
                 System.out.println(result);
+            }
+
+            return 0;
+        }
+    }
+    /**
+     * Server open subcommand
+     */
+    @Command(
+        name = "open", 
+        description = "Open a running server instance in a browser"
+    )
+    static class OpenCommand implements Callable<Integer> {
+
+        @ParentCommand
+        private ServerCommand parent;
+
+        @Option(names = {"-n", "--name"},
+                description = "Name of the server instance to open (defaults to current directory)")
+        private String name;
+
+        @Override
+        public Integer call() throws Exception {
+            // Default to current working directory when no name is provided
+            Path currentDir = Paths.get(System.getProperty("user.dir"));
+
+            LuceeServerManager serverManager = new LuceeServerManager();
+            boolean opened = serverManager.openBrowser(currentDir, name);
+
+            if (!opened) {
+                if (name != null && !name.trim().isEmpty()) {
+                    System.err.println("No running Lucee server found with name '" + name + "'.");
+                } else {
+                    System.err.println("No running Lucee server found for this directory. Start one with 'lucli server start'.");
+                }
+                return 1;
             }
 
             return 0;

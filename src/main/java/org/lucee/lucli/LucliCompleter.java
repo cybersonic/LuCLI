@@ -33,7 +33,7 @@ public class LucliCompleter implements Completer {
         // Terminal/session commands
         "exit", "quit", "clear", "history", "env", "echo",
         // LuCLI top-level commands that unifiedExecutor handles
-        "server", "modules", "cfml", "lint", "help"
+        // "server", "modules", "cfml", "lint", "help"
     };
     
     public LucliCompleter(CommandProcessor commandProcessor) {
@@ -47,9 +47,28 @@ public class LucliCompleter implements Completer {
         if (buffer.trim().isEmpty() || line.words().size() == 1) {
             // Complete internal terminal commands (PicoCLI handles server, modules, cfml, help)
             String partial = line.words().isEmpty() ? "" : line.words().get(0);
+            String lowerPartial = partial.toLowerCase();
+            
+            // 1) Built-in LuCLI / internal commands
             for (String command : internalCommands) {
-                if (command.startsWith(partial.toLowerCase())) {
-                    candidates.add(new Candidate(command, command, null, null, null, null, true));
+                if (command.startsWith(lowerPartial)) {
+                    candidates.add(new Candidate(command, command, "internal-commands", "LuCLI command", null, null, true));
+                }
+            }
+            
+            // 2) Top-level LuCLI modules (installed under modules directory)
+            //    These behave like first-class commands in the terminal (e.g. `lint`).
+            Map<String, Path> modules = listModules();
+            for (String moduleName : modules.keySet()) {
+                if (moduleName.startsWith(lowerPartial) && !isInternalCommand(moduleName)) {
+                    String displayValue = moduleName;
+                    String description = "LuCLI module";
+                    
+                    if (commandProcessor.getSettings().showEmojis()) {
+                        displayValue = "📦 " + moduleName;
+                    }
+                    
+                    candidates.add(new Candidate(moduleName, displayValue, "modules", description, null, null, true));
                 }
             }
         } else {
@@ -172,7 +191,20 @@ public class LucliCompleter implements Completer {
     }
 
 
-
+    
+    /**
+     * Check whether a command name is one of the built-in internal commands
+     * (used to avoid duplicating candidates when suggesting module names).
+     */
+    private boolean isInternalCommand(String command) {
+        for (String internal : internalCommands) {
+            if (internal.equalsIgnoreCase(command)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
     private boolean isFileCommand(String command) {
         switch (command) {
             case "ls":
@@ -492,7 +524,7 @@ public class LucliCompleter implements Completer {
                     completeServerFlags(subcommand, lastWord, candidates);
                 }
             }
-            // For start command, complete with version and option flags
+            // For start command, complete with version, webroot, and option flags
             else if ("start".equals(subcommand) && words.size() >= 3) {
                 String lastWord = words.get(words.size() - 1);
                 String prevWord = words.size() > 3 ? words.get(words.size() - 2) : "";
@@ -507,8 +539,28 @@ public class LucliCompleter implements Completer {
                     String suggestion = "my_server";
                     candidates.add(new Candidate(suggestion, suggestion, "suggested-names", "Suggested server name", null, null, true));
                 }
+                // Directory-aware completion for --webroot values
+                else if ("--webroot".equals(prevWord)) {
+                    // Reuse file completion but force directory-only behaviour by pretending this is a 'cd' command
+                    completeFilePaths(lastWord, candidates, "cd");
+                }
                 else if (!lastWord.startsWith("-")) {
                     // Complete with start command flags
+                    completeServerFlags(subcommand, lastWord, candidates);
+                }
+            }
+            // For run command, complete with version, webroot, and option flags
+            else if ("run".equals(subcommand) && words.size() >= 3) {
+                String lastWord = words.get(words.size() - 1);
+                String prevWord = words.size() > 3 ? words.get(words.size() - 2) : "";
+
+                if ("--version".equals(prevWord) || "-v".equals(prevWord)) {
+                    completeServerVersions(lastWord, candidates);
+                } else if ("--name".equals(prevWord) || "-n".equals(prevWord)) {
+                    completeServerNames(lastWord, candidates);
+                } else if ("--webroot".equals(prevWord)) {
+                    completeFilePaths(lastWord, candidates, "cd");
+                } else if (!lastWord.startsWith("-")) {
                     completeServerFlags(subcommand, lastWord, candidates);
                 }
             }
@@ -623,7 +675,7 @@ public class LucliCompleter implements Completer {
         
         switch (subcommand.toLowerCase()) {
             case "start":
-                flags = new String[]{"--version", "--name", "--force", "-v", "-n", "-f"};
+                flags = new String[]{"--version", "--name", "--force", "--webroot", "-v", "-n", "-f"};
                 break;
             case "stop":
             case "status":

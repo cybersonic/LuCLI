@@ -114,6 +114,7 @@ public class UnifiedCommandExecutor {
         String customName = null;
         String configFileName = null;
         String environment = null;
+        String webrootOverride = null;
         boolean dryRun = false;
         boolean includeLuceeConfig = false;
         boolean includeTomcatWeb = false;
@@ -146,6 +147,11 @@ public class UnifiedCommandExecutor {
                 environment = args[i].substring("--env=".length());
             } else if (args[i].startsWith("--environment=")) {
                 environment = args[i].substring("--environment=".length());
+            } else if ((args[i].equals("--webroot")) && i + 1 < args.length) {
+                webrootOverride = args[i + 1];
+                i++; // Skip next argument
+            } else if (args[i].startsWith("--webroot=")) {
+                webrootOverride = args[i].substring("--webroot=".length());
             } else if (args[i].equals("--dry-run")) {
                 dryRun = true;
             } else if (args[i].equals("--include-tomcat-web")) {
@@ -236,6 +242,11 @@ public class UnifiedCommandExecutor {
             } catch (IllegalArgumentException e) {
                 return formatOutput("❌ " + e.getMessage(), true);
             }
+        }
+
+        // Apply one-shot webroot override (does not persist to lucee.json)
+        if (webrootOverride != null && !webrootOverride.trim().isEmpty()) {
+            finalConfig.webroot = webrootOverride.trim();
         }
         
         // Apply explicit Lucee enable/disable override, if provided
@@ -454,6 +465,7 @@ public class UnifiedCommandExecutor {
         String customName = null;
         String configFileName = null;
         String environment = null;
+        String webrootOverride = null;
         Path projectDir = currentWorkingDirectory; // Default to current directory
         
         LuceeServerManager.AgentOverrides agentOverrides = new LuceeServerManager.AgentOverrides();
@@ -479,6 +491,11 @@ public class UnifiedCommandExecutor {
                 environment = args[i].substring("--env=".length());
             } else if (args[i].startsWith("--environment=")) {
                 environment = args[i].substring("--environment=".length());
+            } else if ((args[i].equals("--webroot")) && i + 1 < args.length) {
+                webrootOverride = args[i + 1];
+                i++; // Skip next argument
+            } else if (args[i].startsWith("--webroot=")) {
+                webrootOverride = args[i].substring("--webroot=".length());
             } else if (args[i].equals("--no-agents")) {
                 agentOverrides.disableAllAgents = true;
             } else if ((args[i].equals("--agents")) && i + 1 < args.length) {
@@ -541,6 +558,8 @@ public class UnifiedCommandExecutor {
         try {
             // Run server in foreground mode - this method blocks until server is stopped
             String cfgFile = configFileName != null ? configFileName : "lucee.json";
+            // For run, webrootOverride is handled inside LuceeServerManager when reading config;
+            // here we just pass through the arguments-driven overrides.
             serverManager.runServerForeground(projectDir, versionOverride, forceReplace, customName, agentOverrides, environment, cfgFile);
             return ""; // Return empty string since output is streamed to console
             

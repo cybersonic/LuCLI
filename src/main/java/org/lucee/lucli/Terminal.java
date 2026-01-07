@@ -5,13 +5,16 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 
+import org.jline.reader.Completer;
 import org.jline.reader.EndOfFileException;
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.UserInterruptException;
 import org.jline.reader.impl.DefaultParser;
+import org.jline.reader.impl.completer.AggregateCompleter;
 import org.jline.terminal.TerminalBuilder;
 import org.lucee.lucli.cli.LuCLICommand;
+import org.lucee.lucli.cli.completion.PicocliStyledCompleter;
 import org.lucee.lucli.modules.ModuleCommand;
 
 import picocli.CommandLine;
@@ -85,7 +88,12 @@ public class Terminal {
         picocliCommandLine = new CommandLine(rootCommand);
         // Treat subcommands as top-level commands in the shell
         // Note: We don't use setCommandName("") anymore as it causes IllegalStateException in SystemCompleter
-        // Instead, we manually construct the SystemCompleter below
+        // Instead, we build a custom JLine completer that wraps Picocli.
+
+        // Build a completer that combines styled picocli completion and LuCLI-specific completion
+        Completer picocliCompleter = new PicocliStyledCompleter(picocliCommandLine);
+        Completer lucliCompleter   = new LucliCompleter(commandProcessor);
+        Completer completer        = new AggregateCompleter(picocliCompleter, lucliCompleter);
         
         // Configure Picocli for terminal mode (don't exit on errors)
         picocliCommandLine.setExecutionExceptionHandler((ex, commandLine, parseResult) -> {
@@ -100,11 +108,10 @@ public class Terminal {
         Path homeDir = Paths.get(System.getProperty("user.home"));
         Path historyFile = homeDir.resolve(".lucli").resolve("history");
         
-        // For now we disable tab completion in the interactive terminal to simplify behavior
-        // and focus on other features. We can re-enable LucliCompleter later when needed.
         LineReader reader = LineReaderBuilder.builder()
                 .terminal(terminal)
                 .parser(new DefaultParser())
+                .completer(completer)
                 .variable(LineReader.HISTORY_FILE, historyFile)
                 .variable(LineReader.HISTORY_SIZE, 1000)
                 .variable(LineReader.HISTORY_FILE_SIZE, 2000)

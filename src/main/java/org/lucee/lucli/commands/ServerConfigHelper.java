@@ -227,6 +227,9 @@ public class ServerConfigHelper {
                 case "host":
                     config.host = value;
                     break;
+                case "webroot":
+                    config.webroot = value;
+                    break;
                 case "enableLucee":
                     config.enableLucee = Boolean.parseBoolean(value);
                     break;

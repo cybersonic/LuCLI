@@ -834,6 +834,65 @@ public class LuceeServerManager {
     
 
     /**
+     * Public helper to open the browser for the currently running server
+     * associated with the given project directory.
+     *
+     * Returns true if a running server was found (and a browser attempt was made),
+     * false if no running server exists for the project.
+     */
+    public boolean openBrowser(Path projectDir) throws IOException {
+        return openBrowser(projectDir, null);
+    }
+
+    /**
+     * Public helper to open the browser for a running server, either:
+     *  - by explicit server name (if serverName is non-null), or
+     *  - by the current project directory (fallback).
+     *
+     * Returns true if a running server was found and a browser attempt was made.
+     */
+    public boolean openBrowser(Path projectDir, String serverName) throws IOException {
+        ServerInstance instance;
+        LuceeServerConfig.ServerConfig config;
+
+        try {
+            if (serverName != null && !serverName.trim().isEmpty()) {
+                // Look up by name
+                ServerInfo info = getServerInfoByName(serverName.trim());
+                if (info == null || !info.isRunning()) {
+                    return false;
+                }
+
+                Path effectiveProjectDir = info.getProjectDir() != null
+                        ? info.getProjectDir()
+                        : projectDir;
+
+                config = LuceeServerConfig.loadConfig(effectiveProjectDir);
+                instance = new ServerInstance(
+                        info.getServerName(),
+                        info.getPid(),
+                        info.getPort(),
+                        info.getServerDir(),
+                        effectiveProjectDir
+                );
+            } else {
+                // Default: running server for this project directory
+                instance = getRunningServer(projectDir);
+                if (instance == null) {
+                    return false;
+                }
+                config = LuceeServerConfig.loadConfig(projectDir);
+            }
+
+            openBrowserForServer(instance, config);
+            return true;
+        } catch (Exception e) {
+            System.err.println("Could not open browser for running server: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Open the configured browser URL (or default) for a started server.
      * This is best-effort and should not cause server startup to fail.
      */
