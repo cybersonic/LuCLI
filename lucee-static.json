@@ -1,0 +1,6 @@
+{
+    "name":"LuCLIStaticSite",
+    "enableLucee": false,
+    "openBrowser": false,
+    "webroot": "./public/"
+}

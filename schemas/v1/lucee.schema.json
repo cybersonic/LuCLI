@@ -8,29 +8,39 @@
   "properties": {
     "name": {
       "type": "string",
-      "description": "Human-friendly server name. Defaults to the project directory name when omitted."
+      "description": "Human-friendly server name. Defaults to the project directory name when omitted.",
+      "x-ui-tab": "General",
+      "x-ui-order": 10
     },
     "version": {
       "type": "string",
       "description": "Lucee engine version to use for this server instance.",
-      "default": "6.2.2.91"
+      "default": "6.2.2.91",
+      "x-ui-tab": "General",
+      "x-ui-order": 20
     },
     "host": {
       "type": "string",
       "description": "Hostname to use when generating default URLs and (when https.enabled=true) the self-signed certificate SANs. Defaults to 'localhost' when omitted.",
-      "default": "localhost"
+      "default": "localhost",
+      "x-ui-tab": "General",
+      "x-ui-order": 30
     },
     "port": {
       "type": "integer",
       "description": "HTTP port for the server.",
       "default": 8080,
       "minimum": 1,
-      "maximum": 65535
+      "maximum": 65535,
+      "x-ui-tab": "General",
+      "x-ui-order": 40
     },
     "webroot": {
       "type": "string",
       "description": "Path to the webroot for this server. Can be relative to the project directory.",
-      "default": "./"
+      "default": "./",
+      "x-ui-tab": "General",
+      "x-ui-order": 50
     },
     "monitoring": {
       "type": "object",
@@ -144,12 +154,16 @@
     "enableLucee": {
       "type": "boolean",
       "description": "Enable Lucee CFML engine and servlet mappings. When false, Tomcat serves only static content (e.g. HTML/HTM).",
-      "default": true
+      "default": true,
+      "x-ui-tab": "General",
+      "x-ui-order": 60
     },
     "enableREST": {
       "type": "boolean",
       "description": "Enable Lucee REST servlet mappings. When false, REST endpoints are disabled. Requires 'enableLucee' to be true.",
-      "default": true
+      "default": true,
+      "x-ui-tab": "General",
+      "x-ui-order": 70
     },
     "agents": {
       "type": "object",

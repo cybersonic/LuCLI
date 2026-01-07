@@ -159,6 +159,16 @@
     },
     {
       "type": "java",
+      "name": "✏️ Module MarkSpresso commands ",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["--verbose", "markspresso", "new", "type=post", "title='Hello World'"],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "java",
       "name": "📑 Debug LuCLI with Input File",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",
@@ -228,6 +238,16 @@
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
       "args": [ "versions-list" ]
+    },
+    {
+      "type": "java",
+      "name": "📝 Lucli Config Edit",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "projectName": "lucli",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "args": [ "config", "edit" ]
     }
   ]
 }

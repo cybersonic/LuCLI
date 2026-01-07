@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download LuCLI — Lucee Command Line Interface</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary-color: #10b981;
+            --accent-color: #f59e0b;
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-tertiary: #f1f5f9;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --text-tertiary: #94a3b8;
+            --border-color: #e2e8f0;
+            --border-hover: #cbd5e1;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --shadow-xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --text-tertiary: #94a3b8;
+            --border-color: #334155;
+            --border-hover: #475569;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 1.75rem;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            padding: 1rem 0;
+        }
+
+        [data-theme="dark"] .header {
+            background: rgba(15, 23, 42, 0.95);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.5rem;
+            font-weight: 800;
+            text-decoration: none;
+            color: var(--primary-color);
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: white;
+            box-shadow: var(--shadow-lg);
+            font-size: 1rem;
+        }
+
+        .header-nav {
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .nav-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: color 0.2s ease;
+        }
+
+        .nav-link:hover,
+        .nav-link.active {
+            color: var(--primary-color);
+        }
+
+        .theme-toggle {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 0.4rem 0.55rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 1.15rem;
+        }
+
+        .theme-toggle:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-1px);
+        }
+
+        .hero {
+            padding: 4.5rem 0 3.5rem;
+            text-align: center;
+            background:
+                radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.05) 0%, transparent 55%),
+                linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-title {
+            font-size: 3rem;
+            font-weight: 900;
+            margin-bottom: 0.75rem;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color), var(--accent-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1.05;
+        }
+
+        .hero-subtitle {
+            font-size: 1.05rem;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .detected-os-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 0.9rem;
+            border-radius: 999px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .download-primary-card {
+            max-width: 540px;
+            margin: 0 auto;
+            background: var(--bg-secondary);
+            border-radius: 18px;
+            padding: 1.75rem 1.9rem;
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-xl);
+            text-align: left;
+        }
+
+        .download-primary-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-bottom: 0.4rem;
+        }
+
+        .download-primary-subtitle {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            margin-bottom: 1.2rem;
+        }
+
+        .download-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.85rem 1.6rem;
+            border-radius: 999px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all 0.25s ease;
+            border: 2px solid transparent;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            color: white;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .download-button:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-xl);
+        }
+
+        .download-button-details {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 400;
+            opacity: 0.9;
+        }
+
+        .download-meta {
+            margin-top: 0.85rem;
+            font-size: 0.85rem;
+            color: var(--text-tertiary);
+        }
+
+        .download-meta a {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+
+        .download-meta a:hover {
+            text-decoration: underline;
+        }
+
+        .section {
+            padding: 3rem 0 3.5rem;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .section-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .section-description {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            max-width: 540px;
+            margin: 0 auto;
+        }
+
+        .downloads-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .download-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.4rem 1.5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            gap: 0.75rem;
+        }
+
+        .download-card-header {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            text-align: left;
+        }
+
+        .download-os-label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-tertiary);
+        }
+
+        .download-os-name {
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+
+        .download-description {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .download-card-footer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.35rem;
+            margin-top: auto;
+        }
+
+        .download-size-hint {
+            font-size: 0.8rem;
+            color: var(--text-tertiary);
+            text-align: center;
+        }
+
+        .download-secondary-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.55rem 1.1rem;
+            border-radius: 999px;
+            border: 1px solid var(--border-color);
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            background: var(--bg-primary);
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .download-secondary-button:hover {
+            border-color: var(--primary-color);
+            transform: translateY(-1px);
+        }
+
+        .footer {
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            padding: 2.5rem 0;
+            margin-top: 2rem;
+        }
+
+        .footer-content {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            margin-top: 1.25rem;
+            flex-wrap: wrap;
+            font-size: 0.9rem;
+        }
+
+        .footer-link {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+
+        .footer-link:hover {
+            color: var(--text-primary);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 1.1rem;
+            }
+
+            .hero-title {
+                font-size: 2.3rem;
+            }
+
+            .header-nav {
+                display: none;
+            }
+
+            .download-primary-card {
+                padding: 1.4rem 1.4rem;
+            }
+        }
+    </style>
+</head>
+<body>
+<header class="header">
+    <div class="container">
+        <div class="header-content">
+            <a href="index.html#top" class="logo">
+                <div class="logo-icon">L&gt;</div>
+                LuCLI
+            </a>
+            <nav class="header-nav">
+                <a href="index.html#what" class="nav-link">What it is</a>
+                <a href="index.html#capabilities" class="nav-link">Capabilities</a>
+                <a href="index.html#getting-started" class="nav-link">Get started</a>
+                <a href="download.html" class="nav-link active">Download</a>
+            </nav>
+            <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
+        </div>
+    </div>
+</header>
+
+<main id="top">
+    <section class="hero">
+        <div class="container">
+            <p class="detected-os-pill">
+                <span>⬇️</span>
+                <span id="detected-os-text">We'll pick the best download for your system.</span>
+            </p>
+
+            <h1 class="hero-title">Download LuCLI</h1>
+            <p class="hero-subtitle">
+                LuCLI bundles the Lucee CFML engine into a focused CLI, with self-contained binaries for
+                macOS, Linux, and Windows, plus a universal JAR that works anywhere Java 17+ is available.
+            </p>
+
+            <div class="download-primary-card">
+                <h2 class="download-primary-title" id="primary-download-title">Recommended download</h2>
+                <p class="download-primary-subtitle" id="primary-download-subtitle">
+                    We'll detect your OS and suggest the right binary. You can always choose a different option below.
+                </p>
+
+                <a id="primary-download-link" href="#all-downloads" class="download-button">
+                    <span id="primary-download-label">Choose a download</span>
+                    <span class="download-button-details" id="primary-download-details">Scroll to see all available builds.</span>
+                </a>
+
+                <p class="download-meta">
+                    Prefer GitHub? 
+                    <a id="latest-release-link" href="https://github.com/cybersonic/LuCLI/releases/latest" target="_blank" rel="noopener noreferrer">
+                        Open the latest release page
+                    </a>.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <section id="all-downloads" class="section">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">All downloads</h2>
+                <p class="section-description">
+                    Pick the build that matches your environment. Self-contained binaries don't require Java;
+                    the JAR works anywhere with Java 17+.
+                </p>
+            </div>
+
+            <div class="downloads-grid">
+                <article class="download-card" data-os="macos">
+                    <div class="download-card-header">
+                        <span class="download-os-label">Recommended for Mac</span>
+                        <span class="download-os-name">macOS</span>
+                        <p class="download-description">
+                            Self-contained macOS binary. No separate Java install required.
+                        </p>
+                    </div>
+                    <div class="download-card-footer">
+                        <a
+                            id="download-macos"
+                            class="download-secondary-button"
+                            data-os="macos"
+                            data-file-template="lucli-__LATEST_VERSION__-macos"
+                            href="#"
+                        >
+                            Download for macOS
+                        </a>
+                        <span class="download-size-hint">Executable binary</span>
+                    </div>
+                </article>
+
+                <article class="download-card" data-os="linux">
+                    <div class="download-card-header">
+                        <span class="download-os-label">For servers & containers</span>
+                        <span class="download-os-name">Linux</span>
+                        <p class="download-description">
+                            Self-contained Linux binary. Ideal for servers, Docker images, and CI runners.
+                        </p>
+                    </div>
+                    <div class="download-card-footer">
+                        <a
+                            id="download-linux"
+                            class="download-secondary-button"
+                            data-os="linux"
+                            data-file-template="lucli-__LATEST_VERSION__-linux"
+                            href="#"
+                        >
+                            Download for Linux
+                        </a>
+                        <span class="download-size-hint">Executable binary</span>
+                    </div>
+                </article>
+
+                <article class="download-card" data-os="windows">
+                    <div class="download-card-header">
+                        <span class="download-os-label">For Windows machines</span>
+                        <span class="download-os-name">Windows</span>
+                        <p class="download-description">
+                            Self-contained Windows launcher (.bat). No separate Java install required.
+                        </p>
+                    </div>
+                    <div class="download-card-footer">
+                        <a
+                            id="download-windows"
+                            class="download-secondary-button"
+                            data-os="windows"
+                            data-file-template="lucli-__LATEST_VERSION__.bat"
+                            href="#"
+                        >
+                            Download for Windows
+                        </a>
+                        <span class="download-size-hint">Batch file launcher</span>
+                    </div>
+                </article>
+
+                <article class="download-card" data-os="jar">
+                    <div class="download-card-header">
+                        <span class="download-os-label">Universal</span>
+                        <span class="download-os-name">JAR (any OS)</span>
+                        <p class="download-description">
+                            Universal JAR for any system with Java 17+ installed. Great for scripting or bundling
+                            into your own tooling.
+                        </p>
+                    </div>
+                    <div class="download-card-footer">
+                        <a
+                            id="download-jar"
+                            class="download-secondary-button"
+                            data-os="jar"
+                            data-file-template="lucli-__LATEST_VERSION__.jar"
+                            href="#"
+                        >
+                            Download JAR
+                        </a>
+                        <span class="download-size-hint">Requires Java 17+</span>
+                    </div>
+                </article>
+            </div>
+        </div>
+    </section>
+</main>
+
+<footer class="footer">
+    <div class="container">
+        <div class="footer-content">
+            <p><strong>LuCLI</strong> — Lucee CFML from your terminal.</p>
+            <div class="footer-links">
+                <a href="https://github.com/cybersonic/LuCLI/tree/main/documentation" class="footer-link">Documentation</a>
+                <a href="https://github.com/cybersonic/LuCLI" class="footer-link" target="_blank">GitHub</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+<script>
+    function toggleTheme() {
+        const html = document.documentElement;
+        const currentTheme = html.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        const toggleBtn = document.querySelector('.theme-toggle');
+
+        html.setAttribute('data-theme', newTheme);
+        toggleBtn.textContent = newTheme === 'dark' ? '605' : ' 1f319';
+        localStorage.setItem('theme', newTheme);
+    }
+
+    function loadTheme() {
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        const html = document.documentElement;
+        const toggleBtn = document.querySelector('.theme-toggle');
+
+        html.setAttribute('data-theme', savedTheme);
+        toggleBtn.textContent = savedTheme === 'dark' ? '605' : ' 1f319';
+    }
+
+    function detectOsKey() {
+        const platform = (navigator.platform || '').toLowerCase();
+        const userAgent = (navigator.userAgent || '').toLowerCase();
+
+        if (platform.includes('mac') || userAgent.includes('mac os x')) return 'macos';
+        if (platform.includes('win')) return 'windows';
+        if (platform.includes('linux')) return 'linux';
+        return 'jar';
+    }
+
+    function configureDownloads() {
+        const LATEST_TAG = '__LATEST_TAG__';       // e.g. v0.1.231
+        const LATEST_VERSION = '__LATEST_VERSION__'; // e.g. 0.1.231
+
+        const baseUrl = 'https://github.com/cybersonic/LuCLI/releases/download/' + LATEST_TAG + '/';
+
+        document.querySelectorAll('[data-file-template]').forEach(link => {
+            const template = link.getAttribute('data-file-template');
+            if (!template) return;
+            const fileName = template.replace(/__LATEST_VERSION__/g, LATEST_VERSION);
+            link.href = baseUrl + fileName;
+        });
+
+        const latestReleaseLink = document.getElementById('latest-release-link');
+        if (latestReleaseLink && LATEST_TAG !== '__LATEST_TAG__') {
+            latestReleaseLink.href = 'https://github.com/cybersonic/LuCLI/releases/tag/' + LATEST_TAG;
+        }
+
+        const osKey = detectOsKey();
+        const osNames = {
+            macos: 'macOS',
+            linux: 'Linux',
+            windows: 'Windows',
+            jar: 'Any OS (JAR)'
+        };
+
+        const detectedText = document.getElementById('detected-os-text');
+        if (detectedText) {
+            const niceName = osNames[osKey] || 'your system';
+            detectedText.textContent = 'Detected ' + niceName + ' — we\'ll recommend the best download.';
+        }
+
+        const primaryLink = document.getElementById('primary-download-link');
+        const primaryLabel = document.getElementById('primary-download-label');
+        const primaryDetails = document.getElementById('primary-download-details');
+
+        const matchingPerOsLink = document.querySelector('a[data-os="' + osKey + '"]');
+        if (primaryLink && primaryLabel && matchingPerOsLink && matchingPerOsLink.href && !matchingPerOsLink.href.endsWith('#')) {
+            primaryLink.href = matchingPerOsLink.href;
+            primaryLabel.textContent = 'Download for ' + (osNames[osKey] || 'your system');
+            primaryDetails.textContent = matchingPerOsLink.textContent.trim();
+        } else if (primaryLabel && primaryDetails) {
+            primaryLabel.textContent = 'Choose a download';
+            primaryDetails.textContent = 'Scroll to see all available builds.';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        loadTheme();
+        configureDownloads();
+    });
+</script>
+</body>
+</html>
