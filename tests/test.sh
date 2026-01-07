@@ -398,14 +398,48 @@ run_test_with_output "Dry-run prod env shows password" "java -jar ../$LUCLI_JAR 
 run_test_with_output "Dry-run prod env disables monitoring" "java -jar ../$LUCLI_JAR server start --env=prod --dry-run env_test_project 2>&1" 'with environment: prod'
 
 # Test 3: Development environment overrides
-run_test_with_output "Dry-run dev env shows port 8091" "java -jar ../$LUCLI_JAR server start --env=dev --dry-run env_test_project 2>&1" '\"port\" : 8091'
+run_test_with_output "Dry-run dev env shows port 8091" "java -jar ../$LUCLI_JAR server start --env=dev --dry-run env_test_project 2>&1" '\\"port\\" : 8091'
 run_test_with_output "Dry-run dev env shows JMX port 9000" "java -jar ../$LUCLI_JAR server start --env=dev --dry-run env_test_project 2>&1" 'with environment: dev'
-run_test_with_output "Dry-run dev env keeps base maxMemory" "java -jar ../$LUCLI_JAR server start --env=dev --dry-run env_test_project 2>&1" '\"maxMemory\" : \"512m\"'
-
+run_test_with_output "Dry-run dev env keeps base maxMemory" "java -jar ../$LUCLI_JAR server start --env=dev --dry-run env_test_project 2>&1" '\\"maxMemory\\" : \\"512m\\"'
+ 
 # Test 4: Staging environment partial overrides
-run_test_with_output "Dry-run staging env shows port 8092" "java -jar ../$LUCLI_JAR server start --env=staging --dry-run env_test_project 2>&1" '\"port\" : 8092'
-run_test_with_output "Dry-run staging env shows 1024m memory" "java -jar ../$LUCLI_JAR server start --env=staging --dry-run env_test_project 2>&1" '\"maxMemory\" : \"1024m\"'
-run_test_with_output "Dry-run staging env keeps base minMemory" "java -jar ../$LUCLI_JAR server start --env=staging --dry-run env_test_project 2>&1" '\"minMemory\" : \"128m\"'
+run_test_with_output "Dry-run staging env shows port 8092" "java -jar ../$LUCLI_JAR server start --env=staging --dry-run env_test_project 2>&1" '\\"port\\" : 8092'
+run_test_with_output "Dry-run staging env shows 1024m memory" "java -jar ../$LUCLI_JAR server start --env=staging --dry-run env_test_project 2>&1" '\\"maxMemory\\" : \\"1024m\\"'
+run_test_with_output "Dry-run staging env keeps base minMemory" "java -jar ../$LUCLI_JAR server start --env=staging --dry-run env_test_project 2>&1" '\\"minMemory\\" : \\"128m\\"'
+
+# Test 4b: Alternate configuration file selection via --config
+echo -e "${BLUE}=== Alternate Configuration File Tests ===${NC}"
+mkdir -p alt_config_project
+cat > alt_config_project/lucee.json << 'EOF'
+{
+  "name": "base-config",
+  "port": 8100,
+  "webroot": "./webroot-base"
+}
+EOF
+
+cat > alt_config_project/lucee-alt.json << 'EOF'
+{
+  "name": "alt-config",
+  "port": 8101,
+  "webroot": "./webroot-alt",
+  "enableLucee": false
+}
+EOF
+
+mkdir -p alt_config_project/webroot-base alt_config_project/webroot-alt
+
+run_test_with_output "Dry-run default uses base lucee.json" \
+  "java -jar ../$LUCLI_JAR server start --dry-run alt_config_project 2>&1" '\\"name\\" : \\"base-config\\"'
+
+run_test_with_output "Dry-run with --config uses alternate file" \
+  "java -jar ../$LUCLI_JAR server start --dry-run --config lucee-alt.json alt_config_project 2>&1" '\\"name\\" : \\"alt-config\\"'
+
+run_test_with_output "Alternate config shows enableLucee=false" \
+  "java -jar ../$LUCLI_JAR server start --dry-run --config lucee-alt.json alt_config_project 2>&1" '\\"enableLucee\\" : false'
+
+# Clean up alternate config project
+rm -rf alt_config_project
 
 # Test 5: Invalid environment error handling
 if java -jar ../$LUCLI_JAR server start --env=invalid --dry-run env_test_project 2>&1 | grep -q "not found in lucee.json"; then

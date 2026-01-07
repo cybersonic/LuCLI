@@ -1,5 +1,6 @@
 package org.lucee.lucli.cli.commands;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.Callable;
@@ -7,6 +8,8 @@ import java.util.concurrent.Callable;
 import org.lucee.lucli.cli.LuCLICommand;
 import org.lucee.lucli.cli.completion.LuceeVersionCandidates;
 import org.lucee.lucli.commands.UnifiedCommandExecutor;
+import org.lucee.lucli.config.editor.ConfigEditorRunner;
+import org.lucee.lucli.server.LuceeServerConfig;
 import org.lucee.lucli.server.LuceeServerManager;
 
 import picocli.CommandLine.Command;
@@ -35,6 +38,8 @@ import picocli.CommandLine.Model.CommandSpec;
         ServerCommand.SetCommand.class,
         ServerCommand.LogCommand.class,
         ServerCommand.OpenCommand.class,
+        ServerCommand.NewCommand.class,
+        ServerCommand.EditCommand.class,
         ServerMonitorCommandImpl.class
     }
 )
@@ -853,6 +858,101 @@ public class ServerCommand implements Callable<Integer> {
                 }
                 return 1;
             }
+
+            return 0;
+        }
+    }
+
+    /**
+     * Server new subcommand - create a new lucee.json (if needed) and open it in the editor.
+     */
+    @Command(
+        name = "new",
+        description = "Create a new lucee.json for this project (or edit it if it already exists)"
+    )
+    static class NewCommand implements Callable<Integer> {
+
+        @ParentCommand
+        private ServerCommand parent;
+
+        @Option(names = {"-d", "--directory"},
+                description = "Project directory (defaults to current directory)")
+        private String projectDir;
+
+        @Option(names = {"-f", "--file"},
+                description = "Configuration file (defaults to lucee.json in the project directory)")
+        private String configFile;
+
+        @Option(names = {"--env", "--environment"},
+                description = "Environment to apply (e.g., prod, dev, staging)")
+        private String environment;
+
+        @Override
+        public Integer call() throws Exception {
+            Path baseDir = projectDir != null
+                ? Paths.get(projectDir)
+                : Paths.get(System.getProperty("user.dir"));
+
+            Path cfg = configFile != null
+                ? Paths.get(configFile)
+                : baseDir.resolve("lucee.json");
+
+            // If lucee.json does not exist, bootstrap a default config for this project
+            if (!Files.exists(cfg)) {
+                LuceeServerConfig.ServerConfig defaultCfg = LuceeServerConfig.createDefaultConfig(baseDir);
+                LuceeServerConfig.saveConfig(defaultCfg, cfg);
+                System.out.println("Created new lucee.json at " + cfg.toAbsolutePath());
+            }
+
+            ConfigEditorRunner runner = new ConfigEditorRunner();
+            runner.run(baseDir, cfg, environment);
+
+            return 0;
+        }
+    }
+
+    /**
+     * Server edit subcommand - edit an existing lucee.json using the same editor.
+     */
+    @Command(
+        name = "edit",
+        description = "Edit existing lucee.json for this project"
+    )
+    static class EditCommand implements Callable<Integer> {
+
+        @ParentCommand
+        private ServerCommand parent;
+
+        @Option(names = {"-d", "--directory"},
+                description = "Project directory (defaults to current directory)")
+        private String projectDir;
+
+        @Option(names = {"-f", "--file"},
+                description = "Configuration file (defaults to lucee.json in the project directory)")
+        private String configFile;
+
+        @Option(names = {"--env", "--environment"},
+                description = "Environment to apply (e.g., prod, dev, staging)")
+        private String environment;
+
+        @Override
+        public Integer call() throws Exception {
+            Path baseDir = projectDir != null
+                ? Paths.get(projectDir)
+                : Paths.get(System.getProperty("user.dir"));
+
+            Path cfg = configFile != null
+                ? Paths.get(configFile)
+                : baseDir.resolve("lucee.json");
+
+            if (!Files.exists(cfg)) {
+                System.err.println("❌ Config file not found: " + cfg.toAbsolutePath());
+                System.err.println("   Use 'lucli server new' to create a new lucee.json.");
+                return 1;
+            }
+
+            ConfigEditorRunner runner = new ConfigEditorRunner();
+            runner.run(baseDir, cfg, environment);
 
             return 0;
         }

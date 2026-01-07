@@ -7,16 +7,19 @@
   "collections": {
     "posts": {
       "permalink": "/posts/:slug/",
-      "path": "posts",
+      "path": "content/posts",
       "layout": "post"
     }
   },
-  "name": "Markspresso Site",
+  "navigation": {
+    "rootPath": "docs"
+  },
+  "name": "LuCLI",
   "baseUrl": "http://localhost:8080",
   "paths": {
-    "content": "docs",
+    "content": "content",
     "output": "public",
-    "layouts": "docs/layouts",
-    "assets": "docs/assets"
+    "layouts": "content/layouts",
+    "assets": "content/assets"
   }
 }
