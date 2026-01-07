@@ -17,72 +17,7 @@ public class LuCLI {
 
     public static Map<String, String> scriptEnvironment = new HashMap<>(System.getenv());
     
-    /**
-     * Print a message only if verbose mode is enabled
-     * @param message The message to print
-     */
-    public static void printVerbose(String message) {
-        if (verbose) {
-            System.out.println(message);
-        }
-    }
-    
-    /**
-     * Print a debug message only if debug mode is enabled
-     * Debug messages go to stderr with [DEBUG] prefix
-     * @param message The message to print
-     */
-    public static void printDebug(String message) {
-        if (debug) {
-            System.err.println("[DEBUG] " + message);
-        }
-    }
-    
-    /**
-     * Print a debug message with context only if debug mode is enabled
-     * @param context The context (e.g., class name or method name)
-     * @param message The message to print
-     */
-    public static void printDebug(String context, String message) {
-        if (debug) {
-            System.err.println("[DEBUG " + context + "] " + message);
-        }
-    }
-    
-    /**
-     * Print an info message (always shown, but can be used for consistency)
-     * @param message The message to print
-     */
-    public static void printInfo(String message) {
-        System.out.println(message);
-    }
-    
-    /**
-     * Print an error message
-     * @param message The error message
-     */
-    public static void printError(String message) {
-        System.err.println(message);
-    }
-    
-    /**
-     * Print a stack trace only if debug mode is enabled
-     * @param e The exception to print
-     */
-    public static void printDebugStackTrace(Exception e) {
-        if (debug) {
-            e.printStackTrace();
-        }
-    }
 
-    
-    /**
-     * Check if we're running in script mode (executing a .lucli file)
-     * This is used to suppress prompts and other interactive elements
-     */
-    public static boolean isLucliScript() {
-        return lucliScript;
-    }
 
     public static void main(String[] args) throws Exception {
         // Check for timing flag early and enable Timer singleton
@@ -232,6 +167,73 @@ public class LuCLI {
         
         Timer.printResults();
         System.exit(exitCode);
+    }
+    
+        /**
+     * Print a message only if verbose mode is enabled
+     * @param message The message to print
+     */
+    public static void printVerbose(String message) {
+        if (verbose) {
+            System.out.println(message);
+        }
+    }
+    
+    /**
+     * Print a debug message only if debug mode is enabled
+     * Debug messages go to stderr with [DEBUG] prefix
+     * @param message The message to print
+     */
+    public static void printDebug(String message) {
+        if (debug) {
+            System.err.println("[DEBUG] " + message);
+        }
+    }
+    
+    /**
+     * Print a debug message with context only if debug mode is enabled
+     * @param context The context (e.g., class name or method name)
+     * @param message The message to print
+     */
+    public static void printDebug(String context, String message) {
+        if (debug) {
+            System.err.println("[DEBUG " + context + "] " + message);
+        }
+    }
+    
+    /**
+     * Print an info message (always shown, but can be used for consistency)
+     * @param message The message to print
+     */
+    public static void printInfo(String message) {
+        System.out.println(message);
+    }
+    
+    /**
+     * Print an error message
+     * @param message The error message
+     */
+    public static void printError(String message) {
+        System.err.println(message);
+    }
+    
+    /**
+     * Print a stack trace only if debug mode is enabled
+     * @param e The exception to print
+     */
+    public static void printDebugStackTrace(Exception e) {
+        if (debug) {
+            e.printStackTrace();
+        }
+    }
+
+    
+    /**
+     * Check if we're running in script mode (executing a .lucli file)
+     * This is used to suppress prompts and other interactive elements
+     */
+    public static boolean isLucliScript() {
+        return lucliScript;
     }
     
     /**
