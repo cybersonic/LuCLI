@@ -10,6 +10,7 @@ import org.lucee.lucli.cli.commands.CfmlCommand;
 import org.lucee.lucli.cli.commands.CompletionCommand;
 import org.lucee.lucli.cli.commands.ModulesCommand;
 import org.lucee.lucli.cli.commands.ParrotCommand;
+import org.lucee.lucli.cli.commands.SecretsCommand;
 import org.lucee.lucli.cli.commands.ServerCommand;
 import org.lucee.lucli.cli.commands.VersionsListCommand;
 import org.lucee.lucli.cli.commands.deps.DepsCommand;
@@ -37,6 +38,7 @@ import picocli.CommandLine.Option;
         CompletionCommand.class,
         VersionsListCommand.class,
         ParrotCommand.class,
+        SecretsCommand.class,
         CommandLine.HelpCommand.class
     },
     footer = {

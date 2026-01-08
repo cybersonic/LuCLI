@@ -35,12 +35,33 @@
       "x-ui-tab": "General",
       "x-ui-order": 40
     },
+    "shutdownPort": {
+      "type": "integer",
+      "description": "Tomcat shutdown port. When omitted, LuCLI derives this from the HTTP port (typically port + 1000) while avoiding conflicts with other servers.",
+      "minimum": 1,
+      "maximum": 65535,
+      "x-ui-tab": "General",
+      "x-ui-order": 45
+    },
     "webroot": {
       "type": "string",
       "description": "Path to the webroot for this server. Can be relative to the project directory.",
       "default": "./",
       "x-ui-tab": "General",
       "x-ui-order": 50
+    },
+    "openBrowser": {
+      "type": "boolean",
+      "description": "When true, LuCLI will try to open a browser to the server URL after startup.",
+      "default": true,
+      "x-ui-tab": "General",
+      "x-ui-order": 55
+    },
+    "openBrowserURL": {
+      "type": "string",
+      "description": "Optional custom URL to open instead of the default computed URL. Empty string or omission means 'use default'.",
+      "x-ui-tab": "General",
+      "x-ui-order": 56
     },
     "monitoring": {
       "type": "object",
@@ -201,6 +222,170 @@
       "type": "object",
       "description": "Inline Lucee CFConfig configuration that overrides/extends the base from 'configurationFile'. The final merged result is written to lucee-server/context/.CFConfig.json on server start. The structure should match Lucee's .CFConfig.json format.",
       "additionalProperties": true
+    },
+    "dependencies": {
+      "type": "object",
+      "description": "Production dependencies for this project. Keys are dependency names; values are either a shorthand version string or a full dependency descriptor object.",
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string",
+            "description": "Shorthand version string (e.g. '4.3.0')."
+          },
+          {
+            "$ref": "#/definitions/dependency"
+          }
+        ]
+      },
+      "default": {}
+    },
+    "devDependencies": {
+      "type": "object",
+      "description": "Development-only dependencies for this project. Same structure as 'dependencies'.",
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string",
+            "description": "Shorthand version string (e.g. '4.3.0')."
+          },
+          {
+            "$ref": "#/definitions/dependency"
+          }
+        ]
+      },
+      "default": {}
+    },
+    "dependencySettings": {
+      "$ref": "#/definitions/dependencySettings"
+    },
+    "packages": {
+      "$ref": "#/definitions/dependencySettings",
+      "description": "Deprecated alias for 'dependencySettings'. Prefer 'dependencySettings' for new configurations."
+    },
+    "environments": {
+      "type": "object",
+      "description": "Named environment configurations that can override base settings. Use 'lucli server start --env <name>' or 'lucli deps install --env <name>' to apply an environment.",
+      "additionalProperties": {
+        "$ref": "#/definitions/environmentConfig"
+      },
+      "default": {}
+    }
+  },
+  "definitions": {
+    "dependency": {
+      "type": "object",
+      "description": "Configuration for a single dependency declared under 'dependencies' or 'devDependencies' in lucee.json.",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Dependency type. Common values include 'cfml', 'jar', 'java', and 'extension'.",
+          "default": "cfml"
+        },
+        "version": {
+          "type": "string",
+          "description": "Version string, typically using semantic versioning (e.g. '1.0.0', '4.3.0')."
+        },
+        "source": {
+          "type": "string",
+          "description": "Source of the dependency. Common values include 'git', 'http', 'file', and 'maven'.",
+          "default": "git"
+        },
+        "url": {
+          "type": "string",
+          "description": "Source URL for git/http/file based dependencies.",
+          "format": "uri"
+        },
+        "ref": {
+          "type": "string",
+          "description": "Git reference (branch, tag, or commit hash).",
+          "default": "main"
+        },
+        "subPath": {
+          "type": "string",
+          "description": "Optional subdirectory within the source that should be installed."
+        },
+        "installPath": {
+          "type": "string",
+          "description": "Installation path relative to the project directory."
+        },
+        "mapping": {
+          "type": "string",
+          "description": "Lucee mapping virtual path for CFML dependencies (e.g. '/framework')."
+        },
+        "path": {
+          "type": "string",
+          "description": "Local file system path for 'file' source dependencies."
+        },
+        "groupId": {
+          "type": "string",
+          "description": "Maven groupId for 'java' dependencies."
+        },
+        "artifactId": {
+          "type": "string",
+          "description": "Maven artifactId for 'java' dependencies."
+        },
+        "repository": {
+          "type": "string",
+          "description": "Custom Maven repository URL.",
+          "format": "uri"
+        },
+        "id": {
+          "type": "string",
+          "description": "Extension ID for Lucee .lex extension dependencies."
+        }
+      }
+    },
+    "dependencySettings": {
+      "type": "object",
+      "description": "Global dependency installation behaviour for 'lucli deps install'.",
+      "additionalProperties": false,
+      "properties": {
+        "installLocation": {
+          "type": "string",
+          "description": "Base directory (relative to the project) where dependencies are installed.",
+          "default": "dependencies"
+        },
+        "autoInstallOnServerStart": {
+          "type": "boolean",
+          "description": "When true, dependencies are automatically installed when the server starts.",
+          "default": true
+        },
+        "verifyIntegrity": {
+          "type": "boolean",
+          "description": "When true, verifies dependency checksums against the lock file.",
+          "default": true
+        },
+        "pruneOnInstall": {
+          "type": "boolean",
+          "description": "When true, removes directories for dependencies that are no longer declared.",
+          "default": false
+        },
+        "installMethod": {
+          "type": "string",
+          "description": "Install method. Common values include 'symlink' or 'copy'.",
+          "default": "symlink"
+        },
+        "installDevDependencies": {
+          "type": ["boolean", "null"],
+          "description": "Override whether devDependencies should be installed for a given environment. When null, defaults to true except when --production is used."
+        }
+      }
+    },
+    "environmentConfig": {
+      "type": "object",
+      "description": "Environment-specific configuration overrides. Values are deep-merged into the base configuration when starting a server with --env or running 'lucli deps install --env'.",
+      "additionalProperties": true,
+      "properties": {
+        "dependencySettings": {
+          "$ref": "#/definitions/dependencySettings",
+          "description": "Dependency installation overrides for this environment."
+        },
+        "packages": {
+          "$ref": "#/definitions/dependencySettings",
+          "description": "Deprecated alias for 'dependencySettings' for backwards compatibility."
+        }
+      }
     }
   }
 }

@@ -10,6 +10,10 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import org.lucee.lucli.secrets.LocalSecretStore;
+import org.lucee.lucli.secrets.SecretStore;
+import org.lucee.lucli.secrets.SecretStoreException;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -215,6 +219,9 @@ public class LuceeServerConfig {
         // Perform environment variable substitution on string fields
         // Supports ${VAR_NAME} and ${VAR_NAME:-default_value}
         substituteEnvironmentVariables(config);
+
+        // Resolve ${secret:NAME} placeholders via the configured SecretStore (local only for now)
+        resolveSecretPlaceholders(config, projectDir);
         
         // Ensure monitoring is initialized
         if (config.monitoring == null) {
@@ -446,6 +453,151 @@ public class LuceeServerConfig {
         }
     }
     
+    /**
+     * Replace secret placeholders in string using ${secret:NAME} syntax.
+     * This is evaluated after environment variables, and only for the local provider
+     * in this initial implementation.
+     */
+    private static String replaceSecretPlaceholders(String value, SecretStore store) throws SecretStoreException {
+        if (value == null) {
+            return null;
+        }
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\\$\\{secret:([^}]+)\\}");
+        java.util.regex.Matcher matcher = pattern.matcher(value);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            String name = matcher.group(1).trim();
+            java.util.Optional<char[]> secret = store.get(name);
+            if (secret.isEmpty()) {
+                throw new SecretStoreException("Secret '" + name + "' not found for placeholder in configuration");
+            }
+            String replacement = new String(secret.get());
+            matcher.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(replacement));
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
+    }
+
+    /**
+     * Quick scan to see if any ${secret:...} placeholders are present in fields we support.
+     */
+    private static boolean hasSecretPlaceholders(ServerConfig config) {
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\\$\\{secret:([^}]+)\\}");
+
+        if (config.admin != null && config.admin.password != null) {
+            if (pattern.matcher(config.admin.password).find()) {
+                return true;
+            }
+        }
+        if (config.configuration != null) {
+            return jsonNodeHasSecretPlaceholders(config.configuration, pattern);
+        }
+        return false;
+    }
+
+    private static boolean jsonNodeHasSecretPlaceholders(com.fasterxml.jackson.databind.JsonNode node, java.util.regex.Pattern pattern) {
+        if (node == null) {
+            return false;
+        }
+        if (node.isTextual()) {
+            return pattern.matcher(node.asText()).find();
+        } else if (node.isArray()) {
+            for (com.fasterxml.jackson.databind.JsonNode element : node) {
+                if (jsonNodeHasSecretPlaceholders(element, pattern)) {
+                    return true;
+                }
+            }
+            return false;
+        } else if (node.isObject()) {
+            java.util.Iterator<java.util.Map.Entry<String, com.fasterxml.jackson.databind.JsonNode>> it = node.fields();
+            while (it.hasNext()) {
+                if (jsonNodeHasSecretPlaceholders(it.next().getValue(), pattern)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return false;
+    }
+
+    /**
+     * Resolve ${secret:...} placeholders across relevant config fields.
+     *
+     * Behaviour:
+     * - If there are no ${secret:...} placeholders, this is a no-op.
+     * - If placeholders exist but no passphrase can be obtained (env var or console),
+     *   an IOException is thrown so the caller sees a clear failure.
+     */
+    private static void resolveSecretPlaceholders(ServerConfig config, Path projectDir) throws IOException {
+        if (!hasSecretPlaceholders(config)) {
+            return; // nothing to do
+        }
+
+        Path storePath = getLucliHome().resolve("secrets").resolve("local.json");
+        if (!Files.exists(storePath)) {
+            throw new IOException("Configuration references ${secret:...} but local secret store does not exist. Run 'lucli secrets init' and define the required secrets.");
+        }
+
+        // Prefer non-interactive passphrase from environment when available
+        char[] passphrase = null;
+        String envPass = System.getenv("LUCLI_SECRETS_PASSPHRASE");
+        if (envPass != null && !envPass.isEmpty()) {
+            passphrase = envPass.toCharArray();
+        } else if (System.console() != null) {
+            passphrase = System.console().readPassword("Enter secrets passphrase to unlock config secrets: ");
+        }
+
+        if (passphrase == null || passphrase.length == 0) {
+            throw new IOException("Configuration requires secrets but no passphrase is available. Set LUCLI_SECRETS_PASSPHRASE or run with an interactive console.");
+        }
+
+        SecretStore store;
+        try {
+            store = new LocalSecretStore(storePath, passphrase);
+        } catch (SecretStoreException e) {
+            throw new IOException("Failed to open local secret store: " + e.getMessage(), e);
+        }
+
+        try {
+            if (config.admin != null && config.admin.password != null) {
+                config.admin.password = replaceSecretPlaceholders(config.admin.password, store);
+            }
+            if (config.configuration != null) {
+                config.configuration = substituteSecretsInJsonNode(config.configuration, store);
+            }
+        } catch (SecretStoreException e) {
+            throw new IOException(e.getMessage(), e);
+        }
+    }
+
+    private static com.fasterxml.jackson.databind.JsonNode substituteSecretsInJsonNode(com.fasterxml.jackson.databind.JsonNode node, SecretStore store) throws SecretStoreException {
+        if (node == null) {
+            return null;
+        }
+        if (node.isTextual()) {
+            String replaced = replaceSecretPlaceholders(node.asText(), store);
+            return objectMapper.getNodeFactory().textNode(replaced);
+        } else if (node.isArray()) {
+            com.fasterxml.jackson.databind.node.ArrayNode arrayNode = objectMapper.getNodeFactory().arrayNode();
+            for (com.fasterxml.jackson.databind.JsonNode element : node) {
+                arrayNode.add(substituteSecretsInJsonNode(element, store));
+            }
+            return arrayNode;
+        } else if (node.isObject()) {
+            com.fasterxml.jackson.databind.node.ObjectNode objNode = objectMapper.getNodeFactory().objectNode();
+            node.fields().forEachRemaining(entry -> {
+                try {
+                    objNode.set(entry.getKey(), substituteSecretsInJsonNode(entry.getValue(), store));
+                } catch (SecretStoreException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+            return objNode;
+        } else {
+            return node;
+        }
+    }
+
     /**
      * Replace environment variables in a string using ${VAR} or ${VAR:-default} syntax
      * Checks .env file variables first, then system environment variables
