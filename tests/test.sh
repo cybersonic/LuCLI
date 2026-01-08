@@ -512,6 +512,43 @@ run_test_with_output "Computed mapping has physical path for testlib" "java -jar
 # Clean up dependency test project
 rm -rf dependency_test_project
 
+# Server Lock Tests
+echo -e "${BLUE}=== Server Lock Tests ===${NC}"
+
+# Create a simple project for lock testing
+mkdir -p lock_test_project
+cat > lock_test_project/lucee.json << 'EOF'
+{
+  "name": "lock-test-project",
+  "version": "6.2.2.91",
+  "port": 8080,
+  "webroot": "./"
+}
+EOF
+
+# Ensure server lock help works
+run_help_test "Server lock help" "java -jar ../$LUCLI_JAR server lock --help" "lock"
+
+# Lock default environment configuration and ensure lucee-lock.json is created
+run_test "Server lock creates lucee-lock.json" "(cd lock_test_project && java -jar ../../$LUCLI_JAR server lock >/dev/null 2>&1 && test -f lucee-lock.json)"
+
+# Verify server config set is blocked when locked
+run_test_with_output "server config set blocked when locked" "(cd lock_test_project && java -jar ../../$LUCLI_JAR server config set port=8081 2>&1 || true)" "Cannot modify lucee.json via 'server config set' because server configuration is LOCKED"
+
+# Unlock and verify server config set now succeeds
+run_test "Server unlock succeeds" "(cd lock_test_project && java -jar ../../$LUCLI_JAR server unlock >/dev/null 2>&1)"
+run_test_with_output "server config set allowed after unlock" "(cd lock_test_project && java -jar ../../$LUCLI_JAR server config set port=8082 2>&1)" "✅ Configuration updated:"
+
+# Re-lock and demonstrate drift warning on real start (lenient behaviour)
+run_test "Re-lock configuration" "(cd lock_test_project && java -jar ../../$LUCLI_JAR server lock >/dev/null 2>&1)"
+# Change lucee.json to introduce drift
+run_test "Modify lucee.json to cause drift" "(cd lock_test_project && sed -i '' 's/8082/8083/' lucee.json)"
+# Start server and expect LOCKED warning (start may time out or be stopped externally, that's fine)
+run_test_with_output "server start logs lock drift warning" "(cd lock_test_project && timeout 60 java -jar ../../$LUCLI_JAR server start 2>&1 || true)" "Server configuration is LOCKED for env '_default' (lucee-lock.json)"
+
+# Clean up lock test project
+rm -rf lock_test_project
+
 # Clean up test project
 rm -rf test_project
 
