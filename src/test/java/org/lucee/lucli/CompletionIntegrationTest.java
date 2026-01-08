@@ -226,8 +226,8 @@ public class CompletionIntegrationTest {
     @Test
     void testVersionHelperIntegration() {
         try {
-            org.lucee.lucli.commands.ServerConfigHelper helper = 
-                new org.lucee.lucli.commands.ServerConfigHelper();
+            org.lucee.lucli.server.ServerConfigHelper helper = 
+                new org.lucee.lucli.server.ServerConfigHelper();
             
             List<String> versions = helper.getAvailableVersions();
             

@@ -3,7 +3,7 @@ package org.lucee.lucli.cli.commands;
 import java.util.List;
 import java.util.concurrent.Callable;
 
-import org.lucee.lucli.commands.ServerConfigHelper;
+import org.lucee.lucli.server.ServerConfigHelper;
 
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;

@@ -3,7 +3,7 @@ package org.lucee.lucli.cli.completion;
 import java.util.Iterator;
 import java.util.List;
 
-import org.lucee.lucli.commands.ServerConfigHelper;
+import org.lucee.lucli.server.ServerConfigHelper;
 
 /**
  * Picocli completion candidates provider for Lucee versions.

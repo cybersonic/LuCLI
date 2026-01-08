@@ -42,6 +42,9 @@ Full reference for `lucee.json` server configuration, including all available se
 **[Dry-Run Preview System](DRY_RUN_PREVIEW.md)**  
 Learn how to preview server configurations before deployment using `--dry-run` and `--include-*` flags. Essential for validating Lucee settings, Tomcat connectors, HTTPS setup, and catching configuration errors early.
 
+**[Server Locking](SERVER_LOCK.md)**  
+How to lock server configuration per environment using `lucee-lock.json`, including `server lock`/`unlock`, drift handling, and mutation guards.
+
 **[Environment Variables](ENVIRONMENT_VARIABLES.md)**  
 Comprehensive guide to using environment variables in `lucee.json` for flexible configuration across environments.
 

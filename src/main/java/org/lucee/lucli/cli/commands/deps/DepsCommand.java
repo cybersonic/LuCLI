@@ -13,6 +13,7 @@ import picocli.CommandLine.Command;
     description = "Manage project dependencies",
     subcommands = {
         InstallCommand.class,
+        AddCommand.class,
         CommandLine.HelpCommand.class
     }
 )

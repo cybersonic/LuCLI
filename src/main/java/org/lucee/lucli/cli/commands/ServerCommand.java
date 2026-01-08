@@ -7,7 +7,7 @@ import java.util.concurrent.Callable;
 
 import org.lucee.lucli.cli.LuCLICommand;
 import org.lucee.lucli.cli.completion.LuceeVersionCandidates;
-import org.lucee.lucli.commands.UnifiedCommandExecutor;
+import org.lucee.lucli.server.ServerCommandHandler;
 import org.lucee.lucli.config.editor.ConfigEditorRunner;
 import org.lucee.lucli.server.LuceeServerConfig;
 import org.lucee.lucli.server.LuceeServerManager;
@@ -40,6 +40,8 @@ import picocli.CommandLine.Model.CommandSpec;
         ServerCommand.OpenCommand.class,
         ServerCommand.NewCommand.class,
         ServerCommand.EditCommand.class,
+        ServerCommand.LockCommand.class,
+        ServerCommand.UnlockCommand.class,
         ServerMonitorCommandImpl.class
     }
 )
@@ -210,8 +212,8 @@ public class ServerCommand implements Callable<Integer> {
                 Paths.get(projectDir) :
                 Paths.get(System.getProperty("user.dir"));
 
-            // Create UnifiedCommandExecutor for CLI mode
-            UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, currentDir);
+            // Create ServerCommandHandler for CLI mode
+            ServerCommandHandler executor = new ServerCommandHandler(false, currentDir);
 
             // Build arguments array for the unified executor
             // NOTE: do not pass projectDir as an argument; the executor already has the correct working directory.
@@ -393,8 +395,8 @@ public class ServerCommand implements Callable<Integer> {
                 Paths.get(projectDir) :
                 Paths.get(System.getProperty("user.dir"));
 
-            // Create UnifiedCommandExecutor for CLI mode
-            UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, currentDir);
+            // Create ServerCommandHandler for CLI mode
+            ServerCommandHandler executor = new ServerCommandHandler(false, currentDir);
 
             // Build arguments array for the unified executor
             java.util.List<String> args = new java.util.ArrayList<>();
@@ -484,8 +486,8 @@ public class ServerCommand implements Callable<Integer> {
 
         @Override
         public Integer call() throws Exception {
-            // Create UnifiedCommandExecutor for CLI mode
-            UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, Paths.get(System.getProperty("user.dir")));
+            // Create ServerCommandHandler for CLI mode
+            ServerCommandHandler executor = new ServerCommandHandler(false, Paths.get(System.getProperty("user.dir")));
 
             // Build arguments array
             java.util.List<String> args = new java.util.ArrayList<>();
@@ -526,8 +528,8 @@ public class ServerCommand implements Callable<Integer> {
 
         @Override
         public Integer call() throws Exception {
-            // Create UnifiedCommandExecutor for CLI mode
-            UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, Paths.get(System.getProperty("user.dir")));
+            // Create ServerCommandHandler for CLI mode
+            ServerCommandHandler executor = new ServerCommandHandler(false, Paths.get(System.getProperty("user.dir")));
 
             // Build arguments array
             java.util.List<String> args = new java.util.ArrayList<>();
@@ -567,8 +569,8 @@ public class ServerCommand implements Callable<Integer> {
 
         @Override
         public Integer call() throws Exception {
-            // Create UnifiedCommandExecutor for CLI mode
-            UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, Paths.get(System.getProperty("user.dir")));
+            // Create ServerCommandHandler for CLI mode
+            ServerCommandHandler executor = new ServerCommandHandler(false, Paths.get(System.getProperty("user.dir")));
 
             // Build arguments array
             java.util.List<String> args = new java.util.ArrayList<>();
@@ -607,8 +609,8 @@ public class ServerCommand implements Callable<Integer> {
 
         @Override
         public Integer call() throws Exception {
-            // Create UnifiedCommandExecutor for CLI mode
-            UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, Paths.get(System.getProperty("user.dir")));
+            // Create ServerCommandHandler for CLI mode
+            ServerCommandHandler executor = new ServerCommandHandler(false, Paths.get(System.getProperty("user.dir")));
 
             // Execute the server list command
             String[] args = running ? new String[]{"list", "--running"} : new String[]{"list"};
@@ -647,8 +649,8 @@ public class ServerCommand implements Callable<Integer> {
 
         @Override
         public Integer call() throws Exception {
-            // Create UnifiedCommandExecutor for CLI mode
-            UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, Paths.get(System.getProperty("user.dir")));
+            // Create ServerCommandHandler for CLI mode
+            ServerCommandHandler executor = new ServerCommandHandler(false, Paths.get(System.getProperty("user.dir")));
 
             // Build arguments array
             java.util.List<String> args = new java.util.ArrayList<>();
@@ -702,8 +704,8 @@ public class ServerCommand implements Callable<Integer> {
 
         @Override
         public Integer call() throws Exception {
-            // Use UnifiedCommandExecutor in CLI mode (non-terminal)
-            UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, Paths.get(System.getProperty("user.dir")));
+            // Use ServerCommandHandler in CLI mode (non-terminal)
+            ServerCommandHandler executor = new ServerCommandHandler(false, Paths.get(System.getProperty("user.dir")));
 
             java.util.List<String> args = new java.util.ArrayList<>();
             args.add("prune");
@@ -755,7 +757,7 @@ public class ServerCommand implements Callable<Integer> {
                 Paths.get(projectDir) :
                 Paths.get(System.getProperty("user.dir"));
 
-            UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, currentDir);
+            ServerCommandHandler executor = new ServerCommandHandler(false, currentDir);
 
             java.util.List<String> args = new java.util.ArrayList<>();
             args.add("config");
@@ -802,7 +804,7 @@ public class ServerCommand implements Callable<Integer> {
                 Paths.get(projectDir) :
                 Paths.get(System.getProperty("user.dir"));
 
-            UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, currentDir);
+            ServerCommandHandler executor = new ServerCommandHandler(false, currentDir);
 
             java.util.List<String> args = new java.util.ArrayList<>();
             args.add("config");
@@ -953,6 +955,109 @@ public class ServerCommand implements Callable<Integer> {
 
             ConfigEditorRunner runner = new ConfigEditorRunner();
             runner.run(baseDir, cfg, environment);
+
+            return 0;
+        }
+    }
+
+    /**
+     * Server lock subcommand - lock server configuration to lucee-lock.json.
+     */
+    @Command(
+        name = "lock",
+        description = "Lock server configuration for this project (per environment)"
+    )
+    static class LockCommand implements Callable<Integer> {
+
+        @ParentCommand
+        private ServerCommand parent;
+
+        @Option(names = {"-d", "--directory"},
+                description = "Project directory (defaults to current directory)")
+        private String projectDir;
+
+        @Option(names = {"--env", "--environment"},
+                description = "Environment to lock (e.g., prod, dev, staging)")
+        private String environment;
+
+        @Option(names = {"-c", "--config"},
+                description = "Configuration file to lock (defaults to lucee.json)")
+        private String configFile;
+
+        @Option(names = {"--update"},
+                description = "Update existing lock from current configuration")
+        private boolean update;
+
+        @Override
+        public Integer call() throws Exception {
+            Path currentDir = projectDir != null
+                ? Paths.get(projectDir)
+                : Paths.get(System.getProperty("user.dir"));
+
+            ServerCommandHandler executor = new ServerCommandHandler(false, currentDir);
+            java.util.List<String> args = new java.util.ArrayList<>();
+            args.add("lock");
+
+            if (environment != null && !environment.trim().isEmpty()) {
+                args.add("--env");
+                args.add(environment);
+            }
+            if (configFile != null && !configFile.trim().isEmpty()) {
+                args.add("--config");
+                args.add(configFile);
+            }
+            if (update) {
+                args.add("--update");
+            }
+
+            String result = executor.executeCommand("server", args.toArray(new String[0]));
+            if (result != null && !result.isEmpty()) {
+                System.out.println(result);
+            }
+
+            return 0;
+        }
+    }
+
+    /**
+     * Server unlock subcommand - remove/disable server configuration lock.
+     */
+    @Command(
+        name = "unlock",
+        description = "Unlock server configuration for this project"
+    )
+    static class UnlockCommand implements Callable<Integer> {
+
+        @ParentCommand
+        private ServerCommand parent;
+
+        @Option(names = {"-d", "--directory"},
+                description = "Project directory (defaults to current directory)")
+        private String projectDir;
+
+        @Option(names = {"--env", "--environment"},
+                description = "Environment to unlock (e.g., prod, dev, staging)")
+        private String environment;
+
+        @Override
+        public Integer call() throws Exception {
+            Path currentDir = projectDir != null
+                ? Paths.get(projectDir)
+                : Paths.get(System.getProperty("user.dir"));
+
+            ServerCommandHandler executor = new ServerCommandHandler(false, currentDir);
+            java.util.List<String> args = new java.util.ArrayList<>();
+            args.add("unlock");
+
+            if (environment != null && !environment.trim().isEmpty()) {
+                args.add("--env");
+                args.add(environment);
+            }
+
+            String result = executor.executeCommand("server", args.toArray(new String[0]));
+            if (result != null && !result.isEmpty()) {
+                System.out.println(result);
+            }
 
             return 0;
         }

@@ -188,12 +188,45 @@ public class LuceeServerManager {
         String cfgFile = (configFileName != null && !configFileName.trim().isEmpty())
                 ? configFileName
                 : "lucee.json";
-        // Load configuration
-        LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(projectDir, cfgFile);
-        
-        // Apply environment overrides if specified
-        if (environment != null && !environment.trim().isEmpty()) {
-            config = LuceeServerConfig.applyEnvironment(config, environment);
+
+        // Determine environment key for locking
+        String envKey = (environment == null || environment.trim().isEmpty())
+                ? "_default"
+                : environment.trim();
+
+        // Load configuration, applying server lock when present (lenient behaviour)
+        LuceeServerConfig.ServerConfig config;
+        org.lucee.lucli.config.LuceeLockFile lockFile = org.lucee.lucli.config.LuceeLockFile.read(projectDir);
+        org.lucee.lucli.config.LuceeLockFile.ServerLock envLock = lockFile.getServerLock(envKey);
+
+        if (envLock != null && envLock.locked && envLock.effectiveConfig != null) {
+            // Use locked effective config snapshot
+            config = envLock.effectiveConfig;
+
+            // Detect drift between current lucee.json and the hash stored with the lock
+            Path cfgPath = projectDir.resolve(cfgFile);
+            String currentHash = org.lucee.lucli.config.LuceeLockFile.computeConfigHash(cfgPath);
+            String lockedHash = envLock.configHash;
+
+            if (currentHash != null && lockedHash != null && !currentHash.equals(lockedHash)) {
+                System.err.println("⚠️  Server configuration is LOCKED for env '" + envKey + "' (lucee-lock.json)\n" +
+                        "    - Using locked configuration snapshot\n" +
+                        "    - Detected changes in " + cfgFile + " since the lock was created (hash mismatch)\n" +
+                        "    - To roll these changes into the lock:\n" +
+                        "        lucli server lock" + ("_default".equals(envKey) ? "" : " --env=" + envKey) + " --update\n" +
+                        "    - To remove the lock:\n" +
+                        "        lucli server unlock" + ("_default".equals(envKey) ? "" : " --env=" + envKey));
+            } else {
+                System.out.println("ℹ️  Using locked server configuration for env '" + envKey + "' (lucee-lock.json)");
+            }
+        } else {
+            // No active lock: load configuration from lucee.json as usual
+            config = LuceeServerConfig.loadConfig(projectDir, cfgFile);
+
+            // Apply environment overrides if specified
+            if (environment != null && !environment.trim().isEmpty()) {
+                config = LuceeServerConfig.applyEnvironment(config, environment);
+            }
         }
         
         // Override version if specified

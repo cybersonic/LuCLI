@@ -180,8 +180,8 @@ component {
         var cwdPath = Paths.get(URI);
 
 
-        // Terminal mode = true so UnifiedCommandExecutor returns strings
-        var executor = createObject("java", "org.lucee.lucli.commands.UnifiedCommandExecutor")
+        // Terminal mode = true so ServerCommandHandler returns strings
+        var executor = createObject("java", "org.lucee.lucli.server.ServerCommandHandler")
             .init(true, cwdPath);
 
         var result = executor.executeCommand(command, args);

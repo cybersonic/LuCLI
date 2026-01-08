@@ -24,7 +24,7 @@ public class ModuleCommand {
  * Execute the module command with the given arguments
  * 
  * @deprecated This method has been replaced by direct PicocLI implementations.
- *             Only used by UnifiedCommandExecutor/Terminal (old code path).
+ *             Only used by the legacy unified server command handling (old terminal code path).
  */
 @Deprecated
 public static void executeModule(String[] args) {

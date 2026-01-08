@@ -6,7 +6,6 @@ import java.util.concurrent.Callable;
 import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.Timer;
 import org.lucee.lucli.cli.LuCLICommand;
-import org.lucee.lucli.commands.UnifiedCommandExecutor; // Still used by other subcommands
 
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;

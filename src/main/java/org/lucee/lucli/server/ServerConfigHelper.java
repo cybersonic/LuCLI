@@ -1,4 +1,4 @@
-package org.lucee.lucli.commands;
+package org.lucee.lucli.server;
 
 import java.io.IOException;
 import java.net.URI;

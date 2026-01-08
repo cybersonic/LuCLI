@@ -490,7 +490,7 @@ public class LucliCompleter implements Completer {
         
         if (words.size() == 2) {
             // Complete server subcommands
-            String[] serverSubcommands = {"start", "stop", "status", "list", "prune", "config", "monitor", "log", "debug"};
+            String[] serverSubcommands = {"start", "stop", "status", "list", "prune", "config", "lock", "unlock", "monitor", "log", "debug"};
             String partial = words.get(1);
             
             for (String subcommand : serverSubcommands) {
@@ -599,6 +599,10 @@ public class LucliCompleter implements Completer {
                 return "Remove stopped server instances";
             case "config":
                 return "Get or set server configuration";
+            case "lock":
+                return "Lock server configuration to lucee-lock.json";
+            case "unlock":
+                return "Unlock server configuration";
             case "monitor":
                 return "Monitor server via JMX";
             case "log":
@@ -627,6 +631,10 @@ public class LucliCompleter implements Completer {
                 return "🗑️";
             case "config":
                 return "⚙️";
+            case "lock":
+                return "🔒";
+            case "unlock":
+                return "🔓";
             case "monitor":
                 return "📈";
             case "log":
@@ -1010,7 +1018,7 @@ public class LucliCompleter implements Completer {
     private void completeConfigKeys(String partial, List<Candidate> candidates) {
         try {
             // Use ServerConfigHelper to get available keys
-            org.lucee.lucli.commands.ServerConfigHelper configHelper = new org.lucee.lucli.commands.ServerConfigHelper();
+            org.lucee.lucli.server.ServerConfigHelper configHelper = new org.lucee.lucli.server.ServerConfigHelper();
             List<String> availableKeys = configHelper.getAvailableKeys();
             
             for (String key : availableKeys) {
@@ -1064,8 +1072,8 @@ public class LucliCompleter implements Completer {
         } else {
             // Complete keys with '=' suffix
             try {
-                org.lucee.lucli.commands.ServerConfigHelper configHelper = new org.lucee.lucli.commands.ServerConfigHelper();
-                List<String> availableKeys = configHelper.getAvailableKeys();
+                org.lucee.lucli.server.ServerConfigHelper configHelper = new org.lucee.lucli.server.ServerConfigHelper();
+                    List<String> availableKeys = configHelper.getAvailableKeys();
                 
                 for (String key : availableKeys) {
                     if (key.startsWith(partial.toLowerCase())) {
@@ -1114,7 +1122,7 @@ public class LucliCompleter implements Completer {
             case "version":
                 // Complete Lucee versions
                 try {
-                    org.lucee.lucli.commands.ServerConfigHelper configHelper = new org.lucee.lucli.commands.ServerConfigHelper();
+                    org.lucee.lucli.server.ServerConfigHelper configHelper = new org.lucee.lucli.server.ServerConfigHelper();
                     List<String> versions = configHelper.getAvailableVersions();
                     
                     for (String version : versions) {

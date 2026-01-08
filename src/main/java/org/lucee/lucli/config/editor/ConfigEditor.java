@@ -15,7 +15,7 @@ import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.ParsedLine;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
-import org.lucee.lucli.commands.ServerConfigHelper;
+import org.lucee.lucli.server.ServerConfigHelper;
 import org.lucee.lucli.server.LuceeServerConfig;
 import org.lucee.lucli.server.LuceeServerConfig.ServerConfig;
 

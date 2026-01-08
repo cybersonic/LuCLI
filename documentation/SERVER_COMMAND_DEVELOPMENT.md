@@ -3,14 +3,14 @@
 This guide explains how to add a new subcommand to the `server` command in LuCLI. The implementation uses a two-layer architecture:
 
 1. **CLI Layer** (`ServerCommand.java`) - Picocli command definition
-2. **Execution Layer** (`UnifiedCommandExecutor.java`) - Command implementation
+2. **Execution Layer** (`ServerCommandHandler.java`) - Server command implementation
 
 ## Architecture Overview
 
 The server command uses a facade pattern where:
 - `ServerCommand` defines the CLI structure using Picocli annotations
 - Each subcommand is a nested static class implementing `Callable<Integer>`
-- `UnifiedCommandExecutor` contains the actual implementation logic
+- `ServerCommandHandler` contains the actual server implementation logic
 - This design ensures feature parity between CLI and terminal modes
 
 ## Step-by-Step: Adding a New Server Subcommand
@@ -44,8 +44,8 @@ static class BackupCommand implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-        // Create UnifiedCommandExecutor for CLI mode
-        UnifiedCommandExecutor executor = new UnifiedCommandExecutor(false, Paths.get(System.getProperty(\"user.dir\")));
+        // Create ServerCommandHandler for CLI mode
+        ServerCommandHandler executor = new ServerCommandHandler(false, Paths.get(System.getProperty("user.dir")));
 
         // Build arguments array
         java.util.List<String> args = new java.util.ArrayList<>();
@@ -77,7 +77,7 @@ static class BackupCommand implements Callable<Integer> {
 - Include `@ParentCommand` reference for Picocli hierarchy
 - Use `@Option` for command flags with both short and long names
 - Use `@Parameters` for positional arguments (if needed)
-- Always create `UnifiedCommandExecutor` and delegate to it
+- Always create `ServerCommandHandler` and delegate to it
 - Match the argument pattern used by other commands
 
 ### Step 2: Register the Subcommand in ServerCommand
@@ -101,9 +101,9 @@ Add your new subcommand class to the `@Command` annotation's `subcommands` list:
 )
 ```
 
-### Step 3: Add Handler Method in UnifiedCommandExecutor
+### Step 3: Add Handler Method in ServerCommandHandler
 
-In `src/main/java/org/lucee/lucli/commands/UnifiedCommandExecutor.java`, add a case in the `executeServerCommand` switch statement:
+In `src/main/java/org/lucee/lucli/server/ServerCommandHandler.java`, add a case in the `executeServerCommand` switch statement:
 
 ```java
 private String executeServerCommand(String[] args) throws Exception {
@@ -141,7 +141,7 @@ private String executeServerCommand(String[] args) throws Exception {
 
 ### Step 4: Implement the Handler Method
 
-Add the implementation method in `UnifiedCommandExecutor.java`:
+Add the implementation method in `ServerCommandHandler.java`:
 
 ```java
 private String handleServerBackup(LuceeServerManager serverManager, String[] args) throws Exception {
@@ -255,6 +255,6 @@ private String projectDir;
 ## Troubleshooting
 
 - **Command not appearing in help**: Ensure it's added to the `subcommands` list in `@Command`
-- **Arguments not parsed**: Check argument names match between `ServerCommand` and `UnifiedCommandExecutor`
+- **Arguments not parsed**: Check argument names match between `ServerCommand` and `ServerCommandHandler`
 - **Terminal mode shows nothing**: Remember to wrap output in `formatOutput()` for terminal mode
 - **Type mismatches**: Ensure argument types are converted correctly (String to Integer, etc.)

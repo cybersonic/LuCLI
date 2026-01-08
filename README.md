@@ -274,7 +274,7 @@ prompt terminal  # Show terminal capabilities
 - **StringOutput**: Centralized output post-processor with emoji and placeholder support
 - **LuceeScriptEngine**: Lucee CFML engine integration with externalized script templates
 - **WindowsSupport**: Smart terminal detection and emoji capability analysis
-- **UnifiedCommandExecutor**: Consistent command handling across all execution modes
+- **ServerCommandHandler**: Consistent server command handling across CLI and terminal modes
 
 ### Externalized Script System
 LuCLI uses externalized CFML templates for better maintainability:

@@ -20,7 +20,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 import org.lucee.lucli.cflint.CFLintCommand;
-import org.lucee.lucli.commands.UnifiedCommandExecutor;
+import org.lucee.lucli.server.ServerCommandHandler;
 import org.lucee.lucli.interactive.InteractiveTestCommand;
 
 /**
@@ -973,6 +973,17 @@ public class CommandProcessor {
                 return emojiSupported ? "👻" : "h:";
             }
             
+            // High-importance LuCEE / LuCLI config files
+            if (fileName.equals("lucee.json") ||
+                (fileName.startsWith("lucee-") && fileName.endsWith(".json"))) {
+                // Use a sun icon to mirror Lucee's branding
+                return emojiSupported ? "☀️" : "L:";
+            }
+            if (fileName.equals("module.json")) {
+                // Module metadata for LuCLI modules
+                return emojiSupported ? "🧩" : "M:";
+            }
+            
             // Get file extension
             String extension = "";
             int lastDot = fileName.lastIndexOf(".");
@@ -1211,12 +1222,12 @@ public class CommandProcessor {
         }
     }
     
-    /**
-     * Handle server management commands using UnifiedCommandExecutor
+/**
+     * Handle server management commands using ServerCommandHandler
      */
     private String serverCommand(String[] args) {
         Path currentDir = fileSystemState.getCurrentWorkingDirectory();
-        UnifiedCommandExecutor executor = new UnifiedCommandExecutor(true, currentDir);
+        org.lucee.lucli.server.ServerCommandHandler executor = new org.lucee.lucli.server.ServerCommandHandler(true, currentDir);
         
         // Execute server command and return result for terminal display
         return executor.executeCommand("server", args);
