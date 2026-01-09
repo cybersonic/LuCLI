@@ -219,9 +219,12 @@ public class LuceeServerConfig {
         // Perform environment variable substitution on string fields
         // Supports ${VAR_NAME} and ${VAR_NAME:-default_value}
         substituteEnvironmentVariables(config);
-
-        // Resolve ${secret:NAME} placeholders via the configured SecretStore (local only for now)
-        resolveSecretPlaceholders(config, projectDir);
+        
+        // NOTE: Secret placeholders (${secret:NAME}) are NOT resolved automatically here
+        // anymore. This prevents read-only commands (status, stop, list, config get, etc.)
+        // from prompting for the secrets passphrase. Callers that actually need the
+        // resolved secrets (e.g. when starting a server or locking config) must
+        // explicitly call resolveSecretPlaceholders(config, projectDir).
         
         // Ensure monitoring is initialized
         if (config.monitoring == null) {
@@ -527,8 +530,12 @@ public class LuceeServerConfig {
      * - If there are no ${secret:...} placeholders, this is a no-op.
      * - If placeholders exist but no passphrase can be obtained (env var or console),
      *   an IOException is thrown so the caller sees a clear failure.
+     *
+     * This method is intentionally public so that only commands that actually
+     * need secrets (e.g. server start, server lock) pay the cost of prompting
+     * for the secret store passphrase.
      */
-    private static void resolveSecretPlaceholders(ServerConfig config, Path projectDir) throws IOException {
+    public static void resolveSecretPlaceholders(ServerConfig config, Path projectDir) throws IOException {
         if (!hasSecretPlaceholders(config)) {
             return; // nothing to do
         }

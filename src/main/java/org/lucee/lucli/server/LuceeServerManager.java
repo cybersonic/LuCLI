@@ -229,6 +229,9 @@ public class LuceeServerManager {
             }
         }
         
+        // Resolve secrets only for actual server startup (not for generic config reads)
+        LuceeServerConfig.resolveSecretPlaceholders(config, projectDir);
+        
         // Override version if specified
         if (versionOverride != null && !versionOverride.trim().isEmpty()) {
             config.version = versionOverride;

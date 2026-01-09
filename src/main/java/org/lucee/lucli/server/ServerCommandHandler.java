@@ -1104,6 +1104,10 @@ public class ServerCommandHandler {
                 config = LuceeServerConfig.applyEnvironment(config, environment.trim());
             }
 
+            // For server lock, resolve secrets so the locked snapshot does not
+            // depend on being able to read the secret store at runtime.
+            LuceeServerConfig.resolveSecretPlaceholders(config, currentWorkingDirectory);
+
             // Compute hash of the underlying config file
             Path cfgPath = currentWorkingDirectory.resolve(cfgFile);
             String hash = org.lucee.lucli.config.LuceeLockFile.computeConfigHash(cfgPath);
