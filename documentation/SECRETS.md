@@ -211,14 +211,16 @@ You can reference secrets by name in your server configuration using the `${secr
 }
 ```
 
-When LuCLI loads `lucee.json` for server commands (e.g. `lucli server start`), it:
+When LuCLI **starts or locks a server configuration** (for example `lucli server start` or `lucli server lock`), it:
 
 1. Loads your config
 2. Applies environment variable substitution (see `ENVIRONMENT_VARIABLES.md`)
 3. Scans for any `${secret:NAME}` placeholders
 4. **Only if placeholders are present**, opens the local secret store and resolves them
 
-If a referenced secret cannot be found, or if the store/passphrase is unavailable, the command fails with a clear error instead of silently leaving the placeholder.
+Read‑only commands that merely inspect configuration (e.g. `lucli server status`, `lucli server stop`, `lucli server list`, `lucli server config get`) do **not** resolve secrets and therefore will **not** prompt for the secrets passphrase just because `${secret:...}` is present in `lucee.json`.
+
+If a referenced secret cannot be found, or if the store/passphrase is unavailable when resolution is required, the command fails with a clear error instead of silently leaving the placeholder.
 
 ### Example: Database password in CFConfig
 

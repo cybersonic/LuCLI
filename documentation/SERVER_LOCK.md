@@ -49,6 +49,7 @@ Semantics:
 - `lucli server lock` (no `--env`) locks the effective configuration for the default environment under the `_default` key.
 - `lucli server lock --env=prod` locks the effective configuration that would be used for `--env=prod`.
 - `--update` replaces an existing lock entry with a new snapshot from the current `lucee.json`.
+- When locking, any `${secret:NAME}` placeholders in `lucee.json`/CFConfig are **resolved once** and the resolved values are stored in the locked snapshot. This ensures future starts under that lock do not depend on being able to open the secret store at runtime.
 
 If a lock is already active for that environment and you do **not** pass `--update`, LuCLI will print a helpful error explaining that the env is already locked and how to update or unlock it.
 
