@@ -32,10 +32,7 @@ config = {
             "primary": "physical",
             "toplevel": false
 		}
-    },
-	"systemErr": "org.lucee.lucli.LuCLIPrintWriter",
-	"systemOut": "org.lucee.lucli.LuCLIPrintWriter"
-
+    }
 	// ,"generalErrorTemplate":"/lucee/templates/error/error-terminal.cfm"
 	// ,"missingErrorTemplate":"/lucee/templates/error/error-terminal.cfm"
 }
