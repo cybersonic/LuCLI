@@ -16,23 +16,27 @@ import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
 
 /**
- * Command to execute a CFML script file (cfm/cfc/cfs).
+ * Command to execute a script file.
  *
- * This centralizes the CFML file execution logic so that it is available as a
- * first-class Picocli command ("lucli run") and can also be used by the
- * root-command shortcut handling (e.g. "lucli somefile.cfm").
+ * Primary use is executing CFML files (.cfm, .cfc, .cfs) as well as delegating
+ * to the LuCLI script engine for `.lucli` batch scripts. This centralizes the
+ * CFML file execution logic so that it is available as a first-class Picocli
+ * command ("lucli run") and can also be used by the root-command shortcut
+ * handling (e.g. "lucli somefile.cfm").
  */
 @Command(
     name = "run",
-    description = "Execute a CFML script file (.cfm, .cfc, .cfs)",
+    description = "Execute a CFML script (.cfm, .cfc, .cfs) or LuCLI script (.lucli)",
     footer = {
         "",
         "Examples:",
         "  lucli run hello.cfm                 # Execute CFML template",
         "  lucli run SomeComponent.cfc arg1   # Execute component entry point",
         "  lucli run script.cfs arg1 arg2     # Execute CFML script file",
+        "  lucli run script.lucli             # Execute LuCLI batch script",
         "  lucli hello.cfm                    # Shortcut for 'lucli run hello.cfm'",
-        "  lucli SomeComponent.cfc arg1       # Shortcut for 'lucli run SomeComponent.cfc arg1'"
+        "  lucli SomeComponent.cfc arg1       # Shortcut for 'lucli run SomeComponent.cfc arg1'",
+        "  lucli script.lucli                 # Shortcut for 'lucli run script.lucli'"
     }
 )
 public class RunCommand implements Callable<Integer> {
@@ -78,12 +82,24 @@ public class RunCommand implements Callable<Integer> {
         }
 
         String fileName = path.getFileName().toString().toLowerCase();
+
+        // Handle .lucli batch scripts by delegating to LuCLI's script engine
+        if (fileName.endsWith(".lucli")) {
+            try {
+                return LuCLI.executeLucliScript(path.toString());
+            } catch (Exception e) {
+                StringOutput.Quick.error("Error executing LuCLI script '" + scriptPath + "': " + e.getMessage());
+                LuCLI.printDebugStackTrace(e);
+                return 1;
+            }
+        }
+
+        // Otherwise, require a CFML file extension
         if (!fileName.endsWith(".cfm") && !fileName.endsWith(".cfc") && !fileName.endsWith(".cfs")) {
             StringOutput.Quick.error("'" + scriptPath + "' is not a CFML file (.cfm, .cfc, or .cfs)");
             return 1;
         }
 
-      
         try {
             // Get or create the LuceeScriptEngine instance
             LuceeScriptEngine luceeEngine = LuceeScriptEngine.getInstance(LuCLI.verbose, LuCLI.debug);
@@ -96,7 +112,6 @@ public class RunCommand implements Callable<Integer> {
                 StringBuilder scriptWithArgs = new StringBuilder();
 
                 try {
-                   
                     String builtinSetup = variableManager.createVariableSetupScript(scriptPath, scriptArgs);
                     scriptWithArgs.append(builtinSetup);
                     scriptWithArgs.append("\n");

@@ -100,7 +100,7 @@ public class LuCLI {
                         if (file.exists() && firstArg.endsWith(".lucli")) {
                             try {
                                  Timer.start("LuCLI Script Shortcut Execution (" + firstArg + ")");
-                                 int ret = executeLucliScript(firstArg, shortcutVerbose, shortcutDebug, shortcutTiming);
+                                 int ret = executeLucliScript(firstArg);
                                  Timer.stop("LuCLI Script Shortcut Execution (" + firstArg + ")");
                                  return ret;
                             } catch (Exception scriptEx) {
@@ -108,6 +108,7 @@ public class LuCLI {
                                 if (shortcutVerbose || shortcutDebug) {
                                     StringOutput.Quick.error("LuCLI script execution failed: " + scriptEx.getMessage());
                                 }
+                                return 1;
                             }
                         }
                         // Check if it's an existing CFML file
@@ -234,6 +235,24 @@ public class LuCLI {
     }
     
     /**
+     * Determine if a given command name should be treated as a file-system style
+     * command within a .lucli script. These are the same commands that the
+     * interactive terminal routes through {@link CommandProcessor}.
+     */
+    private static boolean isFileSystemStyleCommand(String command) {
+        return command.equals("ls") || command.equals("dir") ||
+               command.equals("cd") || command.equals("pwd") ||
+               command.equals("mkdir") || command.equals("rmdir") ||
+               command.equals("rm") || command.equals("cp") ||
+               command.equals("mv") || command.equals("cat") ||
+               command.equals("touch") || command.equals("find") ||
+               command.equals("wc") || command.equals("head") ||
+               command.equals("tail") || command.equals("prompt") ||
+               command.equals("edit") || command.equals("interactive") ||
+               command.equals("cflint");
+    }
+    
+    /**
      * Get formatted version information
      * @param includeLucee Whether to include Lucee version
      * @return Formatted version string with labels
@@ -308,20 +327,23 @@ public class LuCLI {
     }
     
     /**
-     * Execute a .lucli script file line by line
-     * Each line is a command that gets executed individually
+     * Execute a .lucli script file line by line.
+     *
+     * Each non-blank, non-comment line is passed through {@link StringOutput} and then
+     * executed as if it had been typed directly into the interactive terminal.
+     * Lines beginning with {@code #} (after trimming) are treated as comments and
+     * ignored. This method does NOT start the interactive terminal; it uses the same
+     * command infrastructure (Picocli, CommandProcessor, ExternalCommandProcessor)
+     * in a non-interactive, batch-friendly way.
      */
-    private static int executeLucliScript(String scriptPath, boolean verbose, boolean debug, boolean timing) throws Exception {
-        // Set global flags
-        LuCLI.verbose = verbose;
-        LuCLI.debug = debug;
-        LuCLI.timing = timing;
+    public static int executeLucliScript(String scriptPath) throws Exception {
+        // Mark that we're running in non-interactive script mode
         LuCLI.lucliScript = true;
 
         java.nio.file.Path path = java.nio.file.Paths.get(scriptPath);
         if (!java.nio.file.Files.exists(path)) {
             StringOutput.Quick.error("Script not found: " + scriptPath);
-            return 1;
+            throw new java.io.FileNotFoundException("Script file not found: " + scriptPath);
         }
 
         printVerbose("Executing LuCLI script: " + scriptPath);
@@ -333,8 +355,14 @@ public class LuCLI {
             return 0;
         }
 
-        java.util.List<String> processedLines = new java.util.ArrayList<>();
+        // Set up a lightweight command environment similar to Terminal.dispatchCommand
+        org.lucee.lucli.CommandProcessor commandProcessor = new org.lucee.lucli.CommandProcessor();
+        org.lucee.lucli.ExternalCommandProcessor externalCommandProcessor =
+            new org.lucee.lucli.ExternalCommandProcessor(commandProcessor, commandProcessor.getSettings());
+        CommandLine picocli = new CommandLine(new org.lucee.lucli.cli.LuCLICommand());
+
         StringOutput stringOutput = StringOutput.getInstance();
+
         for (String line : lines) {
             if (line == null) {
                 continue;
@@ -346,15 +374,18 @@ public class LuCLI {
                 continue;
             }
 
-            
+            // Treat lines starting with '#' as comments (including shebangs like '#!/usr/bin/env lucli')
+            if (trimmed.startsWith("#")) {
+                printDebug("LuCLIScript", "Skipping comment line: " + line);
+                continue;
+            }
 
             // Check if this is a SET directive (case-insensitive)
-            if (line.trim().toLowerCase().startsWith("set ")) {
+            if (trimmed.toLowerCase().startsWith("set ")) {
                 // Parse: set KEY=VALUE or set KEY="VALUE" or set KEY='VALUE'
-                // Remove "set " prefix (case-insensitive)
-                String afterSet = line.trim().substring(4).trim();
+                String afterSet = trimmed.substring(4).trim();
                 
-                // // Split on first '=' to get key and value
+                // Split on first '=' to get key and value
                 int equalsIndex = afterSet.indexOf('=');
                 if (equalsIndex > 0) {
                     String key = afterSet.substring(0, equalsIndex).trim();
@@ -380,29 +411,59 @@ public class LuCLI {
                 }
             }
 
+            // Apply StringOutput placeholder processing
             String processedLine = stringOutput.process(line);
-            processedLines.add(processedLine);
 
-           
+            // Parse command into parts using the same parser as the terminal
+            String[] parts = commandProcessor.parseCommand(processedLine);
+            if (parts.length == 0) {
+                continue;
+            }
+
+            String command = parts[0].toLowerCase();
+
+            try {
+                // 1) Picocli subcommands (server, modules, cfml, run, etc.)
+                if (picocli.getSubcommands().containsKey(command)) {
+                    picocli.execute(parts); // Picocli writes directly to System.out/err
+                    continue;
+                }
+
+                // 2) Module shortcuts (hello-world, lint, etc.)
+                if (org.lucee.lucli.modules.ModuleCommand.moduleExists(command)) {
+                    String[] moduleArgs = new String[parts.length - 1];
+                    if (moduleArgs.length > 0) {
+                        System.arraycopy(parts, 1, moduleArgs, 0, moduleArgs.length);
+                    }
+                    // Module implementations handle their own output
+                    org.lucee.lucli.modules.ModuleCommand.executeModuleByName(command, moduleArgs);
+                    continue;
+                }
+
+                // 3) File-system style commands (ls, cd, rm, etc.)
+                if (isFileSystemStyleCommand(command)) {
+                    String fsResult = commandProcessor.executeCommand(processedLine);
+                    if (fsResult != null && !fsResult.isEmpty()) {
+                        System.out.println(fsResult);
+                    }
+                    continue;
+                }
+
+                // 4) Fallback to external command processor (git, echo, etc.)
+                String extResult = externalCommandProcessor.executeCommand(processedLine);
+                if (extResult != null && !extResult.isEmpty()) {
+                    System.out.println(extResult);
+                }
+
+            } catch (Exception e) {
+                // Log script-level errors but continue with subsequent lines
+                StringOutput.Quick.error("Error executing script line '" + processedLine + "': " + e.getMessage());
+                printDebugStackTrace(e);
+            }
         }
-        
-        // Execute using Terminal's script mode
-        // This redirects stdin to feed the processed script lines
-        String content = String.join("\n", processedLines) + "\n";
 
-        java.io.InputStream originalIn = System.in;
-        try {
-            System.setIn(new java.io.ByteArrayInputStream(content.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
-            Terminal.main(new String[0]);
-            return 0; // Success if no exception thrown
-        } catch (Exception e) {
-            StringOutput.Quick.error("Error executing script: " + e.getMessage());
-            printDebugStackTrace(e);
-            return 1;
-        } finally {
-            System.setIn(originalIn);
-
-        }
+        // Scripts are best-effort; overall success as long as we didn't hit a fatal error above
+        return 0;
     }
     
     /**
