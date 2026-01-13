@@ -15,7 +15,7 @@ if(fileExists( moduleConfigFilePath )){
         configImport(
             data=moduleConfigStruct.configuration,
             password=request.SERVERADMINPASSWORD,
-            type="server", 
+            type="server",      
             flushExistingData=false
             );
         }
