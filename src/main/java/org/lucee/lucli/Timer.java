@@ -18,6 +18,7 @@ public class Timer {
     private static final int MAX_OPERATION_NAME_LENGTH = 100;
     private static final int MIN_OPERATION_NAME_LENGTH = 20;
     private static final int BASE_LINE_WIDTH = 60;
+    private static final int BAR_WIDTH = 40;
     
     // Instance fields (non-static so each instance has its own state)
     private final Map<String, TimerEntry> timers = new ConcurrentHashMap<>();
@@ -98,8 +99,10 @@ public class Timer {
             return Duration.ZERO;
         }
         
-        Duration duration = Duration.between(entry.startTime, Instant.now());
+        Instant endTime = Instant.now();
+        Duration duration = Duration.between(entry.startTime, endTime);
         entry.duration = duration;
+        entry.endTime = endTime;
         
         // Remove from stack
         List<String> stack = timerStack.get();
@@ -139,7 +142,14 @@ public class Timer {
      * Output all timing results
      */
     public static void printResults() {
-        getInstance()._printResults();
+        getInstance()._printResultsBar();
+    }
+
+    /**
+     * Output timing results as a simple timeline/bar chart to visualize overlaps.
+     */
+    public static void printResultsBar() {
+        getInstance()._printResultsBar();
     }
 
     /** Instance implementation of printResults */
@@ -183,6 +193,167 @@ public class Timer {
                 }
             });
             
+        System.out.println("─".repeat(lineWidth));
+    }
+
+    /**
+     * Instance implementation of the bar/timeline view.
+     */
+    public void _printResultsBar() {
+        if (!enabled || timers.isEmpty()) {
+            return;
+        }
+
+        // Only consider completed timers
+        List<TimerEntry> completed = timers.values().stream()
+            .filter(t -> t.duration != null)
+            .toList();
+
+        if (completed.isEmpty()) {
+            return;
+        }
+
+        // Determine earliest start and latest end to build a global timeline
+        Instant earliestStart = completed.stream()
+            .map(t -> t.startTime)
+            .min(Instant::compareTo)
+            .orElse(null);
+
+        Instant latestEnd = completed.stream()
+            .map(t -> t.getEndTime())
+            .max(Instant::compareTo)
+            .orElse(null);
+
+        if (earliestStart == null || latestEnd == null) {
+            return;
+        }
+
+        long totalMillis = Math.max(1, Duration.between(earliestStart, latestEnd).toMillis());
+
+
+        // Determine name column width similar to _printResults
+        int longestName = completed.stream()
+            .mapToInt(timer -> timer.operationName.length())
+            .max()
+            .orElse(0);
+
+        int nameColumnWidth = Math.min(
+            MAX_OPERATION_NAME_LENGTH,
+            Math.max(longestName, MIN_OPERATION_NAME_LENGTH)
+        );
+
+        // Determine duration column width so everything lines up nicely
+        int maxDurationWidth = completed.stream()
+            .map(timer -> formatDuration(timer.duration))
+            .mapToInt(String::length)
+            .max()
+            .orElse(0);
+
+        // Fixed width for percentage column such as "100.0%"
+        int percentColumnWidth = 7;
+
+        // name + " |" + bar + space + duration + space + percent
+        int lineWidth = nameColumnWidth + 3 + BAR_WIDTH + 1 + maxDurationWidth + 1 + percentColumnWidth;
+
+        System.out.println("\n⏱️  Timing Timeline:");
+        System.out.println("─".repeat(lineWidth));
+        System.out.println("(▓ = wrapper, █ = inner/leaf (% of total wall-clock time))\n");
+
+        // Precompute which timers are wrappers: those that fully contain at least one other interval
+        Map<TimerEntry, Boolean> isWrapper = new ConcurrentHashMap<>();
+        for (TimerEntry outer : completed) {
+            boolean wrapper = completed.stream()
+                .filter(inner -> inner != outer)
+                .anyMatch(inner ->
+                    !outer.startTime.isAfter(inner.startTime) &&
+                    !outer.getEndTime().isBefore(inner.getEndTime())
+                );
+            isWrapper.put(outer, wrapper);
+        }
+
+        // Sort by start time so the visual order roughly follows execution order
+        completed.stream()
+            .sorted((a, b) -> a.startTime.compareTo(b.startTime))
+            .forEach(timer -> {
+                long offsetMillis = Duration.between(earliestStart, timer.startTime).toMillis();
+                long durationMillis = timer.duration.toMillis();
+
+                int offsetChars = (int) Math.round((offsetMillis * 1.0 * BAR_WIDTH) / totalMillis);
+                int lenChars = (int) Math.max(1, Math.round((durationMillis * 1.0 * BAR_WIDTH) / totalMillis));
+
+                // Clamp to bar width
+                if (offsetChars > BAR_WIDTH) {
+                    offsetChars = BAR_WIDTH;
+                }
+                if (offsetChars + lenChars > BAR_WIDTH) {
+                    lenChars = Math.max(0, BAR_WIDTH - offsetChars);
+                }
+
+        boolean wrapper = Boolean.TRUE.equals(isWrapper.get(timer));
+        char blockChar = wrapper ? '▓' : '█';
+
+        // Percentage for this timer relative to overall wall-clock period
+        double pct = (totalMillis > 0)
+            ? (timer.duration.toMillis() * 100.0) / totalMillis
+            : 0.0;
+        String pctStr = String.format("%5.1f%%", pct);
+
+                // Build uncoloured bar first so width math ignores ANSI sequences
+                String spaces = " ".repeat(Math.max(0, offsetChars));
+                String rawBlock = lenChars > 0 ? ("" + blockChar).repeat(lenChars) : "";
+                String rawBar = spaces + rawBlock;
+
+                // Pad with spaces (still uncoloured) to full width so lines align
+                if (rawBar.length() < BAR_WIDTH) {
+                    rawBar = rawBar + " ".repeat(BAR_WIDTH - rawBar.length());
+                }
+
+                // Apply colour
+                String RESET = "\u001B[0m";
+                String colouredBar;
+
+                if (wrapper && !rawBlock.isEmpty()) {
+                    // Wrapper: "silver" / light grey
+                    String SILVER = "\u001B[37m"; // white/grey on dark background
+                    colouredBar = spaces + SILVER + rawBlock + RESET;
+                    // Preserve trailing padding spaces (after the coloured block)
+                    if (rawBar.length() > spaces.length() + rawBlock.length()) {
+                        colouredBar += rawBar.substring(spaces.length() + rawBlock.length());
+                    }
+                } else if (!rawBlock.isEmpty()) {
+                    // Leaf operations: colour by percentage of total time
+                    String GREEN = "\u001B[32m";
+                    String YELLOW = "\u001B[33m"; // amber-ish
+                    String RED = "\u001B[31m";
+
+                    String colour;
+                    if (pct >= 70.0) {
+                        colour = RED;
+                    } else if (pct >= 50.0) {
+                        colour = YELLOW;
+                    } else {
+                        colour = GREEN;
+                    }
+
+                    colouredBar = spaces + colour + rawBlock + RESET;
+                    if (rawBar.length() > spaces.length() + rawBlock.length()) {
+                        colouredBar += rawBar.substring(spaces.length() + rawBlock.length());
+                    }
+                } else {
+                    colouredBar = rawBar;
+                }
+
+                String durationStr = formatDuration(timer.duration);
+
+                System.out.printf(
+                    "%-" + nameColumnWidth + "." + nameColumnWidth + "s |%s %" + maxDurationWidth + "s %" + percentColumnWidth + "s%n",
+                    timer.operationName,
+                    colouredBar,
+                    durationStr,
+                    pctStr
+                );
+            });
+
         System.out.println("─".repeat(lineWidth));
     }
     
@@ -244,10 +415,21 @@ public class Timer {
         final String operationName;
         final Instant startTime;
         Duration duration;
+        Instant endTime;
         
         TimerEntry(String operationName, Instant startTime) {
             this.operationName = operationName;
             this.startTime = startTime;
+        }
+
+        Instant getEndTime() {
+            if (endTime != null) {
+                return endTime;
+            }
+            if (duration != null) {
+                return startTime.plus(duration);
+            }
+            return startTime;
         }
     }
 }

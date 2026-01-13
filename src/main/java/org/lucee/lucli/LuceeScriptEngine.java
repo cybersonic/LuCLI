@@ -1302,6 +1302,7 @@ public class LuceeScriptEngine {
      */
     public String injectBuiltinVariables(String scriptContent, String scriptFile, String[] scriptArgs) throws Exception {
         try {
+            Timer.start("injectBuiltinVariables");
             BuiltinVariableManager variableManager = BuiltinVariableManager.getInstance(verbose, debug);
             String variableSetup = variableManager.createVariableSetupScript(scriptFile, scriptArgs);
             
@@ -1310,7 +1311,7 @@ public class LuceeScriptEngine {
             fullScript.append(variableSetup);
             fullScript.append("\n// === Original Script Content ===\n");
             fullScript.append(scriptContent);
-            
+            Timer.stop("injectBuiltinVariables");
             return fullScript.toString();
         } catch (IOException e) {
             if (isDebugMode()) {

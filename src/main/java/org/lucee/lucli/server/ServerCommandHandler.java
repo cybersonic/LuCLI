@@ -3,6 +3,7 @@ package org.lucee.lucli.server;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
@@ -87,6 +88,8 @@ public class ServerCommandHandler {
                     return handleServerRestart(serverManager, args);
                 case "status":
                     return handleServerStatus(serverManager, args);
+                case "info":
+                    return handleServerInfo(serverManager, args);
                 case "list":
                     return handleServerList(serverManager, args);
                 case "prune":
@@ -400,29 +403,18 @@ public class ServerCommandHandler {
             // Use the realized configuration (including environment and overrides) for summary output
             LuceeServerConfig.ServerConfig config = finalConfig;
             
-            // Compute effective webroot for display
-            java.nio.file.Path effectiveWebroot = LuceeServerConfig.resolveWebroot(config, projectDir);
-           
             result.append("   Server Name:   ").append(instance.getServerName()).append("\n");
             result.append("   Process ID:    ").append(instance.getPid()).append("\n");
-            result.append("   HTTP Port:     ").append(instance.getPort()).append("\n");
-            result.append("   Shutdown Port: ").append(LuceeServerConfig.getEffectiveShutdownPort(config)).append("\n");
-           
-            
-            if (config.monitoring != null && config.monitoring.enabled && config.monitoring.jmx != null) {
-                result.append("   JMX Port:      ").append(config.monitoring.jmx.port).append("\n");
-            }
-            
-            
-            
+
+            // Shared summary (ports, webroot, server dir)
+            appendServerSummary(result, config, projectDir, instance.getServerDir(), instance.getPort());
+
             result.append("   URL:           http://localhost:").append(instance.getPort()).append("\n");
             if (config.enableLucee && config.admin != null && config.admin.enabled) {
                 result.append("   Admin URL:     http://localhost:")
                       .append(instance.getPort())
                       .append("/lucee/admin.cfm\n");
             }
-            result.append("   Web Root:      ").append(effectiveWebroot).append("\n");
-            result.append("   Server Dir:    ").append(instance.getServerDir()).append("\n");
 
             // Show active agents, if any
             java.util.Set<String> activeAgents = serverManager.getActiveAgentsForConfig(config, agentOverrides);
@@ -864,6 +856,154 @@ public class ServerCommandHandler {
         }
         
         return formatOutput(result.toString(), false);
+    }
+
+    /**
+     * Handle server info command - show configuration overview without starting the server.
+     */
+    private String handleServerInfo(LuceeServerManager serverManager, String[] args) throws Exception {
+        String configFileName = null;
+        String environment = null;
+        String webrootOverride = null;
+        Path projectDir = currentWorkingDirectory; // Default to current directory
+
+        // Parse additional arguments (skip "info")
+        for (int i = 1; i < args.length; i++) {
+            String arg = args[i];
+            if (("--config".equals(arg) || "-c".equals(arg)) && i + 1 < args.length) {
+                configFileName = args[++i];
+            } else if (arg.startsWith("--config=")) {
+                configFileName = arg.substring("--config=".length());
+            } else if (("--env".equals(arg) || "--environment".equals(arg)) && i + 1 < args.length) {
+                environment = args[++i];
+            } else if (arg.startsWith("--env=")) {
+                environment = arg.substring("--env=".length());
+            } else if (arg.startsWith("--environment=")) {
+                environment = arg.substring("--environment=".length());
+            } else if ("--webroot".equals(arg) && i + 1 < args.length) {
+                webrootOverride = args[++i];
+            } else if (arg.startsWith("--webroot=")) {
+                webrootOverride = arg.substring("--webroot=".length());
+            } else if (!arg.startsWith("-") && i == 1 && !arg.contains("=")) {
+                // Treat first non-option argument as project directory
+                projectDir = Paths.get(arg);
+            }
+        }
+
+        String cfgFile = configFileName != null ? configFileName : "lucee.json";
+        Path cfgPath = projectDir.resolve(cfgFile);
+
+        // Honour "no lucee.json" requirement: do not create a default file here.
+        if (!Files.exists(cfgPath)) {
+            StringBuilder missing = new StringBuilder();
+            missing.append("❌ Config file not found: ")
+                   .append(cfgPath.toAbsolutePath())
+                   .append("\n");
+            missing.append("   Use 'lucli server new' to create a new lucee.json for this project.\n");
+            return formatOutput(missing.toString(), true);
+        }
+
+        LuceeServerConfig.ServerConfig config;
+        try {
+            config = LuceeServerConfig.loadConfig(projectDir, cfgFile);
+        } catch (IOException e) {
+            return formatOutput("❌ Error reading configuration: " + e.getMessage(), true);
+        }
+
+        // Apply environment overrides if specified
+        if (environment != null && !environment.trim().isEmpty()) {
+            try {
+                config = LuceeServerConfig.applyEnvironment(config, environment.trim());
+            } catch (IllegalArgumentException e) {
+                return formatOutput("❌ " + e.getMessage(), true);
+            }
+        }
+
+        // Apply one-shot webroot override (does not persist to lucee.json)
+        if (webrootOverride != null && !webrootOverride.trim().isEmpty()) {
+            config.webroot = webrootOverride.trim();
+        }
+
+        StringBuilder result = new StringBuilder();
+        result.append("Server configuration for: ").append(projectDir).append("\n");
+        result.append("   Config File:   ").append(cfgPath.toAbsolutePath()).append("\n");
+        result.append("   Server Name:   ").append(config.name).append("\n");
+        if (environment != null && !environment.trim().isEmpty()) {
+            result.append("   Environment:   ").append(environment.trim()).append("\n");
+        }
+        result.append("   Lucee Enabled: ").append(config.enableLucee ? "yes" : "no").append("\n");
+        result.append("   Lucee Version: ").append(config.version).append("\n");
+
+        // Expected server directory for this configuration
+        Path serverDir = serverManager.getServersDir().resolve(config.name);
+
+        // Shared summary (ports, webroot, server dir)
+        appendServerSummary(result, config, projectDir, serverDir, null);
+
+        if (LuceeServerConfig.isHttpsEnabled(config)) {
+            result.append("   HTTPS Port:    ").append(LuceeServerConfig.getEffectiveHttpsPort(config)).append("\n");
+            result.append("   HTTPS Redirect:")
+                  .append(LuceeServerConfig.isHttpsRedirectEnabled(config) ? " enabled" : " disabled")
+                  .append("\n");
+        } else {
+            result.append("   HTTPS:         disabled\n");
+        }
+
+        if (config.admin != null) {
+            result.append("   Admin Enabled: ").append(config.admin.enabled ? "yes" : "no").append("\n");
+        }
+
+        // Show whether a server is currently running for this project
+        // Show whether a server is currently running for this project
+        LuceeServerManager.ServerStatus status = serverManager.getServerStatus(projectDir);
+        result.append("   Status:        ");
+        if (status.isRunning()) {
+            result.append("RUNNING (PID ")
+                  .append(status.getPid())
+                  .append(", Port ")
+                  .append(status.getPort())
+                  .append(")");
+        } else {
+            result.append("NOT RUNNING");
+        }
+
+        return formatOutput(result.toString(), false);
+    }
+
+    /**
+     * Append a shared server summary (ports, JMX, webroot, server dir).
+     */
+    private void appendServerSummary(StringBuilder result,
+                                     LuceeServerConfig.ServerConfig config,
+                                     Path projectDir,
+                                     Path serverDir,
+                                     Integer explicitHttpPort) {
+        // Determine HTTP port (instance port when available, otherwise config.port)
+        int httpPort = explicitHttpPort != null ? explicitHttpPort.intValue() : config.port;
+
+        // Compute effective webroot for display
+        Path effectiveWebroot = LuceeServerConfig.resolveWebroot(config, projectDir);
+
+        result.append("   HTTP Port:     ").append(httpPort).append("\n");
+        result.append("   Shutdown Port: ")
+              .append(LuceeServerConfig.getEffectiveShutdownPort(config))
+              .append("\n");
+
+        if (config.monitoring != null && config.monitoring.enabled && config.monitoring.jmx != null) {
+            result.append("   JMX Port:      ")
+                  .append(config.monitoring.jmx.port)
+                  .append("\n");
+        }
+
+        result.append("   Web Root:      ")
+              .append(effectiveWebroot)
+              .append("\n");
+
+        if (serverDir != null) {
+            result.append("   Server Dir:    ")
+                  .append(serverDir)
+                  .append("\n");
+        }
     }
     
     private String handleServerList(LuceeServerManager serverManager, String[] args) throws Exception {

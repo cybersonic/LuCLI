@@ -1,11 +1,15 @@
 package org.lucee.lucli.config.editor;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
+import java.util.Optional;
 import java.util.Scanner;
 
 import org.jline.reader.Candidate;
@@ -18,6 +22,9 @@ import org.jline.terminal.TerminalBuilder;
 import org.lucee.lucli.server.ServerConfigHelper;
 import org.lucee.lucli.server.LuceeServerConfig;
 import org.lucee.lucli.server.LuceeServerConfig.ServerConfig;
+import org.lucee.lucli.secrets.LocalSecretStore;
+import org.lucee.lucli.secrets.SecretStore;
+import org.lucee.lucli.secrets.SecretStoreException;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
@@ -328,14 +335,15 @@ public class ConfigEditor {
         if (currentPassword.isEmpty()) {
             description("Admin password: (not set)");
         } else if (currentPassword.matches("^\\$\\{.+}$")) {
-            description("Admin password uses environment variable reference (recommended).");
+            description("Admin password uses placeholder reference (env var or secret).");
         } else {
-            description("Admin password is plain text (consider switching to an env var reference).");
+            description("Admin password is plain text (consider switching to a placeholder reference).");
         }
 
         System.out.println("Admin password options:");
         description("k) keep current");
         description("e) use environment variable reference (e.g. ${LUCEE_ADMIN_PASSWORD})");
+        description("s) use secret store placeholder (e.g. ${secret:admin.password})");
         description("p) set plain password");
         System.out.print("Choice [k]: ");
         String adminChoice = scanner.nextLine().trim().toLowerCase();
@@ -352,6 +360,8 @@ public class ConfigEditor {
                 var = "LUCEE_ADMIN_PASSWORD";
             }
             newAdminPassword = "${" + var + "}";
+        } else if (adminChoice.equals("s")) {
+            newAdminPassword = configureAdminPasswordSecret(scanner, config);
         } else if (adminChoice.equals("p")) {
             System.out.print("Enter new admin password: ");
             String p1 = scanner.nextLine();
@@ -638,6 +648,113 @@ public class ConfigEditor {
                 // On failure, leave candidates empty (no completion)
             }
         }
+    }
+
+    private static String configureAdminPasswordSecret(Scanner scanner, ServerConfig config) {
+        Path storePath = resolveSecretsStorePath();
+        boolean storeExists = Files.exists(storePath);
+        char[] passphrase = null;
+
+        if (!storeExists) {
+            System.out.print("No secret store found at " + storePath + ". Initialize one now? (y/N): ");
+            String answer = scanner.nextLine().trim().toLowerCase();
+            if (!answer.equals("y") && !answer.equals("yes")) {
+                System.out.println("Skipping secret-based admin password.");
+                return null;
+            }
+            java.io.Console console = System.console();
+            if (console == null) {
+                System.out.println("⚠️ No console available to read secrets passphrase securely. Cannot initialize secret store here.");
+                return null;
+            }
+            char[] p1 = console.readPassword("Create secrets passphrase: ");
+            char[] p2 = console.readPassword("Confirm secrets passphrase: ");
+            if (!Arrays.equals(p1, p2)) {
+                System.out.println("⚠️ Passphrases do not match. Aborting secret store initialization.");
+                return null;
+            }
+            passphrase = p1;
+            try {
+                new LocalSecretStore(storePath, passphrase);
+                System.out.println("Initialized local secret store at " + storePath);
+            } catch (SecretStoreException e) {
+                System.out.println("⚠️ Failed to initialize secret store: " + e.getMessage());
+                return null;
+            }
+        }
+
+        if (passphrase == null) {
+            String envPass = System.getenv("LUCLI_SECRETS_PASSPHRASE");
+            if (envPass != null && !envPass.isEmpty()) {
+                passphrase = envPass.toCharArray();
+            } else if (System.console() != null) {
+                passphrase = System.console().readPassword("Enter secrets passphrase: ");
+            }
+        }
+
+        if (passphrase == null || passphrase.length == 0) {
+            System.out.println("⚠️ No secrets passphrase available. Aborting secret-based admin password.");
+            return null;
+        }
+
+        System.out.print("Secret name to use for admin password [admin.password]: ");
+        String name = scanner.nextLine().trim();
+        if (name.isEmpty()) {
+            name = "admin.password";
+        }
+
+        try {
+            SecretStore store = new LocalSecretStore(storePath, passphrase);
+            Optional<char[]> existing = store.get(name);
+
+            if (existing.isPresent()) {
+                System.out.print("Secret '" + name + "' already exists. Use it for admin password? (Y/n): ");
+                String useExisting = scanner.nextLine().trim().toLowerCase();
+                if (useExisting.isEmpty() || useExisting.equals("y") || useExisting.equals("yes")) {
+                    return "${secret:" + name + "}";
+                }
+                System.out.println("Skipping secret-based admin password.");
+                return null;
+            }
+
+            System.out.print("Secret '" + name + "' does not exist. Create it now? (y/N): ");
+            String create = scanner.nextLine().trim().toLowerCase();
+            if (!create.equals("y") && !create.equals("yes")) {
+                System.out.println("Skipping secret-based admin password.");
+                return null;
+            }
+
+            java.io.Console console = System.console();
+            if (console == null) {
+                System.out.println("⚠️ No console available to read secret value securely. Cannot create secret.");
+                return null;
+            }
+            char[] v1 = console.readPassword("Enter admin password for secret '%s': ", name);
+            char[] v2 = console.readPassword("Confirm admin password for secret '%s': ", name);
+            if (!Arrays.equals(v1, v2)) {
+                System.out.println("⚠️ Passwords do not match. Aborting secret creation.");
+                return null;
+            }
+            String desc = "Lucee admin password for server '" + (config.name != null ? config.name : "<unnamed>") + "'";
+            store.put(name, v1, desc);
+            System.out.println("Stored secret '" + name + "'.");
+            return "${secret:" + name + "}";
+        } catch (SecretStoreException e) {
+            System.out.println("⚠️ Failed to use secret store for admin password: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private static Path resolveSecretsStorePath() {
+        String lucliHomeStr = System.getProperty("lucli.home");
+        if (lucliHomeStr == null) {
+            lucliHomeStr = System.getenv("LUCLI_HOME");
+        }
+        if (lucliHomeStr == null) {
+            String userHome = System.getProperty("user.home");
+            lucliHomeStr = Paths.get(userHome, ".lucli").toString();
+        }
+        return Paths.get(lucliHomeStr).resolve("secrets").resolve("local.json");
     }
 
     private static Boolean parseBoolean(String input) {

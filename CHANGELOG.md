@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Secrets Management:** Added first-class secrets management support with safeguards to prevent accidental leakage in logs, dry-run output, and documentation examples. Includes automatic checks for hard-coded secrets and improved validation of sensitive configuration values.
+- **Server Configuration Editor:** Introduced an interactive server configuration editor and new `server new`/`server edit` style commands for creating and modifying Lucee server configurations without manually editing `lucee.json`. Centralized configuration handling in a new `ServerConfigHelper` for more consistent behavior.
+- **Configuration Locking:** Added configuration lock behavior and tests to ensure locked server configurations cannot be modified unintentionally, improving safety for shared or production server configs.
+- **Lucee Enable/Disable Flags:** Added `--enable-lucee` and `--disable-lucee` options to `lucli server start` so you can explicitly turn Lucee on or off per run without changing the underlying configuration file.
+- **Server Open Command & Webroot Override:** Added a `lucli server open` command to quickly open the active server in a browser, plus support for overriding the webroot at startup for temporary testing setups.
+- **Terminal Completion Enhancements:** Improved terminal autocompletion to include new server commands and options, as well as better coverage of existing commands in both CLI and interactive terminal modes.
+- **Local Repository Improvements:** Added an initial local repository implementation to support more flexible module and project workflows (e.g., local repositories for tools like markspresso), laying groundwork for richer dependency and module sources.
+- **Documentation Updates:** Expanded and corrected documentation, including new content docs and fixes to the generated command reference and completion markdown for more accurate and readable help output.
+- **Internal Refactoring:** Refactored internal classes to keep public APIs and high-level logic at the top of key classes, improving readability and maintainability without changing user-facing behavior.
 
 ## 0.1.229
 - **Dependency Management:** Added `deps` and `install` CLI commands for managing project dependencies. New dependency infrastructure with `dependencySettings` configuration.

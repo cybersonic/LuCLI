@@ -42,6 +42,7 @@ import picocli.CommandLine.Model.CommandSpec;
         ServerCommand.EditCommand.class,
         ServerCommand.LockCommand.class,
         ServerCommand.UnlockCommand.class,
+        ServerCommand.InfoCommand.class,
         ServerMonitorCommandImpl.class
     }
 )
@@ -582,6 +583,71 @@ public class ServerCommand implements Callable<Integer> {
             }
 
             // Execute the server status command
+            String result = executor.executeCommand("server", args.toArray(new String[0]));
+            if (result != null && !result.isEmpty()) {
+                System.out.println(result);
+            }
+
+            return 0;
+        }
+    }
+
+    /**
+     * Server info subcommand - show configuration overview without starting
+     */
+    @Command(
+        name = "info",
+        description = "Show server configuration overview without starting the server"
+    )
+    static class InfoCommand implements Callable<Integer> {
+
+        @ParentCommand
+        private ServerCommand parent;
+
+        @Option(names = {"-c", "--config"},
+                description = "Configuration file to use (defaults to lucee.json)")
+        private String configFile;
+
+        @Option(names = {"--env", "--environment"},
+                description = "Environment to use (e.g., prod, dev, staging)")
+        private String environment;
+
+        @Option(names = {"--webroot"},
+                description = "Override webroot (relative to project directory, like lucee.json)")
+        private String webroot;
+
+        @Parameters(paramLabel = "[PROJECT_DIR]",
+                    description = "Project directory (defaults to current directory)",
+                    arity = "0..1")
+        private String projectDir;
+
+        @Override
+        public Integer call() throws Exception {
+            // Determine the project directory
+            Path currentDir = projectDir != null ?
+                Paths.get(projectDir) :
+                Paths.get(System.getProperty("user.dir"));
+
+            // Create ServerCommandHandler for CLI mode
+            ServerCommandHandler executor = new ServerCommandHandler(false, currentDir);
+
+            // Build arguments array for the unified executor
+            java.util.List<String> args = new java.util.ArrayList<>();
+            args.add("info");
+
+            if (configFile != null) {
+                args.add("--config");
+                args.add(configFile);
+            }
+            if (environment != null) {
+                args.add("--env");
+                args.add(environment);
+            }
+            if (webroot != null) {
+                args.add("--webroot");
+                args.add(webroot);
+            }
+
             String result = executor.executeCommand("server", args.toArray(new String[0]));
             if (result != null && !result.isEmpty()) {
                 System.out.println(result);

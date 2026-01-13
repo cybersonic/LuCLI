@@ -1,0 +1,128 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://lucli.dev/schemas/v1/settings.schema.json",
+  "title": "LuCLI User Settings",
+  "description": "Global LuCLI user settings stored in ~/.lucli/settings.json.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "currentPrompt": {
+      "type": "string",
+      "description": "Name of the active prompt template. Must match a prompt JSON file under ~/.lucli/prompts or a built-in template name (e.g. 'default', 'minimal', 'zsh', 'time', 'colorful', 'dev', 'space', 'electric', 'hacker', 'gaming', 'corporate', 'train', 'locomotive', 'powerline', 'powerline-pro').",
+      "default": "default"
+    },
+    "showEmojis": {
+      "type": "boolean",
+      "description": "Whether LuCLI should attempt to render emoji glyphs in prompts and command output. Effective emoji display also depends on terminal capabilities.",
+      "default": false
+    },
+    "colorSupport": {
+      "type": "boolean",
+      "description": "Whether the terminal is considered to support ANSI color output. Used by some features to decide whether to emit ANSI color codes.",
+      "default": false
+    },
+    "historySize": {
+      "type": "integer",
+      "description": "Maximum number of history entries kept in the interactive terminal. This is used together with JLine's HISTORY_SIZE/HISTORY_FILE_SIZE.",
+      "minimum": 0,
+      "default": 1000
+    },
+    "language": {
+      "description": "Preferred language/locale for LuCLI messages. When null or omitted, the system default locale is used. Typical values are simple language codes like 'en', 'es', 'fr' or locale codes like 'en_US'.",
+      "type": ["string", "null"]
+    },
+    "prompt": {
+      "$ref": "#/definitions/promptSettings",
+      "description": "Legacy/inline prompt settings. Most prompt customization is now done via JSON files in ~/.lucli/prompts, but this object may still be read for defaults."
+    },
+    "modules": {
+      "type": "object",
+      "description": "Per-module installation metadata recorded by LuCLI when installing modules from repositories. Keys are module names; values describe the last known install source.",
+      "additionalProperties": {
+        "$ref": "#/definitions/moduleInstallInfo"
+      },
+      "default": {}
+    },
+    "moduleRepositories": {
+      "type": "array",
+      "description": "External module repositories that LuCLI will query in addition to the bundled local repository. Each entry describes a remote JSON index file providing module metadata.",
+      "items": {
+        "$ref": "#/definitions/moduleRepository"
+      },
+      "default": []
+    },
+    "configuration": {
+      "type": "object",
+      "description": "Global Lucee CFConfig-style configuration that LuCLI may merge into the embedded Lucee engine configuration at startup. The structure is expected to follow Lucee's .CFConfig.json format, but is not strictly validated here.",
+      "additionalProperties": true
+    }
+  },
+  "definitions": {
+    "promptSettings": {
+      "type": "object",
+      "description": "Inline prompt behavior flags used by older versions of LuCLI. These flags control what information is shown in the prompt when using simple templates.",
+      "additionalProperties": true,
+      "properties": {
+        "showPath": {
+          "type": "boolean",
+          "description": "Whether to include the current working directory in the prompt.",
+          "default": true
+        },
+        "showTime": {
+          "type": "boolean",
+          "description": "Whether to include the current time in the prompt.",
+          "default": false
+        },
+        "showGit": {
+          "type": "boolean",
+          "description": "Whether to include basic Git repository information in the prompt when inside a Git working tree.",
+          "default": false
+        },
+        "useColors": {
+          "type": "boolean",
+          "description": "Whether the prompt should use ANSI colors by default.",
+          "default": true
+        }
+      }
+    },
+    "moduleInstallInfo": {
+      "type": "object",
+      "description": "Information about how a module was last installed, used by 'lucli modules update' to refresh without specifying a URL again.",
+      "additionalProperties": false,
+      "properties": {
+        "repository": {
+          "type": "string",
+          "description": "Base repository URL the module was installed from (e.g. a git HTTPS URL)."
+        },
+        "ref": {
+          "type": "string",
+          "description": "Optional reference within the repository (branch, tag, or commit hash)."
+        },
+        "installedAt": {
+          "type": "string",
+          "description": "Timestamp (ISO-8601) indicating when the module was installed.",
+          "format": "date-time"
+        }
+      },
+      "required": ["repository"]
+    },
+    "moduleRepository": {
+      "type": "object",
+      "description": "External module repository definition loaded from settings.json. Each repository points at a JSON index describing available modules.",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Short name for this repository (used for display and logging).",
+          "default": "external"
+        },
+        "url": {
+          "type": "string",
+          "description": "HTTPS URL to a repository JSON document with a 'repository' field and a 'modules' array.",
+          "format": "uri"
+        }
+      },
+      "required": ["url"]
+    }
+  }
+}

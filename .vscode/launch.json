@@ -16,10 +16,10 @@
     },
     {
       "type": "java",
-      "name": "📄 LucCLI File",
+      "name": "📄 LucCLI File (cfs)",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",
-      "args": ["--debug", "examples/component.cfs"],
+      "args": ["--timing", "run", "tests/cfml/run.cfm"],
       "projectName": "lucli",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal"
@@ -29,7 +29,7 @@
       "name": "🔌 LucCLI Module",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",
-      "args": ["--debug", "modules", "run", "test-module"],
+      "args": ["--debug", "modules", "run", "hello-world"],
       "projectName": "lucli",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal"
@@ -248,6 +248,16 @@
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
       "args": [ "config", "edit" ]
+    },
+    {
+      "type": "java",
+      "name": "🤨 Lucli Server Start Help",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "projectName": "lucli",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "args": [ "server", "start", "--help" ]
     }
   ]
 }

@@ -20,7 +20,7 @@ public class TimingExecutionStrategy implements CommandLine.IExecutionStrategy {
         }
         
         // Get the command name for timing
-        String commandName = getCommandName(parseResult);
+        String commandName = "Command: " + getCommandName(parseResult);
         
         // Start timer for this command
         Timer.start(commandName);
