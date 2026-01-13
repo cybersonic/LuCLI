@@ -1,8 +1,22 @@
 // We only output if verbose is on systemOutput("---------- #DateTimeFormat(now(),'yyyy-mm-dd HH:nn:ss')# - Initilaizing Engine ----------", true);
-
+// These are here so we can use them from a web server, not within lucli
+// param name="lucli_home_path" default="/Users/markdrew/.lucli/";
+// param name="lucli_modules_path" default="#lucli_home_path#modules/";
+// Allow overriding of setings for the ScriptEngine via settings.json in lucli_home_path
+rootConfig = {};
+timer = createObject("java", "org.lucee.lucli.Timer");
+if( 
+		FileExists( lucli_home_path & "settings.json" ) 
+		&& isJSON( FileRead( lucli_home_path & "settings.json" ) 	)
+		){
+		rootConfig = deserializeJSON( FileRead( lucli_home_path & "settings.json" ) );
+		rootConfig = rootConfig.configuration ?: {};
+}
 request.SERVERADMINPASSWORD = "luclipassword";
 server.SERVERADMINPASSWORD = request.SERVERADMINPASSWORD;
 param name="__verboseMode" default=false;	
+
+rootConfig.Mappings = rootConfig.Mappings ?: {};
 
 config = {
 	"Mappings": {
@@ -18,18 +32,26 @@ config = {
             "primary": "physical",
             "toplevel": false
 		}
-    }
+    },
+	"systemErr": "org.lucee.lucli.LuCLIPrintWriter",
+	"systemOut": "org.lucee.lucli.LuCLIPrintWriter"
+
 	// ,"generalErrorTemplate":"/lucee/templates/error/error-terminal.cfm"
 	// ,"missingErrorTemplate":"/lucee/templates/error/error-terminal.cfm"
 }
 
 
+
+rootConfig.Mappings.append( config.Mappings );
+
 if(__verboseMode){
 	echo( serializeJSON(var=config, compact=false) );
 	echo("#Chr(10)#Lucee Engine Initialized at: #expandPath("/lucee/")# #Chr(10)#");
 }
+timer.start("Config Import");
 configImport(
 	data=config,
 	password=request.SERVERADMINPASSWORD,
 	type="server"
-)
+);
+timer.stop("Config Import");
