@@ -15,7 +15,6 @@ packagers:
   brew:
     # Enable Homebrew packaging for all distributions
     active: ALWAYS
-    # Git repo that will host the tap, e.g. github.com/cybersonic/homebrew-tap
     repository:
       owner: cybersonic
       name: homebrew-tap
@@ -30,3 +29,17 @@ distributions:
       version: "17"
     artifacts:
       - path: target/lucli.jar
+  lucli-unix:
+    type: BINARY
+    stereotype: CLI
+    artifacts:
+      - path: target/lucli
+        platform: osx-x86_64 # or generic if you want
+      # you can add linux/x86_64 etc. if you build per-platform
+
+  lucli-windows:
+    type: BINARY
+    stereotype: CLI
+    artifacts:
+      - path: target/lucli.bat
+        platform: windows-x86_64
