@@ -271,26 +271,27 @@ public class Terminal {
      * Captures output and returns it for display in terminal
      */
     private static String executePicocliCommand(String[] args) {
-        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
-        java.io.PrintStream originalOut = System.out;
-        java.io.PrintStream originalErr = System.err;
+        // java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+        // java.io.PrintStream originalOut = System.out;
+        // java.io.PrintStream originalErr = System.err;
         
-        try {
-            // Redirect System.out/err to capture output
-            System.setOut(new java.io.PrintStream(baos));
-            System.setErr(new java.io.PrintStream(baos));
+        // try {
+        //     // Redirect System.out/err to capture output
+        //     System.setOut(new java.io.PrintStream(baos));
+        //     System.setErr(new java.io.PrintStream(baos));
             
             // Execute through Picocli
             picocliCommandLine.execute(args);
             
             // Get captured output
-            return baos.toString().trim();
+            // return baos.toString().trim();
+            return ""; // Output already printed to terminal
             
-        } finally {
-            // Always restore original streams
-            System.setOut(originalOut);
-            System.setErr(originalErr);
-        }
+        // } finally {
+        //     // Always restore original streams
+        //     System.setOut(originalOut);
+        //     System.setErr(originalErr);
+        // }
     }
     
     /**
