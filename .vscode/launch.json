@@ -16,10 +16,10 @@
     },
     {
       "type": "java",
-      "name": "📄 LucCLI File (cfs)",
+      "name": "📄 LucCLI File (cfm)",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",
-      "args": ["--timing", "run", "tests/cfml/run.cfm"],
+      "args": ["--verbose", "run", "tests/cfml/run.cfm"],
       "projectName": "lucli",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal"
@@ -178,12 +178,12 @@
     },
     {
       "type": "java",
-      "name": "📜 Debug LuCLI Script File",
+      "name": "📜  Run a lucli script file",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",
       "projectName": "lucli",
       "console": "integratedTerminal",
-      "args": "--debug tests/test-environment-vars.lucli",
+      "args": "tests/test-environment-vars.lucli",
       "env": {
         "TEST_NAME": "Mark from Env"
       }

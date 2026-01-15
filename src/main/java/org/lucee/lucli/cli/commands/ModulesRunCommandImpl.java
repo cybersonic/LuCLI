@@ -6,7 +6,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.Callable;
 
-import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.LuceeScriptEngine;
 
 import picocli.CommandLine.Command;
@@ -60,7 +59,7 @@ public class ModulesRunCommandImpl implements Callable<Integer> {
         Path moduleFile = moduleDir.resolve("Module.cfc");
         if (Files.exists(moduleFile)) {
             // Execute the Module.cfc with arguments
-            LuceeScriptEngine engine = LuceeScriptEngine.getInstance(LuCLI.verbose, LuCLI.debug);
+            LuceeScriptEngine engine = LuceeScriptEngine.getInstance();
             String[] argsArray = moduleArgs != null ? moduleArgs.toArray(new String[0]) : new String[0];
             engine.executeModule(moduleName, argsArray);
         } else {

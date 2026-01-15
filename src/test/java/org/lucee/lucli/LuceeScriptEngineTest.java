@@ -30,7 +30,7 @@ public class LuceeScriptEngineTest {
 
     @Test
     void parseArguments() throws IOException{
-        LuceeScriptEngine engine = LuceeScriptEngine.getInstance(false, false);
+        LuceeScriptEngine engine = LuceeScriptEngine.getInstance();
         String[] args = null;
         LuceeScriptEngine.ParsedArguments parsed = null;
 
@@ -59,7 +59,7 @@ public class LuceeScriptEngineTest {
 
     @Test
     void testGetDottedPathFromCWD() throws IOException {
-        LuceeScriptEngine engine = LuceeScriptEngine.getInstance(false, false);
+        LuceeScriptEngine engine = LuceeScriptEngine.getInstance();
         // Path originalCwd = Paths.get("").toAbsolutePath();
      
 

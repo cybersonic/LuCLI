@@ -171,7 +171,7 @@ public static void executeModule(String[] args) {
             Scanner scanner = new Scanner(System.in);
             System.out.print("Enter module name: ");
             moduleName = scanner.nextLine().trim();
-            
+            scanner.close();
             if (moduleName.isEmpty()) {
                 System.err.println("Module name cannot be empty.");
                 System.exit(1);
@@ -214,6 +214,7 @@ public static void executeModule(String[] args) {
         System.out.println("  1. Edit " + moduleDir.resolve("Module.cfc") + " to implement your module");
         System.out.println("  2. Update " + moduleDir.resolve("module.json") + " with module metadata");
         System.out.println("  3. Test your module with: lucli " + moduleDir.resolve("Module.cfc"));
+   
     }
 
     /**
@@ -571,7 +572,7 @@ private static ModuleOptions parseArguments(String[] args) {
         Path moduleFile = moduleDir.resolve("Module.cfc");
         if (Files.exists(moduleFile)) {
             // Execute the Module.cfc with arguments
-            LuceeScriptEngine engine = LuceeScriptEngine.getInstance(LuCLI.verbose, LuCLI.debug);
+            LuceeScriptEngine engine = LuceeScriptEngine.getInstance();
             engine.executeModule(moduleName, moduleArgs != null ? moduleArgs : new String[0]);
         } else {
             System.err.println("Module '" + moduleName + "' does not have a Module.cfc file.");

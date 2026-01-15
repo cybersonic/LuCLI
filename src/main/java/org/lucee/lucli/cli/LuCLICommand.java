@@ -73,6 +73,10 @@ public class LuCLICommand implements Callable<Integer> {
             description = "Enable timing output for performance analysis")
     private boolean timing = false;
 
+    @Option(names = {"-w", "--whitespace"}, 
+            description = "Preserve whitespace in script output")
+    private boolean preserveWhitespace = true;
+
     @Option(names = {"-h", "--help"},
             usageHelp = true,
             description = "Show this help message and exit")
@@ -99,6 +103,7 @@ public class LuCLICommand implements Callable<Integer> {
         LuCLI.verbose = verbose;
         LuCLI.debug = debug;
         LuCLI.timing = timing;
+        LuCLI.preserveWhitespace = preserveWhitespace;
 
         // Initialize timing if requested
         Timer.setEnabled(timing);

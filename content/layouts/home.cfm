@@ -4,15 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LuCLI — Lucee Command Line Interface</title>
-    {{ include "partials/head.html"}}
+    <cfinclude template="partials/head.html">
+    
 </head>
 <body>
     <header class="header">
         <div class="container">
-            {{ include "partials/nav.html"}}
+            <cfinclude template="partials/nav.html">
         </div>
     </header>
-
     <main id="top">
         <section class="hero">
             <div class="container">
@@ -45,15 +45,15 @@
                         <div class="demo-dot red"></div>
                         <div class="demo-dot yellow"></div>
                         <div class="demo-dot green"></div>
-                        <div class="demo-title">LuCLI interactive terminal</div>
+                        <div class="demo-title">LuCLI terminal</div>
                     </div>
                     <div class="demo-code">
                         <div class="demo-line">
                             <span class="demo-prompt">$</span>
-                            <span class="demo-command">java -jar lucli.jar terminal</span>
+                            <span class="demo-command">lucli</span>
                         </div>
                         <div class="demo-line">
-                            <span class="demo-output">🚀 LuCLI terminal started (Lucee engine booted)</span>
+                            <span class="demo-output">🚀 LuCLI Terminal 0.1.234-SNAPSHOT</span>
                         </div>
                         <div class="demo-line">
                             <span class="demo-prompt">lucli&gt;</span>
@@ -69,6 +69,9 @@
                         <div class="demo-line">
                             <span class="demo-output">✨ CFML script executed in the current directory</span>
                         </div>
+                        <!--- <div class="demo-footer">
+                            <div>(illustrative example)</div>
+                        </div> --->
                     </div>
                 </div>
             </div>
@@ -81,7 +84,7 @@
                     <p class="section-description">
                         LuCLI is a command line interface that embeds the Lucee CFML engine and exposes it as a
                         minimal, script-friendly tool. Use it as an interactive terminal or as a one-shot CLI
-                        to integrate Lucee into your workflows.
+                        to integrate Lucee into your workflows. It provides a modilar structure allowing you to exectute .cfc and .cfm files as well as manage Lucee servers. And More!
                     </p>
                 </div>
             </div>
@@ -192,7 +195,7 @@ https://github.com/cybersonic/LuCLI/releases/latest/download/lucli.jar
         </section>
     </main>
 
-    {{ include "partials/footer.html"}}
+    <cfinclude template="partials/footer.html">
 
     
 

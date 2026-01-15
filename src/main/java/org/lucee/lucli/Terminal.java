@@ -329,7 +329,7 @@ public class Terminal {
                     terminal.writer().flush();
                 }
                 
-                luceeEngine = LuceeScriptEngine.getInstance(LuCLI.verbose, LuCLI.debug);
+                luceeEngine = LuceeScriptEngine.getInstance();
                 
                 if (LuCLI.verbose) {
                     terminal.writer().println(WindowsSupport.Symbols.SUCCESS + " Lucee engine ready.");
@@ -406,7 +406,7 @@ public class Terminal {
      */
     private static String showLuceeVersion() {
         try {
-            String luceeVersion = LuceeScriptEngine.getInstance(false, false).getVersion();
+            String luceeVersion = LuceeScriptEngine.getInstance().getVersion();
             return "Lucee Version: " + luceeVersion;
         } catch (Exception e) {
             return WindowsSupport.Symbols.ERROR + " Error getting Lucee version: " + e.getMessage();

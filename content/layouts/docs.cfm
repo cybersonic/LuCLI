@@ -1,16 +1,18 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
+    <cfoutput>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{title}} -  LuCLI Documentation</title>
+    <title>#page.meta.title# -  LuCLI Documentation</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/main.css">
     <link rel="stylesheet" href="/css/docs.css">
 
 </head>
 <body>
-    {{ include "partials/nav.html"}}
+
+    <cfinclude template="partials/nav.html">
     <!-- <header class="header">
         
         <div class="header-content">
@@ -30,14 +32,14 @@
     <div class="docs-layout">
         <!-- Left Sidebar Navigation -->
         <aside class="sidebar">
-            {{ navigation }}
+            #data.navigation#
 
-            <nav class="sidebar-section">
+            <!--- <nav class="sidebar-section">
                 <h3 class="sidebar-title">Getting Started</h3>
                 <nav class="header-nav">
-                    <a href="/#what" class="nav-link">What it is</a>
-                    <a href="/#capabilities" class="nav-link">Capabilities</a>
-                    <a href="/#getting-started" class="nav-link">Get started</a>
+                    <a href="/##what" class="nav-link">What it is</a>
+                    <a href="/##capabilities" class="nav-link">Capabilities</a>
+                    <a href="/##getting-started" class="nav-link">Get started</a>
                     <a href="/download" class="nav-link">Download</a>
                 </nav>
             </nav>
@@ -76,20 +78,20 @@
                     <li class="sidebar-item"><a href="command-reference.html" class="sidebar-link">Command Reference</a></li>
                     <li class="sidebar-item"><a href="api.html" class="sidebar-link">API Documentation</a></li>
                 </ul>
-            </nav>
+            </nav> --->
         </aside>
 
         <!-- Main Content Area -->
         <main class="main-content">
             <div class="content-header">
-                <h1 class="content-title">{{title}}</h1>
-                {{#if description}}
+                <h1 class="content-title">#page.meta.title#</h1>
+                <!--- {{#if description}}
                 <p class="content-description">{{description}}</p>
-                {{/if}}
+                {{/if}} --->
             </div>
 
             <div class="content-body">
-                {{content}}
+                #content#
             </div>
         </main>
 
@@ -102,8 +104,10 @@
         </aside>
     </div>
 
-    {{ include "partials/footer.html"}}
+    <cfinclude template="partials/footer.html">
 
-    <script src="../assets/js/docs.js"></script>
+    <script src="/js/main.js"></script>
+    </cfoutput>
+    <!--- <cfdump var="#local#"> --->
 </body>
 </html>

@@ -66,7 +66,7 @@ public class CfmlCompleter {
         try {
             // Get or create Lucee engine instance
             if (luceeEngine == null) {
-                luceeEngine = LuceeScriptEngine.getInstance(false, false);
+                luceeEngine = LuceeScriptEngine.getInstance();
             }
             
             // Get all function names using GetFunctionList()

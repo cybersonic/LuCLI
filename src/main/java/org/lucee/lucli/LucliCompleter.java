@@ -103,7 +103,7 @@ public class LucliCompleter implements Completer {
     private void completeModuleCommand(ParsedLine line, List<Candidate> candidates, String command){
         Array metadata = null;
         try {
-            metadata = LuceeScriptEngine.getInstance(false, false).getComponentMetadata("modules." + command + ".Module" );
+            metadata = LuceeScriptEngine.getInstance().getComponentMetadata("modules." + command + ".Module" );
             // System.out.println("Metadata: " + metadata.toString());lint
       
             if(line.toString().isEmpty() || line.words().size() == 1) {

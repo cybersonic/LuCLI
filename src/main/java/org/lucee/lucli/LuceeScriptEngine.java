@@ -56,9 +56,9 @@ public class LuceeScriptEngine {
      * Private constructor - use getInstance() to get the singleton
      * @throws IOException 
      */
-    private LuceeScriptEngine(boolean verboseMode, boolean debugMode) throws IOException {
-        this.verbose = verboseMode;
-        this.debug = debugMode;
+    private LuceeScriptEngine() throws IOException {
+        this.verbose = LuCLI.verbose;
+        this.debug = LuCLI.debug;
         
         if (verbose) {
             StringOutput.getInstance().println("${EMOJI_TOOL} Initializing LuceeScriptEngine singleton...");
@@ -67,7 +67,6 @@ public class LuceeScriptEngine {
         try {
             this.engine = initializeEngine();
         } catch (Exception e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
         
@@ -80,13 +79,13 @@ public class LuceeScriptEngine {
      * Get the singleton instance of LuceeScriptEngine
      * @throws IOException 
      */
-    public static LuceeScriptEngine getInstance(boolean verboseMode, boolean debugMode) throws IOException {
+    public static LuceeScriptEngine getInstance() throws IOException {
         Timer.start("LuceeScriptEngine Initialization");
         if (instance == null) {
             synchronized (lock) {
                 if (instance == null) {
 
-                    instance = new LuceeScriptEngine(verboseMode, debugMode);
+                    instance = new LuceeScriptEngine();
                 }
             }
         }
@@ -124,6 +123,7 @@ public class LuceeScriptEngine {
         engine.put("lucli_home_path", getLucliHomeDirectory().toString());
         engine.put("__verboseMode", verbose);
         engine.put("__debugMode", debug);
+        engine.put("__preserveWhitespace", LuCLI.preserveWhitespace);
         Timer.stop("Setup Engine Variables");
         
         Timer.start("Execute Initialization Script");
@@ -1447,5 +1447,34 @@ public class LuceeScriptEngine {
 
     public static String testFunction() {
         return "Hello from the test injected function!";
+    }
+
+    public Integer executeCFMFile(String scriptPath, String[] scriptArgs) throws Exception {
+       
+        String script = readScriptTemplate("/script_engine/executeCFMFile.cfs");
+        
+        String scriptFileContent = new String(Files.readAllBytes(Paths.get(scriptPath)), java.nio.charset.StandardCharsets.UTF_8);
+        script = script.replace("${scriptFileContent}", scriptFileContent);
+        //Need to add usual variables. 
+        setupScriptContext(engine, scriptPath, scriptArgs);
+        engine.put("scriptFileContent", scriptFileContent);
+        try{
+            Object res = engine.eval(script);
+            return 0;
+        }catch(Exception e){
+            StringOutput.getInstance().printError("Error executing CFM file: " + e.getMessage());
+            return 1;
+        }
+        
+    }
+
+    public static Integer executeCFCFile(String string, String[] scriptArgs) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'executeCFCFile'");
+    }
+
+    public static Integer executeCFSFile(String string, String[] scriptArgs) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'executeCFSFile'");
     }
 }

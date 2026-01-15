@@ -16,6 +16,7 @@ LuCLI integrates the Lucee CFML engine with advanced features including:
 - **CFML Execution** - Execute CFML scripts directly from the command line
 - **Module System** - Create and run reusable CFML modules  
 - **JMX Monitoring** - Real-time server performance monitoring
+- **Dependency Management** - Manage project dependencies efficiently
 - **Interactive REPL** - Interactive terminal for CFML development
 
 ## Getting Started

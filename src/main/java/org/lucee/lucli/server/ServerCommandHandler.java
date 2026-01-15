@@ -19,11 +19,6 @@ import org.w3c.dom.NodeList;
 import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.Timer;
 import org.lucee.lucli.monitoring.MonitorCommand;
-import org.lucee.lucli.server.LogCommand;
-import org.lucee.lucli.server.LuceeServerConfig;
-import org.lucee.lucli.server.LuceeServerManager;
-import org.lucee.lucli.server.ServerConflictException;
-import org.lucee.lucli.server.TomcatConfigGenerator;
 
 /**
  * Server command handler that provides a single implementation for all server-related commands.
@@ -1108,7 +1103,7 @@ public class ServerCommandHandler {
                 System.out.print(result.toString());
                 java.util.Scanner scanner = new java.util.Scanner(System.in);
                 String response = scanner.nextLine().trim().toLowerCase();
-                
+                scanner.close();
                 if (!response.equals("y") && !response.equals("yes")) {
                     return formatOutput("❌ Prune operation cancelled.", false);
                 }

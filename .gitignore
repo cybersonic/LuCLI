@@ -10,7 +10,7 @@
 *.iml
 *.jsa
 demo_servers/
-docs/
+./docs/
 documentation/todo/
 examples/archive
 examples/to-check
@@ -30,3 +30,5 @@ TODO.md
 WARP.md
 WEB-INF/
 examples/
+docs/
+content/layouts/old/

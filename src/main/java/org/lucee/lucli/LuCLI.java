@@ -13,8 +13,9 @@ public class LuCLI {
     public static boolean verbose = false;
     public static boolean debug = false;
     public static boolean timing = false;
+    public static boolean preserveWhitespace = false;
     private static boolean lucliScript = false;
-
+    
     public static Map<String, String> scriptEnvironment = new HashMap<>(System.getenv());
     
 
@@ -34,6 +35,8 @@ public class LuCLI {
         
         // Set custom execution strategy to automatically time all commands
         cmd.setExecutionStrategy(new TimingExecutionStrategy());
+        // Set custom execution strategy to set global flags
+        cmd.setExecutionStrategy(new GlobalOptionSettingExecutionStrategy());
 
         // Configure CommandLine behavior
         cmd.setExecutionExceptionHandler(new CommandLine.IExecutionExceptionHandler() {
@@ -57,11 +60,12 @@ public class LuCLI {
                 boolean shortcutDebug = java.util.Arrays.asList(args).contains("--debug") || java.util.Arrays.asList(args).contains("-d");
                 boolean shortcutVerbose = java.util.Arrays.asList(args).contains("--verbose") || java.util.Arrays.asList(args).contains("-v");
                 boolean shortcutTiming = java.util.Arrays.asList(args).contains("--timing") || java.util.Arrays.asList(args).contains("-t");
-                
+                boolean preserveWhitespace = java.util.Arrays.asList(args).contains("--whitespace") || java.util.Arrays.asList(args).contains("-w");
                 // set the defaults
                 LuCLI.verbose = shortcutVerbose;
                 LuCLI.debug = shortcutDebug;
                 LuCLI.timing = shortcutTiming;
+                LuCLI.preserveWhitespace = preserveWhitespace;
                 // We should clean them up before we send the rest along
 
                 Timer.setEnabled(LuCLI.timing);
@@ -90,6 +94,7 @@ public class LuCLI {
                             // Skip known flags that should be handled at the root level
                             if (!arg.equals("--verbose") && !arg.equals("-v") &&
                                 !arg.equals("--debug") && !arg.equals("-d") &&
+                                !arg.equals("--whitespace") && !arg.equals("-w") &&
                                 !arg.equals("--timing") && !arg.equals("-t")) {
                                 remainingArgsList.add(arg);
                             }
@@ -278,7 +283,7 @@ public class LuCLI {
         
         if (includeLucee) {
             try {
-                String luceeVersion = LuceeScriptEngine.getInstance(false, false).getVersion();
+                String luceeVersion = LuceeScriptEngine.getInstance().getVersion();
                 info.append("Lucee Version: ").append(luceeVersion).append("\n");
             } catch (Exception e) {
                 info.append("Lucee Version: Error - ").append(e.getMessage()).append("\n");

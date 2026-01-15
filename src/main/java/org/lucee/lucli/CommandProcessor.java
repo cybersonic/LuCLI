@@ -19,8 +19,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
 
-import org.lucee.lucli.cflint.CFLintCommand;
-import org.lucee.lucli.server.ServerCommandHandler;
 import org.lucee.lucli.interactive.InteractiveTestCommand;
 
 /**
@@ -31,13 +29,12 @@ public class CommandProcessor {
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd HH:mm");
     private final Settings settings;
     private final PromptConfig promptConfig;
-    private final CFLintCommand cfLintCommand;
+    
     
     public CommandProcessor() {
         this.fileSystemState = new FileSystemState();
         this.settings = new Settings();
         this.promptConfig = new PromptConfig(settings);
-        this.cfLintCommand = new CFLintCommand();
     }
     
     public FileSystemState getFileSystemState() {
@@ -938,7 +935,7 @@ public class CommandProcessor {
         
         try {
             // Get or create the LuceeScriptEngine instance
-            LuceeScriptEngine luceeEngine = LuceeScriptEngine.getInstance(false, false); // non-verbose for cleaner output
+            LuceeScriptEngine luceeEngine = LuceeScriptEngine.getInstance(); // non-verbose for cleaner output
             
             // Execute the script file with arguments
             luceeEngine.executeScript(scriptPath.toString(), scriptArgs);
@@ -1279,13 +1276,13 @@ public class CommandProcessor {
     /**
      * Handle server monitor command - note this will exit the terminal session
      */
-    private String handleServerMonitor(String[] args) {
-        // Show a warning that this will exit the terminal
-        return "🖥️  Starting JMX monitoring dashboard...\n" +
-               "⚠️  Note: This will exit the terminal session and start the interactive monitor.\n" +
-               "💡 To start monitoring, use: java -jar lucli.jar server monitor\n" +
-               "❌ Direct monitor command from terminal not yet supported.";
-    }
+    // private String handleServerMonitor(String[] args) {
+    //     // Show a warning that this will exit the terminal
+    //     return "🖥️  Starting JMX monitoring dashboard...\n" +
+    //            "⚠️  Note: This will exit the terminal session and start the interactive monitor.\n" +
+    //            "💡 To start monitoring, use: java -jar lucli.jar server monitor\n" +
+    //            "❌ Direct monitor command from terminal not yet supported.";
+    // }
     
     /**
      * Handle lint command - CFML code linting using CFLint

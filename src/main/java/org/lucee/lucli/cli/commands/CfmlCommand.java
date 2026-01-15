@@ -91,7 +91,7 @@ public class CfmlCommand implements Callable<Integer> {
             Timer.start("Lucee Engine Initialization");
             LuCLI.printVerbose("Initializing Lucee CFML engine...");
             
-            luceeEngine = LuceeScriptEngine.getInstance(LuCLI.verbose, LuCLI.debug);
+            luceeEngine = LuceeScriptEngine.getInstance();
             LuCLI.printVerbose("Lucee engine ready.");
             Timer.stop("Lucee Engine Initialization");
             
