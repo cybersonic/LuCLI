@@ -98,8 +98,8 @@ Developer guide for extending and customizing server commands. Covers the server
 
 ### Main Project Files
 
-- **[WARP.md](../WARP.md)** - Developer guide and architecture deep-dive
-- **[CHANGELOG.md](../CHANGELOG.md)** - Version history and release notes
+- **[CHANGELOG.md](CHANGELOG.md)** - Version history and release notes
+- **[DOCUMENTATION/README.md](DOCUMENTATION/README.md)** - Version history and release notes
 
 ### Example Code
 
@@ -134,5 +134,5 @@ Found a typo or want to improve the documentation? Contributions are welcome!
 
 ---
 
-**LuCLI Documentation** - Last updated: November 2025  
+**LuCLI Documentation** - Last updated: Jan 2026  
 *Making CFML development faster, easier, and more enjoyable from the command line.*

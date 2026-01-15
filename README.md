@@ -374,29 +374,27 @@ lucli/
 ├── src/main/java/org/lucee/lucli/     # Core Java classes
 ├── src/main/resources/
 │   ├── script_engine/                 # Externalized CFML templates
-│   ├── prompts/                       # Built-in prompt themes
-│   └── tomcat_template/               # Server configuration templates
+│   └── prompts/                       # Built-in prompt themes
 ├── tests/                             # Test suites and examples
 ├── demo_servers/                      # Development test servers
 └── documentation/                     # Additional documentation
 ```
 
 ### Key Dependencies
-- **Lucee 7.0.0.346-RC**: CFML engine
-- **JLine 3.26.3**: Terminal interface and command-line handling
+- **Lucee 7.x**: CFML engine
+- **JLine 3.x**: Terminal interface and command-line handling
 - **Jackson 2.15.2**: JSON configuration parsing
 - **Picocli 4.7.5**: Command-line parsing and help system
 
 ## 📚 Documentation
 
 ### Core Documentation
-- [**WARP.md**](WARP.md) - Developer guide and architecture overview  
 - [**Help System Guide**](documentation/HELP_SYSTEM.md) - Complete help system documentation
 - [**URL Rewriting Guide**](documentation/URL_REWRITING.md) - Framework routing and URL rewriting
 
 ### Additional Guides
 - [**SHORTCUTS.md**](SHORTCUTS.md) - Quick reference for shortcuts and commands
-- [**TODO.md**](TODO.md) - Current development roadmap and tasks
+
 
 ## 🧪 Testing
 
@@ -507,6 +505,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **Lucee Association**: For the powerful CFML engine
 - **JLine Project**: For excellent terminal interface capabilities
+- **PicoCLI Project**: For excellent command-line argument parsing capabilities
 - **Community Contributors**: For feedback, testing, and improvements
 
 ## 🚀 Get Started
