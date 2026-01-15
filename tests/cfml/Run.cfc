@@ -4,11 +4,21 @@ component {
     }
 
     function main(){
+
         echo("Hello from the main() function #chr(10)#");
+    
+      // some comment
+        sayHello("Person");
+
+      // Another comment
+        init();
+    
     }
 
 
     function sayHello(required string name){
+
+
         echo("Hello, #name#! #chr(10)#");
     }
 }

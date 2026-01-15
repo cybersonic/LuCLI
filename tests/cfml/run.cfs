@@ -1,0 +1,3 @@
+echo("Hello from a cfs based file!");
+Greeting  = " Hi! How are you doing? What is going on? [      lots of space round this.       ]";
+echo(Greeting);

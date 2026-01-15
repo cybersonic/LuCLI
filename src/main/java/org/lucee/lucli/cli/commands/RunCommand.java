@@ -1,11 +1,10 @@
 package org.lucee.lucli.cli.commands;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.Callable;
-
-import org.lucee.lucli.BuiltinVariableManager;
 import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.LuceeScriptEngine;
 import org.lucee.lucli.StringOutput;
@@ -59,12 +58,15 @@ public class RunCommand implements Callable<Integer> {
     )
     private String[] scriptArgs = new String[0];
 
+
     @Override
     public Integer call() throws Exception {
         return executeScriptFile();
     }
 
-    private Integer executeScriptFile() {
+    private Integer executeScriptFile() throws IOException {
+
+
         if (scriptPath == null || scriptPath.trim().isEmpty()) {
             StringOutput.Quick.error("Script path is required");
             return 1;
@@ -82,7 +84,7 @@ public class RunCommand implements Callable<Integer> {
         }
 
         String fileName = path.getFileName().toString().toLowerCase();
-
+        LuceeScriptEngine engine = LuceeScriptEngine.getInstance();
         // Handle .lucli batch scripts by delegating to LuCLI's script engine
         if (fileName.endsWith(".lucli")) {
             try {
@@ -93,57 +95,102 @@ public class RunCommand implements Callable<Integer> {
                 return 1;
             }
         }
-
-        // Otherwise, require a CFML file extension
-        if (!fileName.endsWith(".cfm") && !fileName.endsWith(".cfc") && !fileName.endsWith(".cfs")) {
-            StringOutput.Quick.error("'" + scriptPath + "' is not a CFML file (.cfm, .cfc, or .cfs)");
-            return 1;
-        }
-
-        try {
-            // Get or create the LuceeScriptEngine instance
-            LuceeScriptEngine luceeEngine = LuceeScriptEngine.getInstance(LuCLI.verbose, LuCLI.debug);
-            BuiltinVariableManager variableManager = BuiltinVariableManager.getInstance(LuCLI.verbose, LuCLI.debug);
-
-            // For .cfs files, we need to inject built-in variables and ARGS manually
-            if (fileName.endsWith(".cfs")) {
-                String fileContent = Files.readString(path, java.nio.charset.StandardCharsets.UTF_8);
-
-                StringBuilder scriptWithArgs = new StringBuilder();
-
-                try {
-                    String builtinSetup = variableManager.createVariableSetupScript(scriptPath, scriptArgs);
-                    scriptWithArgs.append(builtinSetup);
-                    scriptWithArgs.append("\n");
-                } catch (Exception e) {
-                    LuCLI.printDebug("RunCommand", "Warning: Failed to inject built-in variables: " + e.getMessage());
-                }
-                
-                // ARGS array setup for backward compatibility
-                scriptWithArgs.append("// Auto-generated ARGS array setup\\n");
-                scriptWithArgs.append("ARGS = ['" + scriptPath + "'");
-                if (scriptArgs != null && scriptArgs.length > 0) {
-                    for (String arg : scriptArgs) {
-                        scriptWithArgs.append(", '" + arg.replace("'", "''") + "'");
-                    }
-                }
-                scriptWithArgs.append("];\n\n");
-                scriptWithArgs.append(fileContent);
-
-                LuCLI.printDebug("RunCommand", "Script with ARGS setup:\\n" + scriptWithArgs + "\\n[DEBUG] End of script");
-
-                luceeEngine.evalWithBuiltinVariables(scriptWithArgs.toString(), scriptPath, scriptArgs);
-
-            } else {
-                // For .cfm and .cfc files, execute directly via LuceeScriptEngine
-                luceeEngine.executeScript(path.toAbsolutePath().toString(), scriptArgs);
+        else if (fileName.endsWith(".cfm") ) {
+            try{
+                return engine.executeCFMFile(path.toString(), scriptArgs);
+            } catch(Exception e){
+                StringOutput.Quick.error("Error executing CFML script '" + scriptPath + "': " + e.getMessage());
+                LuCLI.printDebugStackTrace(e);
+                return 1;
             }
+        }
+        else if (fileName.endsWith(".cfc") ) {
+            try{
+                return engine.executeCFCFile(path.toString(), scriptArgs);
+            } catch(Exception e){
+                StringOutput.Quick.error("Error executing CFML component '" + scriptPath + "': " + e.getMessage());
+                LuCLI.printDebugStackTrace(e);
+                return 1;
+            }
+        }
+        else if (fileName.endsWith(".cfs") ) {
+            try{
+                return engine.executeCFSFile(path.toString(), scriptArgs);
+            } catch(Exception e){
+                StringOutput.Quick.error("Error executing CFML script file '" + scriptPath + "': " + e.getMessage());
+                LuCLI.printDebugStackTrace(e);
+                return 1;
+            }
+        }
 
-            return 0;
-        } catch (Exception e) {
-            StringOutput.Quick.error("Error executing CFML script '" + scriptPath + "': " + e.getMessage());
-            LuCLI.printDebugStackTrace(e);
+        else {
+            StringOutput.Quick.error("Unsupported script file extension for '" + scriptPath + "'. Supported extensions are .cfm, .cfc, .cfs, and .lucli");
             return 1;
         }
+
+        // // Otherwise, require a CFML file extension
+        // if (!fileName.endsWith(".cfm") && !fileName.endsWith(".cfc") && !fileName.endsWith(".cfs")) {
+        //     StringOutput.Quick.error("'" + scriptPath + "' is not a CFML file (.cfm, .cfc, or .cfs)");
+        //     return 1;
+        // }
+
+        // try {
+        //     // Get or create the LuceeScriptEngine instance
+        //     LuceeScriptEngine luceeEngine = LuceeScriptEngine.getInstance(LuCLI.verbose, LuCLI.debug);
+        //     BuiltinVariableManager variableManager = BuiltinVariableManager.getInstance(LuCLI.verbose, LuCLI.debug);
+
+
+        //     if(fileName.endsWith(".cfc") || fileName.endsWith(".cfm") || fileName.endsWith(".cfs")) {
+        //         String includeScriptPath = "include template='" + path.toString() + "';";
+        //         LuCLI.printDebug("RunCommand", "including " + includeScriptPath);
+        //         Object ret =  luceeEngine.eval(includeScriptPath);
+        //         LuCLI.printDebug("RunCommand", "Script returned: " + ret);
+        //     }
+
+
+
+        //     // Make this simpler. have each extension
+
+        //     // maaybe just run it by inclusion
+        //     // For .cfs files, we need to inject built-in variables and ARGS manually
+        //     if (fileName.endsWith(".cfs")) {
+        //         String fileContent = Files.readString(path, java.nio.charset.StandardCharsets.UTF_8);
+
+        //         StringBuilder scriptWithArgs = new StringBuilder();
+
+        //         try {
+        //             String builtinSetup = variableManager.createVariableSetupScript(scriptPath, scriptArgs);
+        //             scriptWithArgs.append(builtinSetup);
+        //             scriptWithArgs.append("\n");
+        //         } catch (Exception e) {
+        //             LuCLI.printDebug("RunCommand", "Warning: Failed to inject built-in variables: " + e.getMessage());
+        //         }
+                
+        //         // ARGS array setup for backward compatibility
+        //         scriptWithArgs.append("// Auto-generated ARGS array setup\\n");
+        //         scriptWithArgs.append("ARGS = ['" + scriptPath + "'");
+        //         if (scriptArgs != null && scriptArgs.length > 0) {
+        //             for (String arg : scriptArgs) {
+        //                 scriptWithArgs.append(", '" + arg.replace("'", "''") + "'");
+        //             }
+        //         }
+        //         scriptWithArgs.append("];\n\n");
+        //         scriptWithArgs.append(fileContent);
+
+        //         LuCLI.printDebug("RunCommand", "Script with ARGS setup:\\n" + scriptWithArgs + "\\n[DEBUG] End of script");
+
+        //         luceeEngine.evalWithBuiltinVariables(scriptWithArgs.toString(), scriptPath, scriptArgs);
+
+        //     } else {
+        //         // For .cfm and .cfc files, execute directly via LuceeScriptEngine
+        //         luceeEngine.executeScript(path.toAbsolutePath().toString(), scriptArgs);
+        //     }
+
+        //     return 0;
+        // } catch (Exception e) {
+        //     StringOutput.Quick.error("Error executing CFML script '" + scriptPath + "': " + e.getMessage());
+        //     LuCLI.printDebugStackTrace(e);
+        //     return 1;
+        // }
     }
 }

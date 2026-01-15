@@ -19,6 +19,9 @@ TEST_PORT=$((8800 + RANDOM % 100))  # Use random port between 8800-8899
 TIMEOUT_SECONDS=30
 MAX_WAIT_TIME=45
 
+# Optional: filter tests by name (substring match, case-insensitive)
+TEST_FILTER="${TEST_FILTER:-}"
+
 echo -e "${BLUE}🌐 URL Rewrite Integration Test${NC}"
 echo -e "${BLUE}==============================${NC}"
 echo ""
@@ -191,7 +194,7 @@ print_status "Executing: java -jar $LUCLI_JAR server start --name $TEST_SERVER_N
 
 # Temporarily disable exit on error for server start
 set +e
-server_output=$(java -jar $LUCLI_JAR server start --name "$TEST_SERVER_NAME" --force 2>&1)
+server_output=$(java -jar $LUCLI_JAR server start --name "$TEST_SERVER_NAME" --open-browser false --force 2>&1)
 server_exit_code=$?
 set -e
 
@@ -235,66 +238,90 @@ test_count=0
 test_passed=0
 
 # Test 1: Root route should work
-print_status "Test 1: Root route (/)"
-if curl -s "http://localhost:$TEST_PORT/" | grep -q "URL rewrite is working"; then
-    print_success "Root route test passed"
-    test_passed=$((test_passed + 1))
+if [[ -n "$TEST_FILTER" ]] && ! echo "Test 1: Root route (/)" | grep -iq -- "$TEST_FILTER"; then
+    print_status "↷ Skipping: Test 1: Root route (/) (does not match filter '$TEST_FILTER')"
 else
-    print_error "Root route test failed"
+    print_status "Test 1: Root route (/)"
+    if curl -s "http://localhost:$TEST_PORT/" | grep -q "URL rewrite is working"; then
+        print_success "Root route test passed"
+        test_passed=$((test_passed + 1))
+    else
+        print_error "Root route test failed"
+    fi
+    test_count=$((test_count + 1))
 fi
-test_count=$((test_count + 1))
 
 # Test 2: Named route should work
-print_status "Test 2: Named route (/hello)"
-if curl -s "http://localhost:$TEST_PORT/hello" | grep -q "Hello from the framework router"; then
-    print_success "Hello route test passed"
-    test_passed=$((test_passed + 1))
+if [[ -n "$TEST_FILTER" ]] && ! echo "Test 2: Named route (/hello)" | grep -iq -- "$TEST_FILTER"; then
+    print_status "↷ Skipping: Test 2: Named route (/hello) (does not match filter '$TEST_FILTER')"
 else
-    print_error "Hello route test failed"
+    print_status "Test 2: Named route (/hello)"
+    if curl -s "http://localhost:$TEST_PORT/hello" | grep -q "Hello from the framework router"; then
+        print_success "Hello route test passed"
+        test_passed=$((test_passed + 1))
+    else
+        print_error "Hello route test failed"
+    fi
+    test_count=$((test_count + 1))
 fi
-test_count=$((test_count + 1))
 
 # Test 3: Another named route
-print_status "Test 3: About route (/about)"
-if curl -s "http://localhost:$TEST_PORT/about" | grep -q "This is the about page"; then
-    print_success "About route test passed"
-    test_passed=$((test_passed + 1))
+if [[ -n "$TEST_FILTER" ]] && ! echo "Test 3: About route (/about)" | grep -iq -- "$TEST_FILTER"; then
+    print_status "↷ Skipping: Test 3: About route (/about) (does not match filter '$TEST_FILTER')"
 else
-    print_error "About route test failed"
+    print_status "Test 3: About route (/about)"
+    if curl -s "http://localhost:$TEST_PORT/about" | grep -q "This is the about page"; then
+        print_success "About route test passed"
+        test_passed=$((test_passed + 1))
+    else
+        print_error "About route test failed"
+    fi
+    test_count=$((test_count + 1))
 fi
-test_count=$((test_count + 1))
 
 # Test 4: API route (JSON response)
-print_status "Test 4: API route (/api/test)"
-api_response=$(curl -s "http://localhost:$TEST_PORT/api/test")
-if echo "$api_response" | grep -q '"success":true' && echo "$api_response" | grep -q '"message":"URL rewrite working"'; then
-    print_success "API route test passed"
-    test_passed=$((test_passed + 1))
+if [[ -n "$TEST_FILTER" ]] && ! echo "Test 4: API route (/api/test)" | grep -iq -- "$TEST_FILTER"; then
+    print_status "↷ Skipping: Test 4: API route (/api/test) (does not match filter '$TEST_FILTER')"
 else
-    print_error "API route test failed"
-    echo "Response: $api_response"
+    print_status "Test 4: API route (/api/test)"
+    api_response=$(curl -s "http://localhost:$TEST_PORT/api/test")
+    if echo "$api_response" | grep -q '\"success\":true' && echo "$api_response" | grep -q '\"message\":\"URL rewrite working\"'; then
+        print_success "API route test passed"
+        test_passed=$((test_passed + 1))
+    else
+        print_error "API route test failed"
+        echo "Response: $api_response"
+    fi
+    test_count=$((test_count + 1))
 fi
-test_count=$((test_count + 1))
 
 # Test 5: Direct .cfm access (should bypass router)
-print_status "Test 5: Direct .cfm access (/direct.cfm)"
-if curl -s "http://localhost:$TEST_PORT/direct.cfm" | grep -q "Direct CFML Access Test"; then
-    print_success "Direct .cfm access test passed"
-    test_passed=$((test_passed + 1))
+if [[ -n "$TEST_FILTER" ]] && ! echo "Test 5: Direct .cfm access (/direct.cfm)" | grep -iq -- "$TEST_FILTER"; then
+    print_status "↷ Skipping: Test 5: Direct .cfm access (/direct.cfm) (does not match filter '$TEST_FILTER')"
 else
-    print_error "Direct .cfm access test failed"
+    print_status "Test 5: Direct .cfm access (/direct.cfm)"
+    if curl -s "http://localhost:$TEST_PORT/direct.cfm" | grep -q "Direct CFML Access Test"; then
+        print_success "Direct .cfm access test passed"
+        test_passed=$((test_passed + 1))
+    else
+        print_error "Direct .cfm access test failed"
+    fi
+    test_count=$((test_count + 1))
 fi
-test_count=$((test_count + 1))
 
 # Test 6: Dynamic route handling
-print_status "Test 6: Dynamic route (/products/laptop)"
-if curl -s "http://localhost:$TEST_PORT/products/laptop" | grep -q "Dynamic Route.*products/laptop"; then
-    print_success "Dynamic route test passed"
-    test_passed=$((test_passed + 1))
+if [[ -n "$TEST_FILTER" ]] && ! echo "Test 6: Dynamic route (/products/laptop)" | grep -iq -- "$TEST_FILTER"; then
+    print_status "↷ Skipping: Test 6: Dynamic route (/products/laptop) (does not match filter '$TEST_FILTER')"
 else
-    print_error "Dynamic route test failed"
+    print_status "Test 6: Dynamic route (/products/laptop)"
+    if curl -s "http://localhost:$TEST_PORT/products/laptop" | grep -q "Dynamic Route.*products/laptop"; then
+        print_success "Dynamic route test passed"
+        test_passed=$((test_passed + 1))
+    else
+        print_error "Dynamic route test failed"
+    fi
+    test_count=$((test_count + 1))
 fi
-test_count=$((test_count + 1))
 
 # Test Results
 echo ""

@@ -19,10 +19,29 @@
       "name": "📄 LucCLI File (cfm)",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",
-      "args": ["--verbose", "run", "tests/cfml/run.cfm"],
+      "args": ["run", "tests/cfml/run.cfm"],
       "projectName": "lucli",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal"
+    },
+    {
+      "type": "java",
+      "name": "📄 LucCLI File (cfs)",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["--whitespace", "run", "tests/cfml/run.cfs"],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+        {
+      "type": "java",
+      "name": "📄 LucCLI File (cfc)",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "projectName": "lucli",
+      "console": "integratedTerminal",
+      "args": ["tests/cfml/Run.cfc", "sayHello", "name=Mark"]
     },
     {
       "type": "java",
@@ -200,15 +219,7 @@
         "TEST_NAME": "Mark from Env"
       }
     },
-    {
-      "type": "java",
-      "name": "👟 One-Shot run a CFC",
-      "request": "launch",
-      "mainClass": "org.lucee.lucli.LuCLI",
-      "projectName": "lucli",
-      "console": "integratedTerminal",
-      "args": ["tests/cfml/Run.cfc", "sayHello", "name=Mark"]
-    },
+
     {
       "type": "java",
       "name": "👟 Debug a timing not appearing",

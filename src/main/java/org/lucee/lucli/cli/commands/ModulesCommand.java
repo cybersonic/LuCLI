@@ -1,17 +1,11 @@
 package org.lucee.lucli.cli.commands;
 
-import java.nio.file.Paths;
 import java.util.concurrent.Callable;
 
-import org.lucee.lucli.LuCLI;
-import org.lucee.lucli.Timer;
 import org.lucee.lucli.cli.LuCLICommand;
 
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
-import org.lucee.lucli.cli.completion.DynamicArgumentCompletion;
 
 /**
  * Module management command using Picocli

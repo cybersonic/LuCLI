@@ -11,12 +11,12 @@ LuCLI now supports convenient shortcuts for executing modules and CFML files wit
 
 Instead of writing the full command:
 ```bash
-java -jar lucli.jar modules run test-module arg1 arg2
+lucli modules run test-module arg1 arg2
 ```
 
 You can now use the shortcut:
 ```bash
-java -jar lucli.jar test-module arg1 arg2
+lucli test-module arg1 arg2
 ```
 
 ### How Module Shortcuts Work
@@ -30,13 +30,13 @@ java -jar lucli.jar test-module arg1 arg2
 
 ```bash
 # Run a module with no arguments
-java -jar lucli.jar midnight
+lucli lint
 
 # Run a module with arguments  
-java -jar lucli.jar cfformat file1.cfs file2.cfs
+lucli lint file=file1.cfs
 
 # Show verbose output while running module
-java -jar lucli.jar --verbose test-module arg1 arg2
+lucli --verbose test-module arg1 arg2
 ```
 
 ## CFML File Shortcuts
@@ -44,7 +44,7 @@ java -jar lucli.jar --verbose test-module arg1 arg2
 Instead of requiring a separate command, you can now execute CFML files directly:
 
 ```bash
-java -jar lucli.jar script.cfs arg1 arg2 "arg with spaces"
+lucli script.cfs arg1 arg2 "arg with spaces"
 ```
 
 ### Supported File Types
@@ -72,16 +72,16 @@ For `.cfs` files, the `ARGS` array is automatically created with:
 
 ```bash
 # Execute a simple script
-java -jar lucli.jar script.cfs
+lucli script.cfs
 
 # Execute with arguments
-java -jar lucli.jar process-data.cfs input.txt output.txt
+lucli process-data.cfs input.txt output.txt
 
 # Execute with verbose output
-java -jar lucli.jar --verbose script.cfs arg1 arg2
+lucli --verbose script.cfs arg1 arg2
 
 # Execute with debug information
-java -jar lucli.jar --debug script.cfs "argument with spaces"
+lucli --debug script.cfs "argument with spaces"
 ```
 
 ## Error Handling
@@ -107,9 +107,9 @@ Both shortcuts support global flags:
 
 Flags can be placed anywhere in the command line:
 ```bash
-java -jar lucli.jar --verbose test-module arg1
-java -jar lucli.jar test-module arg1 --debug
-java -jar lucli.jar script.cfs --verbose arg1 arg2
+lucli --verbose test-module arg1
+lucli test-module arg1 --debug
+lucli script.cfs --verbose arg1 arg2
 ```
 
 ## Implementation Details

@@ -1,0 +1,8 @@
+cd demo_servers
+rmdir lucli_server_test
+mkdir lucli_server_test
+cd lucli_server_test
+lucli create-server --name lucli_server_test --template lucee --port 8888
+lucli server start --name lucli_server_test --open-browser false
+sleep 3000
+lucli server stop --name lucli_server_test

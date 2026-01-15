@@ -49,6 +49,9 @@ TEST_SERVER_NAME="test-server-$(date +%s)"
 LUCLI_HOME_TEST="$(pwd)/${TEST_DIR}/lucli_home"
 export LUCLI_HOME="$LUCLI_HOME_TEST"
 
+# Optional: filter tests by name (substring match, case-insensitive)
+TEST_FILTER="${TEST_FILTER:-}"
+
 echo -e "${BLUE}🧪 LuCLI Comprehensive Test Suite${NC}"
 echo -e "${BLUE}===================================${NC}"
 echo ""
@@ -58,6 +61,12 @@ run_test() {
     local test_name="$1"
     local command="$2"
     local expected_exit_code="${3:-0}"
+
+    # If TEST_FILTER is set and this test name doesn't match, skip it
+    if [[ -n "$TEST_FILTER" ]] && ! echo "$test_name" | grep -iq -- "$TEST_FILTER"; then
+        echo -e "${BLUE}↷ Skipping: ${test_name} (does not match filter '${TEST_FILTER}')${NC}"
+        return
+    fi
     
     echo -e "${CYAN}Testing: ${test_name}${NC}"
     echo -e "${YELLOW}Command: ${command}${NC}"
@@ -87,6 +96,12 @@ run_test_with_output() {
     local test_name="$1"
     local command="$2"
     local expected_pattern="$3"
+
+    # If TEST_FILTER is set and this test name doesn't match, skip it
+    if [[ -n "$TEST_FILTER" ]] && ! echo "$test_name" | grep -iq -- "$TEST_FILTER"; then
+        echo -e "${BLUE}↷ Skipping: ${test_name} (does not match filter '${TEST_FILTER}')${NC}"
+        return
+    fi
     
     echo -e "${CYAN}Testing: ${test_name}${NC}"
     echo -e "${YELLOW}Command: ${command}${NC}"
@@ -113,6 +128,12 @@ run_help_test() {
     local test_name="$1"
     local command="$2"
     local expected_pattern="$3"
+
+    # If TEST_FILTER is set and this test name doesn't match, skip it
+    if [[ -n "$TEST_FILTER" ]] && ! echo "$test_name" | grep -iq -- "$TEST_FILTER"; then
+        echo -e "${BLUE}↷ Skipping: ${test_name} (does not match filter '${TEST_FILTER}')${NC}"
+        return
+    fi
     
     echo -e "${CYAN}Testing: ${test_name}${NC}"
     echo -e "${YELLOW}Command: ${command}${NC}"
@@ -579,7 +600,7 @@ run_test "Web.xml template exists" "jar -tf ../$LUCLI_JAR | grep -q 'tomcat_temp
 
 # Test 20: Version Bumping System Tests
 echo -e "${BLUE}=== Version Bumping System Tests ===${NC}"
-run_test_with_output "Version command returns LuCLI banner" "java -jar ../$LUCLI_JAR --version" "LuCLI "
+run_test_with_output "Version command returns LuCLI banner" "java -jar ../$LUCLI_JAR --version" "Version: "
 # Check that binary and JAR versions match
 BINARY_VERSION=$(../$LUCLI_BINARY --version | grep -o 'LuCLI [0-9.]*' | cut -d' ' -f2)
 JAR_VERSION=$(java -jar ../$LUCLI_JAR --version | grep -o 'LuCLI [0-9.]*' | cut -d' ' -f2)
@@ -630,11 +651,20 @@ else
     run_test "URL rewrite functionality test (basic)" "jar -tf ../$LUCLI_JAR | grep -q 'urlrewrite.xml' || echo 'URL rewrite templates found'"
 fi
 
+
+# Test 24: Whitespace test
+echo -e "${BLUE}=== Whitespace Handling Tests ===${NC}"
+# Sanity check: run.cfm executes and contains our marker text
+run_test_with_output "run.cfm executes" "java -jar ../$LUCLI_JAR run ../tests/cfml/run.cfm" "Lots of space!"
+# With --whitespace we expect more output (extra newlines/spaces) than default
+run_test "--whitespace preserves extra whitespace" "trimmed=\$(java -jar ../$LUCLI_JAR run ../tests/cfml/run.cfm); preserved=\$(java -jar ../$LUCLI_JAR run --whitespace ../tests/cfml/run.cfm); [ \"$trimmed\" != \"$preserved\" ] && [ \${#preserved} -gt \${#trimmed} ]"
+
 # Cleanup
 echo -e "${BLUE}🧹 Cleaning up test files${NC}"
 
 # Clean up any remaining test servers
 echo "Cleaning up any test servers..."
+echo "TODO! This is not implemented yet!"
 echo "Test cleanup completed."
 
 # Clean up test directories

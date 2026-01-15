@@ -118,10 +118,26 @@ writeOutput("Hello from CFML script!" & chr(10));
 writeOutput("Test completed successfully!" & chr(10));
 EOF
 
-run_test_with_output "CFML script execution" "timeout 10 java -jar $LUCLI_JAR hello.cfs 2>&1" "Hello from CFML script"
+run_test_with_output "CFML script execution (shortcut)" "timeout 10 java -jar $LUCLI_JAR hello.cfs 2>&1" "Hello from CFML script"
+run_test_with_output "CFML script execution via run" "timeout 10 java -jar $LUCLI_JAR run hello.cfs 2>&1" "Hello from CFML script"
 run_test "Clean up CFML script" "rm hello.cfs"
 
-# Test 5: JAR Content Validation
+# Test 5: Script and Run Command Variants
+echo -e "${BLUE}=== Run Command and LuCLI Script Tests ===${NC}"
+# .cfm via run
+run_test_with_output ".cfm via run" "timeout 10 java -jar $LUCLI_JAR run tests/cfml/run.cfm 2>&1" "Hello from a tag based file"
+# .cfc via run
+run_test_with_output ".cfc via run" "timeout 10 java -jar $LUCLI_JAR run tests/cfml/Run.cfc 2>&1" "Hello from the main() function"
+# .lucli via shortcut and via run
+cat > test_run.lucli << 'EOF'
+# Simple LuCLI script used for testing
+echo "Run .lucli works"
+EOF
+run_test_with_output ".lucli via shortcut" "timeout 10 java -jar $LUCLI_JAR test_run.lucli 2>&1" "Run .lucli works"
+run_test_with_output ".lucli via run" "timeout 10 java -jar $LUCLI_JAR run test_run.lucli 2>&1" "Run .lucli works"
+run_test "Clean up test_run.lucli" "rm test_run.lucli"
+
+# Test 6: JAR Content Validation
 echo -e "${BLUE}=== JAR Content Tests ===${NC}"
 run_test "JAR contains LuCLI classes" "jar -tf $LUCLI_JAR | grep -q 'org/lucee/lucli'"
 run_test "JAR contains server classes" "jar -tf $LUCLI_JAR | grep -q 'server/' || true"

@@ -3,15 +3,10 @@
 // param name="lucli_home_path" default="/Users/markdrew/.lucli/";
 // param name="lucli_modules_path" default="#lucli_home_path#modules/";
 // Allow overriding of setings for the ScriptEngine via settings.json in lucli_home_path
+
 rootConfig = {};
 timer = createObject("java", "org.lucee.lucli.Timer");
-if( 
-		FileExists( lucli_home_path & "settings.json" ) 
-		&& isJSON( FileRead( lucli_home_path & "settings.json" ) 	)
-		){
-		rootConfig = deserializeJSON( FileRead( lucli_home_path & "settings.json" ) );
-		rootConfig = rootConfig.configuration ?: {};
-}
+LuCLI = createObject("java", "org.lucee.lucli.LuCLI");
 request.SERVERADMINPASSWORD = "luclipassword";
 server.SERVERADMINPASSWORD = request.SERVERADMINPASSWORD;
 param name="__verboseMode" default=false;	
@@ -40,13 +35,10 @@ config = {
 }
 
 // Overwrite whitep
-config["cfmlWriter"] = config["cfmlWriter"] ?: "white-space";
+config["cfmlWriter"] = LuCLI.preserveWhitespace ? "regular": "white-space";
 
 
-
-rootConfig.Mappings.append( config.Mappings );
-
-if(__verboseMode){
+if(LuCLI.verbose){
 	echo( serializeJSON(var=config, compact=false) );
 	echo("#Chr(10)#Lucee Engine Initialized at: #expandPath("/lucee/")# #Chr(10)#");
 }

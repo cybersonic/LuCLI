@@ -26,6 +26,9 @@ TEST_PORT=8888
 WAIT_TIMEOUT=30
 TEST_DIR_NAME="server_test_$(date +%s)"
 
+# Optional: filter tests by name (substring match, case-insensitive)
+TEST_FILTER="${TEST_FILTER:-}"
+
 echo -e "${BLUE}🌐 LuCLI Server CFML Test Suite${NC}"
 echo -e "${BLUE}================================${NC}"
 echo ""
@@ -78,6 +81,26 @@ test_http_endpoint() {
         return 1
     fi
     echo ""
+}
+
+# Helper to run an HTTP test with filtering and counters
+run_server_http_test() {
+    local name="$1"
+    local url="$2"
+    local expected_pattern="$3"
+    local expected_status="${4:-200}"
+
+    # If TEST_FILTER is set and this test name doesn't match, skip it
+    if [[ -n "$TEST_FILTER" ]] && ! echo "$name" | grep -iq -- "$TEST_FILTER"; then
+        echo -e "${BLUE}↷ Skipping: ${name} (does not match filter '${TEST_FILTER}')${NC}"
+        return
+    fi
+
+    if test_http_endpoint "$name" "$url" "$expected_pattern" "$expected_status"; then
+        TESTS_PASSED=$((TESTS_PASSED + 1))
+    else
+        TESTS_FAILED=$((TESTS_FAILED + 1))
+    fi
 }
 
 # Function to cleanup server
@@ -180,7 +203,7 @@ echo -e "${CYAN}🚀 Starting LuCLI server...${NC}"
 echo -e "${YELLOW}Command: java -jar $LUCLI_JAR server start --name $TEST_SERVER_NAME --port $TEST_PORT${NC}"
 
 # Start server in background
-java -jar "$LUCLI_JAR" server start --name "$TEST_SERVER_NAME" --port "$TEST_PORT" > server_start.log 2>&1 &
+java -jar "$LUCLI_JAR" server start --name "$TEST_SERVER_NAME" --port "$TEST_PORT" --open-browser false > server_start.log 2>&1 &
 SERVER_PID=$!
 
 # Wait for server to start
@@ -195,51 +218,43 @@ if wait_for_server $TEST_PORT $WAIT_TIMEOUT; then
     TESTS_FAILED=0
     
     # Test 1: Root index.cfm
-    if test_http_endpoint "Root index.cfm access" "http://localhost:$TEST_PORT/" "LuCLI Test Server"; then
-        TESTS_PASSED=$((TESTS_PASSED + 1))
-    else
-        TESTS_FAILED=$((TESTS_FAILED + 1))
-    fi
+    run_server_http_test "Root index.cfm access" "http://localhost:$TEST_PORT/" "LuCLI Test Server"
     
     # Test 2: Direct .cfs file access
-    if test_http_endpoint "Direct .cfs file access" "http://localhost:$TEST_PORT/test.cfs" "CFS Test Response"; then
-        TESTS_PASSED=$((TESTS_PASSED + 1))
-    else
-        TESTS_FAILED=$((TESTS_FAILED + 1))
-    fi
+    run_server_http_test "Direct .cfs file access" "http://localhost:$TEST_PORT/test.cfs" "CFS Test Response"
     
     # Test 3: Direct .cfm file access
-    if test_http_endpoint "Direct .cfm file access" "http://localhost:$TEST_PORT/test.cfm" "CFM Test Response"; then
-        TESTS_PASSED=$((TESTS_PASSED + 1))
-    else
-        TESTS_FAILED=$((TESTS_FAILED + 1))
-    fi
+    run_server_http_test "Direct .cfm file access" "http://localhost:$TEST_PORT/test.cfm" "CFM Test Response"
     
     # Test 4: API endpoint (.cfs)
-    if test_http_endpoint "API endpoint (.cfs)" "http://localhost:$TEST_PORT/api.cfs" "success"; then
-        TESTS_PASSED=$((TESTS_PASSED + 1))
-    else
-        TESTS_FAILED=$((TESTS_FAILED + 1))
-    fi
+    run_server_http_test "API endpoint (.cfs)" "http://localhost:$TEST_PORT/api.cfs" "success"
     
     # Test 5: Server status via LuCLI
-    echo -e "${CYAN}Testing: Server status command${NC}"
-    if java -jar "$LUCLI_JAR" server status --name "$TEST_SERVER_NAME" > /dev/null 2>&1; then
-        echo -e "${GREEN}✅ PASSED - Server status command works${NC}"
-        TESTS_PASSED=$((TESTS_PASSED + 1))
+    if [[ -z "$TEST_FILTER" ]] || echo "Server status command" | grep -iq -- "$TEST_FILTER"; then
+        echo -e "${CYAN}Testing: Server status command${NC}"
+        if java -jar "$LUCLI_JAR" server status --name "$TEST_SERVER_NAME" > /dev/null 2>&1; then
+            echo -e "${GREEN}✅ PASSED - Server status command works${NC}"
+            TESTS_PASSED=$((TESTS_PASSED + 1))
+        else
+            echo -e "${RED}❌ FAILED - Server status command failed${NC}"
+            TESTS_FAILED=$((TESTS_FAILED + 1))
+        fi
     else
-        echo -e "${RED}❌ FAILED - Server status command failed${NC}"
-        TESTS_FAILED=$((TESTS_FAILED + 1))
+        echo -e "${BLUE}↷ Skipping: Server status command (does not match filter '${TEST_FILTER}')${NC}"
     fi
     
     # Test 6: Server list includes our server
-    echo -e "${CYAN}Testing: Server appears in list${NC}"
-    if java -jar "$LUCLI_JAR" server list | grep -q "$TEST_SERVER_NAME"; then
-        echo -e "${GREEN}✅ PASSED - Server appears in list${NC}"
-        TESTS_PASSED=$((TESTS_PASSED + 1))
+    if [[ -z "$TEST_FILTER" ]] || echo "Server appears in list" | grep -iq -- "$TEST_FILTER"; then
+        echo -e "${CYAN}Testing: Server appears in list${NC}"
+        if java -jar "$LUCLI_JAR" server list | grep -q "$TEST_SERVER_NAME"; then
+            echo -e "${GREEN}✅ PASSED - Server appears in list${NC}"
+            TESTS_PASSED=$((TESTS_PASSED + 1))
+        else
+            echo -e "${RED}❌ FAILED - Server not found in list${NC}"
+            TESTS_FAILED=$((TESTS_FAILED + 1))
+        fi
     else
-        echo -e "${RED}❌ FAILED - Server not found in list${NC}"
-        TESTS_FAILED=$((TESTS_FAILED + 1))
+        echo -e "${BLUE}↷ Skipping: Server appears in list (does not match filter '${TEST_FILTER}')${NC}"
     fi
     
     echo ""

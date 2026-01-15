@@ -8,12 +8,12 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Map;
 
-
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
 import org.lucee.lucli.modules.ModuleCommand;
+
 import lucee.runtime.type.Array;
 
 /**
@@ -83,10 +83,9 @@ public class LuceeScriptEngine {
         Timer.start("LuceeScriptEngine Initialization");
         if (instance == null) {
             synchronized (lock) {
-                if (instance == null) {
-
+                // if (instance == null) {
                     instance = new LuceeScriptEngine();
-                }
+                // }
             }
         }
         Timer.stop("LuceeScriptEngine Initialization");
@@ -337,7 +336,7 @@ public class LuceeScriptEngine {
         
         if (isCFC) {
             Timer.start("Component Execution");
-            executeComponent(scriptFile, scriptContent, scriptArgs);
+            executeComponent(scriptFile, scriptArgs);
             Timer.stop("Component Execution");
          } else if (isCFM) {
             Timer.start("Template Execution");
@@ -391,7 +390,7 @@ public class LuceeScriptEngine {
     /**
      * Execute a CFC component
      */
-    private void executeComponent(String scriptFile, String scriptContent, String[] scriptArgs) throws Exception {
+    private void executeComponent(String scriptFile, String[] scriptArgs) throws Exception {
         if (isVerboseMode()) {
             StringOutput.getInstance().println("${EMOJI_GEAR} Executing CFC component: " + scriptFile);
             StringOutput.getInstance().println("${EMOJI_INFO} Arguments: " + Arrays.toString(scriptArgs));
@@ -1450,31 +1449,31 @@ public class LuceeScriptEngine {
     }
 
     public Integer executeCFMFile(String scriptPath, String[] scriptArgs) throws Exception {
-       
-        String script = readScriptTemplate("/script_engine/executeCFMFile.cfs");
-        
         String scriptFileContent = new String(Files.readAllBytes(Paths.get(scriptPath)), java.nio.charset.StandardCharsets.UTF_8);
-        script = script.replace("${scriptFileContent}", scriptFileContent);
         //Need to add usual variables. 
         setupScriptContext(engine, scriptPath, scriptArgs);
-        engine.put("scriptFileContent", scriptFileContent);
-        try{
-            Object res = engine.eval(script);
-            return 0;
-        }catch(Exception e){
-            StringOutput.getInstance().printError("Error executing CFM file: " + e.getMessage());
-            return 1;
-        }
+        return executeScriptByString("```" + scriptFileContent + "```", scriptPath, scriptArgs);
+    }
+
+    public Integer executeCFSFile(String scriptPath, String[] scriptArgs) throws Exception {
+       String scriptFileContent = new String(Files.readAllBytes(Paths.get(scriptPath)), java.nio.charset.StandardCharsets.UTF_8);
+        //Need to add usual variables. 
+        setupScriptContext(engine, scriptPath, scriptArgs);
+        return executeScriptByString( scriptFileContent , scriptPath, scriptArgs);
+    }
+
+    public Integer executeCFCFile(String scriptPath, String[] scriptArgs) throws Exception {
+        executeComponent(scriptPath, scriptArgs);
+        return 0;
+    }
+
+  
+
+    private Integer executeScriptByString(String script, String scriptPath, String[] scriptArgs) throws Exception {
+        //Need to add usual variables. 
+        setupScriptContext(engine, scriptPath, scriptArgs);
+        Object res = engine.eval(script);
+        return 0;
         
-    }
-
-    public static Integer executeCFCFile(String string, String[] scriptArgs) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'executeCFCFile'");
-    }
-
-    public static Integer executeCFSFile(String string, String[] scriptArgs) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'executeCFSFile'");
     }
 }
