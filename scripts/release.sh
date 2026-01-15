@@ -110,6 +110,36 @@ set_next_snapshot() {
     log_success "Next development version set to: $new_version"
 }
 
+run_jreleaser() {
+    local dry_run="$1"
+    local current_version
+    current_version=$(get_current_version)
+
+    if is_snapshot_version "$current_version"; then
+        log_error "Current version $current_version is a SNAPSHOT. Please run '$0 release' and commit/tag before running JReleaser."
+        exit 1
+    fi
+
+    cd "$PROJECT_ROOT"
+
+    local mvn_cmd="mvn -Pbinary clean package jreleaser:full-release"
+    if [[ "$dry_run" == "true" ]]; then
+        mvn_cmd+=" -Djreleaser.dry.run=true"
+    fi
+
+    log_info "Running JReleaser full-release for version $current_version${dry_run:+ (dry run)}"
+    log_info "$mvn_cmd"
+
+    # Use eval so the composed command (with flags) is executed correctly
+    eval "$mvn_cmd"
+
+    if [[ "$dry_run" == "true" ]]; then
+        log_success "JReleaser dry run completed for version $current_version"
+    else
+        log_success "JReleaser full release completed for version $current_version"
+    fi
+}
+
 check_status() {
     local current_version=$(get_current_version)
     
@@ -150,32 +180,38 @@ LuCLI Release Management Script
 Usage: $0 <command>
 
 Commands:
-    status              Show current version and git status
-    bump <type>         Bump version (major, minor, patch)
-    release             Prepare release version (remove SNAPSHOT)
-    next-snapshot       Set next development version (after release)
+    status                  Show current version and git status
+    bump <type>             Bump version (major, minor, patch)
+    release                 Prepare release version (remove SNAPSHOT)
+    next-snapshot           Set next development version (after release)
+    jreleaser-dry-run       Build binary and run JReleaser full-release in dry-run mode
+    jreleaser-release       Build binary and run JReleaser full-release (actual release)
     
 Examples:
-    $0 status                    # Check current status
-    $0 bump patch               # Bump to next patch version
-    $0 release                  # Prepare for release
-    $0 next-snapshot           # Set next development version
+    $0 status                        # Check current status
+    $0 bump patch                   # Bump to next patch version
+    $0 release                      # Prepare for release
+    $0 jreleaser-dry-run           # Validate JReleaser config without publishing
+    $0 jreleaser-release           # Perform a full JReleaser release
+    $0 next-snapshot               # Set next development version
 
 Typical Release Workflow:
-    1. $0 bump patch           # or minor/major
+    1. $0 bump patch               # or minor/major
     2. Make your changes and commit them
-    3. $0 release              # Remove SNAPSHOT suffix
+    3. $0 release                  # Remove SNAPSHOT suffix
     4. git add pom.xml && git commit -m "Prepare release X.X.X"
-    5. git push                # This triggers the auto-release workflow
-    6. $0 next-snapshot       # Set next development version
-    7. git add pom.xml && git commit -m "Prepare for next development iteration"
-    8. git push
+    5. git push                    # Optional: push tags/commits
+    6. export JRELEASER_GITHUB_TOKEN=...   # Ensure GitHub token is set
+    7. $0 jreleaser-release        # Run JReleaser full-release
+    8. $0 next-snapshot           # Set next development version
+    9. git add pom.xml && git commit -m "Prepare for next development iteration"
+   10. git push
 
 Notes:
+    - JReleaser requires a non-SNAPSHOT version in pom.xml
+    - JReleaser uses JRELEASER_GITHUB_TOKEN for authentication
     - The auto-release workflow will only create a release for non-SNAPSHOT versions
-    - Releases are automatically created when pom.xml version is changed to a non-SNAPSHOT
     - Each release includes binaries for Linux, macOS, and Windows
-    - Installation scripts are automatically generated
 EOF
 }
 
@@ -199,6 +235,12 @@ case "${1:-}" in
         ;;
     next-snapshot)
         set_next_snapshot
+        ;;
+    jreleaser-dry-run)
+        run_jreleaser "true"
+        ;;
+    jreleaser-release)
+        run_jreleaser "false"
         ;;
     help|--help|-h)
         show_help

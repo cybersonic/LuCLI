@@ -41,7 +41,7 @@ fi
 # A plain `mvn clean package` produces a correct shaded jar, so we build that
 # first and then create the self-executing binary ourselves below.
 echo "Building LuCLI JAR and binary..."
-mvn clean package -q -Dmaven.test.skip=true
+mvn clean package -q -Dmaven.test.skip=true -Djreleaser.dry.run=true
 if [ $? -ne 0 ]; then
     echo "Maven build failed!"
     exit 1

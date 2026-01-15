@@ -6,7 +6,7 @@
 
   <groupId>org.lucee</groupId>
   <artifactId>lucli</artifactId>
-  <version>0.1.245-SNAPSHOT</version>
+  <version>0.1.256-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>LuCLI</name>
   <description>A CLI for Lucee</description>
@@ -135,6 +135,20 @@
   <build>
     <plugins>
       <plugin>
+        <groupId>org.jreleaser</groupId>
+        <artifactId>jreleaser-maven-plugin</artifactId>
+        <version>1.22.0</version>
+        <configuration>
+          <jreleaser>
+            <release>
+              <github>
+                <token>${env.JRELEASER_GITHUB_TOKEN}</token>
+              </github>
+            </release>
+          </jreleaser>
+        </configuration>
+      </plugin>
+      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
         <version>3.13.0</version>
@@ -251,6 +265,11 @@
             </configuration>
           </execution>
         </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.jreleaser</groupId>
+        <artifactId>jreleaser-maven-plugin</artifactId>
+        <version>1.22.0</version>
       </plugin>
     </plugins>
   </build>

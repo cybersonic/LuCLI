@@ -1,0 +1,32 @@
+project:
+  # These can be omitted; Maven plugin will fill in from pom.xml.
+  name: lucli
+  description: A CLI for Lucee
+  authors:
+    - Mark Drew
+  license: MIT
+
+release:
+  github:
+    owner: cybersonic
+    name: lucli
+
+packagers:
+  brew:
+    # Enable Homebrew packaging for all distributions
+    active: ALWAYS
+    # Git repo that will host the tap, e.g. github.com/cybersonic/homebrew-tap
+    repository:
+      owner: cybersonic
+      name: homebrew-tap
+distributions:
+  lucli:
+    type: SINGLE_JAR
+    stereotype: CLI
+    java:
+      groupId: org.lucee
+      artifactId: lucli
+      mainClass: org.lucee.lucli.LuCLI
+      version: "17"
+    artifacts:
+      - path: target/lucli.jar
