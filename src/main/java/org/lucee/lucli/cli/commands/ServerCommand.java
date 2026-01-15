@@ -801,7 +801,7 @@ public class ServerCommand implements Callable<Integer> {
      */
     @Command(
         name = "get",
-        description = "Get configuration values from lucee.json"
+        description = "Get configuration values from lucee.json or derived Lucee configuration"
     )
     static class GetCommand implements Callable<Integer> {
 
@@ -809,13 +809,21 @@ public class ServerCommand implements Callable<Integer> {
         private ServerCommand parent;
 
         @Parameters(paramLabel = "KEY",
-                    description = "Configuration key to retrieve (e.g., port, admin.enabled)",
+                    description = "Configuration key to retrieve (e.g., port, admin.enabled, configuration)",
                     arity = "1")
         private String key;
 
         @Option(names = {"-d", "--directory"},
                 description = "Project directory (defaults to current directory)")
         private String projectDir;
+
+        @Option(names = {"--env", "--environment"},
+                description = "Environment to use (e.g., prod, dev, staging)")
+        private String environment;
+
+        @Option(names = {"-c", "--config"},
+                description = "Configuration file to use (defaults to lucee.json)")
+        private String configFile;
 
         @Override
         public Integer call() throws Exception {
@@ -829,6 +837,16 @@ public class ServerCommand implements Callable<Integer> {
             args.add("config");
             args.add("get");
             args.add(key);
+
+            if (environment != null && !environment.trim().isEmpty()) {
+                args.add("--env");
+                args.add(environment.trim());
+            }
+
+            if (configFile != null && !configFile.trim().isEmpty()) {
+                args.add("--config");
+                args.add(configFile.trim());
+            }
 
             String result = executor.executeCommand("server", args.toArray(new String[0]));
             if (result != null && !result.isEmpty()) {
