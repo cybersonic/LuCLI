@@ -412,6 +412,12 @@ public class LuceeServerManager {
                 ? "_default"
                 : environment.trim();
 
+        // Optionally auto-install extension dependencies based on
+        // dependencySettings.autoInstallOnServerStart before starting the
+        // server, so that moved/updated extensions are reflected in the lock
+        // file without requiring an explicit `lucli deps install`.
+        autoInstallExtensionDependenciesIfEnabled(projectDir, environment);
+
         // Load configuration, applying server lock when present (lenient behaviour)
         LuceeServerConfig.ServerConfig config;
         org.lucee.lucli.config.LuceeLockFile lockFile = org.lucee.lucli.config.LuceeLockFile.read(projectDir);
@@ -1371,6 +1377,108 @@ public class LuceeServerManager {
     }
     
     /**
+     * Auto-install extension dependencies when dependencySettings.
+     * autoInstallOnServerStart is enabled. This re-runs the
+     * ExtensionDependencyInstaller for all extension dependencies declared in
+     * lucee.json (and optionally devDependencies, depending on
+     * dependencySettings.installDevDependencies) and updates lucee-lock.json.
+     *
+     * Git/CFML dependencies are left to the explicit `lucli deps install`
+     * command for now; this hook focuses on keeping extensions in sync so that
+     * moved or updated .lex files are reflected automatically when starting
+     * a server.
+     */
+    private void autoInstallExtensionDependenciesIfEnabled(Path projectDir, String environment) {
+        try {
+            org.lucee.lucli.config.LuceeJsonConfig depConfig =
+                    org.lucee.lucli.config.LuceeJsonConfig.load(projectDir);
+
+            // Apply environment-specific overrides for dependencySettings if
+            // requested. We swallow invalid environments here so that server
+            // startup can still proceed (LuceeServerConfig will perform its
+            // own strict environment validation).
+            if (environment != null && !environment.trim().isEmpty()) {
+                try {
+                    depConfig.applyEnvironment(environment.trim());
+                } catch (IllegalArgumentException ignored) {
+                    // No matching environment for dependencies; ignore.
+                }
+            }
+
+            org.lucee.lucli.config.DependencySettingsConfig settings = depConfig.getDependencySettings();
+            if (settings == null || !settings.isAutoInstallOnServerStart()) {
+                return; // Feature disabled
+            }
+
+            java.util.List<org.lucee.lucli.config.DependencyConfig> prodDeps = depConfig.parseDependencies();
+            java.util.List<org.lucee.lucli.config.DependencyConfig> devDeps = java.util.List.of();
+
+            Boolean installDevOverride = settings.getInstallDevDependencies();
+            boolean installDev = (installDevOverride != null) ? installDevOverride.booleanValue() : true;
+            if (installDev) {
+                devDeps = depConfig.parseDevDependencies();
+            }
+
+            if ((prodDeps == null || prodDeps.isEmpty()) && (devDeps == null || devDeps.isEmpty())) {
+                return; // Nothing to do
+            }
+
+            // Read existing lock file so we can preserve non-extension entries
+            org.lucee.lucli.config.LuceeLockFile existingLock =
+                    org.lucee.lucli.config.LuceeLockFile.read(projectDir);
+
+            java.util.Map<String, org.lucee.lucli.deps.LockedDependency> newProd =
+                    new java.util.LinkedHashMap<>(existingLock.getDependencies());
+            java.util.Map<String, org.lucee.lucli.deps.LockedDependency> newDev =
+                    new java.util.LinkedHashMap<>(existingLock.getDevDependencies());
+
+            ExtensionDependencyInstaller extInstaller = new ExtensionDependencyInstaller(projectDir);
+
+            // Re-install all extension dependencies, overriding any existing
+            // lock entries for those names. This is cheap and ensures that
+            // moved/updated .lex paths are kept in sync.
+            if (prodDeps != null) {
+                for (org.lucee.lucli.config.DependencyConfig dep : prodDeps) {
+                    if (!"extension".equals(dep.getType())) {
+                        continue;
+                    }
+                    try {
+                        org.lucee.lucli.deps.LockedDependency locked = extInstaller.install(dep);
+                        newProd.put(dep.getName(), locked);
+                    } catch (Exception e) {
+                        System.err.println(
+                            "Warning: Failed to auto-install extension dependency '" + dep.getName() + "': " + e.getMessage()
+                        );
+                    }
+                }
+            }
+
+            if (devDeps != null) {
+                for (org.lucee.lucli.config.DependencyConfig dep : devDeps) {
+                    if (!"extension".equals(dep.getType())) {
+                        continue;
+                    }
+                    try {
+                        org.lucee.lucli.deps.LockedDependency locked = extInstaller.install(dep);
+                        newDev.put(dep.getName(), locked);
+                    } catch (Exception e) {
+                        System.err.println(
+                            "Warning: Failed to auto-install dev extension dependency '" + dep.getName() + "': " + e.getMessage()
+                        );
+                    }
+                }
+            }
+
+            org.lucee.lucli.config.LuceeLockFile updated = new org.lucee.lucli.config.LuceeLockFile();
+            updated.setDependencies(newProd);
+            updated.setDevDependencies(newDev);
+            updated.write(projectDir.toFile());
+        } catch (Exception e) {
+            System.err.println("Warning: Failed to auto-install extension dependencies: " + e.getMessage());
+        }
+    }
+    
+    /**
      * Deploy extension dependencies (.lex files) to server's lucee-server/deploy folder.
      * Called before server startup.
      */
@@ -1406,34 +1514,59 @@ public class LuceeServerManager {
     
     /**
      * Build LUCEE_EXTENSIONS environment variable from extension dependencies.
-     * Returns comma-separated list of extension IDs.
+     *
+     * Only provider-based extensions (source = "extension-provider") are
+     * included. Each entry is formatted as:
+     *   ID
+     *   ID;version=x.y.z
+     * and entries are comma-separated.
      */
-    private String buildLuceeExtensions(Path projectDir) {
+    public static String buildLuceeExtensions(Path projectDir) {
         try {
             // Load lock file to get installed dependencies
             org.lucee.lucli.config.LuceeLockFile lockFile = org.lucee.lucli.config.LuceeLockFile.read(projectDir);
             
-            java.util.List<String> extensionIds = new java.util.ArrayList<>();
+            java.util.List<String> entries = new java.util.ArrayList<>();
             
-            // Check production dependencies
+            // Production dependencies
             for (org.lucee.lucli.deps.LockedDependency dep : lockFile.getDependencies().values()) {
-                if ("extension".equals(dep.getType()) && dep.getId() != null && !dep.getId().trim().isEmpty()) {
-                    extensionIds.add(dep.getId().trim());
-                }
+                addExtensionEntryIfProviderBased(dep, entries);
             }
             
-            // Check dev dependencies
+            // Dev dependencies
             for (org.lucee.lucli.deps.LockedDependency dep : lockFile.getDevDependencies().values()) {
-                if ("extension".equals(dep.getType()) && dep.getId() != null && !dep.getId().trim().isEmpty()) {
-                    extensionIds.add(dep.getId().trim());
-                }
+                addExtensionEntryIfProviderBased(dep, entries);
             }
             
-            return String.join(",", extensionIds);
+            return String.join(",", entries);
         } catch (Exception e) {
             // If we can't read lock file or it doesn't exist, return empty string
             return "";
         }
+    }
+
+    /**
+     * Add a LUCEE_EXTENSIONS entry for the given locked dependency when it is
+     * a provider-based extension with a resolved ID.
+     */
+    private static void addExtensionEntryIfProviderBased(org.lucee.lucli.deps.LockedDependency dep,
+                                                         java.util.List<String> entries) {
+        if (!"extension".equals(dep.getType())) {
+            return;
+        }
+        if (!"extension-provider".equals(dep.getSource())) {
+            return; // path/url-based extensions are handled via deploy directory
+        }
+        if (dep.getId() == null || dep.getId().trim().isEmpty()) {
+            return; // unknown slug or unresolved ID
+        }
+
+        StringBuilder sb = new StringBuilder(dep.getId().trim());
+        String version = dep.getVersion();
+        if (version != null && !version.trim().isEmpty() && !"unknown".equals(version)) {
+            sb.append(";version=").append(version.trim());
+        }
+        entries.add(sb.toString());
     }
     
     /**
@@ -1512,7 +1645,7 @@ public class LuceeServerManager {
         }
         
         // Set LUCEE_EXTENSIONS environment variable if extensions are configured
-        String luceeExtensions = buildLuceeExtensions(projectDir);
+        String luceeExtensions = LuceeServerManager.buildLuceeExtensions(projectDir);
         if (luceeExtensions != null && !luceeExtensions.isEmpty()) {
             env.put("LUCEE_EXTENSIONS", luceeExtensions);
         }
@@ -1628,11 +1761,9 @@ public class LuceeServerManager {
             opts.add("-Dcom.sun.management.jmxremote.ssl=false");
         }
         
-        // Lucee extensions configuration - set as JVM property so it persists across restarts
-        String luceeExtensions = buildLuceeExtensions(projectDir);
-        if (luceeExtensions != null && !luceeExtensions.isEmpty()) {
-            opts.add("-Dlucee.extensions=" + luceeExtensions);
-        }
+        // Lucee extensions configuration is passed via the LUCEE_EXTENSIONS
+        // environment variable in launchServerProcess, which avoids quoting
+        // issues with semicolons/commas inside CATALINA_OPTS.
         
         // Determine which agents are active for this startup
         Set<String> activeAgents = resolveActiveAgents(config, overrides);

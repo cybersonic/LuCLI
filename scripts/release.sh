@@ -122,7 +122,11 @@ run_jreleaser() {
 
     cd "$PROJECT_ROOT"
 
-    local mvn_cmd="mvn -Pbinary clean package jreleaser:full-release"
+    # IMPORTANT: do NOT use -Pbinary here.
+    # The binary profile auto-bumps the version to the next *-SNAPSHOT*,
+    # which prevents JReleaser from treating this as a proper release.
+    # We build the standard JAR and let JReleaser upload/package that.
+    local mvn_cmd="mvn -DskipTests=true clean package jreleaser:full-release"
     if [[ "$dry_run" == "true" ]]; then
         mvn_cmd+=" -Djreleaser.dry.run=true"
     fi

@@ -5,8 +5,9 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 - **Server Sandbox Mode:** Added a `--sandbox` option to `lucli server run` to start a transient foreground server without creating or modifying `lucee.json` and without persisting the server instance after shutdown.
 - **Run Commands from Modules:** Added `executeCommand` method to `BaseModule.cfc` to allow modules to programmatically execute LuCLI commands.
-- **Env File Configuration & Tomcat Environment:** Added `envFile` and `envVars` top-level keys to `lucee.json` so projects can control which env file is loaded for `${VAR}` substitution and explicitly pass selected variables through to the Tomcat process environment.
-- **Example: server-envvars:** New `examples/server-envvars/` example demonstrating `envFile`, `envVars`, and inspection of environment variables from within Lucee via `GetEnvironmentVariable()`.
+- **Env File Configuration & Tomcat Environment:** Added `envFile` and `envVars` top-level keys to `lucee.json` so projects can control which env file is loaded for `${VAR}` substitution and explicitly pass selected variables through to the Tomcat process environment. You can see usage examples in the updated [Environment Variables documentation](documentation/ENVIRONMENT_VARIABLES.md).
+- **Dependency Install Reliability:** Improved `deps install` and local repository behavior when using env-driven configuration and custom repositories.
+
 
 ## 0.1.258
 - **Secrets Management:** Added first-class secrets management support with safeguards to prevent accidental leakage in logs, dry-run output, and documentation examples. Includes automatic checks for hard-coded secrets and improved validation of sensitive configuration values.

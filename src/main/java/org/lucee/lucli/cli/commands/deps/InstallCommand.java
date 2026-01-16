@@ -12,8 +12,10 @@ import org.lucee.lucli.StringOutput;
 import org.lucee.lucli.config.DependencyConfig;
 import org.lucee.lucli.config.LuceeJsonConfig;
 import org.lucee.lucli.config.LuceeLockFile;
+import org.lucee.lucli.deps.ExtensionDependencyInstaller;
 import org.lucee.lucli.deps.GitDependencyInstaller;
 import org.lucee.lucli.deps.LockedDependency;
+import org.lucee.lucli.server.LuceeServerManager;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -47,7 +49,7 @@ public class InstallCommand implements Callable<Integer> {
     public Integer call() throws Exception {
         try {
             // 1. Parse configuration
-            StringOutput.Quick.info("📦 Reading lucee.json...");
+            StringOutput.Quick.info(" Reading lucee.json...");
             LuceeJsonConfig config = LuceeJsonConfig.load(Paths.get("."));
             
             // 2. Apply environment if specified
@@ -56,7 +58,7 @@ public class InstallCommand implements Callable<Integer> {
             }
             
             // 3. Parse dependencies
-            StringOutput.Quick.info("🔍 Resolving dependencies...");
+            StringOutput.Quick.info(" Resolving dependencies...");
             List<DependencyConfig> deps = config.parseDependencies();
             
             // 4. Determine if we should install devDependencies
@@ -67,29 +69,39 @@ public class InstallCommand implements Callable<Integer> {
             
             List<DependencyConfig> devDeps = installDev ? config.parseDevDependencies() : List.of();
             
-            // 5. Filter to git sources only for MVP
+            // 5. Basic stats for supported sources (git + extensions)
             long gitCount = deps.stream().filter(d -> "git".equals(d.getSource())).count();
             long gitDevCount = devDeps.stream().filter(d -> "git".equals(d.getSource())).count();
+            long extCount = deps.stream().filter(d -> "extension".equals(d.getType())).count();
+            long extDevCount = devDeps.stream().filter(d -> "extension".equals(d.getType())).count();
             
             if (dryRun) {
-                System.out.println("\nWould install:");
-                System.out.println("  " + deps.size() + " production dependencies (" + gitCount + " git sources)");
-                System.out.println("  " + devDeps.size() + " dev dependencies (" + gitDevCount + " git sources)");
-                System.out.println("\nGit dependencies:");
+                StringOutput.Quick.print("\nWould install:");
+                StringOutput.Quick.print("  " + deps.size() + " production dependencies (" + gitCount + " git, " + extCount + " extensions)");
+                StringOutput.Quick.print("  " + devDeps.size() + " dev dependencies (" + gitDevCount + " git, " + extDevCount + " extensions)");
+                StringOutput.Quick.print("\nGit dependencies:");
                 deps.stream()
                     .filter(d -> "git".equals(d.getSource()))
-                    .forEach(d -> System.out.println("  " + d.getName() + " (" + d.getUrl() + "@" + d.getRef() + ")"));
+                    .forEach(d -> StringOutput.Quick.print("  " + d.getName() + " (" + d.getUrl() + "@" + d.getRef() + ")"));
                 devDeps.stream()
                     .filter(d -> "git".equals(d.getSource()))
-                    .forEach(d -> System.out.println("  " + d.getName() + " (" + d.getUrl() + "@" + d.getRef() + ") [dev]"));
-                
-                StringOutput.Quick.info("\nℹ️  Note: Only git sources are supported in this MVP");
-                System.out.println("   Other sources will be skipped:");
+                    .forEach(d -> StringOutput.Quick.print("  " + d.getName() + " (" + d.getUrl() + "@" + d.getRef() + ") [dev]"));
+
+                StringOutput.Quick.print("\nExtension dependencies:");
                 deps.stream()
-                    .filter(d -> !"git".equals(d.getSource()))
+                    .filter(d -> "extension".equals(d.getType()))
+                    .forEach(d -> StringOutput.Quick.print("  " + d.getName() + " (type=extension, source=" + d.getSource() + ")"));
+                devDeps.stream()
+                    .filter(d -> "extension".equals(d.getType()))
+                    .forEach(d -> StringOutput.Quick.print("  " + d.getName() + " (type=extension, source=" + d.getSource() + ") [dev]"));
+                
+                StringOutput.Quick.info("Note: Git sources and extension dependencies are supported.");
+                StringOutput.Quick.print("   Other sources will be skipped:");
+                deps.stream()
+                    .filter(d -> !"git".equals(d.getSource()) && !"extension".equals(d.getType()))
                     .forEach(d -> StringOutput.Quick.warning("  " + d.getName() + " (" + d.getSource() + ") - not implemented yet"));
                 devDeps.stream()
-                    .filter(d -> !"git".equals(d.getSource()))
+                    .filter(d -> !"git".equals(d.getSource()) && !"extension".equals(d.getType()))
                     .forEach(d -> StringOutput.Quick.warning("  " + d.getName() + " (" + d.getSource() + ") - not implemented yet [dev]"));
 
                 // Show the realized dependency configuration (including environment overrides)
@@ -97,9 +109,9 @@ public class InstallCommand implements Callable<Integer> {
                     ObjectMapper mapper = new ObjectMapper();
                     mapper.enable(SerializationFeature.INDENT_OUTPUT);
                     String realizedJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(config);
-                    System.out.println("\n📋 DRY RUN: Dependency configuration that would be used (from lucee.json):\n");
-                    System.out.println(realizedJson);
-                    System.out.println("\n✅ Run without --dry-run to install these dependencies and update lucee-lock.json.\n");
+                    StringOutput.Quick.info("DRY RUN: Dependency configuration that would be used (from lucee.json):\n");
+                    StringOutput.Quick.print(realizedJson);
+                    StringOutput.Quick.success("Run without --dry-run to install these dependencies and update lucee-lock.json.");
                 } catch (Exception e) {
                     StringOutput.Quick.warning("\n⚠️  Failed to render realized dependency configuration: " + e.getMessage());
                 }
@@ -115,21 +127,19 @@ public class InstallCommand implements Callable<Integer> {
             allDeps.addAll(prodDeps);
             allDeps.addAll(devDepsList);
             
-            List<DependencyConfig> gitDeps = allDeps.stream()
-                .filter(d -> "git".equals(d.getSource()))
-                .collect(java.util.stream.Collectors.toList());
-            
-            if (gitDeps.isEmpty()) {
-                StringOutput.Quick.info("\nℹ️  No git dependencies to install");
-                StringOutput.Quick.info("   (Only git sources are supported in this MVP)");
+            boolean hasSupported = allDeps.stream().anyMatch(d -> "git".equals(d.getSource()) || "extension".equals(d.getType()));
+            if (!hasSupported) {
+                StringOutput.Quick.info("\nℹ️  No git or extension dependencies to install");
                 return 0;
             }
             
             // 7. Read existing lock file for verification
             LuceeLockFile existingLockFile = LuceeLockFile.read();
             
-            System.out.println("\n📥 Installing dependencies...");
-            GitDependencyInstaller gitInstaller = new GitDependencyInstaller(Paths.get("."));
+            StringOutput.Quick.info(" Installing dependencies...");
+            java.nio.file.Path projectDir = Paths.get(".");
+            GitDependencyInstaller gitInstaller = new GitDependencyInstaller(projectDir);
+            ExtensionDependencyInstaller extInstaller = new ExtensionDependencyInstaller(projectDir);
             
             java.util.Map<String, LockedDependency> installedProd = new java.util.LinkedHashMap<>();
             java.util.Map<String, LockedDependency> installedDev = new java.util.LinkedHashMap<>();
@@ -137,12 +147,16 @@ public class InstallCommand implements Callable<Integer> {
             int skipCount = 0;
             int unchangedCount = 0;
             
+            
             for (DependencyConfig dep : allDeps) {
-                if ("git".equals(dep.getSource())) {
+                boolean isGit = "git".equals(dep.getSource());
+                boolean isExtension = "extension".equals(dep.getType());
+
+                if (isGit || isExtension) {
                     try {
                         boolean isDevDep = devDepsList.contains(dep);
                         
-                        // Check if dependency is already installed with same version
+                        // Check if dependency is already installed with same version/source
                         LockedDependency existing = isDevDep 
                             ? existingLockFile.getDevDependencies().get(dep.getName())
                             : existingLockFile.getDependencies().get(dep.getName());
@@ -157,11 +171,13 @@ public class InstallCommand implements Callable<Integer> {
                             } else {
                                 installedProd.put(dep.getName(), existing);
                             }
-                            System.out.println("  " + dep.getName() + " - unchanged (" + existing.getVersion() + ")");
+                            StringOutput.Quick.print("   " + dep.getName() + " - unchanged (" + existing.getVersion() + ")");
                             unchangedCount++;
                         } else {
-                            // Install/reinstall
-                            LockedDependency locked = gitInstaller.install(dep);
+                            // Install/reinstall via appropriate installer
+                            LockedDependency locked = isGit
+                                ? gitInstaller.install(dep)
+                                : extInstaller.install(dep);
                             
                             if (isDevDep) {
                                 installedDev.put(dep.getName(), locked);
@@ -172,17 +188,16 @@ public class InstallCommand implements Callable<Integer> {
                             successCount++;
                         }
                     } catch (Exception e) {
-                        StringOutput.Quick.error("  ✗ Failed to install " + dep.getName() + ": " + e.getMessage());
+                        StringOutput.Quick.error(" Failed to install " + dep.getName() + ": " + e.getMessage());
                         if (LuCLI.verbose || LuCLI.debug) {
                             e.printStackTrace();
                         }
                     }
                 } else {
-                    System.out.println("  " + dep.getName() + " (" + dep.getSource() + ") - skipped (not implemented)");
+                    StringOutput.Quick.warning("  " + dep.getName() + " (" + dep.getSource() + ") - skipped (not implemented)");
                     skipCount++;
                 }
             }
-            
             // 8. Write lock file
             if (successCount > 0 || unchangedCount > 0) {
                 LuceeLockFile lockFile = new LuceeLockFile();
@@ -192,7 +207,7 @@ public class InstallCommand implements Callable<Integer> {
                 try {
                     lockFile.write();
                 } catch (Exception e) {
-                    StringOutput.Quick.error("\n❌ Failed to write lock file: " + e.getMessage());
+                    StringOutput.Quick.error("\n Failed to write lock file: " + e.getMessage());
                     if (LuCLI.verbose || LuCLI.debug) {
                         e.printStackTrace();
                     }
@@ -201,18 +216,28 @@ public class InstallCommand implements Callable<Integer> {
             }
             
             // 9. Report results
-            System.out.println();
+            StringOutput.Quick.print("");
             if (successCount > 0) {
-                StringOutput.Quick.success("✅ " + successCount + " dependencies installed");
+                StringOutput.Quick.success(successCount + " dependencies installed");
             }
             if (unchangedCount > 0) {
-                StringOutput.Quick.info("ℹ️  " + unchangedCount + " dependencies unchanged");
+                StringOutput.Quick.info(unchangedCount + " dependencies unchanged");
             }
             if (skipCount > 0) {
-                StringOutput.Quick.info("ℹ️  " + skipCount + " dependencies skipped (non-git sources)");
+                StringOutput.Quick.info(skipCount + " dependencies skipped (unsupported sources)");
             }
             if (successCount > 0 || unchangedCount > 0) {
-                StringOutput.Quick.info("📝 Updated lucee-lock.json");
+                StringOutput.Quick.info(" Updated lucee-lock.json");
+
+                // Show the LUCEE_EXTENSIONS value that will be used when the
+                // server starts based on the newly written lock file.
+                String luceeExt = LuceeServerManager.buildLuceeExtensions(Paths.get("."));
+                if (luceeExt != null && !luceeExt.isBlank()) {
+                    StringOutput.Quick.print("\nLUCEE_EXTENSIONS that will be set when the server starts:");
+                    StringOutput.Quick.print("  " + luceeExt);
+                } else {
+                    StringOutput.Quick.print("\nNo LUCEE_EXTENSIONS will be set from dependencies.");
+                }
             }
             
             return 0;

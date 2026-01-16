@@ -299,8 +299,6 @@
       "cwd": "${workspaceFolder}",
       "args": [ "config", "edit" ]
     },
-
-
     {
       "type": "java",
       "name": "🧩 Lucli Deps Install",
@@ -310,6 +308,26 @@
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}/demo_servers/dependencies_demo",
       "args": [ "--verbose", "deps", "install"]
+    },
+    {
+      "type": "java",
+      "name": "🧩 Lucli Deps Install Extensions ",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "projectName": "lucli",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/examples/dependency-extensions/",
+      "args": ["deps", "install"]
+    },
+    {
+      "type": "java",
+      "name": "🧩 Lucli Deps Add",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "projectName": "lucli",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "args": [ "--verbose", "deps", "add"]
     }
   ]
 }

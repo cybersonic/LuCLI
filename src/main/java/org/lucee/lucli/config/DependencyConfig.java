@@ -90,7 +90,21 @@ public class DependencyConfig {
         if (source == null || source.equals("git")) {
             if ("java".equals(type)) {
                 source = "maven";
-            } else if (url != null) {
+            } 
+            else if ("extension".equals(type)) {
+                // For extensions, default to provider-based installation when no
+                // explicit path or URL is given. The actual ID can come from the
+                // explicit "id" field or from the dependency name (slug) via the
+                // ExtensionRegistry at resolution time.
+                if (url != null) {
+                    source = "http";
+                } else if (path != null) {
+                    source = "file";
+                } else {
+                    source = "extension-provider";
+                }
+            }
+            else if (url != null) {
                 if (url.startsWith("git") || url.contains("github.com") || url.contains("gitlab.com")) {
                     source = "git";
                 } else {
@@ -251,14 +265,39 @@ public class DependencyConfig {
     /**
      * Get the extension ID, resolving from name/slug if necessary.
      * For extensions, this will resolve friendly names like "redis" or "h2" to their UUID.
+     *
+     * Resolution rules for extensions:
+     * - If an explicit "id" is provided, use that as the primary lookup key
+     * - Otherwise, fall back to the dependency name (key in dependencies map)
+     * - First try the ExtensionRegistry (slug/name/alias)
+     * - If that fails but the key looks like a UUID/32-hex, accept it as-is
+     * - Otherwise return null so callers can decide how to handle unknown slugs
      */
     public String getId() {
-        if (id != null && "extension".equals(type)) {
-            // Try to resolve the ID from registry if it's not already a UUID
-            String resolved = org.lucee.lucli.deps.ExtensionRegistry.resolveId(id);
-            return resolved != null ? resolved : id;
+        if (!"extension".equals(type)) {
+            return id;
         }
-        return id;
+
+        // Prefer explicit id, otherwise use the dependency name (slug)
+        String key = (id != null && !id.isBlank()) ? id : name;
+        if (key == null || key.isBlank()) {
+            return null;
+        }
+
+        // Try registry (supports slugs, names, aliases, and raw UUIDs)
+        String resolved = org.lucee.lucli.deps.ExtensionRegistry.resolveId(key);
+        if (resolved != null && !resolved.isBlank()) {
+            return resolved;
+        }
+
+        // Fallback: treat direct UUID/32-hex as valid
+        if (key.matches("^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$") ||
+            key.matches("^[0-9A-Fa-f]{32}$")) {
+            return key;
+        }
+
+        // Unknown slug / id
+        return null;
     }
     
     /**

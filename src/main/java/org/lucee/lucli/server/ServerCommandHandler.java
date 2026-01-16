@@ -63,7 +63,7 @@ public class ServerCommandHandler {
      */
     private String executeServerCommand(String[] args) throws Exception {
         if (args.length == 0) {
-        return formatOutput("❌ server: missing subcommand\n💡 Usage: server [start|run|stop|restart|status|list|prune|config|lock|unlock|monitor|log|debug] [options]", true);
+        return formatOutput("❌ server: missing subcommand\n💡 Usage: server [start|run|stop|restart|status|list|prune|config|lock|unlock|monitor|log|debug|env] [options]", true);
         }
         
         String subCommand = args[0];
@@ -101,9 +101,11 @@ public class ServerCommandHandler {
                     return handleServerLog(Arrays.copyOfRange(args, 1, args.length));
                 case "debug":
                     return handleServerDebug(Arrays.copyOfRange(args, 1, args.length));
+                case "env":
+                    return handleServerEnv(args);
                 default:
                     return formatOutput("❌ Unknown server command: " + subCommand + 
-                        "\n💡 Available commands: start, run, stop, restart, status, list, prune, config, lock, unlock, monitor, log, debug", true);
+                        "\n💡 Available commands: start, run, stop, restart, status, list, prune, config, lock, unlock, monitor, log, debug, env", true);
             }
         } finally {
             Timer.stop("Server " + subCommand + " Command");
@@ -1106,6 +1108,127 @@ public class ServerCommandHandler {
                   .append(serverDir)
                   .append("\n");
         }
+    }
+    
+    /**
+     * Handle `server env` command - show effective environment for this project.
+     *
+     * By default this shows only project-scoped variables (from envFile / .env and
+     * lucee.json envVars). Use --global to include the full System environment as well.
+     */
+    private String handleServerEnv(String[] args) throws Exception {
+        String configFileName = null;
+        String environment = null;
+        boolean showGlobal = false;
+        Path projectDir = currentWorkingDirectory; // Default to current directory
+
+        // Parse additional arguments (skip "env")
+        for (int i = 1; i < args.length; i++) {
+            String arg = args[i];
+            if (("--config".equals(arg) || "-c".equals(arg)) && i + 1 < args.length) {
+                configFileName = args[++i];
+            } else if (arg.startsWith("--config=")) {
+                configFileName = arg.substring("--config=".length());
+            } else if (("--env".equals(arg) || "--environment".equals(arg)) && i + 1 < args.length) {
+                environment = args[++i];
+            } else if (arg.startsWith("--env=")) {
+                environment = arg.substring("--env=".length());
+            } else if (arg.startsWith("--environment=")) {
+                environment = arg.substring("--environment=".length());
+            } else if ("--global".equals(arg)) {
+                showGlobal = true;
+            } else if (!arg.startsWith("-") && i == 1 && !arg.contains("=")) {
+                // Treat first non-option argument as project directory
+                projectDir = Paths.get(arg);
+            }
+        }
+
+        String cfgFile = configFileName != null ? configFileName : "lucee.json";
+        Path cfgPath = projectDir.resolve(cfgFile);
+
+        // Do not create default lucee.json here; env is a read-only inspection command.
+        if (!Files.exists(cfgPath)) {
+            StringBuilder missing = new StringBuilder();
+            missing.append("❌ Config file not found: ")
+                   .append(cfgPath.toAbsolutePath())
+                   .append("\n");
+            missing.append("   Use 'lucli server new' to create a new lucee.json for this project.\n");
+            return formatOutput(missing.toString(), true);
+        }
+
+        LuceeServerConfig.ServerConfig config;
+        try {
+            config = LuceeServerConfig.loadConfig(projectDir, cfgFile);
+        } catch (IOException e) {
+            return formatOutput("❌ Error reading configuration: " + e.getMessage(), true);
+        }
+
+        // Apply environment overrides if specified (for envVars overrides).
+        if (environment != null && !environment.trim().isEmpty()) {
+            try {
+                config = LuceeServerConfig.applyEnvironment(config, environment.trim());
+            } catch (IllegalArgumentException e) {
+                return formatOutput("❌ " + e.getMessage(), true);
+            }
+        }
+
+        // 1) Capture variables coming from envFile / .env only
+        java.util.Map<String, String> envFileVars = new java.util.HashMap<>();
+        LuceeServerConfig.applyLoadedEnvToProcessEnvironment(envFileVars);
+
+        // 2) Build effective environment map (System + envFile + envVars)
+        java.util.Map<String, String> effectiveEnv = new java.util.HashMap<>(System.getenv());
+        LuceeServerConfig.applyLoadedEnvToProcessEnvironment(effectiveEnv);
+        if (config.envVars != null && !config.envVars.isEmpty()) {
+            effectiveEnv.putAll(config.envVars);
+        }
+
+        // For non-global view, restrict to keys coming from envFile and/or envVars.
+        java.util.Map<String, String> toDisplay;
+        String scopeLabel;
+        if (showGlobal) {
+            toDisplay = effectiveEnv;
+            scopeLabel = "System + envFile + envVars";
+        } else {
+            java.util.Set<String> keys = new java.util.TreeSet<>(); // sorted output
+            keys.addAll(envFileVars.keySet());
+            if (config.envVars != null) {
+                keys.addAll(config.envVars.keySet());
+            }
+            java.util.Map<String, String> scoped = new java.util.LinkedHashMap<>();
+            for (String key : keys) {
+                scoped.put(key, effectiveEnv.get(key));
+            }
+            toDisplay = scoped;
+            scopeLabel = "envFile + envVars (project-scoped)";
+        }
+
+        StringBuilder result = new StringBuilder();
+        result.append("Effective environment for: ").append(projectDir).append("\n");
+        result.append("   Config File:   ").append(cfgPath.toAbsolutePath()).append("\n");
+        if (environment != null && !environment.trim().isEmpty()) {
+            result.append("   Environment:   ").append(environment.trim()).append("\n");
+        }
+        result.append("\nEnvironment variables (" ).append(scopeLabel).append("):\n");
+        result.append("═══════════════════════════════════════════\n");
+
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            mapper.enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT);
+            String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(toDisplay);
+            result.append(json).append("\n");
+        } catch (Exception e) {
+            result.append("❌ Error serializing environment: ").append(e.getMessage()).append("\n");
+        }
+
+        result.append("═══════════════════════════════════════════\n");
+        if (showGlobal) {
+            result.append("\n💡 Showing full process environment merged with envFile and lucee.json envVars. Use without --global to see only project-scoped keys.\n");
+        } else {
+            result.append("\n💡 Showing only variables defined in your envFile/.env and lucee.json envVars. Use --global to include the full System environment.\n");
+        }
+
+        return formatOutput(result.toString(), false);
     }
     
     private String handleServerList(LuceeServerManager serverManager, String[] args) throws Exception {

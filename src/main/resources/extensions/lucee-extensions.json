@@ -1,150 +1,1384 @@
 {
   "version": "1.0",
-  "lastUpdated": "2025-12-23",
+  "lastUpdated": "2026-01-16",
   "extensions": [
     {
-      "id": "465E1E35-2425-4F4E-8B3FAB638BD7280A",
-      "slug": "h2",
-      "name": "H2 Embedded Database",
-      "aliases": ["h2-database"]
+      "aliases": [
+        "ajax"
+      ],
+      "slug": "ajax",
+      "versions": [
+        "1.0.0.6",
+        "1.0.0.6-SNAPSHOT",
+        "1.0.0.5",
+        "1.0.0.5-SNAPSHOT",
+        "1.0.0.4",
+        "1.0.0.4-SNAPSHOT",
+        "1.0.0.3",
+        "1.0.0.2"
+      ],
+      "latestVersion": "1.0.0.6",
+      "name": "Ajax Extension",
+      "id": "6E2CB28F-98FB-4B51-B6BE6C64ADF35473",
+      "description": "A lightweight extension that provides built-in Ajax functionality for Lucee Server applications. Enables seamless asynchronous communication between client-side JavaScript and server-side CFML, featuring easy-to-use tags and functions for dynamic content loading, form submissions, and real-time data updates without page refreshes. Includes support for JSON serialization, error handling, and cross-browser compatibility."
     },
     {
-      "id": "CD5C93C8-00B0-4F84-9B4F1C3B0A78E69A",
-      "slug": "mysql",
-      "name": "MySQL Driver",
-      "aliases": ["mysql-jdbc", "mysql-connector"]
+      "aliases": [
+        "argon2"
+      ],
+      "slug": "argon2",
+      "versions": [
+        "1.0.0.9",
+        "1.0.0.9-RC",
+        "1.0.0.9-SNAPSHOT",
+        "1.0.0.8-SNAPSHOT",
+        "1.0.0.7",
+        "1.0.0.6",
+        "1.0.0.5"
+      ],
+      "latestVersion": "1.0.0.9",
+      "name": "Argon2 Extension",
+      "id": "7891D723-8F78-45F5-B7E333A22F8467CA",
+      "description": "Argon2 password hashing extension with configurable security parameters for Lucee Server"
     },
     {
-      "id": "79AB06C5-67EE-49BB-802C2D1C8E475965",
-      "slug": "postgres",
-      "name": "PostgreSQL JDBC Driver",
-      "aliases": ["postgresql", "pgsql"]
+      "aliases": [
+        "kinesis"
+      ],
+      "slug": "kinesis",
+      "versions": [
+        "1.0.1.3",
+        "1.0.1.3-RC",
+        "1.0.1.3-SNAPSHOT",
+        "1.0.1.2-SNAPSHOT"
+      ],
+      "latestVersion": "1.0.1.3",
+      "name": "AWS Kinesis Resource Extension",
+      "id": "D6700FE4-E168-4512-9B95E1AE7784A3A5",
+      "description": "Core Extension to integrate Kinesis into Lucee."
     },
     {
-      "id": "CD4F2CA5-88BE-4A90-810E1F23C3B89E74",
-      "slug": "mssql",
-      "name": "Microsoft SQL Server JDBC Driver",
-      "aliases": ["sqlserver", "ms-sql"]
-    },
-    {
-      "id": "A2C2D8A3-DEAE-4BE2-B9A3-0E63A6D9DBF5",
-      "slug": "oracle",
-      "name": "Oracle Database Driver",
-      "aliases": ["oracle-jdbc"]
-    },
-    {
-      "id": "F71B8FCA-B98C-4EEE-A2F1-AEF1D0FA52BF",
-      "slug": "mariadb",
-      "name": "MariaDB Connector/J",
-      "aliases": ["maria"]
-    },
-    {
-      "id": "ECC268AA-4B25-4DBC-A57CA2E7A929A83E",
-      "slug": "redis",
-      "name": "Redis Cache",
-      "aliases": ["redis-cache"]
-    },
-    {
-      "id": "B3E1C8D2-F4A5-4C7E-9D8A1B2C3D4E5F6A",
-      "slug": "memcached",
-      "name": "Memcached Cache",
-      "aliases": []
-    },
-    {
-      "id": "C4F2D9E3-G5B6-5D8F-AE9B2C3D4E5F6G7B",
-      "slug": "ehcache",
-      "name": "EHCache",
-      "aliases": []
-    },
-    {
-      "id": "8DDDC9DE-8B2F-4550-891FA8AFDFE13A5C",
-      "slug": "mongodb",
-      "name": "MongoDB Cache",
-      "aliases": ["mongo"]
-    },
-    {
-      "id": "B737ABC4-D43F-4D91-8E8E973E37C40D1B",
-      "slug": "image",
-      "name": "Image Extension",
-      "aliases": ["cfimage"]
-    },
-    {
-      "id": "4753BAD1-2E27-4964-B370-0F2418F5ABF7",
-      "slug": "pdf",
-      "name": "PDF Extension",
-      "aliases": ["cfdocument", "cfpdf"]
-    },
-    {
-      "id": "D54B86E9-5DFF-4A49-949F55CFBF9EC684",
-      "slug": "spreadsheet",
-      "name": "Spreadsheet Extension",
-      "aliases": ["poi", "excel"]
-    },
-    {
-      "id": "EFDEB172-F52E-4D84-9CD1A1F561B3DCC8",
-      "slug": "search",
-      "name": "Lucee Search Extension",
-      "aliases": ["lucene"]
-    },
-    {
-      "id": "FB90B08D-D1AC-4D19-8857C1903EB6CF82",
-      "slug": "video",
-      "name": "Video Extension",
-      "aliases": ["cfvideo"]
-    },
-    {
-      "id": "17DCCC2E-96A8-47DF-895EC64D9B3B5B7F",
-      "slug": "compress",
-      "name": "Compress Extension",
-      "aliases": ["zip"]
-    },
-    {
-      "id": "99C70B4C-5B5A-48A7-BD15A6B0C6F7A3A5",
-      "slug": "ftp",
-      "name": "FTP Extension",
-      "aliases": ["cfftp"]
-    },
-    {
-      "id": "D1BEE6B0-224A-4687-89DC4D49A86D4C82",
-      "slug": "mail",
-      "name": "Mail Extension",
-      "aliases": ["cfmail", "smtp"]
-    },
-    {
-      "id": "5F0B3B98-8E6E-4FEB-961E2E7F7F9C2A3C",
-      "slug": "esapi",
-      "name": "OWASP ESAPI Extension",
-      "aliases": ["owasp"]
-    },
-    {
-      "id": "09E51B93-0C53-4846-98FDD092B056C5D9",
-      "slug": "orm",
-      "name": "ORM Extension (Hibernate)",
-      "aliases": ["hibernate"]
-    },
-    {
-      "id": "A91DB5B1-18EB-4D57-AD87E36ED44649FE",
+      "aliases": [
+        "org.lucee.axis.extension",
+        "axis",
+        "axis1"
+      ],
       "slug": "axis",
-      "name": "Axis Web Service Extension",
-      "aliases": ["webservice"]
+      "versions": [
+        "1.4.1.0-SNAPSHOT",
+        "1.4.0.38",
+        "1.4.0.38-SNAPSHOT",
+        "1.4.0.37",
+        "1.4.0.37-SNAPSHOT",
+        "1.4.0.36-SNAPSHOT",
+        "1.4.0.35",
+        "1.4.0.35-SNAPSHOT",
+        "1.4.0.34-SNAPSHOT",
+        "1.4.0.32-SNAPSHOT",
+        "1.4.0.27",
+        "1.4.0.27-RC",
+        "1.4.0.27-SNAPSHOT",
+        "1.4.0.26-SNAPSHOT",
+        "1.4.0.25",
+        "1.4.0.25-SNAPSHOT",
+        "1.4.0.24",
+        "1.4.0.24-ALPHA",
+        "1.4.0.23-ALPHA",
+        "1.4.0.22-ALPHA",
+        "1.4.0.21-ALPHA"
+      ],
+      "latestVersion": "1.4.1.0-SNAPSHOT",
+      "name": "Axis 1 Webservices",
+      "id": "DF28D0A4-6748-44B9-A2FDC12E4E2E4D38",
+      "description": "Apache Axis (Apache eXtensible Interaction System) is an open-source, XML based Web service framework. It consists of a"
     },
     {
-      "id": "BFD4D045-49AF-43E7-A5B79A0D52F7C9C1",
-      "slug": "s3",
-      "name": "Amazon S3 Resource",
-      "aliases": ["aws-s3"]
+      "aliases": [
+        "cfspreadsheet",
+        "spreadsheet"
+      ],
+      "slug": "spreadsheet",
+      "versions": [
+        "3.0.3"
+      ],
+      "latestVersion": "3.0.3",
+      "name": "cfspreadsheet",
+      "id": "037A27FF-0B80-4CBA-B954BEBD790B460E",
+      "description": "A spreadsheet extension for Lucee 5"
     },
     {
-      "id": "EFDEB172-F52E-4D84-9CD1A1F561B3DCC8",
-      "slug": "admin",
-      "name": "Lucee Administrator Extension",
-      "aliases": []
+      "aliases": [
+        "chart"
+      ],
+      "slug": "chart",
+      "versions": [
+        "1.0.20.1",
+        "1.0.20.0",
+        "1.0.19.25",
+        "1.0.19.24",
+        "1.0.19.23",
+        "1.0.19.19"
+      ],
+      "latestVersion": "1.0.20.1",
+      "name": "Chart Extension",
+      "id": "D46B46A9-A0E3-44E1-D972A04AC3A8DC10",
+      "description": "Chart Extension to integrate the tag cfchart into Lucee"
     },
     {
-      "id": "D56C1E8B-9A65-4B0A-B33A2D333E95E948",
+      "aliases": [
+        "compress"
+      ],
+      "slug": "compress",
+      "versions": [
+        "1.0.0.16",
+        "1.0.0.15",
+        "1.0.0.15-SNAPSHOT",
+        "1.0.0.14",
+        "1.0.0.14-SNAPSHOT",
+        "1.0.0.13-SNAPSHOT",
+        "1.0.0.12",
+        "1.0.0.12-SNAPSHOT",
+        "1.0.0.11-SNAPSHOT",
+        "1.0.0.9-SNAPSHOT",
+        "1.0.0.8-SNAPSHOT",
+        "1.0.0.7",
+        "1.0.0.7-SNAPSHOT",
+        "1.0.0.6-SNAPSHOT",
+        "1.0.0.5-SNAPSHOT",
+        "1.0.0.4-SNAPSHOT",
+        "1.0.0.2",
+        "1.0.0.2-SNAPSHOT",
+        "1.0.0.1",
+        "1.0.0.1-BETA",
+        "1.0.0.0-BETA"
+      ],
+      "latestVersion": "1.0.0.16",
+      "name": "Compress Tags",
+      "id": "8D7FB0DF-08BB-1589-FE3975678F07DB17",
+      "description": "Compress Tags (cfzip, cfzipparam)"
+    },
+    {
+      "aliases": [
+        "couchbase",
+        "couchbase-server",
+        "couchbase-db"
+      ],
+      "slug": "couchbase",
+      "versions": [
+        "1.0.0.36",
+        "1.0.0.36-RC",
+        "1.0.0.36-SNAPSHOT",
+        "1.0.0.35-SNAPSHOT",
+        "1.0.0.34-SNAPSHOT",
+        "1.0.0.33-BETA"
+      ],
+      "latestVersion": "1.0.0.36",
+      "name": "Couchbase Extension",
+      "id": "0F6E1F35-32A0-4B8C-B5A4BBA87EE621A8",
+      "description": "Couchbase Server, originally known as Membase, is an open-source, distributed (shared-nothing architecture) multi-model NoSQL document-oriented database software package optimized for interactive applications."
+    },
+    {
+      "aliases": [
+        "org.duckdb.duckdb_jdbc",
+        "duckdb_jdbc"
+      ],
+      "slug": "duckdb",
+      "versions": [
+        "1.3.2.1",
+        "1.3.2.0"
+      ],
+      "latestVersion": "1.3.2.1",
+      "name": "DuckDB",
+      "id": "811918E2-796C-4354-8374B1F331118AEB",
+      "description": "DuckDB is an in-process, open-source SQL OLAP database management system optimized for fast, analytical workloads and designed for simplicity, portability, and high performance."
+    },
+    {
+      "aliases": [
+        "ec2",
+        "aws-ec2"
+      ],
+      "slug": "ec2",
+      "versions": [
+        "1.0.0.5",
+        "1.0.0.5-SNAPSHOT",
+        "1.0.0.2-SNAPSHOT",
+        "1.0.0.1"
+      ],
+      "latestVersion": "1.0.0.5",
+      "name": "EC2 Extension",
+      "id": "261114AC-7372-4CA8-BA7090895E01682D",
+      "description": "Core Extension to integrate EC2 into Lucee."
+    },
+    {
+      "aliases": [
+        "ehcache"
+      ],
+      "slug": "ehcache",
+      "versions": [
+        "2.10.0.38",
+        "2.10.0.38-SNAPSHOT",
+        "2.10.0.37-SNAPSHOT",
+        "2.10.0.36",
+        "2.10.0.36-SNAPSHOT",
+        "2.10.0.35-SNAPSHOT",
+        "2.10.0.34-SNAPSHOT",
+        "2.10.0.33-SNAPSHOT",
+        "2.10.0.32-SNAPSHOT",
+        "2.10.0.31",
+        "2.10.0.31-SNAPSHOT",
+        "2.10.0.30",
+        "2.10.0.30-SNAPSHOT",
+        "2.10.0.28",
+        "2.10.0.28-SNAPSHOT",
+        "2.10.0.27-SNAPSHOT",
+        "2.10.0.25",
+        "2.10.0.24",
+        "2.10.0.22",
+        "2.10.0.21",
+        "2.10.0.20",
+        "2.10.0.19",
+        "2.10.0.18",
+        "2.10.0.17",
+        "2.10.0.16"
+      ],
+      "latestVersion": "2.10.0.38",
+      "name": "EHCache Extension",
+      "id": "87FE44E5-179C-43A3-A87B3D38BEF4652E",
+      "description": "Integrates EHCache as a high-performance caching provider for Lucee Server. Enables distributed caching, disk persistence, session clustering, and advanced memory management for enterprise applications."
+    },
+    {
+      "aliases": [
+        "esapi"
+      ],
+      "slug": "esapi",
+      "versions": [
+        "2.6.0.1",
+        "2.6.0.1-SNAPSHOT",
+        "2.6.0.0-SNAPSHOT",
+        "2.2.4.18",
+        "2.2.4.18-RC",
+        "2.2.4.18-SNAPSHOT",
+        "2.2.4.17-SNAPSHOT",
+        "2.2.4.16-SNAPSHOT",
+        "2.2.4.15",
+        "2.2.4.15-RC",
+        "2.2.4.15-SNAPSHOT",
+        "2.2.4.14-SNAPSHOT",
+        "2.2.4.13",
+        "2.2.4.13-SNAPSHOT",
+        "2.2.4.9-SNAPSHOT",
+        "2.2.4.8",
+        "2.2.4.8-SNAPSHOT",
+        "2.2.4.7",
+        "2.2.4.5",
+        "2.2.4.5-SNAPSHOT",
+        "2.2.0.1",
+        "2.2.0.1-RC",
+        "2.2.0.0-RC",
+        "2.2.0.0-SNAPSHOT",
+        "2.1.0.18",
+        "2.1.0.18-SNAPSHOT",
+        "2.1.0.17",
+        "2.1.0.17-SNAPSHOT",
+        "2.1.0.16",
+        "2.1.0.16-ALPHA"
+      ],
+      "latestVersion": "2.6.0.1",
+      "name": "ESAPI extension",
+      "id": "37C61C0A-5D7E-4256-8572639BE0CF5838",
+      "description": "Provides OWASP ESAPI (Enterprise Security API) functions for Lucee Server to enhance application security. Includes encoding, encryption, validation, and sanitization methods to protect against XSS, SQL injection, and other common web vulnerabilities."
+    },
+    {
+      "aliases": [
+        "org.lucee.exasol",
+        "exasol-jdbc",
+        "exasol-db"
+      ],
+      "slug": "exasol",
+      "versions": [
+        "7.1.20",
+        "25.2.5",
+        "24.2.1",
+        "24.1.2",
+        "24.0.0",
+        "7.1.16",
+        "7.1.2",
+        "7.1.2"
+      ],
+      "latestVersion": "7.1.20",
+      "name": "Exasol JDBC Driver",
+      "id": "0F5DEC68-DB34-42BB-A1C1B609175D7C57",
+      "description": "Exasol is a parallelized relational database management system (RDBMS) which runs on a cluster of standard computer hardware servers."
+    },
+    {
+      "aliases": [
+        "form"
+      ],
+      "slug": "form",
+      "versions": [
+        "1.0.0.10",
+        "1.0.0.10-SNAPSHOT",
+        "1.0.0.9",
+        "1.0.0.9-RC",
+        "1.0.0.9-SNAPSHOT",
+        "1.0.0.8",
+        "1.0.0.7"
+      ],
+      "latestVersion": "1.0.0.10",
+      "name": "Form Tags",
+      "id": "FAD67145-E3AE-30F8-1C11A6CCF544F0B7",
+      "description": "Form Tags"
+    },
+    {
+      "aliases": [
+        "git"
+      ],
+      "slug": "git",
+      "versions": [
+        "4.11.0.35",
+        "4.11.0.35-SNAPSHOT",
+        "4.11.0.34-BETA",
+        "4.11.0.33-BETA"
+      ],
+      "latestVersion": "4.11.0.35",
+      "name": "GIT Resource Extension",
+      "id": "1A1FA05C-CF89-4834-9BC71D617046A6A8",
+      "description": "Extension to integrate GIT Resource into Lucee."
+    },
+    {
+      "aliases": [
+        "h2",
+        "h2-db",
+        "h2jdbc"
+      ],
+      "slug": "h2",
+      "versions": [
+        "2.1.214.0001L",
+        "1.3.172"
+      ],
+      "latestVersion": "2.1.214.0001L",
+      "name": "H2",
+      "id": "465E1E35-2425-4F4E-8B3FAB638BD7280A",
+      "description": "H2 is a relational database management system written in Java."
+    },
+    {
+      "aliases": [
+        "hibernate",
+        "hibernate-orm"
+      ],
+      "slug": "hibernate",
+      "versions": [
+        "5.4.29.27-BETA",
+        "5.4.29.26-BETA",
+        "5.4.29.25-BETA",
+        "5.4.29.24-BETA",
+        "5.4.29.23-BETA",
+        "5.4.29.22-BETA",
+        "5.4.29.21-BETA",
+        "5.4.29.20-BETA",
+        "5.4.29.19-BETA",
+        "5.4.29.18-BETA",
+        "5.4.29.17-BETA",
+        "5.4.29.16-BETA",
+        "5.4.29.15-BETA",
+        "5.4.29.13-BETA",
+        "5.4.29.11-BETA",
+        "5.4.29.10-BETA",
+        "5.4.29.8-BETA",
+        "5.4.29.7-BETA",
+        "5.4.29.6-BETA",
+        "5.4.29.4-BETA",
+        "5.4.29.3-BETA",
+        "5.4.29.2-BETA",
+        "5.4.29.1-BETA",
+        "5.4.29.0-BETA",
+        "3.5.5.89",
+        "3.5.5.89",
+        "3.5.5.89-SNAPSHOT",
+        "3.5.5.87",
+        "3.5.5.87",
+        "3.5.5.87-SNAPSHOT",
+        "3.5.5.85-SNAPSHOT",
+        "3.5.5.84",
+        "3.5.5.84",
+        "3.5.5.84-SNAPSHOT",
+        "3.5.5.81-SNAPSHOT",
+        "3.5.5.80-SNAPSHOT",
+        "3.5.5.78-SNAPSHOT",
+        "3.5.5.77",
+        "3.5.5.77",
+        "3.5.5.77-SNAPSHOT",
+        "3.5.5.76-SNAPSHOT",
+        "3.5.5.75",
+        "3.5.5.75",
+        "3.5.5.75-SNAPSHOT",
+        "3.5.5.74-SNAPSHOT",
+        "3.5.5.73",
+        "3.5.5.73",
+        "3.5.5.73-SNAPSHOT",
+        "3.5.5.72-SNAPSHOT",
+        "3.5.5.71",
+        "3.5.5.71",
+        "3.5.5.71-RC",
+        "3.5.5.71-SNAPSHOT",
+        "3.5.5.70",
+        "3.5.5.70",
+        "3.5.5.70-SNAPSHOT",
+        "3.5.5.69-SNAPSHOT",
+        "3.5.5.68",
+        "3.5.5.67",
+        "3.5.5.66",
+        "3.5.5.65",
+        "3.5.5.64",
+        "3.5.5.63",
+        "3.5.5.62",
+        "3.5.5.61",
+        "3.5.5.60",
+        "3.5.5.59",
+        "3.5.5.57",
+        "3.5.5.56",
+        "3.5.5.55",
+        "3.5.5.53",
+        "3.5.5.52"
+      ],
+      "latestVersion": "5.4.29.27-BETA",
+      "name": "Hibernate ORM Engine",
+      "id": "FAD1E8CB-4F45-4184-86359145767C29DE",
+      "description": "Hibernate ORM (Hibernate in short) is an object-relational mapping library for the Java language,"
+    },
+    {
+      "aliases": [
+        "hsqldb",
+        "hsqldb-java-driver",
+        "hsqldb-driver"
+      ],
+      "slug": "hsqldb",
+      "versions": [
+        "2.7.2.jdk11",
+        "2.7.2.jdk8",
+        "2.4.0",
+        "2.3.5",
+        "2.3.2",
+        "1.8.0"
+      ],
+      "latestVersion": "2.7.2.jdk11",
+      "name": "HSQLDB (Hypersonic SQL DB)",
+      "id": "6DD4728A-AB0C-4F67-9DCE1A91A8ACD114",
+      "description": "HSQLDB (HyperSQL DataBase) is the leading SQL relational database software written in Java. It offers a small, fast multithreaded and transactional database engine with in-memory and disk-based tables and supports embedded and server modes. It includes a powerful command line SQL tool and simple GUI query tools."
+    },
+    {
+      "aliases": [
+        "image"
+      ],
+      "slug": "image",
+      "versions": [
+        "2.0.0.31-SNAPSHOT",
+        "2.0.0.30-SNAPSHOT",
+        "2.0.0.29",
+        "2.0.0.29-RC",
+        "2.0.0.29-SNAPSHOT",
+        "2.0.0.28-SNAPSHOT",
+        "2.0.0.26",
+        "2.0.0.26-RC",
+        "2.0.0.26-SNAPSHOT",
+        "2.0.0.25",
+        "2.0.0.24-RC",
+        "2.0.0.23-RC",
+        "2.0.0.23-BETA",
+        "2.0.0.22-BETA",
+        "2.0.0.21-BETA",
+        "2.0.0.20-BETA",
+        "2.0.0.19-BETA",
+        "2.0.0.18-BETA",
+        "2.0.0.17-BETA",
+        "2.0.0.16-BETA",
+        "2.0.0.15-BETA",
+        "2.0.0.14-BETA",
+        "2.0.0.13-BETA",
+        "2.0.0.12-BETA",
+        "2.0.0.11-BETA",
+        "2.0.0.10-BETA",
+        "2.0.0.9-BETA",
+        "2.0.0.8-BETA",
+        "2.0.0.7-BETA",
+        "2.0.0.5-BETA",
+        "2.0.0.4-BETA",
+        "2.0.0.1-BETA",
+        "2.0.0.0-BETA",
+        "1.0.0.51",
+        "1.0.0.50",
+        "1.0.0.50-SNAPSHOT",
+        "1.0.0.49-SNAPSHOT",
+        "1.0.0.48-SNAPSHOT",
+        "1.0.0.47-SNAPSHOT",
+        "1.0.0.46-SNAPSHOT",
+        "1.0.0.45-SNAPSHOT",
+        "1.0.0.44-SNAPSHOT",
+        "1.0.0.43-SNAPSHOT",
+        "1.0.0.42",
+        "1.0.0.42-SNAPSHOT",
+        "1.0.0.41-SNAPSHOT",
+        "1.0.0.40-SNAPSHOT",
+        "1.0.0.39",
+        "1.0.0.39-RC",
+        "1.0.0.39-SNAPSHOT",
+        "1.0.0.38",
+        "1.0.0.38-RC",
+        "1.0.0.38-SNAPSHOT",
+        "1.0.0.37-SNAPSHOT",
+        "1.0.0.36-SNAPSHOT",
+        "1.0.0.35",
+        "1.0.0.35-SNAPSHOT",
+        "1.0.0.34-SNAPSHOT",
+        "1.0.0.33-SNAPSHOT",
+        "1.0.0.32-SNAPSHOT",
+        "1.0.0.31-SNAPSHOT",
+        "1.0.0.30-SNAPSHOT",
+        "1.0.0.29-SNAPSHOT",
+        "1.0.0.28-SNAPSHOT",
+        "1.0.0.27",
+        "1.0.0.27-SNAPSHOT",
+        "1.0.0.26-SNAPSHOT",
+        "1.0.0.25-SNAPSHOT",
+        "1.0.0.24-SNAPSHOT",
+        "1.0.0.23-SNAPSHOT",
+        "1.0.0.22-SNAPSHOT",
+        "1.0.0.21",
+        "1.0.0.21",
+        "1.0.0.21-BETA",
+        "1.0.0.20-ALPHA",
+        "1.0.0.19-ALPHA",
+        "1.0.0.18-ALPHA"
+      ],
+      "latestVersion": "2.0.0.31-SNAPSHOT",
+      "name": "Image Extension",
+      "id": "B737ABC4-D43F-4D91-8E8E973E37C40D1B",
+      "description": "Extension for Image functions and tags for Lucee."
+    },
+    {
+      "aliases": [
+        "infinispan",
+        "infinispan-cache"
+      ],
+      "slug": "infinispan",
+      "versions": [
+        "8.2.3.21",
+        "8.2.3.21-SNAPSHOT",
+        "8.2.3.18"
+      ],
+      "latestVersion": "8.2.3.21",
+      "name": "Infinispan Cache(Remote)",
+      "id": "71BF38A8-6AC8-4704-8BC02C29893F56B3",
+      "description": "This drivers can be used to access an Infinispan cache from remote (via hotrod protocol)."
+    },
+    {
+      "aliases": [
+        "json",
+        "json-functions"
+      ],
+      "slug": "json",
+      "versions": [
+        "1.0.0.0-RC"
+      ],
+      "latestVersion": "1.0.0.0-RC",
+      "name": "JSON",
+      "id": "A03F4335-BDEF-44DE-946FB16C47802F96",
+      "description": "JSON functions"
+    },
+    {
+      "aliases": [
+        "jtds"
+      ],
+      "slug": "jtds",
+      "versions": [
+        "1.3.1",
+        "1.3.0",
+        "1.2.8",
+        "1.2.7",
+        "1.2.5"
+      ],
+      "latestVersion": "1.3.1",
+      "name": "jTDS (MSSQL,Sybase)",
+      "id": "2BCD080F-4E1E-48F5-BEFE794232A21AF6",
+      "description": "jTDS is an open source 100% pure Java (type 4) JDBC 3.0 driver for Microsoft SQL Server (6.5, 7, 2000, 2005, 2008 and 2012) and Sybase Adaptive Server Enterprise (10, 11, 12 and 15)."
+    },
+    {
+      "aliases": [
+        "log",
+        "log-analyser"
+      ],
+      "slug": "log",
+      "versions": [
+        "2.3.1.16"
+      ],
+      "latestVersion": "2.3.1.16",
+      "name": "Log analyzer",
+      "id": "1C9A7C34-2555-4AAA-92FBB7FC7111140C",
+      "description": "This extension adds a plugin to your Lucee server/web admin, to view the Lucee log files"
+    },
+    {
+      "aliases": [
+        "administrator"
+      ],
+      "slug": "administrator",
+      "versions": [
+        "1.0.0.6",
+        "1.0.0.5",
+        "1.0.0.4",
+        "1.0.0.3"
+      ],
+      "latestVersion": "1.0.0.6",
+      "name": "Lucee Administrator",
+      "id": "CED6227E-0F49-6367-A68D21AACA6B07E8",
+      "description": "Core Extension to integrate the Lucee Administrator into Lucee."
+    },
+    {
+      "aliases": [
+        "documentation"
+      ],
       "slug": "documentation",
-      "name": "Lucee Documentation Extension",
-      "aliases": ["docs"]
+      "versions": [
+        "1.0.0.5",
+        "1.0.0.4",
+        "1.0.0.3",
+        "1.0.0.2"
+      ],
+      "latestVersion": "1.0.0.5",
+      "name": "Lucee Documentation",
+      "id": "D46D49C3-EB85-8D97-30BEC2F38561E985",
+      "description": "Core Extension to integrate the Lucee Documentation into Lucee."
+    },
+    {
+      "aliases": [
+        "scheduler"
+      ],
+      "slug": "scheduler",
+      "versions": [
+        "1.0.0.0"
+      ],
+      "latestVersion": "1.0.0.0",
+      "name": "Lucee Scheduler (Classic)",
+      "id": "97EB5427-F051-4684-91EBA6DBB5C5203F",
+      "description": "Core Extension to integrate the Classic Scheduler into Lucee, that was part of the Lucee core up to Lucee 6."
+    },
+    {
+      "aliases": [
+        "lucene"
+      ],
+      "slug": "lucene",
+      "versions": [
+        "3.0.0.163",
+        "3.0.0.163-RC",
+        "3.0.0.163-SNAPSHOT",
+        "3.0.0.162-RC",
+        "3.0.0.162-SNAPSHOT",
+        "3.0.0.161-BETA",
+        "3.0.0.161-SNAPSHOT",
+        "3.0.0.147-ALPHA",
+        "2.4.2.4",
+        "2.4.2.4-SNAPSHOT",
+        "2.4.2.3-SNAPSHOT",
+        "2.4.1.33",
+        "2.4.1.33-RC",
+        "2.4.1.33-SNAPSHOT",
+        "2.4.1.32",
+        "2.4.1.32-RC",
+        "2.4.1.32-SNAPSHOT",
+        "2.4.1.31-SNAPSHOT",
+        "2.4.1.30",
+        "2.4.1.29",
+        "2.4.1.28"
+      ],
+      "latestVersion": "3.0.0.163",
+      "name": "Lucene Search Extension",
+      "id": "EFDEB172-F52E-4D84-9CD1A1F561B3DFC8",
+      "description": "The Lucee Search Extension integrates Apache Lucene to provide robust, scalable, and efficient full-text search functionalities within Lucee applications."
+    },
+    {
+      "aliases": [
+        "memcached",
+        "memcached-cache"
+      ],
+      "slug": "memcached",
+      "versions": [
+        "4.0.0.13",
+        "4.0.0.13-RC",
+        "4.0.0.13-SNAPSHOT",
+        "4.0.0.10-SNAPSHOT",
+        "4.0.0.9-SNAPSHOT",
+        "4.0.0.8-SNAPSHOT",
+        "4.0.0.7-SNAPSHOT",
+        "4.0.0.6-SNAPSHOT",
+        "4.0.0.5-SNAPSHOT",
+        "4.0.0.4-SNAPSHOT",
+        "4.0.0.3-SNAPSHOT",
+        "4.0.0.2-SNAPSHOT",
+        "4.0.0.1-SNAPSHOT",
+        "4.0.0.0-SNAPSHOT",
+        "3.0.2.29",
+        "3.0.2.28",
+        "2.12.3.3-SNAPSHOT"
+      ],
+      "latestVersion": "4.0.0.13",
+      "name": "Memcached Cache Extension",
+      "id": "16FF9B13-C595-4FA7-B87DED467B7E61A0",
+      "description": "Free and open source, high-performance, distributed memory object caching system, generic in nature, but intended for use in speeding up dynamic web applications by alleviating database load."
+    },
+    {
+      "aliases": [
+        "mssql",
+        "sqlserver",
+        "mssql-jdbc",
+        "sqlserver-jdbc"
+      ],
+      "slug": "mssql",
+      "versions": [
+        "6.2.1-jre8",
+        "6.2.1-jre7",
+        "13.2.1",
+        "12.8.2",
+        "12.6.5",
+        "12.10.2",
+        "12.6.3.jre11",
+        "12.6.3.jre8",
+        "12.4.2.jre11",
+        "12.4.2.jre8",
+        "12.2.0.jre11",
+        "12.2.0.jre8",
+        "11.2.3.jre11",
+        "11.2.3.jre8",
+        "10.2.3.jre11",
+        "10.2.3.jre8",
+        "9.4.1.jre11",
+        "9.4.1.jre8",
+        "8.4.1.jre8",
+        "7.4.1.jre8",
+        "7.2.2.jre8",
+        "6.5.4",
+        "6.4.0.jre8",
+        "6.4.0.jre9",
+        "6.2.2.jre7",
+        "6.2.2.jre8",
+        "6.0.7728.100",
+        "4.2.6420.100",
+        "4.1.5605.100",
+        "4.0.2206.100",
+        "4.0.0"
+      ],
+      "latestVersion": "6.2.1-jre8",
+      "name": "Microsoft SQL Server (Vendor Microsoft)",
+      "id": "99A4EF8D-F2FD-40C8-8FB8C2E67A4EEEB6",
+      "description": "JDBC Driver from Microsoft for SQL Server, SQL Server is a relational database management system developed by Microsoft."
+    },
+    {
+      "aliases": [
+        "mongodb"
+      ],
+      "slug": "mongodb",
+      "versions": [
+        "3.12.13.9",
+        "3.12.13.9-SNAPSHOT",
+        "3.12.13.0",
+        "3.12.8.133",
+        "3.12.8.132",
+        "3.12.8.131",
+        "3.4.2.59",
+        "3.2.2.54",
+        "3.2.2.52",
+        "2.13.0.42"
+      ],
+      "latestVersion": "3.12.13.9",
+      "name": "MongoDB Datasource and Cache",
+      "id": "E6634E1A-4CC5-4839-A83C67549ECA8D5B",
+      "description": "This is the MongoDB Cache implementation for Lucee. This allows you to cache objects, primitives and queries in a MongoDB server that can be used as a cache."
+    },
+    {
+      "aliases": [
+        "mysql",
+        "mysql-jdbc",
+        "mysql-driver"
+      ],
+      "slug": "mysql",
+      "versions": [
+        "9.5.0",
+        "9.4.0",
+        "9.3.0",
+        "9.2.0",
+        "9.1.0",
+        "9.0.0",
+        "8.4.0",
+        "8.3.0",
+        "8.1.0",
+        "8.0.33",
+        "8.0.32",
+        "8.0.31",
+        "8.0.30",
+        "8.0.29",
+        "8.0.28",
+        "8.0.27",
+        "8.0.26",
+        "8.0.25",
+        "8.0.24",
+        "8.0.23",
+        "8.0.22",
+        "8.0.21",
+        "8.0.20",
+        "8.0.19",
+        "8.0.18",
+        "8.0.17",
+        "8.0.16",
+        "8.0.15",
+        "8.0.14",
+        "8.0.13",
+        "8.0.12",
+        "8.0.11",
+        "8.0.9",
+        "6.0.6",
+        "6.0.5",
+        "5.1.40",
+        "5.1.38",
+        "5.1.20"
+      ],
+      "latestVersion": "9.5.0",
+      "name": "MySQL JDBC Driver",
+      "id": "7E673D15-D87C-41A6-8B5F1956528C605F",
+      "description": "JDBC Type 4 Driver for the MySQL and MariaDB databases."
+    },
+    {
+      "aliases": [
+        "oracle",
+        "oracle-jdbc",
+        "oracle-driver"
+      ],
+      "slug": "oracle",
+      "versions": [
+        "23.26.0.0-ojdbc11",
+        "21.19.0.0-ojdbc11",
+        "21.8.0.0-ojdbc11",
+        "21.8.0.0-ojdbc8",
+        "21.3.0.0000",
+        "21.3.0.0-ojdbc11",
+        "21.3.0.0-ojdbc8",
+        "19.18.0.0-ojdbc8",
+        "19.17.0.0-ojdbc8",
+        "19.12.0.0000",
+        "19.12.0.0-ojdbc8",
+        "12.1.0.2",
+        "11.2.0.4",
+        "10.2.0.2"
+      ],
+      "latestVersion": "23.26.0.0-ojdbc11",
+      "name": "Oracle JDBC Driver",
+      "id": "D4EDFDBD-A9A3-E9AF-597322D767E0C949",
+      "description": "Oracle Database Driver to access a Oracle Database System."
+    },
+    {
+      "aliases": [
+        "pdf"
+      ],
+      "slug": "pdf",
+      "versions": [
+        "1.2.0.11-SNAPSHOT",
+        "1.2.0.10",
+        "1.2.0.10-RC",
+        "1.2.0.10-SNAPSHOT",
+        "1.2.0.9-SNAPSHOT",
+        "1.2.0.8-SNAPSHOT",
+        "1.2.0.7-SNAPSHOT",
+        "1.2.0.6-SNAPSHOT",
+        "1.2.0.5-SNAPSHOT",
+        "1.2.0.4-SNAPSHOT",
+        "1.1.0.20-SNAPSHOT",
+        "1.1.0.19",
+        "1.1.0.19-SNAPSHOT",
+        "1.1.0.18-SNAPSHOT",
+        "1.1.0.17-SNAPSHOT",
+        "1.1.0.16-SNAPSHOT",
+        "1.1.0.15-SNAPSHOT",
+        "1.1.0.14-SNAPSHOT",
+        "1.1.0.13-SNAPSHOT",
+        "1.1.0.12-SNAPSHOT",
+        "1.1.0.11-SNAPSHOT",
+        "1.1.0.10-SNAPSHOT",
+        "1.1.0.9-SNAPSHOT",
+        "1.1.0.8-SNAPSHOT",
+        "1.1.0.7",
+        "1.1.0.7-SNAPSHOT",
+        "1.1.0.6-SNAPSHOT",
+        "1.1.0.5-SNAPSHOT",
+        "1.1.0.4-SNAPSHOT",
+        "1.1.0.3-SNAPSHOT",
+        "1.1.0.2-SNAPSHOT",
+        "1.1.0.1-SNAPSHOT",
+        "1.1.0.0-SNAPSHOT",
+        "1.0.0.99-SNAPSHOT",
+        "1.0.0.98-SNAPSHOT",
+        "1.0.0.97-RC",
+        "1.0.0.97-SNAPSHOT",
+        "1.0.0.96-SNAPSHOT",
+        "1.0.0.95-SNAPSHOT",
+        "1.0.0.94",
+        "1.0.0.94-RC",
+        "1.0.0.94-SNAPSHOT",
+        "1.0.0.93-SNAPSHOT",
+        "1.0.0.92-SNAPSHOT",
+        "1.0.0.91-SNAPSHOT",
+        "1.0.0.90-SNAPSHOT",
+        "1.0.0.89-SNAPSHOT",
+        "1.0.0.88-SNAPSHOT",
+        "1.0.0.87-SNAPSHOT",
+        "1.0.0.86-SNAPSHOT",
+        "1.0.0.85-SNAPSHOT",
+        "1.0.0.84-SNAPSHOT",
+        "1.0.0.83-SNAPSHOT",
+        "1.0.0.82-SNAPSHOT",
+        "1.0.0.81-SNAPSHOT",
+        "1.0.0.80",
+        "1.0.0.80-SNAPSHOT",
+        "1.0.0.79-SNAPSHOT",
+        "1.0.0.78-SNAPSHOT",
+        "1.0.0.77-SNAPSHOT",
+        "1.0.0.76-SNAPSHOT",
+        "1.0.0.75",
+        "1.0.0.75-SNAPSHOT",
+        "1.0.0.74-SNAPSHOT",
+        "1.0.0.73-SNAPSHOT",
+        "1.0.0.72",
+        "1.0.0.72-SNAPSHOT",
+        "1.0.0.71-SNAPSHOT",
+        "1.0.0.70-SNAPSHOT",
+        "1.0.0.69-SNAPSHOT",
+        "1.0.0.68",
+        "1.0.0.67",
+        "1.0.0.66",
+        "1.0.0.65",
+        "1.0.0.64",
+        "1.0.0.63",
+        "1.0.0.62",
+        "1.0.0.61",
+        "1.0.0.60",
+        "1.0.0.59",
+        "1.0.0.58",
+        "1.0.0.57",
+        "1.0.0.56",
+        "1.0.0.55",
+        "1.0.0.54",
+        "1.0.0.53",
+        "1.0.0.52",
+        "1.0.0.51",
+        "1.0.0.50",
+        "1.0.0.49",
+        "1.0.0.48",
+        "1.0.0.16",
+        "1.0.0.15"
+      ],
+      "latestVersion": "1.2.0.11-SNAPSHOT",
+      "name": "PDF Extension",
+      "id": "66E312DD-D083-27C0-64189D16753FD6F0",
+      "description": "Core Extension to integrate the tag cfdocument into Lucee."
+    },
+    {
+      "aliases": [
+        "poi",
+        "apache-poi"
+      ],
+      "slug": "poi",
+      "versions": [
+        "1.0.0.6",
+        "1.0.0.6-RC",
+        "1.0.0.6-BETA",
+        "1.0.0.5-BETA"
+      ],
+      "latestVersion": "1.0.0.6",
+      "name": "POI Extension",
+      "id": "64B91581-2F6D-4316-8F21279369EB6F82",
+      "description": "Extension for interacting with Apache POI."
+    },
+    {
+      "aliases": [
+        "postgresql",
+        "postgres",
+        "postgres-jdbc",
+        "postgres-driver"
+      ],
+      "slug": "postgresql",
+      "versions": [
+        "9.4.1212",
+        "9.4.1211",
+        "42.7.7",
+        "42.7.5",
+        "42.7.4",
+        "42.7.3",
+        "42.6.0",
+        "42.2.20",
+        "42.2.19",
+        "42.2.18",
+        "42.2.17",
+        "42.1.4",
+        "8.3.0.jdbc4"
+      ],
+      "latestVersion": "9.4.1212",
+      "name": "PostgreSQL",
+      "id": "671B01B8-B3B3-42B9-AC055A356BED5281",
+      "description": "JDBC Driver for the PostgreSQL Database."
+    },
+    {
+      "aliases": [
+        "quartz"
+      ],
+      "slug": "quartz",
+      "versions": [
+        "1.0.0.34-BETA"
+      ],
+      "latestVersion": "1.0.0.34-BETA",
+      "name": "Quartz Scheduler Extension",
+      "id": "E99E43A5-C10E-41E9-878BFC82BAAD99CE",
+      "description": "Core Extension to integrate Quartz Scheduler into Lucee."
+    },
+    {
+      "aliases": [
+        "redis",
+        "redis-cache"
+      ],
+      "slug": "redis",
+      "versions": [
+        "4.0.0.0-SNAPSHOT",
+        "3.0.1.0",
+        "3.0.1.0-SNAPSHOT",
+        "3.0.0.60-SNAPSHOT",
+        "3.0.0.57-SNAPSHOT",
+        "3.0.0.56-SNAPSHOT",
+        "3.0.0.55-SNAPSHOT",
+        "3.0.0.54-SNAPSHOT",
+        "3.0.0.53-SNAPSHOT",
+        "3.0.0.52-SNAPSHOT",
+        "3.0.0.51",
+        "3.0.0.51-SNAPSHOT",
+        "3.0.0.48",
+        "3.0.0.47",
+        "3.0.0.46",
+        "3.0.0.45-RC",
+        "3.0.0.44-RC",
+        "3.0.0.43-BETA",
+        "3.0.0.42-BETA",
+        "3.0.0.41-BETA",
+        "3.0.0.39-BETA",
+        "3.0.0.36-BETA",
+        "3.0.0.35-BETA",
+        "3.0.0.33-BETA",
+        "3.0.0.32-BETA",
+        "3.0.0.31-BETA",
+        "3.0.0.29-BETA",
+        "3.0.0.28-BETA",
+        "3.0.0.27-BETA",
+        "3.0.0.26-BETA",
+        "3.0.0.25-BETA",
+        "3.0.0.23-BETA",
+        "3.0.0.22-BETA",
+        "3.0.0.21-BETA",
+        "3.0.0.20-BETA",
+        "3.0.0.19-BETA",
+        "3.0.0.17-BETA",
+        "3.0.0.16-BETA",
+        "3.0.0.15-BETA",
+        "3.0.0.14-BETA",
+        "3.0.0.13-BETA",
+        "3.0.0.12-BETA",
+        "3.0.0.11-BETA",
+        "3.0.0.10-BETA",
+        "3.0.0.9-BETA",
+        "3.0.0.6-BETA",
+        "3.0.0.5-BETA",
+        "3.0.0.4-BETA",
+        "3.0.0.2-BETA",
+        "3.0.0.1-BETA",
+        "3.0.0.0-BETA",
+        "2.9.1.0-SNAPSHOT",
+        "2.9.0.10",
+        "2.9.0.10-RC",
+        "2.9.0.9-RC",
+        "2.9.0.8-RC",
+        "2.9.0.7-RC",
+        "2.9.0.6-RC",
+        "2.9.0.5-RC",
+        "2.9.0.4-BETA",
+        "2.9.0.3-BETA",
+        "2.9.0.2-BETA",
+        "2.9.0.1-BETA",
+        "2.9.0.0-BETA",
+        "2.7.2.1-BETA",
+        "2.7.2.0-BETA"
+      ],
+      "latestVersion": "4.0.0.0-SNAPSHOT",
+      "name": "Redis Extension for Jakarta EE (Lucee 7+)",
+      "id": "60772C12-F179-D555-8E2CD2B4F7428718",
+      "description": "Free and open source, high-performance, distributed memory object caching system, generic in nature, but intended for use in speeding up dynamic web applications by alleviating database load."
+    },
+    {
+      "aliases": [
+        "s3",
+        "s3-storage",
+        "aws-s3"
+      ],
+      "slug": "s3",
+      "versions": [
+        "2.0.3.0",
+        "2.0.3.0-RC",
+        "2.0.3.0-SNAPSHOT",
+        "2.0.2.21",
+        "2.0.2.21-RC",
+        "2.0.2.21-SNAPSHOT",
+        "2.0.2.19",
+        "2.0.2.19-SNAPSHOT",
+        "2.0.2.17-SNAPSHOT",
+        "2.0.2.16-SNAPSHOT",
+        "2.0.2.15-SNAPSHOT",
+        "2.0.2.9-SNAPSHOT",
+        "2.0.2.6-SNAPSHOT",
+        "2.0.2.5-SNAPSHOT",
+        "2.0.2.4-SNAPSHOT",
+        "2.0.2.3-SNAPSHOT",
+        "2.0.2.2-SNAPSHOT",
+        "2.0.2.1-SNAPSHOT",
+        "2.0.2.0-SNAPSHOT",
+        "2.0.1.25",
+        "2.0.1.25-RC",
+        "2.0.1.25-SNAPSHOT",
+        "2.0.1.22-SNAPSHOT",
+        "2.0.1.19-SNAPSHOT",
+        "2.0.1.15",
+        "2.0.1.15-RC",
+        "2.0.1.15-SNAPSHOT",
+        "2.0.1.14-SNAPSHOT",
+        "2.0.1.12-SNAPSHOT",
+        "2.0.1.11-SNAPSHOT",
+        "2.0.1.10-RC",
+        "2.0.1.10-SNAPSHOT",
+        "2.0.1.8-SNAPSHOT",
+        "2.0.1.7-SNAPSHOT",
+        "2.0.1.2-SNAPSHOT",
+        "2.0.1.1-SNAPSHOT",
+        "2.0.1.0-SNAPSHOT",
+        "2.0.0.112",
+        "2.0.0.112-SNAPSHOT",
+        "2.0.0.111-SNAPSHOT",
+        "2.0.0.110-SNAPSHOT",
+        "2.0.0.109-SNAPSHOT",
+        "2.0.0.108-SNAPSHOT",
+        "2.0.0.101-RC",
+        "2.0.0.99-RC",
+        "2.0.0.98-RC",
+        "2.0.0.97-RC",
+        "2.0.0.96-RC",
+        "2.0.0.95-RC",
+        "2.0.0.94-RC",
+        "2.0.0.93-RC",
+        "2.0.0.92-RC",
+        "2.0.0.90-RC",
+        "2.0.0.89-RC",
+        "2.0.0.86-RC",
+        "2.0.0.85-RC",
+        "2.0.0.83-RC",
+        "2.0.0.82-RC",
+        "2.0.0.80-RC",
+        "2.0.0.79-RC",
+        "2.0.0.78-RC",
+        "2.0.0.77-RC",
+        "2.0.0.76-RC",
+        "2.0.0.75-RC",
+        "2.0.0.74-BETA",
+        "2.0.0.71-RC",
+        "2.0.0.71-BETA",
+        "2.0.0.70-BETA",
+        "2.0.0.68-BETA",
+        "2.0.0.66-BETA",
+        "2.0.0.59-BETA",
+        "2.0.0.57-BETA",
+        "2.0.0.50-BETA",
+        "2.0.0.48-BETA",
+        "2.0.0.47-BETA",
+        "2.0.0.45-BETA",
+        "0.9.4.156",
+        "0.9.4.156-SNAPSHOT",
+        "0.9.4.155-SNAPSHOT",
+        "0.9.4.154",
+        "0.9.4.154-SNAPSHOT",
+        "0.9.4.153-SNAPSHOT",
+        "0.9.4.152-SNAPSHOT",
+        "0.9.4.151-SNAPSHOT",
+        "0.9.4.150-SNAPSHOT",
+        "0.9.4.148-SNAPSHOT",
+        "0.9.4.146-SNAPSHOT",
+        "0.9.4.145-SNAPSHOT",
+        "0.9.4.143-SNAPSHOT",
+        "0.9.4.142-SNAPSHOT",
+        "0.9.4.141-SNAPSHOT",
+        "0.9.4.140-SNAPSHOT",
+        "0.9.4.139-SNAPSHOT",
+        "0.9.4.138-SNAPSHOT",
+        "0.9.4.137-SNAPSHOT",
+        "0.9.4.136-SNAPSHOT",
+        "0.9.4.135",
+        "0.9.4.135-RC",
+        "0.9.4.135-SNAPSHOT",
+        "0.9.4.134-SNAPSHOT",
+        "0.9.4.131-SNAPSHOT",
+        "0.9.4.130-SNAPSHOT",
+        "0.9.4.129",
+        "0.9.4.129-RC",
+        "0.9.4.129-SNAPSHOT",
+        "0.9.4.128-SNAPSHOT",
+        "0.9.4.127-SNAPSHOT",
+        "0.9.4.126-SNAPSHOT",
+        "0.9.4.125-RC",
+        "0.9.4.125-SNAPSHOT",
+        "0.9.4.124-SNAPSHOT",
+        "0.9.4.123-SNAPSHOT",
+        "0.9.4.122",
+        "0.9.4.122-SNAPSHOT",
+        "0.9.4.121-SNAPSHOT",
+        "0.9.4.120-SNAPSHOT",
+        "0.9.4.119",
+        "0.9.4.119-RC",
+        "0.9.4.119-SNAPSHOT",
+        "0.9.4.118-SNAPSHOT",
+        "0.9.4.117-SNAPSHOT",
+        "0.9.4.116",
+        "0.9.4.115",
+        "0.9.4.114",
+        "0.9.4.113",
+        "0.9.4.112",
+        "0.9.4.111",
+        "0.9.4.110",
+        "0.9.4.105",
+        "0.9.4.104",
+        "0.9.4.103",
+        "0.9.4.102",
+        "0.9.4.101",
+        "0.9.4.100",
+        "0.9.4.99",
+        "0.9.4.98",
+        "0.9.4.97",
+        "0.9.4.27",
+        "0.9.4.2",
+        "0.9.4.1",
+        "0.9.4.0"
+      ],
+      "latestVersion": "2.0.3.0",
+      "name": "S3 Resource Extension",
+      "id": "17AB52DE-B300-A94B-E058BD978511E39E",
+      "description": "Core Extension to integrate Amazon Simple Storage Service (S3) Resource into Lucee."
+    },
+    {
+      "aliases": [
+        "maxdb",
+        "maxdb-database",
+        "maxdb-jdbc"
+      ],
+      "slug": "maxdb",
+      "versions": [
+        "7.4.4"
+      ],
+      "latestVersion": "7.4.4",
+      "name": "SAP MaxDB",
+      "id": "745C310A-5C54-4782-ACC8A821D1FEAFEB",
+      "description": "MaxDB is an ANSI SQL-92 (entry level) compliant relational database management system (RDBMS) from SAP AG, which was also delivered by MySQL AB from 2003 to 2007. MaxDB is targeted for large SAP environments e.g. mySAP Business Suite and other applications that require enterprise-level database functionality."
+    },
+    {
+      "aliases": [
+        "sentry"
+      ],
+      "slug": "sentry",
+      "versions": [
+        "5.6.0.0-BETA",
+        "5.6.0.0-SNAPSHOT",
+        "5.5.2.16",
+        "5.5.2.15",
+        "5.5.2.12-BETA",
+        "1.7.22.6-BETA",
+        "1.7.22.5-BETA",
+        "1.7.22.4-BETA",
+        "1.7.22.3-BETA",
+        "1.7.22.2-BETA",
+        "1.7.22.1-BETA",
+        "1.7.22.0-BETA"
+      ],
+      "latestVersion": "5.6.0.0-BETA",
+      "name": "Sentry Appender Extension",
+      "id": "83062C18-FA1F-4647-815BB663BCF98AC0",
+      "description": "Adds a Log4j2 Sentry appender to Lucee Server for real-time error tracking and monitoring. Automatically captures and reports application errors, exceptions, and log events to Sentry for centralized debugging and alerting."
+    },
+    {
+      "aliases": [
+        "tasks",
+        "task-events-gateway"
+      ],
+      "slug": "tasks",
+      "versions": [
+        "1.0.0.1",
+        "1.0.0.1-SNAPSHOT"
+      ],
+      "latestVersion": "1.0.0.1",
+      "name": "Tasks Extension",
+      "id": "947C02B0-7AE4-4054-938A8E059DD7625A",
+      "description": "Task Event Gateway Extension implementation."
+    },
+    {
+      "aliases": [
+        "teradata",
+        "teradata-database",
+        "teradata-jdbc"
+      ],
+      "slug": "teradata",
+      "versions": [
+        "16.20.0.12",
+        "16.20.0.04",
+        "15.0.0.35",
+        "14.10.0.44"
+      ],
+      "latestVersion": "16.20.0.12",
+      "name": "Teradata Database",
+      "id": "337A9955-C0FA-848F-0B3F0AEBA155CA9B",
+      "description": "The Teradata Database supports and enables all Teradata Data Warehouse solutions."
+    },
+    {
+      "aliases": [
+        "websocket"
+      ],
+      "slug": "websocket",
+      "versions": [
+        "2.3.0.7",
+        "2.3.0.7-BETA",
+        "2.3.0.7-SNAPSHOT"
+      ],
+      "latestVersion": "2.3.0.7",
+      "name": "WebSockets Client Extension",
+      "id": "058215B3-5544-4392-A187A1649EB5CA90",
+      "description": "Simple client for Websocket interaction for testing."
+    },
+    {
+      "aliases": [
+        "websocket"
+      ],
+      "slug": "websocket",
+      "versions": [
+        "3.0.0.18-SNAPSHOT",
+        "3.0.0.17",
+        "3.0.0.17-RC",
+        "3.0.0.17-SNAPSHOT",
+        "3.0.0.16-SNAPSHOT",
+        "3.0.0.15-SNAPSHOT",
+        "3.0.0.14-RC",
+        "3.0.0.14-SNAPSHOT",
+        "3.0.0.11-RC",
+        "2.0.3",
+        "2.0.2",
+        "2.0.1"
+      ],
+      "latestVersion": "3.0.0.18-SNAPSHOT",
+      "name": "WebSockets Extension",
+      "id": "3F9DFF32-B555-449D-B0EB5DB723044045",
+      "description": "Websocket integration into Lucee."
     }
   ]
 }

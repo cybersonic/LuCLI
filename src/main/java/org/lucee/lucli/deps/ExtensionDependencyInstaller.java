@@ -9,6 +9,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 
 /**
@@ -18,11 +19,30 @@ import java.nio.file.StandardCopyOption;
  * During server start: Deploys .lex files to lucee-server/deploy folder
  * 
  * Handles three scenarios:
- * 1. Extension with only ID - recorded for LUCEE_EXTENSIONS env var
- * 2. Extension with URL - URL stored in lock file, downloaded at server start
- * 3. Extension with path - path stored in lock file, copied at server start
+ * 1. Extension with only ID/slug - recorded for LUCEE_EXTENSIONS env var
+ * 2. Extension with URL - downloaded to a cache folder at install time
+ * 3. Extension with path - path recorded (validated) and copied at server start
+ * 
+ * More information on ways to install extensions with lucee can be found here:
+ * https://docs.lucee.org/recipes/extension-installation.html
  */
 public class ExtensionDependencyInstaller implements DependencyInstaller {
+    
+    private final Path projectDir;
+    private final Path cacheDir;
+
+    public ExtensionDependencyInstaller(Path projectDir) {
+        this.projectDir = projectDir != null ? projectDir : Paths.get(".");
+
+        String lucliHome = System.getProperty("lucli.home");
+        if (lucliHome == null) {
+            lucliHome = System.getenv("LUCLI_HOME");
+        }
+        if (lucliHome == null) {
+            lucliHome = System.getProperty("user.home") + "/.lucli";
+        }
+        this.cacheDir = Paths.get(lucliHome, "extensions-cache");
+    }
     
     @Override
     public boolean supports(DependencyConfig dep) {
@@ -35,27 +55,62 @@ public class ExtensionDependencyInstaller implements DependencyInstaller {
         locked.setType("extension");
         locked.setVersion(dep.getVersion() != null ? dep.getVersion() : "unknown");
         
-        // Store extension ID if provided
-        if (dep.getId() != null && !dep.getId().trim().isEmpty()) {
-            locked.setId(dep.getId().trim());
+        // 1) Path-based extension: validate and record absolute path. Lucee will
+        //    install it from the server's deploy directory on startup.
+        if (dep.getPath() != null && !dep.getPath().trim().isEmpty()) {
+            String configured = dep.getPath().trim();
+            Path configuredPath = Path.of(configured);
+            Path resolvedPath = configuredPath.isAbsolute()
+                ? configuredPath
+                : projectDir.resolve(configuredPath).normalize();
+
+            if (!Files.exists(resolvedPath)) {
+                throw new IOException("Extension file not found: " + resolvedPath);
+            }
+            if (!Files.isRegularFile(resolvedPath)) {
+                throw new IOException("Extension path is not a file: " + resolvedPath);
+            }
+
+            String absPath = resolvedPath.toAbsolutePath().toString();
+            locked.setSource("path:" + absPath);
+            locked.setInstallPath(absPath);
+            System.out.println("  " + dep.getName() + " - recorded (extension from path: " + absPath + ")");
+            return locked;
         }
-        
-        // Record URL or path in lock file - actual deployment happens at server start
+
+        // 2) URL-based extension: download to cache folder at install time and
+        //    record cached path so server start only needs to copy to deploy/.
         if (dep.getUrl() != null && !dep.getUrl().trim().isEmpty()) {
-            locked.setSource(dep.getUrl());
-            System.out.println("  " + dep.getName() + " - recorded (extension from URL)");
-        } else if (dep.getPath() != null && !dep.getPath().trim().isEmpty()) {
-            locked.setSource("path:" + dep.getPath());
-            locked.setInstallPath(dep.getPath());
-            System.out.println("  " + dep.getName() + " - recorded (extension from path)");
-        } else if (locked.getId() != null) {
-            // Only ID provided - will be installed via LUCEE_EXTENSIONS env var
-            locked.setSource("extension-provider");
-            System.out.println("  " + dep.getName() + " - recorded (extension ID: " + locked.getId() + ")");
-        } else {
-            throw new Exception("Extension must have either 'id', 'url', or 'path' specified");
+            String urlString = dep.getUrl().trim();
+            String absPath = downloadExtensionToCache(urlString);
+            locked.setSource("path:" + absPath);
+            locked.setInstallPath(absPath);
+            System.out.println("  " + dep.getName() + " - downloaded extension to " + absPath);
+            return locked;
         }
-        
+
+        // 3) Provider-based extension via LUCEE_EXTENSIONS. We resolve the
+        //    extension ID from either the explicit "id" field or the dependency
+        //    name (slug) using DependencyConfig.getId(). If it cannot be
+        //    resolved, we warn but do not fail the install.
+        String resolvedId = dep.getId();
+        String keyForMsg = dep.getRawId() != null && !dep.getRawId().trim().isEmpty()
+            ? dep.getRawId()
+            : dep.getName();
+
+        locked.setSource("extension-provider");
+
+        if (resolvedId == null || resolvedId.trim().isEmpty()) {
+            System.err.println(
+                "Warning: Extension '" + keyForMsg + "' was not found in the Lucee extension registry. " +
+                "It will NOT be included in LUCEE_EXTENSIONS."
+            );
+            // Leave ID null so it is ignored when building LUCEE_EXTENSIONS
+            return locked;
+        }
+
+        locked.setId(resolvedId.trim());
+        System.out.println("  " + dep.getName() + " - recorded (extension ID: " + locked.getId() + ")");
         return locked;
     }
     
@@ -88,7 +143,9 @@ public class ExtensionDependencyInstaller implements DependencyInstaller {
             if (source.startsWith("path:")) {
                 deployExtensionFromPath(source.substring(5), deployDir);
             } else {
-                // Assume URL
+                // Backwards compatibility: older lock files may still use the
+                // raw URL as the source. In that case, download directly to the
+                // deploy directory.
                 deployExtensionFromUrl(source, deployDir);
             }
         }
@@ -201,5 +258,52 @@ public class ExtensionDependencyInstaller implements DependencyInstaller {
         
         // Fallback to hash-based name
         return "extension-" + Math.abs(urlString.hashCode()) + ".lex";
+    }
+
+    /**
+     * Download an extension .lex file into the shared cache directory and
+     * return the absolute path to the cached file. If the file already
+     * exists, it is reused without re-downloading.
+     */
+    private String downloadExtensionToCache(String urlString) throws Exception {
+        Files.createDirectories(cacheDir);
+
+        String filename = extractFilenameFromUrl(urlString);
+        Path targetFile = cacheDir.resolve(filename);
+
+        if (Files.exists(targetFile)) {
+            return targetFile.toAbsolutePath().toString();
+        }
+
+        URL url = new URL(urlString);
+        HttpURLConnection connection = null;
+
+        try {
+            connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+            connection.setConnectTimeout(30000); // 30 seconds
+            connection.setReadTimeout(30000);
+
+            int responseCode = connection.getResponseCode();
+            if (responseCode != HttpURLConnection.HTTP_OK) {
+                throw new IOException("Failed to download extension from " + urlString +
+                        ". HTTP response code: " + responseCode);
+            }
+
+            try (InputStream in = connection.getInputStream();
+                 FileOutputStream out = new FileOutputStream(targetFile.toFile())) {
+                byte[] buffer = new byte[8192];
+                int bytesRead;
+                while ((bytesRead = in.read(buffer)) != -1) {
+                    out.write(buffer, 0, bytesRead);
+                }
+            }
+
+            return targetFile.toAbsolutePath().toString();
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
     }
 }

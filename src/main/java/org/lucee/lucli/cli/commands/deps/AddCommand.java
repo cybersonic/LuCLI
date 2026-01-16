@@ -16,6 +16,14 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
 
+import org.jline.reader.Candidate;
+import org.jline.reader.Completer;
+import org.jline.reader.LineReader;
+import org.jline.reader.ParsedLine;
+import org.jline.reader.LineReaderBuilder;
+import org.jline.terminal.Terminal;
+import org.jline.terminal.TerminalBuilder;
+
 /**
  * Interactive wizard to add dependencies to lucee.json
  */
@@ -26,6 +34,11 @@ import java.util.concurrent.Callable;
 public class AddCommand implements Callable<Integer> {
 
     private final BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
+
+    // JLine reader for extension identifier completion (slugs/IDs) in the
+    // extension dependency wizard. Lazily initialized and falls back to
+    // standard input if JLine cannot be created.
+    private static LineReader extensionLineReader;
 
     @Override
     public Integer call() throws Exception {
@@ -196,7 +209,7 @@ public class AddCommand implements Callable<Integer> {
         if (name == null) return null;
 
         while (true) {
-            String identifier = askRequired("Extension identifier (slug/name/alias/UUID or .lex URL/path)");
+            String identifier = readExtensionIdentifier("Extension identifier (slug/name/alias/UUID or .lex URL/path): ");
             if (identifier == null) return null;
             if ("?".equals(identifier.trim())) {
                 printExtensionList();
@@ -413,6 +426,32 @@ public class AddCommand implements Callable<Integer> {
 
     // === Prompt helpers ===
 
+    /**
+     * Read an extension identifier with JLine-based completion against the
+     * Lucee ExtensionRegistry, falling back to plain stdin when JLine is not
+     * available. This mirrors the Lucee version completion behaviour used by
+     * the server config editor.
+     */
+    private String readExtensionIdentifier(String prompt) throws IOException {
+        try {
+            if (extensionLineReader == null) {
+                Terminal terminal = TerminalBuilder.builder()
+                        .system(true)
+                        .build();
+                extensionLineReader = LineReaderBuilder.builder()
+                        .terminal(terminal)
+                        .completer(new ExtensionIdentifierCompleter())
+                        .build();
+            }
+            return extensionLineReader.readLine(prompt);
+        } catch (Exception e) {
+            // Fallback to plain stdin if JLine cannot be initialized
+            System.out.print(prompt);
+            String line = in.readLine();
+            return line;
+        }
+    }
+
     private String askRequired(String label) throws IOException {
         while (true) {
             System.out.print(label + ": ");
@@ -444,5 +483,40 @@ public class AddCommand implements Callable<Integer> {
         if (line == null) return null;
         line = line.trim();
         return line.isEmpty() ? null : line;
+    }
+
+    /**
+     * JLine completer for Lucee extension identifiers (slugs/aliases/ids).
+     * Uses ExtensionRegistry.listAll() and completes on the registry keys,
+     * showing the human-readable name alongside the slug.
+     */
+    private static class ExtensionIdentifierCompleter implements Completer {
+        @Override
+        public void complete(LineReader reader, ParsedLine line, java.util.List<Candidate> candidates) {
+            String buffer = line.word().trim().toLowerCase();
+            try {
+                Map<String, ExtensionRegistry.ExtensionInfo> all = ExtensionRegistry.listAll();
+                if (all == null || all.isEmpty()) {
+                    return;
+                }
+                for (Map.Entry<String, ExtensionRegistry.ExtensionInfo> e : all.entrySet()) {
+                    String slug = e.getKey();
+                    if (slug == null || slug.isEmpty()) {
+                        continue;
+                    }
+                    if (!buffer.isEmpty() && !slug.toLowerCase().startsWith(buffer)) {
+                        continue;
+                    }
+                    ExtensionRegistry.ExtensionInfo info = e.getValue();
+                    String display = slug;
+                    if (info != null && info.name != null && !info.name.isBlank()) {
+                        display = slug + " (" + info.name + ")";
+                    }
+                    candidates.add(new Candidate(slug, display, "extensions", "Lucee extension", null, null, true));
+                }
+            } catch (Exception ex) {
+                // On failure, leave candidates empty (no completion)
+            }
+        }
     }
 }

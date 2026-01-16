@@ -43,6 +43,7 @@ import picocli.CommandLine.Model.CommandSpec;
         ServerCommand.LockCommand.class,
         ServerCommand.UnlockCommand.class,
         ServerCommand.InfoCommand.class,
+        ServerCommand.EnvCommand.class,
         ServerMonitorCommandImpl.class
     }
 )
@@ -675,6 +676,68 @@ public class ServerCommand implements Callable<Integer> {
             if (webroot != null) {
                 args.add("--webroot");
                 args.add(webroot);
+            }
+
+            String result = executor.executeCommand("server", args.toArray(new String[0]));
+            if (result != null && !result.isEmpty()) {
+                System.out.println(result);
+            }
+
+            return 0;
+        }
+    }
+
+    /**
+     * Server env subcommand - show effective environment (System + envFile + envVars)
+     */
+    @Command(
+        name = "env",
+        description = "Show effective environment variables for this project (System + envFile + envVars)"
+    )
+    static class EnvCommand implements Callable<Integer> {
+
+        @ParentCommand
+        private ServerCommand parent;
+
+        @Option(names = {"-d", "--directory"},
+                description = "Project directory (defaults to current directory)")
+        private String projectDir;
+
+        @Option(names = {"-c", "--config"},
+                description = "Configuration file to use (defaults to lucee.json)")
+        private String configFile;
+
+        @Option(names = {"--env", "--environment"},
+                description = "Environment to use (e.g., prod, dev, staging)")
+        private String environment;
+
+        @Option(names = {"--global"},
+                description = "Include the full System environment in addition to envFile/envVars")
+        private boolean global;
+
+        @Override
+        public Integer call() throws Exception {
+            Path currentDir = projectDir != null ?
+                Paths.get(projectDir) :
+                Paths.get(System.getProperty("user.dir"));
+
+            ServerCommandHandler executor = new ServerCommandHandler(false, currentDir);
+
+            java.util.List<String> args = new java.util.ArrayList<>();
+            args.add("env");
+
+            if (configFile != null && !configFile.trim().isEmpty()) {
+                args.add("--config");
+                args.add(configFile.trim());
+            }
+
+            if (environment != null && !environment.trim().isEmpty()) {
+                args.add("--env");
+                args.add(environment.trim());
+            }
+
+            if (global) {
+                args.add("--global");
             }
 
             String result = executor.executeCommand("server", args.toArray(new String[0]));

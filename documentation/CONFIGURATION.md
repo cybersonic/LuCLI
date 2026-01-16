@@ -230,6 +230,98 @@ Available environments: prod, dev, staging
 
 ---
 
+## Dependencies and Lucee Extensions
+
+LuCLI can manage CFML dependencies and Lucee extensions via the `dependencies`, `devDependencies`, and `dependencySettings` sections in `lucee.json`. Installed dependencies are recorded in `lucee-lock.json`, which is also used by server locking.
+
+At a high level:
+
+- `dependencies` – production dependencies (CFML libraries, Lucee extensions, etc.).
+- `devDependencies` – development-only dependencies.
+- `dependencySettings` – controls how and where dependencies are installed.
+- `lucee-lock.json` – records the resolved versions, install paths, and mappings.
+- `LUCEE_EXTENSIONS` – built automatically from locked extension dependencies when the server starts.
+
+### Declaring Lucee extensions as dependencies
+
+You can declare Lucee extensions in `lucee.json` using `type: "extension"`. LuCLI supports several ways to identify the extension:
+
+```json
+{
+  "dependencies": {
+    "h2": {
+      "type": "extension",
+      "id": "465E1E35-2425-4F4E-8B3FAB638BD7280A"
+    },
+    "redis": {
+      "type": "extension",
+      "slug": "redis"  
+    },
+    "my-local-ext": {
+      "type": "extension",
+      "path": "./extensions/my-local-ext.lex"
+    },
+    "custom-provider-ext": {
+      "type": "extension",
+      "url": "https://extensions.example.com/my-ext.lex"
+    }
+  }
+}
+```
+
+Supported forms:
+
+- **By ID**: `id` is a Lucee extension UUID.
+- **By slug/name**: `slug` or name is resolved via `lucee-extensions.json` (see `src/main/resources/extensions/EXTENSION_REGISTRY.md`).
+- **By local path**: `path` points to a `.lex` file on disk.
+- **By URL**: `url` points to a `.lex` download URL.
+
+### Installing dependencies (including extensions)
+
+Use the dependency installer command from the project root:
+
+```bash
+# Install all dependencies and devDependencies
+lucli deps install
+
+# Production-only install (skip devDependencies)
+lucli deps install --production
+
+# Apply environment-specific dependencySettings & overrides
+lucli deps install --env prod
+
+# Preview what would be installed and the realized dependency config
+lucli deps install --dry-run
+```
+
+Behaviour:
+
+- Reads `dependencies`, `devDependencies`, and `dependencySettings` from `lucee.json`.
+- Applies environment overrides (when `--env` is used) before resolving dependencies.
+- Installs supported dependency types:
+  - `source: "git"` – CFML libraries installed from Git repositories.
+  - `type: "extension"` – Lucee extensions installed via providers, URLs, or local `.lex` files.
+- Writes a normalized record for each dependency into `lucee-lock.json` (including version, source, install path, and, for extensions, their Lucee ID).
+- Prints the `LUCEE_EXTENSIONS` value that will be set when the server starts, built from all locked extension dependencies.
+
+### How extensions are activated at server startup
+
+When you start a server, LuCLI:
+
+1. Reads `lucee-lock.json` for the project.
+2. Collects all locked dependencies with `type: "extension"`.
+3. Builds a comma-separated `LUCEE_EXTENSIONS` string from those locked entries.
+4. Injects `LUCEE_EXTENSIONS` into the server process environment (along with any other `envVars`).
+5. Lucee reads `LUCEE_EXTENSIONS` at startup and installs/activates the listed extensions.
+
+This means:
+
+- The **set of active extensions is driven by `lucee-lock.json`**, not by `lucee.json` alone.
+- Running `lucli deps install` is the canonical way to update which extensions are installed and locked for a project.
+- Server lock (`lucee-lock.json` → `serverLocks`) coexists with dependency locking; updating dependencies and updating server locks are separate, explicit steps.
+
+For more about dependency structure, see `LuceeJsonConfig` and `DependencySettingsConfig` in the codebase, and for lock format see `LuceeLockFile`.
+
 ## Settings reference
 
 This section expands on the basic configuration reference and documents every available setting.

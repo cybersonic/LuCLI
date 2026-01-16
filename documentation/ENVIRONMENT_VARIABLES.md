@@ -206,6 +206,26 @@ lucli server config set port='${HTTP_PORT:-8080}' version='${LUCEE_VERSION:-6.2.
 lucli server config set port='${HTTP_PORT:-8080}' --dry-run
 ```
 
+### Inspecting the Effective Environment
+
+Use `lucli server env` to see which environment variables are in play for a given project:
+
+```bash
+# Show project-scoped variables (from envFile/.env and lucee.json envVars)
+lucli server env
+
+# Include environment-specific overrides
+lucli server env --env prod
+
+# Show the full process environment merged with envFile and envVars
+lucli server env --global
+
+# Point at a specific project directory and config file
+lucli server env -d /path/to/project -c lucee.json --env dev
+```
+
+By default, `lucli server env` limits output to variables coming from your `envFile`/`.env` and `envVars` in `lucee.json`. This is useful when you want to confirm that values from files like `.dk.env` are being loaded and passed through to Lucee without the noise of unrelated system variables. Use `--global` when you need to debug the complete environment seen by the Tomcat/Lucee process.
+
 
 ## Best Practices
 

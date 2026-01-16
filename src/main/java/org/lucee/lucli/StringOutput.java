@@ -645,6 +645,10 @@ public class StringOutput {
             output.println("${EMOJI_INFO} " + message);
         }
         
+        public static void print(String message) {
+            output.println("  " + message);
+        }
+        
         public static void tip(String message) {
             output.println("${EMOJI_BULB} " + message);
         }
