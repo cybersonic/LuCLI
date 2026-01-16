@@ -180,11 +180,13 @@ component {
         var cwdPath = Paths.get(URI);
 
 
+        var LuCLI = createObject("java", "org.lucee.lucli.LuCLI");
+        LuCLI.main(["--version"]);
         // Terminal mode = true so ServerCommandHandler returns strings
-        var executor = createObject("java", "org.lucee.lucli.server.ServerCommandHandler")
-            .init(true, cwdPath);
+        // var executor = createObject("java", "org.lucee.lucli.server.ServerCommandHandler")
+        //     .init(true, cwdPath);
 
-        var result = executor.executeCommand(command, args);
+        // var result = executor.executeCommand(command, args);
 
         // Always return a string (never null)
         return result ?: "";

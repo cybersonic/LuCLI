@@ -223,6 +223,22 @@
       "description": "Inline Lucee CFConfig configuration that overrides/extends the base from 'configurationFile'. The final merged result is written to lucee-server/context/.CFConfig.json on server start. The structure should match Lucee's .CFConfig.json format.",
       "additionalProperties": true
     },
+    "envFile": {
+      "type": "string",
+      "description": "Optional path to a .env-style file that is loaded before environment variable substitution. When omitted or empty, LuCLI defaults to a file named '.\u0065nv' in the same directory as lucee.json. May be relative to the project directory or an absolute path.",
+      "x-ui-tab": "Environment",
+      "x-ui-order": 10
+    },
+    "envVars": {
+      "type": "object",
+      "description": "Additional environment variables to inject into the Tomcat process. Keys are environment variable names; values are strings that support `${VAR}` and `${VAR:-default}` substitution. Resolved values are passed to the child Java process via its environment.",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "default": {},
+      "x-ui-tab": "Environment",
+      "x-ui-order": 20
+    },
     "dependencies": {
       "type": "object",
       "description": "Production dependencies for this project. Keys are dependency names; values are either a shorthand version string or a full dependency descriptor object.",

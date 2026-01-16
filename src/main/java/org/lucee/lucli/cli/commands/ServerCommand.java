@@ -28,7 +28,7 @@ import picocli.CommandLine.Model.CommandSpec;
         mixinStandardHelpOptions = true,
         subcommands = {
         ServerCommand.StartCommand.class,
-        ServerCommand.RunCommand.class,
+        ServerCommand.RunCommand.class, //This should be the same as StartCommand but runs in foreground, so an alias can be used 
         ServerCommand.StopCommand.class,
         ServerCommand.RestartCommand.class,
         ServerCommand.StatusCommand.class,
@@ -63,7 +63,7 @@ public class ServerCommand implements Callable<Integer> {
      */
     @Command(
         name = "start", 
-        aliases = {"tart"},
+        aliases = {"tart", "runny"},
         description = "Start a Lucee server instance"
     )
     static class StartCommand implements Callable<Integer> {
@@ -166,6 +166,10 @@ public class ServerCommand implements Callable<Integer> {
         @Option(names = {"--webroot"},
                 description = "Override webroot (relative to project directory, like lucee.json)")
         private String webroot;
+
+        @Option(names = {"--sandbox"},
+                description = "Start a transient server in background without writing lucee.json or persisting the server instance")
+        private boolean sandbox = false;
         
         @Parameters(paramLabel = "[PROJECT_DIR]", 
                     description = "Project directory (defaults to current directory)",
@@ -302,6 +306,10 @@ public class ServerCommand implements Callable<Integer> {
             } else if (enableLucee) {
                 args.add("--enable-lucee");
             }
+
+            if (sandbox) {
+                args.add("--sandbox");
+            }
             
             // Add any config overrides (key=value pairs)
             if (configOverrides != null && !configOverrides.isEmpty()) {
@@ -364,6 +372,14 @@ public class ServerCommand implements Callable<Integer> {
                 description = "Override webroot (relative to project directory, like lucee.json)")
         private String webroot;
 
+        @Option(names = {"--disable-lucee"},
+                description = "Disable Lucee CFML engine for this run (static server)")
+        private boolean disableLucee = false;
+
+        @Option(names = {"--enable-lucee"},
+                description = "Explicitly enable Lucee CFML engine for this run")
+        private boolean enableLucee = false;
+
         @Option(names = {"--no-agents"},
                 description = "Disable all Java agents")
         private boolean noAgents = false;
@@ -379,6 +395,11 @@ public class ServerCommand implements Callable<Integer> {
         @Option(names = {"--disable-agent"}, 
                 description = "Disable a specific agent by ID (repeatable)")
         private java.util.List<String> disableAgents;
+
+        @Option(names = {"--sandbox"},
+                description = "Run a transient server in foreground without writing lucee.json or persisting the server instance")
+        private boolean sandbox = false;
+
 
         @Parameters(paramLabel = "[PROJECT_DIR]", 
                     description = "Project directory (defaults to current directory)",
@@ -448,6 +469,14 @@ public class ServerCommand implements Callable<Integer> {
                     args.add("--disable-agent");
                     args.add(agent);
                 }
+            }
+            if (disableLucee) {
+                args.add("--disable-lucee");
+            } else if (enableLucee) {
+                args.add("--enable-lucee");
+            }
+            if (sandbox) {
+                args.add("--sandbox");
             }
 
             // Add any config overrides (key=value pairs)

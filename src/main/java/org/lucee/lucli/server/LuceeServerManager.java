@@ -151,7 +151,7 @@ public class LuceeServerManager {
         runServerForeground(projectDir, versionOverride, forceReplace, customName, agentOverrides, environment, null);
     }
     
-    /**
+/**
      * Run a Lucee server in foreground mode (similar to catalina.sh run) with an explicit config file.
      * This starts Tomcat in-process with console output streaming.
      * When the process is stopped (Ctrl+C), the server stops.
@@ -168,7 +168,225 @@ public class LuceeServerManager {
                                     AgentOverrides agentOverrides, String environment, String configFileName) throws Exception {
         startServerInternal(projectDir, versionOverride, forceReplace, customName, agentOverrides, environment, configFileName, true);
     }
+
+/**
+     * Run a transient "sandbox" server in foreground mode without writing lucee.json
+     * in the project directory or persisting the server instance after shutdown.
+     *
+     * @param projectDir The project directory (used for webroot and dependency resolution)
+     * @param versionOverride Optional Lucee version override (can be null)
+     * @param forceReplace Whether to allow overwriting an existing sandbox server directory
+     * @param customName Optional custom server name (can be null); when null a unique sandbox name is generated
+     * @param agentOverrides Optional agent overrides (can be null)
+     * @param environment Optional environment name (currently only persisted as metadata)
+     * @param webrootOverride Optional webroot override for this sandbox run
+     * @param portOverride Optional HTTP port override for this sandbox run
+     * @param enableLuceeOverride Optional one-shot Lucee enable/disable override for this sandbox run
+     */
+    public void runServerForegroundSandbox(Path projectDir,
+                                           String versionOverride,
+                                           boolean forceReplace,
+                                           String customName,
+                                           AgentOverrides agentOverrides,
+                                           String environment,
+                                           String webrootOverride,
+                                           Integer portOverride,
+                                           Boolean enableLuceeOverride) throws Exception {
+        // Build an in-memory configuration; this does not create or modify lucee.json
+        LuceeServerConfig.ServerConfig config = LuceeServerConfig.createDefaultConfig(projectDir);
+
+        // Apply CLI overrides
+        if (versionOverride != null && !versionOverride.trim().isEmpty()) {
+            config.version = versionOverride.trim();
+        }
+
+        if (customName != null && !customName.trim().isEmpty()) {
+            config.name = customName.trim();
+        } else {
+            // Generate a unique sandbox name based on the project directory
+            String baseName = projectDir.getFileName() != null
+                    ? projectDir.getFileName().toString()
+                    : "sandbox";
+            String sandboxBase = baseName + "-sandbox";
+            config.name = LuceeServerConfig.getUniqueServerName(sandboxBase, serversDir);
+        }
+
+        if (webrootOverride != null && !webrootOverride.trim().isEmpty()) {
+            config.webroot = webrootOverride.trim();
+        }
+
+        if (portOverride != null) {
+            config.port = portOverride;
+        }
+
+        if (enableLuceeOverride != null) {
+            config.enableLucee = enableLuceeOverride.booleanValue();
+        }
+
+        // Do not auto-open browser for sandbox foreground runs
+        config.openBrowser = false;
+
+        // Ensure Lucee Express is available for the chosen version
+        Path luceeExpressDir = ensureLuceeExpress(config.version);
+
+        // Resolve port conflicts just before startup using the same logic as normal servers
+        LuceeServerConfig.PortConflictResult portResult = LuceeServerConfig.resolvePortConflicts(config, false, this);
+        if (portResult.hasConflicts) {
+            throw new IllegalStateException(portResult.message);
+        }
+        config = portResult.updatedConfig;
+
+        // Log port information for the sandbox server
+        StringBuilder portInfo = new StringBuilder();
+        portInfo.append("Running sandbox server '\"")
+                .append(config.name)
+                .append("\" in foreground mode:\n");
+        portInfo.append("  HTTP port:     ").append(config.port).append("\n");
+        portInfo.append("  Shutdown port: ").append(LuceeServerConfig.getEffectiveShutdownPort(config)).append("\n");
+        if (config.monitoring != null && config.monitoring.enabled && config.monitoring.jmx != null) {
+            portInfo.append("  JMX port:      ").append(config.monitoring.jmx.port).append("\n");
+        }
+        if (LuceeServerConfig.isHttpsEnabled(config)) {
+            portInfo.append("  HTTPS port:    ").append(LuceeServerConfig.getEffectiveHttpsPort(config)).append("\n");
+            portInfo.append("  HTTPS redirect:")
+                    .append(LuceeServerConfig.isHttpsRedirectEnabled(config) ? " enabled" : " disabled")
+                    .append("\n");
+        }
+        portInfo.append("\nPress Ctrl+C to stop the server\n");
+        System.out.println(portInfo.toString());
+
+        // Create sandbox server instance directory under ~/.lucli/servers
+        Path serverInstanceDir = serversDir.resolve(config.name);
+        if (Files.exists(serverInstanceDir) && forceReplace) {
+            deleteServerDirectory(serverInstanceDir);
+        }
+        Files.createDirectories(serverInstanceDir);
+
+        // Mark this server as sandbox so we can clean it up on stop/prune
+        try {
+            Files.writeString(serverInstanceDir.resolve(".sandbox"), "sandbox");
+        } catch (IOException e) {
+            System.err.println("Warning: Failed to write sandbox marker: " + e.getMessage());
+        }
+
+        try {
+            // Generate Tomcat configuration and supporting files in the sandbox directory
+            TomcatConfigGenerator configGenerator = new TomcatConfigGenerator();
+            boolean overwriteProjectConfig = forceReplace;
+            configGenerator.generateConfiguration(serverInstanceDir, config, projectDir, luceeExpressDir, overwriteProjectConfig);
+
+            // Write CFConfig (.CFConfig.json) if present in the in-memory configuration
+            LuceeServerConfig.writeCfConfigIfPresent(config, projectDir, serverInstanceDir);
+
+            // Deploy any extension dependencies to the sandbox server
+            deployExtensionsForServer(projectDir, serverInstanceDir);
+
+            // Launch foreground process; this blocks until shutdown
+            launchServerProcess(serverInstanceDir, config, projectDir, luceeExpressDir,
+                                agentOverrides, environment, true);
+        } finally {
+            // After the foreground process exits, clean up the sandbox server directory
+            try {
+                deleteServerDirectory(serverInstanceDir);
+            } catch (IOException e) {
+                System.err.println("Warning: Failed to delete sandbox server directory "
+                        + serverInstanceDir + ": " + e.getMessage());
+            }
+        }
+    }
     
+/**
+     * Start a transient "sandbox" server in background mode without writing lucee.json
+     * in the project directory. The server directory is automatically removed after
+     * the server is stopped or pruned.
+     */
+    public ServerInstance startServerSandbox(Path projectDir,
+                                             String versionOverride,
+                                             boolean forceReplace,
+                                             String customName,
+                                             AgentOverrides agentOverrides,
+                                             String environment,
+                                             String webrootOverride,
+                                             Integer portOverride,
+                                             Boolean enableLuceeOverride) throws Exception {
+        // Build an in-memory configuration; this does not create or modify lucee.json
+        LuceeServerConfig.ServerConfig config = LuceeServerConfig.createDefaultConfig(projectDir);
+
+        // Apply CLI overrides
+        if (versionOverride != null && !versionOverride.trim().isEmpty()) {
+            config.version = versionOverride.trim();
+        }
+
+        if (customName != null && !customName.trim().isEmpty()) {
+            config.name = customName.trim();
+        } else {
+            String baseName = projectDir.getFileName() != null
+                    ? projectDir.getFileName().toString()
+                    : "sandbox";
+            String sandboxBase = baseName + "-sandbox";
+            config.name = LuceeServerConfig.getUniqueServerName(sandboxBase, serversDir);
+        }
+
+        if (webrootOverride != null && !webrootOverride.trim().isEmpty()) {
+            config.webroot = webrootOverride.trim();
+        }
+
+        if (portOverride != null) {
+            config.port = portOverride;
+        }
+
+        if (enableLuceeOverride != null) {
+            config.enableLucee = enableLuceeOverride.booleanValue();
+        }
+
+        // For sandbox background servers, do not auto-open browser by default
+        config.openBrowser = false;
+
+        // Ensure Lucee Express is available for the chosen version
+        Path luceeExpressDir = ensureLuceeExpress(config.version);
+
+        // Resolve port conflicts just before startup using the same logic as normal servers
+        LuceeServerConfig.PortConflictResult portResult = LuceeServerConfig.resolvePortConflicts(config, false, this);
+        if (portResult.hasConflicts) {
+            throw new IllegalStateException(portResult.message);
+        }
+        config = portResult.updatedConfig;
+
+        // Create sandbox server instance directory under ~/.lucli/servers
+        Path serverInstanceDir = serversDir.resolve(config.name);
+        if (Files.exists(serverInstanceDir) && forceReplace) {
+            deleteServerDirectory(serverInstanceDir);
+        }
+        Files.createDirectories(serverInstanceDir);
+
+        // Mark this server as sandbox so we can clean it up on stop/prune
+        try {
+            Files.writeString(serverInstanceDir.resolve(".sandbox"), "sandbox");
+        } catch (IOException e) {
+            System.err.println("Warning: Failed to write sandbox marker: " + e.getMessage());
+        }
+
+        // Generate Tomcat configuration and supporting files in the sandbox directory
+        TomcatConfigGenerator configGenerator = new TomcatConfigGenerator();
+        boolean overwriteProjectConfig = forceReplace;
+        configGenerator.generateConfiguration(serverInstanceDir, config, projectDir, luceeExpressDir, overwriteProjectConfig);
+
+        // Write CFConfig (.CFConfig.json) if present in the in-memory configuration
+        LuceeServerConfig.writeCfConfigIfPresent(config, projectDir, serverInstanceDir);
+
+        // Deploy any extension dependencies to the sandbox server
+        deployExtensionsForServer(projectDir, serverInstanceDir);
+
+        // Launch background process; this returns immediately
+        ServerInstance instance = launchServerProcess(serverInstanceDir, config, projectDir, luceeExpressDir,
+                                                     agentOverrides, environment, false);
+
+        // Optionally wait for startup before returning (same timeout as normal start)
+        waitForServerStartup(instance, 30);
+
+        return instance;
+    }
+
     /**
      * Internal server startup method that handles both background and foreground modes.
      * 
@@ -427,6 +645,11 @@ public class LuceeServerManager {
         if (instance.getPid() <= 0) {
             return false;
         }
+
+        Path serverDir = instance.getServerDir();
+        Path pidFile = serverDir.resolve("server.pid");
+        Path sandboxMarker = serverDir.resolve(".sandbox");
+        boolean isSandbox = Files.exists(sandboxMarker);
         
         try {
             // Try graceful shutdown first
@@ -444,13 +667,21 @@ public class LuceeServerManager {
                 }
                 
                 // Remove PID file
-                Files.deleteIfExists(instance.getServerDir().resolve("server.pid"));
+                Files.deleteIfExists(pidFile);
+
+                // If this was a sandbox server, remove the entire server directory
+                if (isSandbox) {
+                    deleteServerDirectory(serverDir);
+                }
                 
                 return true;
             }
         } catch (Exception e) {
             // Fallback: remove stale PID file
-            Files.deleteIfExists(instance.getServerDir().resolve("server.pid"));
+            Files.deleteIfExists(pidFile);
+            if (isSandbox) {
+                deleteServerDirectory(serverDir);
+            }
         }
         
         return false;
@@ -1261,6 +1492,9 @@ public class LuceeServerManager {
         
         // Set environment variables for Tomcat configuration
         Map<String, String> env = pb.environment();
+        // Ensure any .env / envFile values loaded during configuration are also
+        // visible to the child process, without clobbering explicit OS vars.
+        LuceeServerConfig.applyLoadedEnvToProcessEnvironment(env);
         env.put("CATALINA_BASE", serverInstanceDir.toString());
         env.put("CATALINA_HOME", serverInstanceDir.toString());
         
@@ -1281,6 +1515,20 @@ public class LuceeServerManager {
         String luceeExtensions = buildLuceeExtensions(projectDir);
         if (luceeExtensions != null && !luceeExtensions.isEmpty()) {
             env.put("LUCEE_EXTENSIONS", luceeExtensions);
+        }
+
+        // Apply additional environment variables defined in lucee.json (envVars)
+        if (config.envVars != null && !config.envVars.isEmpty()) {
+            for (Map.Entry<String, String> entry : config.envVars.entrySet()) {
+                String key = entry.getKey();
+                if (key == null || key.trim().isEmpty()) {
+                    continue;
+                }
+                String value = entry.getValue();
+                if (value != null) {
+                    env.put(key, value);
+                }
+            }
         }
         
         // Write project path marker file to track which project this server belongs to

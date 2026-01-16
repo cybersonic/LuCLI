@@ -124,6 +124,8 @@ public class ServerCommandHandler {
         boolean includeHttpsKeystorePlan = false;
         boolean includeHttpsRedirectRules = false;
         Boolean enableLuceeOverride = null;
+        boolean sandbox = false;
+        Integer portOverride = null;
         Path projectDir = currentWorkingDirectory; // Default to current directory
         
         LuceeServerManager.AgentOverrides agentOverrides = new LuceeServerManager.AgentOverrides();
@@ -154,6 +156,19 @@ public class ServerCommandHandler {
                 i++; // Skip next argument
             } else if (args[i].startsWith("--webroot=")) {
                 webrootOverride = args[i].substring("--webroot=".length());
+            } else if ((args[i].equals("--port") || args[i].equals("-p")) && i + 1 < args.length) {
+                try {
+                    portOverride = Integer.parseInt(args[i + 1]);
+                } catch (NumberFormatException ignore) {
+                    // ignore invalid port and fall back to defaults
+                }
+                i++; // Skip next argument
+            } else if (args[i].startsWith("--port=")) {
+                try {
+                    portOverride = Integer.parseInt(args[i].substring("--port=".length()));
+                } catch (NumberFormatException ignore) {
+                    // ignore invalid port and fall back to defaults
+                }
             } else if (args[i].equals("--dry-run")) {
                 dryRun = true;
             } else if (args[i].equals("--include-tomcat-web")) {
@@ -177,6 +192,8 @@ public class ServerCommandHandler {
                 enableLuceeOverride = Boolean.FALSE;
             } else if (args[i].equals("--enable-lucee")) {
                 enableLuceeOverride = Boolean.TRUE;
+            } else if (args[i].equals("--sandbox")) {
+                sandbox = true;
             } else if (args[i].equals("--no-agents")) {
                 agentOverrides.disableAllAgents = true;
             } else if ((args[i].equals("--agents")) && i + 1 < args.length) {
@@ -212,9 +229,15 @@ public class ServerCommandHandler {
                 configOverrides.add(args[i]);
             }
         }
+
+        // If sandbox mode is requested, disallow dry-run and preview flags which rely on lucee.json
+        if (sandbox && (dryRun || includeLuceeConfig || includeTomcatWeb || includeTomcatServer
+                || includeHttpsKeystorePlan || includeHttpsRedirectRules)) {
+            return formatOutput("❌ --sandbox cannot be combined with --dry-run or preview flags (--include-*, --include-all).", true);
+        }
         
         // Apply any configuration overrides to lucee.json before starting the server.
-        if (!configOverrides.isEmpty()) {
+        if (!sandbox && (!configOverrides.isEmpty() || portOverride != null || enableLuceeOverride != null)) {
             String cfgFile = configFileName != null ? configFileName : "lucee.json";
             LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(projectDir, cfgFile);
             ServerConfigHelper configHelper = new ServerConfigHelper();
@@ -228,6 +251,12 @@ public class ServerCommandHandler {
                 if (!key.isEmpty()) {
                     configHelper.setConfigValue(config, key, value);
                 }
+            }
+            if (portOverride != null) {
+                config.port = portOverride;
+            }
+            if (enableLuceeOverride != null) {
+                config.enableLucee = enableLuceeOverride.booleanValue();
             }
             Path configFile = projectDir.resolve(configFileName != null ? configFileName : "lucee.json");
             LuceeServerConfig.saveConfig(config, configFile);
@@ -367,6 +396,56 @@ public class ServerCommandHandler {
             agentOverrides = null;
         }
         
+        // Sandbox start: use in-memory configuration and background sandbox server
+        if (sandbox) {
+            try {
+                LuceeServerManager.ServerInstance instance = serverManager.startServerSandbox(
+                    projectDir,
+                    versionOverride,
+                    forceReplace,
+                    customName,
+                    agentOverrides,
+                    environment,
+                    webrootOverride,
+                    portOverride,
+                    enableLuceeOverride
+                );
+                StringBuilder result = new StringBuilder();
+                result.append("Starting sandbox server in: ").append(projectDir).append("\n");
+                result.append("   Server Name:   ").append(instance.getServerName()).append("\n");
+                result.append("   Process ID:    ").append(instance.getPid()).append("\n");
+                result.append("   Port:          ").append(instance.getPort()).append("\n");
+                result.append("   Server Dir:    ").append(instance.getServerDir()).append("\n");
+                result.append("   URL:           http://localhost:").append(instance.getPort()).append("/\n");
+                result.append("(Sandbox server will be removed automatically when stopped)\n");
+                return formatOutput(result.toString(), false);
+            } catch (ServerConflictException e) {
+                StringBuilder result = new StringBuilder();
+                result.append("⚠️  ").append(e.getMessage()).append("\n\n");
+                result.append("Choose an option:\n");
+                result.append("  1. Replace the existing server (delete and recreate):\n");
+                if (isTerminalMode) {
+                    result.append("     server start --sandbox --force\n\n");
+                } else {
+                    result.append("     lucli server start --sandbox --force\n\n");
+                }
+                result.append("  2. Create server with suggested name '").append(e.getSuggestedName()).append("':\n");
+                if (isTerminalMode) {
+                    result.append("     server start --sandbox --name ").append(e.getSuggestedName()).append("\n\n");
+                } else {
+                    result.append("     lucli server start --sandbox --name ").append(e.getSuggestedName()).append("\n\n");
+                }
+                result.append("  3. Create server with custom name:\n");
+                if (isTerminalMode) {
+                    result.append("     server start --sandbox --name <your-name>\n\n");
+                } else {
+                    result.append("     lucli server start --sandbox --name <your-name>\n\n");
+                }
+                result.append("💡 Use --force to replace existing servers, or --name to specify a different name.");
+                return formatOutput(result.toString(), true);
+            }
+        }
+        
         try {
             StringBuilder result = new StringBuilder();
             boolean isLuceeEnabledForStartup = finalConfig.enableLucee;
@@ -457,6 +536,9 @@ public class ServerCommandHandler {
         String configFileName = null;
         String environment = null;
         String webrootOverride = null;
+        boolean sandbox = false;
+        Integer portOverride = null;
+        Boolean enableLuceeOverride = null;
         Path projectDir = currentWorkingDirectory; // Default to current directory
         
         LuceeServerManager.AgentOverrides agentOverrides = new LuceeServerManager.AgentOverrides();
@@ -464,33 +546,47 @@ public class ServerCommandHandler {
         
         // Parse additional arguments (skip "run")
         for (int i = 1; i < args.length; i++) {
-            if ((args[i].equals("--version") || args[i].equals("-v")) && i + 1 < args.length) {
-                versionOverride = args[i + 1];
-                i++; // Skip next argument
-            } else if (args[i].equals("--force") || args[i].equals("-f")) {
+            String arg = args[i];
+            if (("--version".equals(arg) || "-v".equals(arg)) && i + 1 < args.length) {
+                versionOverride = args[++i];
+            } else if ("--force".equals(arg) || "-f".equals(arg)) {
                 forceReplace = true;
-            } else if ((args[i].equals("--name") || args[i].equals("-n")) && i + 1 < args.length) {
-                customName = args[i + 1];
-                i++; // Skip next argument
-            } else if ((args[i].equals("--config") || args[i].equals("-c")) && i + 1 < args.length) {
-                configFileName = args[i + 1];
-                i++; // Skip next argument
-            } else if ((args[i].equals("--env") || args[i].equals("--environment")) && i + 1 < args.length) {
-                environment = args[i + 1];
-                i++; // Skip next argument
-            } else if (args[i].startsWith("--env=")) {
-                environment = args[i].substring("--env=".length());
-            } else if (args[i].startsWith("--environment=")) {
-                environment = args[i].substring("--environment=".length());
-            } else if ((args[i].equals("--webroot")) && i + 1 < args.length) {
-                webrootOverride = args[i + 1];
-                i++; // Skip next argument
-            } else if (args[i].startsWith("--webroot=")) {
-                webrootOverride = args[i].substring("--webroot=".length());
-            } else if (args[i].equals("--no-agents")) {
+            } else if (("--name".equals(arg) || "-n".equals(arg)) && i + 1 < args.length) {
+                customName = args[++i];
+            } else if (("--config".equals(arg) || "-c".equals(arg)) && i + 1 < args.length) {
+                configFileName = args[++i];
+            } else if (("--env".equals(arg) || "--environment".equals(arg)) && i + 1 < args.length) {
+                environment = args[++i];
+            } else if (arg.startsWith("--env=")) {
+                environment = arg.substring("--env=".length());
+            } else if (arg.startsWith("--environment=")) {
+                environment = arg.substring("--environment=".length());
+            } else if (("--port".equals(arg) || "-p".equals(arg)) && i + 1 < args.length) {
+                try {
+                    portOverride = Integer.parseInt(args[++i]);
+                } catch (NumberFormatException ignore) {
+                    // ignore invalid port and fall back to defaults
+                }
+            } else if (arg.startsWith("--port=")) {
+                try {
+                    portOverride = Integer.parseInt(arg.substring("--port=".length()));
+                } catch (NumberFormatException ignore) {
+                    // ignore invalid port and fall back to defaults
+                }
+            } else if ("--webroot".equals(arg) && i + 1 < args.length) {
+                webrootOverride = args[++i];
+            } else if (arg.startsWith("--webroot=")) {
+                webrootOverride = arg.substring("--webroot=".length());
+            } else if ("--sandbox".equals(arg)) {
+                sandbox = true;
+            } else if ("--disable-lucee".equals(arg)) {
+                enableLuceeOverride = Boolean.FALSE;
+            } else if ("--enable-lucee".equals(arg)) {
+                enableLuceeOverride = Boolean.TRUE;
+            } else if ("--no-agents".equals(arg)) {
                 agentOverrides.disableAllAgents = true;
-            } else if ((args[i].equals("--agents")) && i + 1 < args.length) {
-                String value = args[i + 1];
+            } else if ("--agents".equals(arg) && i + 1 < args.length) {
+                String value = args[++i];
                 java.util.Set<String> ids = new java.util.HashSet<>();
                 for (String part : value.split(",")) {
                     String trimmed = part.trim();
@@ -499,32 +595,30 @@ public class ServerCommandHandler {
                     }
                 }
                 agentOverrides.includeAgents = ids;
-                i++; // Skip next argument
-            } else if (args[i].equals("--enable-agent") && i + 1 < args.length) {
+            } else if ("--enable-agent".equals(arg) && i + 1 < args.length) {
                 if (agentOverrides.enableAgents == null) {
                     agentOverrides.enableAgents = new java.util.HashSet<>();
                 }
-                agentOverrides.enableAgents.add(args[i + 1]);
-                i++; // Skip next argument
-            } else if (args[i].equals("--disable-agent") && i + 1 < args.length) {
+                agentOverrides.enableAgents.add(args[++i]);
+            } else if ("--disable-agent".equals(arg) && i + 1 < args.length) {
                 if (agentOverrides.disableAgents == null) {
                     agentOverrides.disableAgents = new java.util.HashSet<>();
                 }
-                agentOverrides.disableAgents.add(args[i + 1]);
-                i++; // Skip next argument
-            } else if (!args[i].startsWith("-") && i == 1 && !args[i].contains("=")) {
+                agentOverrides.disableAgents.add(args[++i]);
+            } else if (!arg.startsWith("-") && i == 1 && !arg.contains("=")) {
                 // If the first non-option argument after "run" is provided and does not
                 // look like a key=value override, treat it as the project directory.
-                projectDir = Paths.get(args[i]);
-            } else if (!args[i].startsWith("-") && args[i].contains("=")) {
+                projectDir = Paths.get(arg);
+            } else if (!arg.startsWith("-") && arg.contains("=")) {
                 // Treat bare key=value arguments as configuration overrides that should
                 // be applied to the configuration file before starting the server.
-                configOverrides.add(args[i]);
+                configOverrides.add(arg);
             }
         }
         
-        // Apply any configuration overrides to the selected configuration file before starting the server.
-        if (!configOverrides.isEmpty()) {
+        // Apply any configuration overrides to the selected configuration file before starting the server,
+        // but only in normal (non-sandbox) mode so sandbox does not create/write lucee.json.
+        if (!sandbox && (!configOverrides.isEmpty() || portOverride != null || enableLuceeOverride != null)) {
             String cfgFile = configFileName != null ? configFileName : "lucee.json";
             LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(projectDir, cfgFile);
             ServerConfigHelper configHelper = new ServerConfigHelper();
@@ -533,6 +627,12 @@ public class ServerCommandHandler {
                 if (parts.length == 2) {
                     configHelper.setConfigValue(config, parts[0], parts[1]);
                 }
+            }
+            if (portOverride != null) {
+                config.port = portOverride;
+            }
+            if (enableLuceeOverride != null) {
+                config.enableLucee = enableLuceeOverride.booleanValue();
             }
             Path configFile = projectDir.resolve(cfgFile);
             LuceeServerConfig.saveConfig(config, configFile);
@@ -548,10 +648,17 @@ public class ServerCommandHandler {
         
         try {
             // Run server in foreground mode - this method blocks until server is stopped
-            String cfgFile = configFileName != null ? configFileName : "lucee.json";
-            // For run, webrootOverride is handled inside LuceeServerManager when reading config;
-            // here we just pass through the arguments-driven overrides.
-            serverManager.runServerForeground(projectDir, versionOverride, forceReplace, customName, agentOverrides, environment, cfgFile);
+            if (sandbox) {
+                // Sandbox: transient foreground server with no lucee.json writes
+                serverManager.runServerForegroundSandbox(projectDir, versionOverride, forceReplace, customName,
+                        agentOverrides, environment, webrootOverride, portOverride, enableLuceeOverride);
+            } else {
+                String cfgFile = configFileName != null ? configFileName : "lucee.json";
+                // For run, webrootOverride is handled inside LuceeServerManager when reading config;
+                // here we just pass through the arguments-driven overrides.
+                serverManager.runServerForeground(projectDir, versionOverride, forceReplace, customName,
+                        agentOverrides, environment, cfgFile);
+            }
             return ""; // Return empty string since output is streamed to console
             
         } catch (ServerConflictException e) {

@@ -93,6 +93,22 @@ public class LuceeServerConfig {
          * against the project directory when starting the server.
          */
         public String configurationFile;
+
+        /**
+         * Optional path to a project-specific environment file. When set, this
+         * file is loaded before performing ${VAR} substitution in lucee.json.
+         * Relative paths are resolved against the project directory. When not
+         * specified, LuCLI defaults to `.env` in the project directory.
+         */
+        public String envFile;
+
+        /**
+         * Additional environment variables to expose to the Tomcat process when
+         * starting the server. Values support the same ${VAR} and
+         * ${VAR:-default} syntax as the rest of lucee.json and are resolved
+         * against the combined .env + system environment.
+         */
+        public Map<String, String> envVars = new HashMap<>();
         
         /**
          * Optional environment-specific configuration overrides.
@@ -173,9 +189,9 @@ public class LuceeServerConfig {
      * @param configFileName The configuration file name (e.g., "lucee.json", "lucee-simple.json")
      */
     public static ServerConfig loadConfig(Path projectDir, String configFileName) throws IOException {
-        // Load .env file if it exists in the same directory as lucee.json
-        loadEnvFile(projectDir);
-        
+        // Reset any previously loaded .env variables for this new project/config load
+        envVariables.clear();
+
         Path configFile = projectDir.resolve(configFileName);
         
         if (!Files.exists(configFile)) {
@@ -215,6 +231,12 @@ public class LuceeServerConfig {
         if (config.openBrowserURL != null && config.openBrowserURL.trim().isEmpty()) {
             config.openBrowserURL = null;
         }
+
+        // Load environment variables from the configured envFile (or default .env)
+        String envFileName = (config.envFile == null || config.envFile.trim().isEmpty())
+                ? ".env"
+                : config.envFile.trim();
+        loadEnvFile(projectDir, envFileName);
 
         // Perform environment variable substitution on string fields
         // Supports ${VAR_NAME} and ${VAR_NAME:-default_value}
@@ -293,20 +315,30 @@ public class LuceeServerConfig {
     }
     
     /**
-     * Load environment variables from a .env file in the project directory.
-     * The .env file should be in the same directory as lucee.json.
+     * Load environment variables from an env file in the project directory.
+     * The env file is typically `.env` and should be in the same directory as lucee.json.
      * Lines starting with # are treated as comments.
      * Supports KEY=VALUE format, including quoted values.
-     * Environment variables in the file take precedence over system env vars.
+     * Environment variables in the file take precedence over system env vars for
+     * configuration substitution. Loaded values are also available to server
+     * processes via {@link #applyLoadedEnvToProcessEnvironment(Map)}.
      */
-    private static void loadEnvFile(Path projectDir) {
-        Path envFile = projectDir.resolve(".env");
-        if (!Files.exists(envFile)) {
-            return; // No .env file, skip
+    private static void loadEnvFile(Path projectDir, String envFileName) {
+        if (envFileName == null || envFileName.trim().isEmpty()) {
+            return; // No env file configured
+        }
+
+        Path envFilePath = Paths.get(envFileName);
+        if (!envFilePath.isAbsolute()) {
+            envFilePath = projectDir.resolve(envFileName);
+        }
+
+        if (!Files.exists(envFilePath)) {
+            return; // No env file, skip
         }
         
         try {
-            java.util.List<String> lines = Files.readAllLines(envFile);
+            java.util.List<String> lines = Files.readAllLines(envFilePath);
             for (String line : lines) {
                 line = line.trim();
                 
@@ -340,8 +372,31 @@ public class LuceeServerConfig {
         }
     }
     
-    // Map to store environment variables loaded from .env files
+    // Map to store environment variables loaded from .env / envFile for the current config.
+    // This map is cleared at the start of each loadConfig call.
     private static final Map<String, String> envVariables = new java.util.HashMap<>();
+    
+    /**
+     * Apply the currently loaded .env / envFile variables into a target process
+     * environment map (e.g. ProcessBuilder.environment()).
+     *
+     * This only sets variables that are not already present in the target
+     * environment, so explicit OS environment variables and values provided via
+     * envVars in lucee.json take precedence.
+     */
+    public static void applyLoadedEnvToProcessEnvironment(Map<String, String> targetEnv) {
+        if (targetEnv == null) {
+            return;
+        }
+        for (Map.Entry<String, String> entry : envVariables.entrySet()) {
+            String key = entry.getKey();
+            String value = entry.getValue();
+            if (key == null || key.isEmpty() || value == null) {
+                continue;
+            }
+            targetEnv.putIfAbsent(key, value);
+        }
+    }
     
     /**
      * Get an environment variable, checking .env loaded vars first, then system env vars
@@ -384,6 +439,9 @@ public class LuceeServerConfig {
         if (config.configurationFile != null) {
             config.configurationFile = replaceEnvVars(config.configurationFile);
         }
+        if (config.envFile != null) {
+            config.envFile = replaceEnvVars(config.envFile);
+        }
         
         // Substitute in JVM config
         if (config.jvm != null) {
@@ -412,7 +470,20 @@ public class LuceeServerConfig {
             if (config.admin.password != null) {
                 config.admin.password = replaceEnvVars(config.admin.password);
             }
-            
+        }
+
+        // Substitute in envVars map (values only)
+        if (config.envVars != null && !config.envVars.isEmpty()) {
+            Map<String, String> resolved = new HashMap<>();
+            for (Map.Entry<String, String> entry : config.envVars.entrySet()) {
+                String key = entry.getKey();
+                String value = entry.getValue();
+                if (key == null || key.trim().isEmpty()) {
+                    continue;
+                }
+                resolved.put(key, value != null ? replaceEnvVars(value) : null);
+            }
+            config.envVars = resolved;
         }
         
         // Recursively substitute in the configuration JSON object
@@ -715,16 +786,25 @@ public class LuceeServerConfig {
     
     /**
      * Assign default ports to config if not already set.
-     * This ensures HTTP and shutdown ports are always available, even if not explicitly configured.
-     * This is called during config load to guarantee ports are assigned before conflict checking.
+     *
+     * Behaviour:
+     *  - If an explicit HTTP port is configured in lucee.json (non-zero), we ALWAYS
+     *    honour that value, even if it is currently in use. Port availability
+     *    conflicts are detected later by {@link #resolvePortConflicts} so we can
+     *    give detailed diagnostics and point at the owning LuCLI server.
+     *  - If no HTTP port is configured (port == 0), we assign a sensible default
+     *    starting from 8080, using the same "next available" logic as for
+     *    freshly created configs.
+     *  - The shutdown port is auto-assigned when not explicitly set.
      */
     private static void assignDefaultPortsIfNeeded(ServerConfig config) {
-        Path lucliHome = getLucliHome();
-        Path serversDir = lucliHome.resolve("servers");
-        Set<Integer> existingPorts = getExistingServerPorts(serversDir);
-        
-        // Try default HTTP port (8080) first
-        if (config.port == 0 || !isPortAvailable(config.port)) {
+        // If no HTTP port has been configured at all, pick a default using the
+        // same strategy as createDefaultConfig (avoid existing server ports and
+        // prefer 8080 when possible).
+        if (config.port == 0) {
+            Path lucliHome = getLucliHome();
+            Path serversDir = lucliHome.resolve("servers");
+            Set<Integer> existingPorts = getExistingServerPorts(serversDir);
             config.port = findAvailablePortAvoidingExisting(8080, 8000, 8999, existingPorts);
         }
         

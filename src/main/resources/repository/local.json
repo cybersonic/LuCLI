@@ -6,6 +6,17 @@
       "name": "markspresso",
       "description": "Brew static sites from Markdwon in shot!",
       "url": "https://github.com/cybersonic/markspresso.git"
+    },
+    {
+      "name": "lint",
+      "description": "Linter for Lucee CFML files (alpha)",
+      "url": "https://github.com/cybersonic/lucli-lint.git"
+    },
+    {
+      "name": "bitbucket",
+      "description": "Interact with Bitbucket API from LuCLI (alpha)",
+      "url": "https://github.com/cybersonic/lucli-bitbucket.git"
     }
+
   ]
 }

@@ -48,6 +48,14 @@ Variables are resolved in the following order of precedence:
 
 ## .env File
 
+By default, LuCLI looks for a `.env` file in the same directory as `lucee.json` to define local environment variables that will be automatically loaded. You can override the file name/path using the top-level `envFile` key in `lucee.json`:
+
+```json
+{
+  "envFile": ".env.local"
+}
+```
+
 Create a `.env` file in the same directory as `lucee.json` to define local environment variables that will be automatically loaded:
 
 ```bash
@@ -86,9 +94,10 @@ JVM_MIN_MEMORY=512m
 
 Environment variable substitution is supported in:
 
-- **Top-level string fields:** `version`, `name`, `webroot`, `openBrowserURL`, `configurationFile`
+- **Top-level string fields:** `version`, `name`, `webroot`, `openBrowserURL`, `configurationFile`, `envFile`
 - **JVM configuration:** `jvm.maxMemory`, `jvm.minMemory`, `jvm.additionalArgs`
 - **URL Rewrite:** `urlRewrite.routerFile`
+- **`envVars` values:** each value in the `envVars` object is resolved using the same `${VAR}` / `${VAR:-default}` rules before being passed through to the Tomcat process
 - **Entire `configuration` object:** All strings, arrays, and nested objects within the CFConfig can use variables
 
 ## Example Configuration
@@ -160,6 +169,24 @@ EOF
 lucli server start
 ```
 
+### Passing variables through to the Tomcat process with `envVars`
+
+In addition to using variables inside `lucee.json`, you can expose selected values to the Tomcat process by defining `envVars` at the top level of `lucee.json`:
+
+```json
+{
+  "envFile": ".env",
+  "envVars": {
+    "APP_ENV": "${APP_ENV:-dev}",
+    "DB_HOST": "${DB_HOST:-localhost}",
+    "DB_PORT": "${DB_PORT:-3306}",
+    "FEATURE_FLAG_COOL_THING": "${FEATURE_FLAG_COOL_THING:-false}"
+  }
+}
+```
+
+At server startup, LuCLI resolves the `envVars` values using the combined environment from `envFile` + system env vars and then injects them into the Tomcat process environment. Inside Lucee you can access them via `server.system.environment["APP_ENV"]`, etc.
+
 ### Getting and Setting Configuration Values
 
 ```bash
@@ -179,38 +206,10 @@ lucli server config set port='${HTTP_PORT:-8080}' version='${LUCEE_VERSION:-6.2.
 lucli server config set port='${HTTP_PORT:-8080}' --dry-run
 ```
 
-## Future: Java System Properties
-
-> ⚠️ **This feature is currently under consideration and not yet implemented.**
-
-**Proposed syntax** for Java system properties:
-
-```json
-{
-  "appName": "${java:app.name}",
-  "version": "${java:app.version}"
-}
-```
-
-This would allow access to Java system properties set via JVM arguments:
-
-```bash
-java -Dapp.name=myapp -Dapp.version=1.0 -jar lucli.jar ...
-```
-
-### Design
-
-The proposed `${java:...}` syntax provides:
-- Clear distinction from environment variables (which use `${VAR}`)
-- Access to Java system properties without conflict
-- Standard Java property notation
-
-Implementation would require:
-1. Detecting the `java:` prefix in variable substitution
-2. Resolving via `System.getProperty()` instead of `System.getenv()`
-3. Updated documentation and examples
 
 ## Best Practices
+
+> Note: We should document, for each relevant setting, which values are baked into the generated Tomcat configuration files versus which are provided as dynamic environment variables at server startup (e.g. `CATALINA_OPTS`, `LUCEE_ADMIN_PASSWORD`, custom `envVars`).
 
 1. **Use `.env` for development:** Keep sensitive data in `.env` which can be added to `.gitignore`
 2. **Use environment variables for CI/CD:** Set via deployment scripts or container orchestration
@@ -267,3 +266,4 @@ If you see `${VARIABLE_NAME}` in your output instead of the value:
 
 - [CONFIGURATION.md](CONFIGURATION.md) - Complete configuration reference
 - [EXECUTING_COMMANDS.md](EXECUTING_COMMANDS.md) - Running servers and commands
+- Example: `examples/server-envvars/` – demonstrates `envFile`, `envVars`, and how environment variables appear inside Lucee/Tomcat

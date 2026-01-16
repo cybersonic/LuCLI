@@ -15,6 +15,9 @@ import org.lucee.lucli.config.LuceeLockFile;
 import org.lucee.lucli.deps.GitDependencyInstaller;
 import org.lucee.lucli.deps.LockedDependency;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -88,6 +91,18 @@ public class InstallCommand implements Callable<Integer> {
                 devDeps.stream()
                     .filter(d -> !"git".equals(d.getSource()))
                     .forEach(d -> StringOutput.Quick.warning("  " + d.getName() + " (" + d.getSource() + ") - not implemented yet [dev]"));
+
+                // Show the realized dependency configuration (including environment overrides)
+                try {
+                    ObjectMapper mapper = new ObjectMapper();
+                    mapper.enable(SerializationFeature.INDENT_OUTPUT);
+                    String realizedJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(config);
+                    System.out.println("\n📋 DRY RUN: Dependency configuration that would be used (from lucee.json):\n");
+                    System.out.println(realizedJson);
+                    System.out.println("\n✅ Run without --dry-run to install these dependencies and update lucee-lock.json.\n");
+                } catch (Exception e) {
+                    StringOutput.Quick.warning("\n⚠️  Failed to render realized dependency configuration: " + e.getMessage());
+                }
                     
                 return 0;
             }
