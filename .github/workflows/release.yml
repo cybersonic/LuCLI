@@ -93,6 +93,7 @@ jobs:
               # Copy JAR (once)
               if [ -f "$dir/lucli.jar" ] && [ ! -f "release-files/lucli-$VERSION.jar" ]; then
                 cp "$dir/lucli.jar" "release-files/lucli-$VERSION.jar"
+                cp "$dir/lucli.jar" "release-files/lucli.jar"
               fi
               
               # Copy Unix binary
@@ -195,7 +196,7 @@ jobs:
             ## LuCLI v${{ steps.version.outputs.VERSION }}
             
             ### Downloads
-            - **lucli-${{ steps.version.outputs.VERSION }}.jar** - Universal JAR (Java 17+, works everywhere)
+            - **lucli-${{ steps.version.outputs.VERSION }}.jar**/**lucli.jar** - Universal JAR (Java 17+, works everywhere)
             - **lucli-${{ steps.version.outputs.VERSION }}-linux** - Self-contained Linux binary (no Java needed)
             - **lucli-${{ steps.version.outputs.VERSION }}-macos** - Self-contained macOS binary (no Java needed)
             - **lucli-${{ steps.version.outputs.VERSION }}.bat** - Self-contained Windows binary (no Java needed)

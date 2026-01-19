@@ -3,6 +3,9 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Fixing build process:** Corrected the release workflow to add the expected "static" lucee.json
+
+## v0.1.265
 - **Server Sandbox Mode:** Added a `--sandbox` option to `lucli server run` to start a transient foreground server without creating or modifying `lucee.json` and without persisting the server instance after shutdown.
 - **Run Commands from Modules:** Added `executeCommand` method to `BaseModule.cfc` to allow modules to programmatically execute LuCLI commands.
 - **Env File Configuration & Tomcat Environment:** Added `envFile` and `envVars` top-level keys to `lucee.json` so projects can control which env file is loaded for `${VAR}` substitution and explicitly pass selected variables through to the Tomcat process environment. You can see usage examples in the updated [Environment Variables documentation](documentation/ENVIRONMENT_VARIABLES.md).
