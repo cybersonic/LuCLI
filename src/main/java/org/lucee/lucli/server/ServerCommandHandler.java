@@ -286,6 +286,8 @@ public class ServerCommandHandler {
         
         // Load final realized config for dry-run or actual startup
         String cfgFile = configFileName != null ? configFileName : "lucee.json";
+        Path cfgPath = projectDir.resolve(cfgFile);
+        boolean configFileExisted = Files.exists(cfgPath);
         LuceeServerConfig.ServerConfig finalConfig = LuceeServerConfig.loadConfig(projectDir, cfgFile);
         
         // Apply environment overrides if --env flag was provided
@@ -547,6 +549,54 @@ public class ServerCommandHandler {
                 environment,
                 cfgFile
             );
+
+            // If this command created a new lucee.json and the user supplied a
+            // --version override, persist that override so the generated
+            // configuration matches the running server.
+            if (!configFileExisted && versionOverride != null && !versionOverride.trim().isEmpty()) {
+                try {
+                    LuceeServerConfig.ServerConfig persistedConfig = LuceeServerConfig.loadConfig(projectDir, cfgFile);
+                    persistedConfig.version = versionOverride.trim();
+                    LuceeServerConfig.saveConfig(persistedConfig, cfgPath);
+                } catch (IOException e) {
+                    System.err.println("Warning: Failed to persist Lucee version override to " + cfgFile + ": " + e.getMessage());
+                }
+            }
+
+            // If lucee.json already existed and the user supplied a --version override
+            // that differs from the persisted version, optionally offer to update
+            // lucee.json so it reflects the version the server was started with.
+            if (configFileExisted && versionOverride != null && !versionOverride.trim().isEmpty()) {
+                try {
+                    LuceeServerConfig.ServerConfig persistedConfig = LuceeServerConfig.loadConfig(projectDir, cfgFile);
+                    String existingVersion = persistedConfig.version;
+                    String requestedVersion = versionOverride.trim();
+                    if (existingVersion != null && !existingVersion.equals(requestedVersion)) {
+                        // Only prompt in CLI mode with an interactive console; in terminal
+                        // mode we leave lucee.json unchanged to avoid blocking.
+                        if (!isTerminalMode && System.console() != null) {
+                            System.out.print(
+                                "⚠️  lucee.json version (" + existingVersion +
+                                ") differs from requested --version (" + requestedVersion + ").\n" +
+                                "Update lucee.json to " + requestedVersion + "? (y/N): "
+                            );
+                            java.util.Scanner scanner = new java.util.Scanner(System.in);
+                            String response = scanner.nextLine().trim().toLowerCase();
+                            if ("y".equals(response) || "yes".equals(response)) {
+                                persistedConfig.version = requestedVersion;
+                                LuceeServerConfig.saveConfig(persistedConfig, cfgPath);
+                                result.append("   Updated lucee.json version from ")
+                                      .append(existingVersion)
+                                      .append(" to ")
+                                      .append(requestedVersion)
+                                      .append("\n");
+                            }
+                        }
+                    }
+                } catch (IOException e) {
+                    System.err.println("Warning: Failed to inspect/persist Lucee version override to " + cfgFile + ": " + e.getMessage());
+                }
+            }
             
             // Use the realized configuration (including environment and overrides) for summary output
             LuceeServerConfig.ServerConfig config = finalConfig;
