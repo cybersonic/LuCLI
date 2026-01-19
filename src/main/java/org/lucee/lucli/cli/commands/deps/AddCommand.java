@@ -205,6 +205,44 @@ public class AddCommand implements Callable<Integer> {
         System.out.println("  • local path to a .lex file");
         System.out.println("Type '?' to list known extensions.");
 
+        // If we have a populated extension registry, offer an interactive
+        // selection first so users can pick an extension and version from a
+        // curated list.
+        Map<String, ExtensionRegistry.ExtensionInfo> all = ExtensionRegistry.listAll();
+        boolean hasRegistry = all != null && !all.isEmpty();
+
+        if (hasRegistry) {
+            while (true) {
+                System.out.println();
+                System.out.println("How do you want to select the extension?");
+                System.out.println("  1) Choose from Lucee extension registry (interactive list)");
+                System.out.println("  2) Enter extension identifier manually");
+                System.out.println("  0) Cancel");
+                System.out.print("> ");
+                String modeLine = in.readLine();
+                if (modeLine == null) {
+                    return null;
+                }
+                modeLine = modeLine.trim();
+                if ("0".equals(modeLine)) {
+                    return null; // cancel wizard
+                }
+                if (modeLine.isEmpty() || "1".equals(modeLine)) {
+                    DependencyConfig fromRegistry = runExtensionWizardFromRegistry(all);
+                    if (fromRegistry != null) {
+                        return fromRegistry;
+                    }
+                    // If user backed out of registry selection, fall through to
+                    // manual mode.
+                    break;
+                }
+                if ("2".equals(modeLine)) {
+                    break; // manual mode
+                }
+                System.out.println("Please enter 0, 1, or 2.");
+            }
+        }
+
         String name = askRequired("Dependency name (key in dependencies, e.g. redis, h2) ");
         if (name == null) return null;
 
@@ -407,21 +445,201 @@ public class AddCommand implements Callable<Integer> {
 
     private void printExtensionList() {
         System.out.println();
-        System.out.println("Known Lucee extensions (slug → name):");
+        System.out.println("Known Lucee extensions (slug  name):");
         Map<String, ExtensionRegistry.ExtensionInfo> all = ExtensionRegistry.listAll();
-        // De-duplicate by ID, prefer slug-like keys
+        // De-duplicate by ID, prefer the canonical slug from the registry
         Map<String, String> byId = new LinkedHashMap<>();
-        for (Map.Entry<String, ExtensionRegistry.ExtensionInfo> e : all.entrySet()) {
-            String key = e.getKey();
-            ExtensionRegistry.ExtensionInfo info = e.getValue();
+        for (ExtensionRegistry.ExtensionInfo info : all.values()) {
+            if (info == null || info.id == null) {
+                continue;
+            }
             if (!byId.containsKey(info.id)) {
-                byId.put(info.id, key + " → " + info.name);
+                String slug = info.slug != null && !info.slug.isBlank() ? info.slug : info.name;
+                byId.put(info.id, slug + "  " + info.name);
             }
         }
         for (String value : byId.values()) {
             System.out.println("  - " + value);
         }
         System.out.println();
+    }
+
+    /**
+     * Interactive registry-based extension selector. Lets the user pick an
+     * extension and (optionally) a specific version from the bundled
+     * ExtensionRegistry and returns a fully populated DependencyConfig.
+     *
+     * Returns null when the user chooses to fall back to manual entry or
+     * cancels.
+     */
+    private DependencyConfig runExtensionWizardFromRegistry(Map<String, ExtensionRegistry.ExtensionInfo> all) throws IOException {
+        java.util.List<ExtensionRegistry.ExtensionInfo> list = uniqueExtensionsById(all);
+        if (list.isEmpty()) {
+            return null;
+        }
+
+        // Sort by slug (fallback to name) for a stable, user-friendly list
+        list.sort((a, b) -> {
+            String sa = a.slug != null && !a.slug.isBlank() ? a.slug : a.name;
+            String sb = b.slug != null && !b.slug.isBlank() ? b.slug : b.name;
+            if (sa == null) sa = "";
+            if (sb == null) sb = "";
+            return sa.compareToIgnoreCase(sb);
+        });
+
+        while (true) {
+            System.out.println();
+            System.out.println("Known Lucee extensions (from registry):");
+            for (int i = 0; i < list.size(); i++) {
+                ExtensionRegistry.ExtensionInfo info = list.get(i);
+                String slug = info.slug != null && !info.slug.isBlank() ? info.slug : info.name;
+                String latest = info.latestVersion != null ? info.latestVersion : null;
+                System.out.print("  " + (i + 1) + ") " + slug);
+                if (info.name != null && !info.name.isBlank() && !info.name.equalsIgnoreCase(slug)) {
+                    System.out.print(" - " + info.name);
+                }
+                if (latest != null && !latest.isBlank()) {
+                    System.out.print(" [latest: " + latest + "]");
+                }
+                System.out.println();
+            }
+            System.out.println("  0) Custom / manual extension");
+
+            System.out.print("Select extension [0 for custom]: ");
+            String line = in.readLine();
+            if (line == null) {
+                return null;
+            }
+            line = line.trim();
+            if (line.isEmpty() || "0".equals(line)) {
+                return null; // fall back to manual
+            }
+
+            int idx;
+            try {
+                idx = Integer.parseInt(line);
+            } catch (NumberFormatException e) {
+                System.out.println("Please enter a number between 0 and " + list.size() + ".");
+                continue;
+            }
+
+            if (idx < 1 || idx > list.size()) {
+                System.out.println("Please enter a number between 0 and " + list.size() + ".");
+                continue;
+            }
+
+            ExtensionRegistry.ExtensionInfo selected = list.get(idx - 1);
+            String slug = selected.slug != null && !selected.slug.isBlank() ? selected.slug : selected.name;
+
+            // Let the user choose a specific version when we have a version
+            // list; otherwise use latestVersion if present.
+            String chosenVersion = null;
+            if (selected.versions != null && selected.versions.length > 0) {
+                chosenVersion = chooseExtensionVersion(selected);
+                if (chosenVersion == null) {
+                    // User cancelled version selection; treat as cancelling the
+                    // registry-based flow.
+                    return null;
+                }
+            } else if (selected.latestVersion != null && !selected.latestVersion.isBlank()) {
+                chosenVersion = selected.latestVersion;
+            }
+
+            String defaultDepName = slug != null ? slug : selected.name;
+            String depName = askWithDefault("Dependency name (key in dependencies)", defaultDepName);
+            if (depName == null) {
+                return null;
+            }
+
+            DependencyConfig dep = new DependencyConfig(depName.trim());
+            dep.setType("extension");
+
+            // Pin explicit extension ID so installs are stable even if the
+            // registry changes in the future.
+            if (selected.id != null && !selected.id.isBlank()) {
+                dep.setId(selected.id);
+            } else if (slug != null && !slug.isBlank()) {
+                // Fallback: use slug and let DependencyConfig resolve it
+                dep.setId(slug);
+            }
+
+            if (chosenVersion != null && !chosenVersion.isBlank()) {
+                dep.setVersion(chosenVersion);
+            }
+
+            dep.applyDefaults();
+            return dep;
+        }
+    }
+
+    /**
+     * Build a de-duplicated list of ExtensionInfo entries keyed by extension
+     * ID. The underlying registry map is keyed by slug/name/alias, so we need
+     * to collapse those down to unique logical extensions.
+     */
+    private java.util.List<ExtensionRegistry.ExtensionInfo> uniqueExtensionsById(Map<String, ExtensionRegistry.ExtensionInfo> all) {
+        java.util.Map<String, ExtensionRegistry.ExtensionInfo> byId = new LinkedHashMap<>();
+        for (ExtensionRegistry.ExtensionInfo info : all.values()) {
+            if (info == null || info.id == null || info.id.isBlank()) {
+                continue;
+            }
+            if (!byId.containsKey(info.id)) {
+                byId.put(info.id, info);
+            }
+        }
+        return new java.util.ArrayList<>(byId.values());
+    }
+
+    /**
+     * Prompt the user to choose a specific version for a given extension from
+     * the registry. Returns the chosen version string, or null if the user
+     * cancels via EOF.
+     */
+    private String chooseExtensionVersion(ExtensionRegistry.ExtensionInfo info) throws IOException {
+        if (info.versions == null || info.versions.length == 0) {
+            return info.latestVersion;
+        }
+
+        String label = info.slug != null && !info.slug.isBlank() ? info.slug : info.name;
+
+        System.out.println();
+        System.out.println("Available versions for " + label + ":");
+        String latest = info.latestVersion;
+        for (int i = 0; i < info.versions.length; i++) {
+            String v = info.versions[i];
+            boolean isLatest = latest != null && latest.equals(v);
+            System.out.printf("  %d) %s%s%n", i + 1, v, isLatest ? " (latest)" : "");
+        }
+        System.out.println("  0) Use latest version");
+
+        while (true) {
+            System.out.print("Select version [0 for latest]: ");
+            String line = in.readLine();
+            if (line == null) {
+                return null;
+            }
+            line = line.trim();
+            if (line.isEmpty() || "0".equals(line)) {
+                if (latest != null && !latest.isBlank()) {
+                    return latest;
+                }
+                // Fall back to first listed version when latestVersion is not
+                // provided.
+                return info.versions[0];
+            }
+            int idx;
+            try {
+                idx = Integer.parseInt(line);
+            } catch (NumberFormatException e) {
+                System.out.println("Please enter a number between 0 and " + info.versions.length + ".");
+                continue;
+            }
+            if (idx < 1 || idx > info.versions.length) {
+                System.out.println("Please enter a number between 0 and " + info.versions.length + ".");
+                continue;
+            }
+            return info.versions[idx - 1];
+        }
     }
 
     // === Prompt helpers ===

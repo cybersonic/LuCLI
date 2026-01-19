@@ -128,6 +128,9 @@ public class ServerCommandHandler {
         Boolean enableLuceeOverride = null;
         boolean sandbox = false;
         Integer portOverride = null;
+        boolean createConfig = false;
+        Path sourceDirOverride = null;
+        Path destDirOverride = null;
         Path projectDir = currentWorkingDirectory; // Default to current directory
         
         LuceeServerManager.AgentOverrides agentOverrides = new LuceeServerManager.AgentOverrides();
@@ -183,6 +186,18 @@ public class ServerCommandHandler {
                 includeHttpsKeystorePlan = true;
             } else if (args[i].equals("--include-https-redirect-rules")) {
                 includeHttpsRedirectRules = true;
+            } else if (args[i].equals("--create-config")) {
+                createConfig = true;
+            } else if (args[i].equals("--source") && i + 1 < args.length) {
+                sourceDirOverride = Paths.get(args[i + 1]);
+                i++; // Skip next argument
+            } else if (args[i].startsWith("--source=")) {
+                sourceDirOverride = Paths.get(args[i].substring("--source=".length()));
+            } else if (args[i].equals("--dest") && i + 1 < args.length) {
+                destDirOverride = Paths.get(args[i + 1]);
+                i++; // Skip next argument
+            } else if (args[i].startsWith("--dest=")) {
+                destDirOverride = Paths.get(args[i].substring("--dest=".length()));
             } else if (args[i].equals("--include-all")) {
                 // Convenience flag for debugging: show all available dry-run previews.
                 includeTomcatWeb = true;
@@ -232,10 +247,15 @@ public class ServerCommandHandler {
             }
         }
 
-        // If sandbox mode is requested, disallow dry-run and preview flags which rely on lucee.json
+        // If sandbox mode is requested, disallow dry-run/preview flags which rely on lucee.json
         if (sandbox && (dryRun || includeLuceeConfig || includeTomcatWeb || includeTomcatServer
-                || includeHttpsKeystorePlan || includeHttpsRedirectRules)) {
-            return formatOutput("❌ --sandbox cannot be combined with --dry-run or preview flags (--include-*, --include-all).", true);
+                || includeHttpsKeystorePlan || includeHttpsRedirectRules || createConfig)) {
+            return formatOutput("❌ --sandbox cannot be combined with --dry-run, --create-config or preview flags (--include-*, --include-all).", true);
+        }
+
+        // --source/--dest are only meaningful together with --create-config
+        if (!createConfig && (sourceDirOverride != null || destDirOverride != null)) {
+            return formatOutput("❌ --source/--dest are only supported with --create-config.", true);
         }
         
         // Apply any configuration overrides to lucee.json before starting the server.
@@ -293,6 +313,58 @@ public class ServerCommandHandler {
             }
         }
         
+        // If create-config is requested, materialize the server configuration and exit without starting.
+        if (createConfig) {
+            Path sourceDir;
+            if (sourceDirOverride != null) {
+                if (!Files.exists(sourceDirOverride) || !Files.isDirectory(sourceDirOverride)) {
+                    return formatOutput("❌ Source directory not found or not a directory: " + sourceDirOverride.toAbsolutePath(), true);
+                }
+                sourceDir = sourceDirOverride.toAbsolutePath();
+            } else {
+                try {
+                    sourceDir = serverManager.ensureLuceeExpress(finalConfig.version);
+                } catch (IOException e) {
+                    return formatOutput("❌ Failed to obtain server distribution for version " + finalConfig.version + ": " + e.getMessage(), true);
+                }
+            }
+
+            Path serverInstanceDir = (destDirOverride != null)
+                ? destDirOverride.toAbsolutePath()
+                : serverManager.getServersDir().resolve(finalConfig.name);
+
+            try {
+                TomcatConfigGenerator generator = new TomcatConfigGenerator();
+                generator.generateConfiguration(serverInstanceDir, finalConfig, projectDir, sourceDir, false);
+            } catch (IOException e) {
+                return formatOutput("❌ Failed to generate server configuration: " + e.getMessage(), true);
+            }
+
+            StringBuilder result = new StringBuilder();
+            result.append("📦 Server configuration generated (no server started):\n\n");
+            result.append("   Project:      ").append(projectDir).append("\n");
+            result.append("   Source:       ").append(sourceDir).append("\n");
+            result.append("   Instance dir: ").append(serverInstanceDir).append("\n");
+
+            Path effectiveWebroot = LuceeServerConfig.resolveWebroot(finalConfig, projectDir);
+            result.append("   Web root:     ").append(effectiveWebroot).append("\n");
+            result.append("   Config files:\n");
+            result.append("     - ").append(serverInstanceDir.resolve("conf").resolve("server.xml")).append("\n");
+            result.append("     - ").append(effectiveWebroot.resolve("WEB-INF").resolve("web.xml")).append("\n");
+
+            if (finalConfig.enableLucee && finalConfig.urlRewrite != null && finalConfig.urlRewrite.enabled) {
+                result.append("     - ").append(effectiveWebroot.resolve("WEB-INF").resolve("urlrewrite.xml")).append("\n");
+            }
+            if (LuceeServerConfig.isHttpsEnabled(finalConfig)) {
+                Path certsDir = serverInstanceDir.resolve("certs");
+                result.append("     - ").append(certsDir.resolve("keystore.p12")).append("\n");
+                result.append("     - ").append(certsDir.resolve("keystore.pass")).append("\n");
+            }
+
+            result.append("\nYou can now inspect this instance or start it later with 'lucli server start' (without --create-config).\n");
+            return formatOutput(result.toString(), false);
+        }
+
         // If dry-run, show what would happen and exit
         if (dryRun) {
             StringBuilder result = new StringBuilder();

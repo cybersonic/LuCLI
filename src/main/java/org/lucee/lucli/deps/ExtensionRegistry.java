@@ -28,13 +28,27 @@ public class ExtensionRegistry {
     
     public static class ExtensionInfo {
         public final String id;
+        public final String slug;
         public final String name;
         public final String[] aliases;
-        
-        public ExtensionInfo(String id, String name, String... aliases) {
+        public final String[] versions;
+        public final String latestVersion;
+        public final String description;
+
+        public ExtensionInfo(String id,
+                             String slug,
+                             String name,
+                             String[] aliases,
+                             String[] versions,
+                             String latestVersion,
+                             String description) {
             this.id = id;
+            this.slug = slug;
             this.name = name;
-            this.aliases = aliases;
+            this.aliases = aliases != null ? aliases : new String[0];
+            this.versions = versions != null ? versions : new String[0];
+            this.latestVersion = latestVersion;
+            this.description = description;
         }
     }
     
@@ -48,34 +62,52 @@ public class ExtensionRegistry {
             if (is != null) {
                 JsonNode root = MAPPER.readTree(is);
                 JsonNode extensions = root.get("extensions");
-                
+
                 if (extensions != null && extensions.isArray()) {
                     for (JsonNode ext : extensions) {
                         String id = ext.get("id").asText();
                         String name = ext.get("name").asText();
                         String slug = ext.has("slug") ? ext.get("slug").asText() : null;
-                        
+
+                        // Aliases
                         JsonNode aliasesNode = ext.get("aliases");
-                        String[] aliases = new String[aliasesNode != null ? aliasesNode.size() : 0];
+                        String[] aliases = new String[aliasesNode != null && aliasesNode.isArray() ? aliasesNode.size() : 0];
                         if (aliasesNode != null && aliasesNode.isArray()) {
                             for (int i = 0; i < aliasesNode.size(); i++) {
                                 aliases[i] = aliasesNode.get(i).asText();
                             }
                         }
-                        
-                        ExtensionInfo info = new ExtensionInfo(id, name, aliases);
-                        
+
+                        // Versions (optional)
+                        JsonNode versionsNode = ext.get("versions");
+                        String[] versions = null;
+                        if (versionsNode != null && versionsNode.isArray()) {
+                            versions = new String[versionsNode.size()];
+                            for (int i = 0; i < versionsNode.size(); i++) {
+                                versions[i] = versionsNode.get(i).asText();
+                            }
+                        }
+
+                        String latestVersion = ext.has("latestVersion") ? ext.get("latestVersion").asText() : null;
+                        String description = ext.has("description") ? ext.get("description").asText() : null;
+
+                        ExtensionInfo info = new ExtensionInfo(id, slug, name, aliases, versions, latestVersion, description);
+
                         // Register by slug (primary key)
-                        if (slug != null) {
+                        if (slug != null && !slug.isEmpty()) {
                             EXTENSIONS.put(slug.toLowerCase(), info);
                         }
-                        
+
                         // Register by name (for lookups)
-                        EXTENSIONS.put(name.toLowerCase(), info);
-                        
+                        if (name != null && !name.isEmpty()) {
+                            EXTENSIONS.put(name.toLowerCase(), info);
+                        }
+
                         // Register aliases
-                        for (String alias : aliases) {
-                            EXTENSIONS.put(alias.toLowerCase(), info);
+                        for (String alias : info.aliases) {
+                            if (alias != null && !alias.isEmpty()) {
+                                EXTENSIONS.put(alias.toLowerCase(), info);
+                            }
                         }
                     }
                 }

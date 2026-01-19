@@ -13,6 +13,7 @@ import java.util.Set;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.xpath.XPathExpressionException;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -26,6 +27,9 @@ import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
+
+import static org.lucee.lucli.server.XmlHelper.append;
+import static org.lucee.lucli.server.XmlHelper.exists;
 
 /**
  * XML-based patching of Tomcat/Lucee web.xml.
@@ -88,7 +92,7 @@ public class TomcatWebXmlPatcher {
         }
     }
 
-    /**
+/**
      * Ensure that the lucee.json configuration file is not accessible via HTTP.
      *
      * <p>Adds a security-constraint that denies all access to /lucee.json if
@@ -104,56 +108,31 @@ public class TomcatWebXmlPatcher {
             return;
         }
 
-        // Check if there is already a security-constraint protecting /lucee.json.
-        NodeList constraints = root.getElementsByTagName("security-constraint");
-        if (constraints != null) {
-            for (int i = 0; i < constraints.getLength(); i++) {
-                Node node = constraints.item(i);
-                if (!(node instanceof Element)) {
-                    continue;
-                }
-                Element constraint = (Element) node;
-                NodeList collections = constraint.getElementsByTagName("web-resource-collection");
-                for (int j = 0; j < collections.getLength(); j++) {
-                    Node cNode = collections.item(j);
-                    if (!(cNode instanceof Element)) {
-                        continue;
-                    }
-                    Element collection = (Element) cNode;
-                    NodeList urlPatterns = collection.getElementsByTagName("url-pattern");
-                    for (int k = 0; k < urlPatterns.getLength(); k++) {
-                        Node pNode = urlPatterns.item(k);
-                        if (!(pNode instanceof Element)) {
-                            continue;
-                        }
-                        String pattern = pNode.getTextContent();
-                        if (pattern != null && pattern.trim().equals("/lucee.json")) {
-                            // Already protected.
-                            return;
-                        }
-                    }
-                }
+        try {
+            // Check if there is already a security-constraint protecting /lucee.json.
+            boolean alreadyProtected = exists(
+                document,
+                "//security-constraint" +
+                "[web-resource-collection/url-pattern[normalize-space(text())='/lucee.json']]"
+            );
+            if (alreadyProtected) {
+                return;
             }
+        } catch (XPathExpressionException e) {
+            // If XPath evaluation fails for any reason, fail-safe by leaving
+            // web.xml unchanged rather than risking duplicate or broken rules.
+            return;
         }
 
         // Not yet protected: append a new security-constraint at the end of web-app.
-        Element securityConstraint = document.createElement("security-constraint");
+        Element securityConstraint = append(root, "security-constraint", null);
 
-        Element webResourceCollection = document.createElement("web-resource-collection");
-        Element webResourceName = document.createElement("web-resource-name");
-        webResourceName.setTextContent("LuCLI configuration");
-        Element urlPattern = document.createElement("url-pattern");
-        urlPattern.setTextContent("/lucee.json");
-        webResourceCollection.appendChild(webResourceName);
-        webResourceCollection.appendChild(urlPattern);
+        Element webResourceCollection = append(securityConstraint, "web-resource-collection", null);
+        append(webResourceCollection, "web-resource-name", "LuCLI configuration");
+        append(webResourceCollection, "url-pattern", "/lucee.json");
 
-        Element authConstraint = document.createElement("auth-constraint");
         // Empty auth-constraint means no roles are allowed => deny all.
-
-        securityConstraint.appendChild(webResourceCollection);
-        securityConstraint.appendChild(authConstraint);
-
-        root.appendChild(securityConstraint);
+        append(securityConstraint, "auth-constraint", null);
     }
 
     /**

@@ -90,18 +90,23 @@ public class DependencyConfig {
         if (source == null || source.equals("git")) {
             if ("java".equals(type)) {
                 source = "maven";
-            } 
+            }
             else if ("extension".equals(type)) {
-                // For extensions, default to provider-based installation when no
-                // explicit path or URL is given. The actual ID can come from the
-                // explicit "id" field or from the dependency name (slug) via the
-                // ExtensionRegistry at resolution time.
+                // For extensions, we distinguish between provider-based
+                // extensions (no path/URL, resolved via ID/slug) and explicit
+                // .lex locations.
                 if (url != null) {
+                    // .lex from URL
                     source = "http";
                 } else if (path != null) {
+                    // .lex from local file path
                     source = "file";
                 } else {
-                    source = "extension-provider";
+                    // Provider-based extension: we intentionally leave
+                    // source unset so lucee.json stays minimal. The
+                    // ExtensionDependencyInstaller only needs the resolved
+                    // ID (via DependencyConfig.getId()).
+                    source = null;
                 }
             }
             else if (url != null) {
@@ -136,11 +141,23 @@ public class DependencyConfig {
                     break;
                 case "extension":
                 case "lex":
-                    installPath = "extensions/" + name + ".lex";
+                    // Only set an install path when we have a concrete .lex
+                    // file location (URL or path). For provider-based
+                    // extensions we don't need an installPath entry in
+                    // lucee.json.
+                    if (url != null || path != null) {
+                        installPath = "extensions/" + name + ".lex";
+                    }
                     break;
                 default:
                     installPath = "dependencies/" + name;
             }
+        }
+
+        // For extensions, ref is not meaningful (only used for git
+        // dependencies), so avoid persisting a default like "main".
+        if ("extension".equals(type)) {
+            ref = null;
         }
         
         // Apply mapping default for cfml type only

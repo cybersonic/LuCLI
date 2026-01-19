@@ -462,6 +462,75 @@ run_test_with_output "Alternate config shows enableLucee=false" \
 # Clean up alternate config project
 rm -rf alt_config_project
 
+# Sandbox server run tests (foreground, transient server)
+echo -e "${BLUE}=== Sandbox Server Run Tests ===${NC}"
+if command -v curl &> /dev/null; then
+    SANDBOX_TEST_NAME_PORT="Sandbox server run uses requested port"
+    SANDBOX_TEST_NAME_CLEANUP="Sandbox server run cleans up server directory"
+
+    # Skip both tests together if they don't match TEST_FILTER
+    if [[ -n "$TEST_FILTER" ]] && ! echo "$SANDBOX_TEST_NAME_PORT $SANDBOX_TEST_NAME_CLEANUP" | grep -iq -- "$TEST_FILTER"; then
+        echo -e "${BLUE}↷ Skipping sandbox server tests (do not match filter '${TEST_FILTER}')${NC}"
+    else
+        SANDBOX_PROJECT="sandbox_project"
+        SANDBOX_PORT=9099
+        mkdir -p "$SANDBOX_PROJECT"
+        echo 'OK' > "$SANDBOX_PROJECT/index.html"
+
+        # Count existing sandbox server directories for this project before the run
+        BEFORE_SANDBOX_COUNT=$(find "$LUCLI_HOME_TEST/servers" -maxdepth 1 -type d -name 'sandbox_project-sandbox*' 2>/dev/null | wc -l || echo 0)
+
+        # Helper to wait for HTTP port to respond
+        wait_for_sandbox_port() {
+            local port="$1"; local timeout="$2"; local count=0
+            while [ "$count" -lt "$timeout" ]; do
+                if curl -s "http://localhost:${port}/" > /dev/null 2>&1; then
+                    return 0
+                fi
+                sleep 1
+                count=$((count + 1))
+            done
+            return 1
+        }
+
+        echo -e "${CYAN}Starting sandbox server in foreground (inside timeout)...${NC}"
+        (
+          cd "$SANDBOX_PROJECT" && timeout 30 java -jar ../$LUCLI_JAR server run --sandbox --disable-lucee --port "$SANDBOX_PORT"
+        ) > sandbox_run.log 2>&1 &
+        SANDBOX_RUN_PID=$!
+
+        # Test: port is actually used
+        TOTAL_TESTS=$((TOTAL_TESTS + 1))
+        if wait_for_sandbox_port "$SANDBOX_PORT" 20; then
+            echo -e "${GREEN}✅ ${SANDBOX_TEST_NAME_PORT}${NC}"
+        else
+            echo -e "${RED}❌ ${SANDBOX_TEST_NAME_PORT}${NC}"
+            echo -e "${YELLOW}💡 Sandbox run log:${NC}"
+            [ -f sandbox_run.log ] && sed -e '1,40p' sandbox_run.log || true
+            FAILED_TESTS=$((FAILED_TESTS + 1))
+        fi
+
+        # Allow the timeout or manual stop to complete, then give sandbox cleanup some time
+        wait "$SANDBOX_RUN_PID" || true
+        sleep 3
+
+        # Test: sandbox server directories are cleaned up (no additional sandbox_project-sandbox* dirs)
+        TOTAL_TESTS=$((TOTAL_TESTS + 1))
+        AFTER_SANDBOX_COUNT=$(find "$LUCLI_HOME_TEST/servers" -maxdepth 1 -type d -name 'sandbox_project-sandbox*' 2>/dev/null | wc -l || echo 0)
+        if [ "$AFTER_SANDBOX_COUNT" -eq "$BEFORE_SANDBOX_COUNT" ]; then
+            echo -e "${GREEN}✅ ${SANDBOX_TEST_NAME_CLEANUP}${NC}"
+        else
+            echo -e "${RED}❌ ${SANDBOX_TEST_NAME_CLEANUP}${NC}"
+            echo -e "${YELLOW}Before count: ${BEFORE_SANDBOX_COUNT}, After count: ${AFTER_SANDBOX_COUNT}${NC}"
+            FAILED_TESTS=$((FAILED_TESTS + 1))
+        fi
+
+        rm -rf "$SANDBOX_PROJECT"
+    fi
+else
+    echo -e "${YELLOW}⚠️ curl not available, skipping sandbox server run tests${NC}"
+fi
+
 # Test 5: Invalid environment error handling
 if java -jar ../$LUCLI_JAR server start --env=invalid --dry-run env_test_project 2>&1 | grep -q "not found in lucee.json"; then
     echo -e "${GREEN}✅ PASSED - Invalid environment error handled correctly${NC}"

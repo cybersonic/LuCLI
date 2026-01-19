@@ -126,6 +126,18 @@ public class ServerCommand implements Callable<Integer> {
                 description = "Include HTTPS redirect rules in dry-run output")
         private boolean includeHttpsRedirectRules = false;
 
+        @Option(names = {"--create-config"},
+                description = "Generate server configuration and exit without starting the server")
+        private boolean createConfig = false;
+
+        @Option(names = {"--source"},
+                description = "Server template/source directory to use (defaults to the vendor distribution for the selected version)")
+        private String source;
+
+        @Option(names = {"--dest"},
+                description = "Server instance directory to write configuration into (defaults to the standard servers directory)")
+        private String dest;
+
         @Option(names = {"--include-all"}, 
                 description = "Include all available dry-run previews")
         private boolean includeAll = false;
@@ -252,12 +264,23 @@ public class ServerCommand implements Callable<Integer> {
             if (dryRun) {
                 args.add("--dry-run");
             }
+            if (createConfig) {
+                args.add("--create-config");
+            }
             if (includeLucee) {
                 args.add("--include-lucee");
             }
             if (webroot != null) {
                 args.add("--webroot");
                 args.add(webroot);
+            }
+            if (source != null) {
+                args.add("--source");
+                args.add(source);
+            }
+            if (dest != null) {
+                args.add("--dest");
+                args.add(dest);
             }
             if (includeTomcatWeb) {
                 args.add("--include-tomcat-web");

@@ -42,19 +42,27 @@ public class LuceeServerManager {
     
     private static final String LUCEE_CDN_URL_TEMPLATE = "https://cdn.lucee.org/lucee-express-{version}.zip";
     private static final String DEFAULT_VERSION = "6.2.2.91";
-    
+
+    // Lucee engine JAR variants
+    private static final String LUCEE_JAR_STANDARD_TEMPLATE = "https://cdn.lucee.org/lucee-{version}.jar";
+    private static final String LUCEE_JAR_LIGHT_TEMPLATE = "https://cdn.lucee.org/lucee-light-{version}.jar";
+    private static final String LUCEE_JAR_ZERO_TEMPLATE = "https://cdn.lucee.org/lucee-zero-{version}.jar";
+
     private final Path lucliHome;
     private final Path expressDir;
     private final Path serversDir;
+    private final Path jarsDir;
     
     public LuceeServerManager() throws IOException {
         this.lucliHome = getLucliHome();
         this.expressDir = lucliHome.resolve("express");
         this.serversDir = lucliHome.resolve("servers");
+        this.jarsDir = lucliHome.resolve("jars");
         
         // Ensure directories exist
         Files.createDirectories(expressDir);
         Files.createDirectories(serversDir);
+        Files.createDirectories(jarsDir);
     }
     
     /**
@@ -1238,6 +1246,55 @@ public class LuceeServerManager {
         Files.deleteIfExists(zipFile);
         
         return versionDir;
+    }
+
+    /**
+     * Ensure the Lucee engine JAR for the specified version and variant is available.
+     *
+     * @param version the Lucee version (e.g. "6.2.4.24"); when null/blank, DEFAULT_VERSION is used
+     * @param variant one of "standard", "light", or "zero" (case-insensitive)
+     * @return the path to the downloaded JAR inside the LuCLI jars directory
+     */
+    public Path ensureLuceeJar(String version, String variant) throws Exception {
+        String effectiveVersion = (version == null || version.trim().isEmpty())
+                ? DEFAULT_VERSION
+                : version.trim();
+
+        String effectiveVariant = (variant == null || variant.trim().isEmpty())
+                ? "standard"
+                : variant.trim().toLowerCase();
+
+        String downloadUrl;
+        String jarFileName;
+
+        switch (effectiveVariant) {
+            case "standard":
+                downloadUrl = LUCEE_JAR_STANDARD_TEMPLATE.replace("{version}", effectiveVersion);
+                jarFileName = "lucee-" + effectiveVersion + ".jar";
+                break;
+            case "light":
+                downloadUrl = LUCEE_JAR_LIGHT_TEMPLATE.replace("{version}", effectiveVersion);
+                jarFileName = "lucee-light-" + effectiveVersion + ".jar";
+                break;
+            case "zero":
+                downloadUrl = LUCEE_JAR_ZERO_TEMPLATE.replace("{version}", effectiveVersion);
+                jarFileName = "lucee-zero-" + effectiveVersion + ".jar";
+                break;
+            default:
+                throw new IllegalArgumentException(
+                        "Unknown Lucee JAR variant '" + variant + "'. Supported variants: standard, light, zero.");
+        }
+
+        Path jarPath = jarsDir.resolve(jarFileName);
+        if (Files.exists(jarPath)) {
+            // Already downloaded
+            return jarPath;
+        }
+
+        System.out.println("Downloading Lucee " + effectiveVariant + " JAR " + effectiveVersion + "...");
+        downloadFile(downloadUrl, jarPath);
+
+        return jarPath;
     }
     
     /**

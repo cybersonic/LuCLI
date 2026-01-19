@@ -14,6 +14,7 @@ import org.lucee.lucli.cli.commands.ParrotCommand;
 import org.lucee.lucli.cli.commands.SecretsCommand;
 import org.lucee.lucli.cli.commands.ServerCommand;
 import org.lucee.lucli.cli.commands.VersionsListCommand;
+import org.lucee.lucli.cli.commands.XmlCommand;
 import org.lucee.lucli.cli.commands.deps.DepsCommand;
 import org.lucee.lucli.cli.commands.deps.InstallCommand;
 
@@ -41,7 +42,9 @@ import picocli.CommandLine.Option;
         ParrotCommand.class,
         SecretsCommand.class,
         CommandLine.HelpCommand.class,
-        RunCommand.class
+        RunCommand.class,
+        // Hidden/internal diagnostics
+        XmlCommand.class
     },
     footer = {
         "",

@@ -22,12 +22,15 @@ import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
+import javax.xml.xpath.XPathExpressionException;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
+
+import static org.lucee.lucli.server.XmlHelper.removeAll;
 
 /**
  * XML-based patching of Tomcat's server.xml.
@@ -649,43 +652,25 @@ public class TomcatServerXmlPatcher {
     }
     
     /**
-     * Remove all AJP connectors from the document
+     * Remove all AJP connectors from the document.
      */
     private void removeAjpConnectors(Document document) {
         if (document == null) {
             return;
         }
-        
-        NodeList connectors = document.getElementsByTagName("Connector");
-        if (connectors == null || connectors.getLength() == 0) {
-            return;
-        }
-        
-        // Iterate backwards to safely remove elements during iteration
-        for (int i = connectors.getLength() - 1; i >= 0; i--) {
-            if (!(connectors.item(i) instanceof Element)) {
-                continue;
-            }
-            
-            Element connector = (Element) connectors.item(i);
-            String protocol = connector.getAttribute("protocol");
-            
-            // Check if this is an AJP connector
-            boolean isAjpConnector = 
-                protocol != null && (
-                    protocol.contains("AJP") || 
-                    protocol.contains("ajp") ||
-                    "AJP/1.3".equals(protocol) ||
-                    "org.apache.coyote.ajp.AjpNioProtocol".equals(protocol)
-                );
-            
-            if (isAjpConnector) {
-                // Remove the connector from its parent
-                Node parent = connector.getParentNode();
-                if (parent != null) {
-                    parent.removeChild(connector);
-                }
-            }
+
+        try {
+            // Match any Connector whose protocol attribute clearly indicates AJP.
+            removeAll(document,
+                "//Connector[" +
+                "contains(@protocol, 'AJP') or " +
+                "contains(@protocol, 'ajp') or " +
+                "@protocol='AJP/1.3' or " +
+                "@protocol='org.apache.coyote.ajp.AjpNioProtocol'" +
+                "]");
+        } catch (XPathExpressionException e) {
+            // If XPath evaluation fails for any reason, fall back to leaving
+            // server.xml unchanged instead of risking partial edits.
         }
     }
 }
