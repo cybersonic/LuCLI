@@ -9,21 +9,28 @@ import java.nio.file.StandardCopyOption;
 import java.util.Comparator;
 import java.util.stream.Stream;
 
+import org.lucee.lucli.Settings;
 import org.lucee.lucli.StringOutput;
 import org.lucee.lucli.config.DependencyConfig;
 
 /**
  * Git dependency installer
- * Clones Git repositories and installs them with optional subPath support
+ * Clones Git repositories and installs them with optional subPath support.
+ *
+ * Uses a shared cache under ~/.lucli/deps/git-cache so subsequent installs of
+ * the same repository can reuse the clone. This behavior is controlled by the
+ * usePersistentGitCache setting in ~/.lucli/settings.json (defaults to true).
  */
 public class GitDependencyInstaller implements DependencyInstaller {
     
     private final Path projectDir;
-    private final Path tempDir;
+    private final Path cacheRoot;
+    private final Settings settings;
     
     public GitDependencyInstaller(Path projectDir) {
         this.projectDir = projectDir;
-        // Use ~/.lucli/tmp/deps for temp clones
+        this.settings = new Settings();
+        
         String lucliHome = System.getProperty("lucli.home");
         if (lucliHome == null) {
             lucliHome = System.getenv("LUCLI_HOME");
@@ -31,7 +38,8 @@ public class GitDependencyInstaller implements DependencyInstaller {
         if (lucliHome == null) {
             lucliHome = System.getProperty("user.home") + "/.lucli";
         }
-        this.tempDir = Paths.get(lucliHome, "tmp", "deps");
+        // Use ~/.lucli/deps/git-cache for git dependency clones
+        this.cacheRoot = Paths.get(lucliHome, "deps", "git-cache");
     }
     
     @Override
@@ -43,73 +51,139 @@ public class GitDependencyInstaller implements DependencyInstaller {
     public LockedDependency install(DependencyConfig dep) throws Exception {
         StringOutput.Quick.info("  Installing " + dep.getName() + " from git...");
         
-        // 1. Create temp directory for this dependency
-        Path depTempDir = tempDir.resolve(dep.getName());
-        Files.createDirectories(depTempDir);
+        boolean useCache = settings.usePersistentGitCache();
+        String ref = dep.getRef() != null ? dep.getRef() : "main";
         
-        try {
-            // 2. Clone the repository
-            StringOutput.Quick.info("    🔄 Cloning " + dep.getUrl() + "...");
-            cloneRepository(dep.getUrl(), depTempDir);
+        if (useCache) {
+            // Persistent cache: reuse clones by name+URL hash, always fetching
+            Files.createDirectories(cacheRoot);
+            String cacheKey = buildCacheKey(dep);
+            Path repoDir = cacheRoot.resolve(cacheKey);
             
-            // 3. Checkout the specified ref
-            String ref = dep.getRef() != null ? dep.getRef() : "main";
-            StringOutput.Quick.info("    📌 Checking out " + ref + "...");
-            checkoutRef(depTempDir, ref);
-            
-            // 4. Get commit hash
-            String commitHash = getCommitHash(depTempDir);
-            StringOutput.Quick.info("    📝 Commit: " + commitHash.substring(0, 8));
-            
-            // 5. Determine source directory (with subPath if specified)
-            Path sourceDir = depTempDir;
-            if (dep.getSubPath() != null && !dep.getSubPath().trim().isEmpty()) {
-                sourceDir = depTempDir.resolve(dep.getSubPath());
-                if (!Files.exists(sourceDir)) {
-                    throw new IOException("SubPath '" + dep.getSubPath() + "' not found in repository");
+            try {
+                try {
+                    ensureRepository(repoDir, dep.getUrl());
+                } catch (Exception e) {
+                    // Cache corrupted or fetch failed - delete and re-clone once
+                    StringOutput.Quick.info("    ⚠️  Cache for " + dep.getName() + " is invalid, recloning...");
+                    deleteDirectory(repoDir);
+                    cloneRepository(dep.getUrl(), repoDir);
                 }
-                StringOutput.Quick.info("    📦 Extracting " + dep.getSubPath() + "/...");
+                
+                return installFromRepoDir(dep, repoDir, ref);
+            } catch (Exception e) {
+                // We've already attempted a fresh clone once; surface the error
+                throw e;
             }
+        } else {
+            // Non-persistent behavior: use a throwaway clone and delete it after
+            Files.createDirectories(cacheRoot);
+            String tempKey = buildCacheKey(dep) + "-" + System.nanoTime();
+            Path tempDir = cacheRoot.resolve(tempKey);
             
-            // 6. Copy to install path
-            Path installPath = projectDir.resolve(dep.getInstallPath());
-            StringOutput.Quick.info("    📂 Installing to " + dep.getInstallPath() + "...");
-            
-            // Remove existing installation if present
-            if (Files.exists(installPath)) {
-                deleteDirectory(installPath);
-            }
-            
-            // Copy files
-            copyDirectory(sourceDir, installPath);
-            
-            // 7. Calculate checksum
-            String checksum = ChecksumCalculator.calculate(installPath);
-            
-            // 8. Create lock file entry
-            LockedDependency locked = new LockedDependency();
-            locked.setVersion(ref);
-            locked.setResolved(dep.getUrl() + "#" + ref);
-            locked.setIntegrity("sha512-" + checksum);
-            locked.setSource("git");
-            locked.setType(dep.getType());
-            locked.setInstallPath(dep.getInstallPath());
-            locked.setMapping(dep.getMapping());
-            locked.setGitCommit(commitHash);
-            if (dep.getSubPath() != null) {
-                locked.setSubPath(dep.getSubPath());
-            }
-            
-            StringOutput.Quick.success("    ✓ Installed " + dep.getName());
-            
-            return locked;
-            
-        } finally {
-            // 9. Clean up temp directory
-            if (Files.exists(depTempDir)) {
-                deleteDirectory(depTempDir);
+            try {
+                StringOutput.Quick.info("    🔄 Cloning " + dep.getUrl() + "...");
+                cloneRepository(dep.getUrl(), tempDir);
+                return installFromRepoDir(dep, tempDir, ref);
+            } finally {
+                if (Files.exists(tempDir)) {
+                    deleteDirectory(tempDir);
+                }
             }
         }
+    }
+    
+    /**
+     * Build a stable cache key from dependency name and URL.
+     */
+    private String buildCacheKey(DependencyConfig dep) {
+        String name = dep.getName() != null ? dep.getName() : "dep";
+        String url = dep.getUrl() != null ? dep.getUrl() : "";
+        int urlHash = url.hashCode();
+        return name + "-" + Integer.toHexString(urlHash);
+    }
+    
+    /**
+     * Ensure the repository exists and is up to date:
+     * - If repo dir doesn't exist: clone
+     * - If it exists and is a git repo: fetch --tags
+     * - If it exists but is not a git repo: signal corruption
+     */
+    private void ensureRepository(Path repoDir, String url) throws Exception {
+        if (Files.exists(repoDir.resolve(".git"))) {
+            ProcessBuilder pb = new ProcessBuilder("git", "fetch", "--tags");
+            pb.directory(repoDir.toFile());
+            pb.redirectErrorStream(true);
+            
+            Process process = pb.start();
+            int exitCode = process.waitFor();
+            
+            if (exitCode != 0) {
+                String output = new String(process.getInputStream().readAllBytes());
+                throw new RuntimeException("Git fetch failed: " + output);
+            }
+        } else if (Files.exists(repoDir)) {
+            // Directory exists but is not a git repo - treat as corrupt cache
+            throw new RuntimeException("Existing cache directory is not a git repository: " + repoDir);
+        } else {
+            StringOutput.Quick.info("    🔄 Cloning " + url + "...");
+            cloneRepository(url, repoDir);
+        }
+    }
+    
+    /**
+     * Common installation flow once we have a prepared git working directory.
+     */
+    private LockedDependency installFromRepoDir(DependencyConfig dep, Path repoDir, String ref) throws Exception {
+        // 1. Checkout the specified ref
+        StringOutput.Quick.info("    📌 Checking out " + ref + "...");
+        checkoutRef(repoDir, ref);
+        
+        // 2. Get commit hash
+        String commitHash = getCommitHash(repoDir);
+        StringOutput.Quick.info("    📝 Commit: " + commitHash.substring(0, 8));
+        
+        // 3. Determine source directory (with subPath if specified)
+        Path sourceDir = repoDir;
+        if (dep.getSubPath() != null && !dep.getSubPath().trim().isEmpty()) {
+            sourceDir = repoDir.resolve(dep.getSubPath());
+            if (!Files.exists(sourceDir)) {
+                throw new IOException("SubPath '" + dep.getSubPath() + "' not found in repository");
+            }
+            StringOutput.Quick.info("    📦 Extracting " + dep.getSubPath() + "/...");
+        }
+        
+        // 4. Copy to install path
+        Path installPath = projectDir.resolve(dep.getInstallPath());
+        StringOutput.Quick.info("    📂 Installing to " + dep.getInstallPath() + "...");
+        
+        // Remove existing installation if present
+        if (Files.exists(installPath)) {
+            deleteDirectory(installPath);
+        }
+        
+        // Copy files
+        copyDirectory(sourceDir, installPath);
+        
+        // 5. Calculate checksum
+        String checksum = ChecksumCalculator.calculate(installPath);
+        
+        // 6. Create lock file entry
+        LockedDependency locked = new LockedDependency();
+        locked.setVersion(ref);
+        locked.setResolved(dep.getUrl() + "#" + ref);
+        locked.setIntegrity("sha512-" + checksum);
+        locked.setSource("git");
+        locked.setType(dep.getType());
+        locked.setInstallPath(dep.getInstallPath());
+        locked.setMapping(dep.getMapping());
+        locked.setGitCommit(commitHash);
+        if (dep.getSubPath() != null) {
+            locked.setSubPath(dep.getSubPath());
+        }
+        
+        StringOutput.Quick.success("    ✓ Installed " + dep.getName());
+        return locked;
     }
     
     /**

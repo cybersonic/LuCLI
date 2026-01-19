@@ -217,6 +217,14 @@ public class Settings {
     }
     
     /**
+     * Whether to use persistent git cache for dependencies.
+     * Defaults to true when not explicitly configured.
+     */
+    public boolean usePersistentGitCache() {
+        return getBoolean("usePersistentGitCache", true);
+    }
+    
+    /**
      * Set emoji display setting
      */
     public void setShowEmojis(boolean showEmojis) {

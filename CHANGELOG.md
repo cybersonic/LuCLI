@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+
+- **Git Dependency Caching:** Added persistent git dependency cache under `~/.lucli/deps/git-cache` (configurable via `usePersistentGitCache`) and a new `lucli deps prune` command to clear cached git clones.
+
+## 0.1.266
 - **Fixing build process:** Corrected the release workflow to add the expected "static" lucee.json
 
 ## v0.1.265

@@ -234,6 +234,33 @@ Available environments: prod, dev, staging
 
 LuCLI can manage CFML dependencies and Lucee extensions via the `dependencies`, `devDependencies`, and `dependencySettings` sections in `lucee.json`. Installed dependencies are recorded in `lucee-lock.json`, which is also used by server locking.
 
+### Git dependency caching
+
+Git-based dependencies (`source: "git"`) are installed by cloning their repositories and copying the requested `ref` (and optional `subPath`) into the project `installPath`. To speed up repeated installs, LuCLI maintains a shared git cache under:
+
+- `~/.lucli/deps/git-cache` (or `${LUCLI_HOME}/deps/git-cache` when `LUCLI_HOME` / `-Dlucli.home` is set)
+
+Behavior:
+
+- The first time a given git dependency is installed, LuCLI clones the repository into the cache directory.
+- Subsequent installs of the same dependency reuse the cached clone, running `git fetch --tags` to pull the latest refs before checking out the requested `ref`.
+- Each cached repository is keyed by **name + URL hash**, so different dependencies that share the same name but use different URLs will not collide.
+- If the cached clone becomes invalid (broken `.git` dir, fetch failure, etc.), LuCLI automatically deletes that cache entry and re-clones it once.
+
+You can control this behavior via a user-level setting in `~/.lucli/settings.json`:
+
+- `usePersistentGitCache` (boolean, default: `true`)
+  - When `true`, LuCLI uses the shared cache under `~/.lucli/deps/git-cache`.
+  - When `false`, LuCLI uses a throwaway clone per install and deletes it afterwards (slower, but leaves no cached git repositories on disk).
+
+To manually clear the git cache, use:
+
+```bash
+lucli deps prune
+```
+
+This removes all cached git clones under `~/.lucli/deps/git-cache`.
+
 At a high level:
 
 - `dependencies` – production dependencies (CFML libraries, Lucee extensions, etc.).
