@@ -6,10 +6,15 @@
 
   <groupId>org.lucee</groupId>
   <artifactId>lucli</artifactId>
-  <version>0.1.266</version>
-  <packaging>jar</packaging>
+  <version>0.1.268-SNAPSHOT</version>
+
   <name>LuCLI</name>
   <description>A CLI for Lucee</description>
+  <url>https://lucli.dev</url>
+  <inceptionYear>2025</inceptionYear>
+  
+  <packaging>jar</packaging>
+
   <properties>
     <maven.compiler.source>21</maven.compiler.source>
     <maven.compiler.target>21</maven.compiler.target>
@@ -18,6 +23,23 @@
     <lucee.version>7.0.1.93-SNAPSHOT</lucee.version>
     <lucee.classifier>zero</lucee.classifier>
   </properties>
+
+
+  <licenses>
+    <license>
+      <name>MIT License</name>
+      <url>https://opensource.org/licenses/MIT</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+
+  <developers>
+    <developer>
+      <id>cybersonic</id>
+      <name>Mark Drew</name>
+    </developer>
+  </developers>
 
   <repositories>
     <!-- Lucee official repository -->
@@ -142,6 +164,7 @@
           <jreleaser>
             <release>
               <github>
+                <!-- Owner can be inferred from the Git remote; override here if needed -->
                 <token>${env.JRELEASER_GITHUB_TOKEN}</token>
               </github>
             </release>
@@ -266,12 +289,9 @@
           </execution>
         </executions>
       </plugin>
-      <plugin>
-        <groupId>org.jreleaser</groupId>
-        <artifactId>jreleaser-maven-plugin</artifactId>
-        <version>1.22.0</version>
-      </plugin>
+      
     </plugins>
+
   </build>
   <profiles>
     <profile>
