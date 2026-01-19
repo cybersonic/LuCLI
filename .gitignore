@@ -32,3 +32,5 @@ WEB-INF/
 examples/
 docs/
 content/layouts/old/
+scripts/extensions.cfs
+tomcat_tests/
