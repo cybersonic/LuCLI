@@ -30,7 +30,9 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
+import static org.lucee.lucli.server.XmlHelper.exists;
 import static org.lucee.lucli.server.XmlHelper.removeAll;
+import static org.lucee.lucli.server.XmlHelper.setAttribute;
 
 /**
  * XML-based patching of Tomcat's server.xml.
@@ -119,34 +121,22 @@ public class TomcatServerXmlPatcher {
             return;
         }
 
-        NodeList connectors = document.getElementsByTagName("Connector");
-        if (connectors == null) {
+        try{
+         
+            setAttribute(document,
+                "//Connector[" +
+                "@protocol='HTTP/1.1' or " +
+                "not(@protocol) or " +
+                "@protocol='org.apache.coyote.http11.Http11NioProtocol'" +
+                "]",
+                "port",
+                String.valueOf(config.port));
+
+
+        } catch (XPathExpressionException e) {
             return;
         }
 
-        for (int i = 0; i < connectors.getLength(); i++) {
-            if (!(connectors.item(i) instanceof Element)) {
-                continue;
-            }
-
-            Element connector = (Element) connectors.item(i);
-            String protocol = connector.getAttribute("protocol");
-
-            boolean isHttpConnector =
-                "HTTP/1.1".equals(protocol) ||
-                protocol == null || protocol.isEmpty() ||
-                "org.apache.coyote.http11.Http11NioProtocol".equals(protocol);
-
-            if (!isHttpConnector) {
-                continue;
-            }
-
-            if (connector.hasAttribute("port")) {
-                connector.setAttribute("port", String.valueOf(config.port));
-                // Only update the first matching HTTP connector for now.
-                break;
-            }
-        }
     }
 
     /**

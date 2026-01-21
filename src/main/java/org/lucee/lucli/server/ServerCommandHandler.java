@@ -398,10 +398,16 @@ public class ServerCommandHandler {
                     Path serverInstanceDir = serverManager.getServersDir().resolve(finalConfig.name);
 
                     if(includeLuceeConfig) {
-                        result.append("\n📄 .CFConfig.json (patched, from lucee.json):\n");
+                        result.append("\n📄 .CFConfig.json (effective, including existing file if present):\n");
                         result.append("────────────────────────────────────────────\n");
                         try {
-                            com.fasterxml.jackson.databind.JsonNode cfConfig = LuceeServerConfig.resolveConfigurationNode(finalConfig, projectDir);
+                            java.util.List<String> arrayPaths = new java.util.ArrayList<>();
+                            com.fasterxml.jackson.databind.JsonNode cfConfig = LuceeServerConfig.resolveEffectiveCfConfigForContext(
+                                finalConfig,
+                                projectDir,
+                                serverInstanceDir,
+                                arrayPaths
+                            );
                             if (cfConfig == null || cfConfig.isNull()) {
                                 result.append("No Lucee configuration defined (no configuration or configurationFile in lucee.json)\n");
                             } else {
@@ -409,6 +415,13 @@ public class ServerCommandHandler {
                                 mapper.enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT);
                                 String cfConfigJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(cfConfig);
                                 result.append(cfConfigJson).append("\n");
+
+                                if (!arrayPaths.isEmpty()) {
+                                    result.append("\n⚠️  NOTE: The following CFConfig array paths will replace existing arrays in .CFConfig.json (not be merged):\n");
+                                    for (String path : arrayPaths) {
+                                        result.append("  - ").append(path).append("\n");
+                                    }
+                                }
                             }
                         } catch (Exception e) {
                             result.append("❌ Error generating .CFConfig.json preview: ").append(e.getMessage()).append("\n");
@@ -1716,10 +1729,10 @@ public class ServerCommandHandler {
     
     private String handleConfigGet(ServerConfigHelper configHelper, String[] args) throws Exception {
         if (args.length < 3) {
-            return formatOutput("❌ config get: missing key\n💡 Usage: server config get <key>\\n" +
-                "💡 Example: server config get port\\n" +
-                "💡 Example: server config get admin.enabled\\n" +
-                "💡 Example: server config get serverDir (virtual key - shows Tomcat instance location)\\n" +
+            return formatOutput("❌ config get: missing key\n💡 Usage: server config get <key>\n" +
+                "💡 Example: server config get port\n" +
+                "💡 Example: server config get admin.enabled\n" +
+                "💡 Example: server config get serverDir (virtual key - shows Tomcat instance location)\n" +
                 "💡 Example: server config get configuration --env=prod (export Lucee CFConfig for an environment)", true);
         }
         
@@ -1794,22 +1807,22 @@ public class ServerCommandHandler {
             
             // Warn if key is unknown but might still exist in the config
             if (!configHelper.isKnownKey(key) && !"serverDir".equals(key)) {
-                result.append("⚠️  Unknown configuration key (may not be officially supported):\\n");
-                result.append("  ⚠️  ").append(key).append("\\n\\n");
+                result.append("⚠️  Unknown configuration key (may not be officially supported):\n");
+                result.append("  ⚠️  ").append(key).append("\n\n");
             }
             
             if (value != null) {
-                result.append("✅ ").append(key).append("=\\n");
+                result.append("✅ ").append(key).append("=\n");
                 result.append("   Value: ").append(value);
                 return formatOutput(result.toString(), false);
             } else {
-                result.append("❌ Configuration key '" + key + "' not found\\n\\n");
-                result.append("Available keys:\\n");
+                result.append("❌ Configuration key '" + key + "' not found\n\n");
+                result.append("Available keys:\n");
                 for (String availKey : configHelper.getAvailableKeys()) {
-                    result.append("  • ").append(availKey).append("\\n");
+                    result.append("  • ").append(availKey).append("\n");
                 }
-                result.append("\\nVirtual keys (read-only, computed values):\\n");
-                result.append("  • serverDir - Location of Tomcat server instance (~/.lucli/servers/<name>)\\n");
+                result.append("\nVirtual keys (read-only, computed values):\n");
+                result.append("  • serverDir - Location of Tomcat server instance (~/.lucli/servers/<name>)\n");
                 return formatOutput(result.toString(), true);
             }
         } catch (Exception e) {

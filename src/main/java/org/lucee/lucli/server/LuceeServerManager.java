@@ -52,6 +52,19 @@ public class LuceeServerManager {
     private final Path expressDir;
     private final Path serversDir;
     private final Path jarsDir;
+
+    /**
+     * Registered runtime providers keyed by their runtime type strings
+     * (e.g. "lucee-express", "tomcat"). Providers are per-manager so they
+     * can reuse this manager's helper methods and directories.
+     */
+    private final java.util.Map<String, RuntimeProvider> runtimeProviders = new java.util.HashMap<>();
+
+    /**
+     * Default provider used when runtime.type is omitted or unknown.
+     * Currently this is always the Lucee Express provider.
+     */
+    private final RuntimeProvider defaultRuntimeProvider;
     
     public LuceeServerManager() throws IOException {
         this.lucliHome = getLucliHome();
@@ -63,6 +76,12 @@ public class LuceeServerManager {
         Files.createDirectories(expressDir);
         Files.createDirectories(serversDir);
         Files.createDirectories(jarsDir);
+
+        // Register built-in runtime providers.
+        RuntimeProvider express = new LuceeExpressRuntimeProvider();
+        this.defaultRuntimeProvider = express;
+        registerRuntimeProvider(express);
+        registerRuntimeProvider(new TomcatRuntimeProvider());
     }
     
     /**
@@ -178,6 +197,57 @@ public class LuceeServerManager {
     }
 
 /**
+     * Runtime provider abstraction used to support different backends
+     * (lucee-express, tomcat, docker, ...).
+     */
+    private interface RuntimeProvider {
+        String getType();
+        ServerInstance start(RuntimeContext context) throws Exception;
+    }
+
+    /**
+     * Context passed to runtime providers so they can perform startup logic
+     * without needing to know the full LuceeServerManager API surface.
+     */
+    private static final class RuntimeContext {
+        final LuceeServerConfig.ServerConfig config;
+        final Path projectDir;
+        final String environment;
+        final AgentOverrides agentOverrides;
+        final boolean foreground;
+        final boolean forceReplace;
+
+        RuntimeContext(LuceeServerConfig.ServerConfig config,
+                       Path projectDir,
+                       String environment,
+                       AgentOverrides agentOverrides,
+                       boolean foreground,
+                       boolean forceReplace) {
+            this.config = config;
+            this.projectDir = projectDir;
+            this.environment = environment;
+            this.agentOverrides = agentOverrides;
+            this.foreground = foreground;
+            this.forceReplace = forceReplace;
+        }
+    }
+
+    private void registerRuntimeProvider(RuntimeProvider provider) {
+        if (provider == null || provider.getType() == null) {
+            return;
+        }
+        runtimeProviders.put(provider.getType(), provider);
+    }
+
+    private RuntimeProvider getRuntimeProvider(String type) {
+        if (type == null || type.trim().isEmpty()) {
+            return defaultRuntimeProvider;
+        }
+        RuntimeProvider provider = runtimeProviders.get(type);
+        return provider != null ? provider : defaultRuntimeProvider;
+    }
+
+    /**
      * Run a transient "sandbox" server in foreground mode without writing lucee.json
      * in the project directory or persisting the server instance after shutdown.
      *
@@ -513,131 +583,14 @@ public class LuceeServerManager {
                                           " (PID: " + existingInstance.getPid() + ", Port: " + existingInstance.getPort() + ")");
         }
         
-        // Ensure Lucee Express is available
-        Path luceeExpressDir = ensureLuceeExpress(config.version);
-        
-        // Resolve port conflicts right before starting server to avoid race conditions
-        LuceeServerConfig.PortConflictResult portResult = LuceeServerConfig.resolvePortConflicts(config, false, this);
-        
-        if (portResult.hasConflicts) {
-            // Check for specific server conflicts and provide helpful messages
-            String httpPortServer = getServerUsingPort(config.port);
-            String shutdownPortServer = getServerUsingPort(LuceeServerConfig.getShutdownPort(config.port));
-            String jmxPortServer = null;
-            if (config.monitoring != null && config.monitoring.jmx != null) {
-                jmxPortServer = getServerUsingPort(config.monitoring.jmx.port);
-            }
-            
-            StringBuilder errorMessage = new StringBuilder("Cannot start server - port conflicts detected:\n\n");
-            
-            if (!LuceeServerConfig.isPortAvailable(config.port)) {
-                if (httpPortServer != null) {
-                    errorMessage.append("• HTTP port ").append(config.port)
-                            .append(" is being used by Lucee server '").append(httpPortServer).append("'\n")
-                            .append("  Use: lucli server stop ").append(httpPortServer).append(" (to stop the server)\n")
-                            .append("  Or change the port in your lucee.json file\n\n");
-                } else {
-                    errorMessage.append("• HTTP port ").append(config.port)
-                            .append(" is already in use by another process\n")
-                            .append("  Use: lsof -i :").append(config.port).append(" (to see what's using the port)\n")
-                            .append("  Or change the port in your lucee.json file\n\n");
-                }
-            }
-            
-            int shutdownPort = LuceeServerConfig.getShutdownPort(config.port);
-            if (!LuceeServerConfig.isPortAvailable(shutdownPort)) {
-                if (shutdownPortServer != null) {
-                    errorMessage.append("• Shutdown port ").append(shutdownPort)
-                            .append(" (HTTP port + 1000) is being used by Lucee server '").append(shutdownPortServer).append("'\n")
-                            .append("  Use: lucli server stop ").append(shutdownPortServer).append(" (to stop the server)\n")
-                            .append("  Or change the HTTP port in your lucee.json file\n\n");
-                } else {
-                    errorMessage.append("• Shutdown port ").append(shutdownPort)
-                            .append(" (HTTP port + 1000) is already in use by another process\n")
-                            .append("  Use: lsof -i :").append(shutdownPort).append(" (to see what's using the port)\n")
-                            .append("  Or change the HTTP port in your lucee.json file\n\n");
-                }
-            }
-            
-            if (config.monitoring != null && config.monitoring.jmx != null && config.monitoring.enabled && !LuceeServerConfig.isPortAvailable(config.monitoring.jmx.port)) {
-                if (jmxPortServer != null) {
-                    errorMessage.append("• JMX port ").append(config.monitoring.jmx.port)
-                            .append(" is being used by Lucee server '").append(jmxPortServer).append("'\n")
-                            .append("  Use: lucli server stop ").append(jmxPortServer).append(" (to stop the server)\n")
-                            .append("  Or change the JMX port in your lucee.json file\n\n");
-                } else {
-                    errorMessage.append("• JMX port ").append(config.monitoring.jmx.port)
-                            .append(" is already in use by another process\n")
-                            .append("  Use: lsof -i :").append(config.monitoring.jmx.port).append(" (to see what's using the port)\n")
-                            .append("  Or change the JMX port in your lucee.json file\n\n");
-                }
-            }
+        // At this point the logical server name and environment are resolved
+        // and any existing LuCLI-managed server directories have been checked.
+        // Delegate the actual runtime-specific startup to a RuntimeProvider.
 
-            if (LuceeServerConfig.isHttpsEnabled(config) && !LuceeServerConfig.isPortAvailable(LuceeServerConfig.getEffectiveHttpsPort(config))) {
-                int httpsPort = LuceeServerConfig.getEffectiveHttpsPort(config);
-                errorMessage.append("• HTTPS port ").append(httpsPort)
-                        .append(" is already in use by another process\n")
-                        .append("  Use: lsof -i :").append(httpsPort).append(" (to see what's using the port)\n")
-                        .append("  Or change https.port in your lucee.json file (or disable https)\n\n");
-            }
-            
-            throw new IllegalStateException(errorMessage.toString().trim());
-        }
-        
-        // Build port information message
-        StringBuilder portInfo = new StringBuilder();
-        if (foreground) {
-            portInfo.append("Running server '\"").append(config.name).append("\' in foreground mode:");
-        } else {
-            portInfo.append("Starting server '\"").append(config.name).append("\' on:");
-        }
-        portInfo.append("\n  HTTP port:     ").append(config.port);
-        portInfo.append("\n  Shutdown port: ").append(LuceeServerConfig.getEffectiveShutdownPort(config));
-        if (config.monitoring != null && config.monitoring.enabled && config.monitoring.jmx != null) {
-            portInfo.append("\n  JMX port:      ").append(config.monitoring.jmx.port);
-        }
-        if (LuceeServerConfig.isHttpsEnabled(config)) {
-            portInfo.append("\n  HTTPS port:    ").append(LuceeServerConfig.getEffectiveHttpsPort(config));
-            portInfo.append("\n  HTTPS redirect:").append(LuceeServerConfig.isHttpsRedirectEnabled(config) ? " enabled" : " disabled");
-        }
-        if (foreground) {
-            portInfo.append("\n\nPress Ctrl+C to stop the server\n");
-        }
-        
-        System.out.println(portInfo.toString());
-        
-        // Create server instance directory
-        Path serverInstanceDir = serversDir.resolve(config.name);
-        Files.createDirectories(serverInstanceDir);
-        
-        // Generate Tomcat configuration
-        TomcatConfigGenerator configGenerator = new TomcatConfigGenerator();
-        // When forceReplace is true (e.g. --force), also allow overwriting project-level
-        // WEB-INF config files (web.xml, urlrewrite.xml, UrlRewriteFilter JAR). Without
-        // --force, we preserve any existing project configuration files.
-        boolean overwriteProjectConfig = forceReplace;
-        configGenerator.generateConfiguration(serverInstanceDir, config, projectDir, luceeExpressDir, overwriteProjectConfig);
-
-        // Write CFConfig (.CFConfig.json) into the Lucee context if configured in lucee.json.
-        // This treats lucee.json as the source of truth and .CFConfig.json as a derived file.
-        LuceeServerConfig.writeCfConfigIfPresent(config, projectDir, serverInstanceDir);
-        
-        // Deploy extension dependencies to lucee-server/deploy folder (always deploy)
-        deployExtensionsForServer(projectDir, serverInstanceDir);
-        
-        // Launch the server process
-        ServerInstance instance = launchServerProcess(serverInstanceDir, config, projectDir, luceeExpressDir, agentOverrides, environment, foreground);
-        
-        // For background mode only: wait for startup and open browser
-        if (!foreground) {
-            // Wait for server to start
-            waitForServerStartup(instance, 30); // 30 second timeout
-            
-            // Open the browser if enabled
-            openBrowserForServer(instance, config);
-        }
-        
-        return instance;
+        LuceeServerConfig.RuntimeConfig runtimeConfig = LuceeServerConfig.getEffectiveRuntime(config);
+        RuntimeProvider provider = getRuntimeProvider(runtimeConfig.type);
+        RuntimeContext context = new RuntimeContext(config, projectDir, environment, agentOverrides, foreground, forceReplace);
+        return provider.start(context);
     }
     
     /**
@@ -820,6 +773,233 @@ public class LuceeServerManager {
         return null;
     }
     
+    public void checkAndReportPortConflicts(LuceeServerConfig.ServerConfig config, LuceeServerConfig.PortConflictResult portResult)
+                throws IOException {
+            if (portResult.hasConflicts) {
+                // Check for specific server conflicts and provide helpful messages
+                String httpPortServer = getServerUsingPort(config.port);
+                String shutdownPortServer = getServerUsingPort(LuceeServerConfig.getShutdownPort(config.port));
+                String jmxPortServer = null;
+                if (config.monitoring != null && config.monitoring.jmx != null) {
+                    jmxPortServer = getServerUsingPort(config.monitoring.jmx.port);
+                }
+
+                StringBuilder errorMessage = new StringBuilder("Cannot start server - port conflicts detected:\n\n");
+
+                if (!LuceeServerConfig.isPortAvailable(config.port)) {
+                    if (httpPortServer != null) {
+                        errorMessage.append("• HTTP port ").append(config.port)
+                                .append(" is being used by Lucee server '").append(httpPortServer).append("'\n")
+                                .append("  Use: lucli server stop ").append(httpPortServer).append(" (to stop the server)\n")
+                                .append("  Or change the port in your lucee.json file\n\n");
+                    } else {
+                        errorMessage.append("• HTTP port ").append(config.port)
+                                .append(" is already in use by another process\n")
+                                .append("  Use: lsof -i :").append(config.port).append(" (to see what's using the port)\n")
+                                .append("  Or change the port in your lucee.json file\n\n");
+                    }
+                }
+
+                int shutdownPort = LuceeServerConfig.getShutdownPort(config.port);
+                if (!LuceeServerConfig.isPortAvailable(shutdownPort)) {
+                    if (shutdownPortServer != null) {
+                        errorMessage.append("• Shutdown port ").append(shutdownPort)
+                                .append(" (HTTP port + 1000) is being used by Lucee server '").append(shutdownPortServer).append("'\n")
+                                .append("  Use: lucli server stop ").append(shutdownPortServer).append(" (to stop the server)\n")
+                                .append("  Or change the HTTP port in your lucee.json file\n\n");
+                    } else {
+                        errorMessage.append("• Shutdown port ").append(shutdownPort)
+                                .append(" (HTTP port + 1000) is already in use by another process\n")
+                                .append("  Use: lsof -i :").append(shutdownPort).append(" (to see what's using the port)\n")
+                                .append("  Or change the HTTP port in your lucee.json file\n\n");
+                    }
+                }
+
+                if (config.monitoring != null && config.monitoring.jmx != null && config.monitoring.enabled && !LuceeServerConfig.isPortAvailable(config.monitoring.jmx.port)) {
+                    if (jmxPortServer != null) {
+                        errorMessage.append("• JMX port ").append(config.monitoring.jmx.port)
+                                .append(" is being used by Lucee server '").append(jmxPortServer).append("'\n")
+                                .append("  Use: lucli server stop ").append(jmxPortServer).append(" (to stop the server)\n")
+                                .append("  Or change the JMX port in your lucee.json file\n\n");
+                    } else {
+                        errorMessage.append("• JMX port ").append(config.monitoring.jmx.port)
+                                .append(" is already in use by another process\n")
+                                .append("  Use: lsof -i :").append(config.monitoring.jmx.port).append(" (to see what's using the port)\n")
+                                .append("  Or change the JMX port in your lucee.json file\n\n");
+                    }
+                }
+
+                if (LuceeServerConfig.isHttpsEnabled(config) && !LuceeServerConfig.isPortAvailable(LuceeServerConfig.getEffectiveHttpsPort(config))) {
+                    int httpsPort = LuceeServerConfig.getEffectiveHttpsPort(config);
+                    errorMessage.append("• HTTPS port ").append(httpsPort)
+                            .append(" is already in use by another process\n")
+                            .append("  Use: lsof -i :").append(httpsPort).append(" (to see what's using the port)\n")
+                            .append("  Or change https.port in your lucee.json file (or disable https)\n\n");
+                }
+
+                throw new IllegalStateException(errorMessage.toString().trim());
+            }
+        }
+
+     private void displayPortDetails(LuceeServerConfig.ServerConfig config, boolean foreground) {
+            StringBuilder portInfo = new StringBuilder();
+            if (foreground) {
+                portInfo.append("Running server '\"").append(config.name).append("\' in foreground mode:");
+            } else {
+                portInfo.append("Starting server '\"").append(config.name).append("\' on:");
+            }
+            portInfo.append("\n  HTTP port:     ").append(config.port);
+            portInfo.append("\n  Shutdown port: ").append(LuceeServerConfig.getEffectiveShutdownPort(config));
+            if (config.monitoring != null && config.monitoring.enabled && config.monitoring.jmx != null) {
+                portInfo.append("\n  JMX port:      ").append(config.monitoring.jmx.port);
+            }
+            if (LuceeServerConfig.isHttpsEnabled(config)) {
+                portInfo.append("\n  HTTPS port:    ").append(LuceeServerConfig.getEffectiveHttpsPort(config));
+                portInfo.append("\n  HTTPS redirect:").append(LuceeServerConfig.isHttpsRedirectEnabled(config) ? " enabled" : " disabled");
+            }
+            if (foreground) {
+                portInfo.append("\n\nPress Ctrl+C to stop the server\n");
+            }
+
+            System.out.println(portInfo.toString());
+        }
+    /**
+     * Runtime provider for the default Lucee Express runtime. This preserves the
+     * existing behaviour of LuceeServerManager prior to introducing the runtime
+     * abstraction.
+     */
+    private final class LuceeExpressRuntimeProvider implements RuntimeProvider {
+        @Override
+        public String getType() {
+            return "lucee-express";
+        }
+
+        @Override
+        public ServerInstance start(RuntimeContext ctx) throws Exception {
+            LuceeServerConfig.ServerConfig config = ctx.config;
+            Path projectDir = ctx.projectDir;
+            String environment = ctx.environment;
+            AgentOverrides agentOverrides = ctx.agentOverrides;
+            boolean foreground = ctx.foreground;
+            boolean forceReplace = ctx.forceReplace;
+
+            // Ensure Lucee Express is available for the requested version
+            Path luceeExpressDir = ensureLuceeExpress(config.version);
+
+            // Resolve port conflicts right before starting server to avoid race conditions
+            LuceeServerConfig.PortConflictResult portResult = LuceeServerConfig.resolvePortConflicts(config, false, LuceeServerManager.this);
+
+            checkAndReportPortConflicts(config, portResult);
+
+            // Build port information message (unchanged behaviour)
+            displayPortDetails(config, foreground);
+
+            // Create server instance directory
+            Path serverInstanceDir = serversDir.resolve(config.name);
+            Files.createDirectories(serverInstanceDir);
+
+            // Generate Lucee Express-backed Tomcat configuration
+            LuceeExpressConfigGenerator configGenerator = new LuceeExpressConfigGenerator();
+            // When forceReplace is true (e.g. --force), also allow overwriting project-level
+            // WEB-INF config files (web.xml, urlrewrite.xml, UrlRewriteFilter JAR). Without
+            // --force, we preserve any existing project configuration files.
+            boolean overwriteProjectConfig = forceReplace;
+            configGenerator.generateConfiguration(serverInstanceDir, config, projectDir, luceeExpressDir, overwriteProjectConfig);
+
+            // Write CFConfig (.CFConfig.json) into the Lucee context if configured in lucee.json.
+            // This treats lucee.json as the source of truth and .CFConfig.json as a derived file.
+            LuceeServerConfig.writeCfConfigIfPresent(config, projectDir, serverInstanceDir);
+
+            // Deploy extension dependencies to lucee-server/deploy folder (always deploy)
+            deployExtensionsForServer(projectDir, serverInstanceDir);
+
+            // Launch the server process
+            ServerInstance instance = launchServerProcess(serverInstanceDir, config, projectDir, luceeExpressDir, agentOverrides, environment, foreground);
+
+            // For background mode only: wait for startup and open browser
+            if (!foreground) {
+                // Wait for server to start
+                waitForServerStartup(instance, 30); // 30 second timeout
+
+                // Open the browser if enabled
+                openBrowserForServer(instance, config);
+            }
+
+            return instance;
+        }
+
+       
+
+        
+    }
+
+    /**
+     * Runtime provider for the "tomcat" runtime type. For the first pass this
+     * behaves like the Lucee Express runtime but clearly indicates that the
+     * tomcat runtime is in preview so users can already configure it without
+     * surprising deployment behaviour.
+     */
+    private final class TomcatRuntimeProvider implements RuntimeProvider {
+        @Override
+        public String getType() {
+            return "tomcat";
+        }
+
+        @Override
+        public ServerInstance start(RuntimeContext ctx) throws Exception {
+            LuceeServerConfig.ServerConfig config = ctx.config;
+
+            boolean foreground = ctx.foreground;
+            
+            
+            // config.runtime.catalinaHome;
+            // config.runtime.catalinaBase;
+            String variant = config.runtime != null ? config.runtime.variant : "";
+
+            // Ensure Lucee JAR is available for the requested version and variant
+            Path luceeJarPath = ensureLuceeJar(config.version, config.runtime.variant);
+
+            // Resolve port conflicts right before starting server to avoid race conditions
+            LuceeServerConfig.PortConflictResult portResult = LuceeServerConfig.resolvePortConflicts(config, false, LuceeServerManager.this);
+
+            // Report any port conflicts
+            checkAndReportPortConflicts(config, portResult);
+
+            // Build port information message (unchanged behaviour)
+            displayPortDetails(config, foreground);
+
+
+            // Create server instance directory CATALINA_BASE
+            Path serverInstanceDir = serversDir.resolve(config.name);
+            Files.createDirectories(serverInstanceDir);
+
+
+            // Generate Tomcat configuration
+            TomcatConfigGenerator configGenerator = new TomcatConfigGenerator();
+            // When forceReplace is true (e.g. --force), also allow overwriting project-level
+            // WEB-INF config files (web.xml, urlrewrite.xml, UrlRewriteFilter JAR). Without
+            // --force, we preserve any existing project configuration files.
+            boolean overwriteProjectConfig = forceReplace;
+            configGenerator.generateConfiguration(serverInstanceDir, config, projectDir, luceeExpressDir, overwriteProjectConfig);
+
+            
+
+            // Resolve effective runtime so that any future tomcat-specific
+            // fields (catalinaHome, patchMode, etc.) are available, but for
+            // now we intentionally keep behaviour identical to the Lucee
+            // Express runtime and do not override webroot or other settings
+            // from runtime.installPath.
+            LuceeServerConfig.getEffectiveRuntime(config);
+
+            System.out.println("Using runtime.type=\"tomcat\"");
+
+            // Delegate to the default provider so process management and
+            // Tomcat configuration remain consistent with lucee-express.
+            throw new UnsupportedOperationException("tomcat runtime is not yet implemented");
+            // return defaultRuntimeProvider.start(ctx);
+        }
+    }
+
     /**
      * Check if a process is running
      */
@@ -1368,7 +1548,7 @@ public class LuceeServerManager {
     
     /**
      * Format bytes as MB with 1 decimal place
-     */
+     */ 
     private String formatMB(long bytes) {
         return String.format("%.1f", bytes / 1024.0 / 1024.0);
     }

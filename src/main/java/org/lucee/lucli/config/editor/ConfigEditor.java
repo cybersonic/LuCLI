@@ -175,9 +175,96 @@ public class ConfigEditor {
                 updaters.put("enableREST", () -> config.enableREST = parsed);
             }
         }
-
+        
         newline();
 
+        // --- Runtime section ---
+        title("Runtime");
+
+        // Use effective runtime defaults so users always see a type even when
+        // the "runtime" block is missing from lucee.json.
+        LuceeServerConfig.RuntimeConfig runtime = LuceeServerConfig.getEffectiveRuntime(config);
+
+        // runtime.type
+        System.out.println("Runtime backend controls where/how the server runs.");
+        System.out.println("  Known types: lucee-express (default), tomcat, docker");
+        System.out.print("Runtime type [" + nullToEmpty(runtime.type) + "]: ");
+        String runtimeTypeInput = scanner.nextLine().trim();
+        if (!runtimeTypeInput.isEmpty()) {
+            String normalized = runtimeTypeInput.toLowerCase();
+            if (!normalized.equals("lucee-express") && !normalized.equals("tomcat") && !normalized.equals("docker")) {
+                System.out.println("⚠️ Unknown runtime type. Expected one of: lucee-express, tomcat, docker. Ignoring change.");
+            } else {
+                runtime.type = normalized;
+            }
+        }
+
+        // runtime.installPath (common)
+        System.out.print("Runtime installPath [" + nullToEmpty(runtime.installPath) + "]: ");
+        String installPathInput = scanner.nextLine().trim();
+        if (!installPathInput.isEmpty()) {
+            runtime.installPath = installPathInput;
+        }
+
+        // Type-specific prompts
+        if ("lucee-express".equals(runtime.type)) {
+            System.out.print("Lucee JAR variant (standard/light/zero) [" + nullToEmpty(runtime.variant) + "]: ");
+            String variantInput = scanner.nextLine().trim();
+            if (!variantInput.isEmpty()) {
+                String v = variantInput.toLowerCase();
+                if (!v.equals("standard") && !v.equals("light") && !v.equals("zero")) {
+                    System.out.println("⚠️ Expected standard, light, or zero. Ignoring change.");
+                } else {
+                    runtime.variant = v;
+                }
+            }
+
+            System.out.print("Shared install (true/false) [" + (runtime.shared != null ? runtime.shared : Boolean.FALSE) + "]: ");
+            String sharedInput = scanner.nextLine().trim();
+            if (!sharedInput.isEmpty()) {
+                Boolean parsed = parseBoolean(sharedInput);
+                if (parsed == null) {
+                    System.out.println("⚠️ Expected true/false. Ignoring change.");
+                } else {
+                    runtime.shared = parsed;
+                }
+            }
+        } else if ("tomcat".equals(runtime.type)) {
+            
+            // System.out.print("Tomcat patchMode (off/safe/full) [" + nullToEmpty(runtime.patchMode) + "]: ");
+            // String patchModeInput = scanner.nextLine().trim();
+            // if (!patchModeInput.isEmpty()) {
+            //     String m = patchModeInput.toLowerCase();
+            //     if (!m.equals("off") && !m.equals("safe") && !m.equals("full")) {
+            //         System.out.println("⚠️ Expected off, safe, or full. Ignoring change.");
+            //     } else {
+            //         runtime.patchMode = m;
+            //     }
+            // }
+        } else if ("docker".equals(runtime.type)) {
+            System.out.print("Docker image [" + nullToEmpty(runtime.image) + "]: ");
+            String imageInput = scanner.nextLine().trim();
+            if (!imageInput.isEmpty()) {
+                runtime.image = imageInput;
+            }
+
+            System.out.print("Docker runMode (mount/copy) [" + nullToEmpty(runtime.runMode) + "]: ");
+            String runModeInput = scanner.nextLine().trim();
+            if (!runModeInput.isEmpty()) {
+                String rm = runModeInput.toLowerCase();
+                if (!rm.equals("mount") && !rm.equals("copy")) {
+                    System.out.println("⚠️ Expected mount or copy. Ignoring change.");
+                } else {
+                    runtime.runMode = rm;
+                }
+            }
+        }
+
+        // Ensure the updated runtime block is written back when saving.
+        updaters.put("runtime", () -> config.runtime = runtime);
+        
+        newline();
+        
         // --- JVM section ---
         title("JVM");
 

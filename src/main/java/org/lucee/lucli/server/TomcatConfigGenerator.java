@@ -13,8 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Generates Tomcat configuration files for Lucee server instances using templates.
- * Copies template files from resources and replaces placeholders with actual values.
+ * Generates Tomcat configuration files for Lucee server instances.
  */
 public class TomcatConfigGenerator {
     
@@ -23,8 +22,7 @@ public class TomcatConfigGenerator {
         "https://repo1.maven.org/maven2/org/tuckey/urlrewritefilter/" + URLREWRITE_VERSION +
         "/urlrewritefilter-" + URLREWRITE_VERSION + ".jar";
     
-    // XML patchers for server.xml and web.xml. Initially no-op; behavior will
-    // be introduced incrementally in follow-up changes.
+    
     private final TomcatServerXmlPatcher serverXmlPatcher = new TomcatServerXmlPatcher();
     private final TomcatWebXmlPatcher webXmlPatcher = new TomcatWebXmlPatcher();
     
@@ -608,7 +606,9 @@ public class TomcatConfigGenerator {
      * already set, so that LuCLI can continue to override CATALINA_OPTS via the
      * ProcessBuilder environment when starting servers programmatically.
      */
-    private void writeSetenvScripts(Path serverInstanceDir, LuceeServerConfig.ServerConfig config, Path projectDir) throws IOException {
+    static void writeSetenvScripts(Path serverInstanceDir,
+                                   LuceeServerConfig.ServerConfig config,
+                                   Path projectDir) throws IOException {
         Path binDir = serverInstanceDir.resolve("bin");
         if (!Files.exists(binDir)) {
             // Unexpected, but don't fail server creation if bin does not exist.

@@ -239,6 +239,78 @@
       "x-ui-tab": "Environment",
       "x-ui-order": 20
     },
+    "runtime": {
+      "type": "object",
+      "description": "Runtime backend that runs your Lucee app (lucee-express, tomcat, docker). When omitted, LuCLI defaults to a Lucee Express runtime managed under ~/.lucli.",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Runtime backend type.",
+          "enum": ["lucee-express", "tomcat", "docker"],
+          "default": "lucee-express"
+        },
+        "installPath": {
+          "type": "string",
+          "description": "Install path for the app. For lucee-express and tomcat this is a host path; for docker this is a path inside the container."
+        },
+        "variant": {
+          "type": "string",
+          "description": "Lucee engine JAR variant for lucee-express.",
+          "enum": ["standard", "light", "zero"],
+          "default": "standard"
+        },
+        "shared": {
+          "type": "boolean",
+          "description": "When true, reuse a shared Express install instead of a per-project one.",
+          "default": false
+        },
+        "catalinaHome": {
+          "type": "string",
+          "description": "Tomcat CATALINA_HOME directory for tomcat runtime."
+        },
+        "catalinaBase": {
+          "type": "string",
+          "description": "Tomcat CATALINA_BASE directory; defaults to catalinaHome when omitted."
+        },
+        "webappsDir": {
+          "type": "string",
+          "description": "Subdirectory under catalinaBase where webapps are deployed.",
+          "default": "webapps"
+        },
+        "contextPath": {
+          "type": "string",
+          "description": "Tomcat context path such as '/' or '/my-app'."
+        },
+        "image": {
+          "type": "string",
+          "description": "Docker image to use for docker runtime (usually a Lucee vendor image)."
+        },
+        "dockerfile": {
+          "type": "string",
+          "description": "Path to a Dockerfile that LuCLI can generate or maintain."
+        },
+        "context": {
+          "type": "string",
+          "description": "Docker build context directory.",
+          "default": "."
+        },
+        "tag": {
+          "type": "string",
+          "description": "Default Docker image tag to use when building images."
+        },
+        "containerName": {
+          "type": "string",
+          "description": "Default container name for docker runtime."
+        },
+        "runMode": {
+          "type": "string",
+          "description": "How the app is wired into the container for docker runtime.",
+          "enum": ["mount", "copy"],
+          "default": "mount"
+        }
+      }
+    },
     "dependencies": {
       "type": "object",
       "description": "Production dependencies for this project. Keys are dependency names; values are either a shorthand version string or a full dependency descriptor object.",
@@ -400,6 +472,10 @@
         "packages": {
           "$ref": "#/definitions/dependencySettings",
           "description": "Deprecated alias for 'dependencySettings' for backwards compatibility."
+        },
+        "runtime": {
+          "$ref": "#/properties/runtime",
+          "description": "Environment-specific runtime overrides (e.g. switch to docker in dev or tomcat in prod)."
         }
       }
     }

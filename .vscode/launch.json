@@ -197,6 +197,16 @@
     },
     {
       "type": "java",
+      "name": "🌍 Lucli Server Start Runtime (Tomcat)",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "projectName": "lucli",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/demo_servers/runtime_demo/",
+      "args": [ "server", "start"]
+    },
+    {
+      "type": "java",
       "name": "🧩 Lucli Module Timing ",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",
