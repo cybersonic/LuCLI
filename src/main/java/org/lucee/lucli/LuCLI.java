@@ -268,6 +268,13 @@ public class LuCLI {
      */
     public static String getVersionInfo(boolean includeLucee) {
         StringBuilder info = new StringBuilder();
+
+        // Version information header first so tools/tests that only see the
+        // first few lines can still parse the version without needing to
+        // strip the ASCII art banner.
+        String ver = getVersion();
+        info.append("LuCLI Version: ").append(ver).append("\n");
+        // info.append("Version: ").append(ver).append("\n");
         
         // ASCII art banner
         info.append("\n");
@@ -277,9 +284,6 @@ public class LuCLI {
         info.append("| |__| |_| | |___| |___ | | \n");
         info.append("|_____\\__,_|\\____|_____|___|\n");
         info.append("\n");
-        
-        // Version information
-        info.append("Version: ").append(getVersion()).append("\n");
         
         if (includeLucee) {
             try {
