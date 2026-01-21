@@ -14,6 +14,7 @@ import javax.script.ScriptException;
 
 import org.lucee.lucli.modules.ModuleCommand;
 
+import lucee.runtime.script.LuceeScriptEngineFactory;
 import lucee.runtime.type.Array;
 
 /**
@@ -102,12 +103,12 @@ public class LuceeScriptEngine {
         configureLuceeDirectories();
         Timer.stop("Configure Lucee Directories");
         
-        Timer.start("Create ScriptEngineManager");
-        ScriptEngineManager manager = new ScriptEngineManager();
-        Timer.stop("Create ScriptEngineManager");
+        // Timer.start("Create ScriptEngineManager");
+        // ScriptEngineManager manager = new ScriptEngineManager();
+        // Timer.stop("Create ScriptEngineManager");
         
         Timer.start("Get CFML Engine by Name");
-        ScriptEngine engine = manager.getEngineByName(ENGINE_NAME);
+        ScriptEngine engine = new LuceeScriptEngineFactory().getScriptEngine();
         Timer.stop("Get CFML Engine by Name");
         
         if (engine == null) {
@@ -123,6 +124,7 @@ public class LuceeScriptEngine {
         engine.put("__verboseMode", verbose);
         engine.put("__debugMode", debug);
         engine.put("__preserveWhitespace", LuCLI.preserveWhitespace);
+        
         Timer.stop("Setup Engine Variables");
         
         Timer.start("Execute Initialization Script");

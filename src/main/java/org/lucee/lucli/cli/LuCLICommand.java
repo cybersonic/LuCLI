@@ -140,7 +140,6 @@ public class LuCLICommand implements Callable<Integer> {
         } finally {
             // Always stop total timer and show results before exit (if timing enabled)
             Timer.stop("Total Execution");
-            Timer.printResults();
         }
     }
 

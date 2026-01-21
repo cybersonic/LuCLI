@@ -73,7 +73,6 @@ public class CfmlCommand implements Callable<Integer> {
             return 0;
         } finally {
             Timer.stop("CFML Command Execution");
-            Timer.printResults();
         }
     }
 

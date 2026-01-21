@@ -19,7 +19,10 @@ if(fileExists( moduleConfigFilePath )){
             flushExistingData=false
             );
         }
-        systemOutput("Imported module configuration for module: #moduleName#", true, false );
+
+        if(LuCLI.verbose){
+            echo("Imported module configuration for module: #moduleName#");
+        }
 }
 
 

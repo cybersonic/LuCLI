@@ -148,7 +148,7 @@ public class Timer {
     /**
      * Output timing results as a simple timeline/bar chart to visualize overlaps.
      */
-    public static void printResultsBar() {
+    private static void printResultsBar() {
         getInstance()._printResultsBar();
     }
 
