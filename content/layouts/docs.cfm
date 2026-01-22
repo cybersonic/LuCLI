@@ -12,7 +12,11 @@
 </head>
 <body>
 
-    <cfinclude template="partials/nav.html">
+     <header class="header">
+        <div class="container">
+            <cfinclude template="partials/nav.html">
+        </div>
+    </header>
     <!-- <header class="header">
         
         <div class="header-content">
@@ -92,6 +96,18 @@
 
             <div class="content-body">
                 #content#
+
+                <!-- Docs prev/next pagination (driven by Markspresso meta: prev_url/next_url) -->
+                <cfif (structKeyExists(data, "prev_url") and len(data.prev_url)) or (structKeyExists(data, "next_url") and len(data.next_url))>
+                    <nav class="docs-pagination">
+                        <cfif structKeyExists(data, "prev_url") and len(data.prev_url)>
+                            <a href="#data.prev_url#" class="docs-pagination__link docs-pagination__prev">&larr; #htmlEditFormat(data.prev_title)#</a>
+                        </cfif>
+                        <cfif structKeyExists(data, "next_url") and len(data.next_url)>
+                            <a href="#data.next_url#" class="docs-pagination__link docs-pagination__next">#htmlEditFormat(data.next_title)# &rarr;</a>
+                        </cfif>
+                    </nav>
+                </cfif>
             </div>
         </main>
 
@@ -103,11 +119,96 @@
             </ul>
         </aside>
     </div>
+    
+    <!-- Docs search overlay (Cmd/Ctrl+K) -->
+    <div class="docs-search-overlay" id="docs-search-overlay" aria-hidden="true">
+        <div class="docs-search-backdrop"></div>
+        <div class="docs-search-dialog" role="dialog" aria-modal="true" aria-labelledby="docs-search-label">
+            <div class="docs-search-input-row">
+                <span class="docs-search-icon">🔍</span>
+                <input
+                    id="markspresso-search-input"
+                    type="search"
+                    placeholder="Search the LuCLI docs…"
+                    autocomplete="off"
+                    aria-label="Search the documentation"
+                />
+                <button type="button" class="docs-search-close" aria-label="Close search">
+                    Esc
+                </button>
+            </div>
+            <div id="markspresso-search-results" class="docs-search-results"></div>
+        </div>
+    </div>
 
     <cfinclude template="partials/footer.html">
-
     <script src="/js/main.js"></script>
+
+    <script>
+    (function () {
+        var overlay = document.getElementById('docs-search-overlay');
+        var input = document.getElementById('markspresso-search-input');
+        var closeBtn = overlay ? overlay.querySelector('.docs-search-close') : null;
+        var activeBefore = null;
+
+        function openSearch() {
+            if (!overlay) return;
+            activeBefore = document.activeElement;
+            overlay.classList.add('is-open');
+            overlay.setAttribute('aria-hidden', 'false');
+            if (input) {
+                setTimeout(function () { input.focus(); }, 0);
+            }
+        }
+
+        function closeSearch() {
+            if (!overlay) return;
+            overlay.classList.remove('is-open');
+            overlay.setAttribute('aria-hidden', 'true');
+            if (activeBefore && typeof activeBefore.focus === 'function') {
+                activeBefore.focus();
+            }
+        }
+
+        // Expose a hook for header search control
+        window.MarkspressoOpenSearch = openSearch;
+
+        document.addEventListener('keydown', function (e) {
+            var isMac = navigator.platform && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+            var metaOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+
+            // Cmd/Ctrl + K opens search
+            if (metaOrCtrl && (e.key === 'k' || e.key === 'K')) {
+                e.preventDefault();
+                openSearch();
+                return;
+            }
+
+            // Esc closes when overlay is open
+            if (e.key === 'Escape' && overlay && overlay.classList.contains('is-open')) {
+                e.preventDefault();
+                closeSearch();
+            }
+        });
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                closeSearch();
+            });
+        }
+
+        if (overlay) {
+            overlay.addEventListener('click', function (e) {
+                if (e.target === overlay || e.target.classList.contains('docs-search-backdrop')) {
+                    closeSearch();
+                }
+            });
+        }
+    })();
+    </script>
+
+    #markspressoScripts#
     </cfoutput>
-    <!--- <cfdump var="#local#"> --->
 </body>
 </html>
