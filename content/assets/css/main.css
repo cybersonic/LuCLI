@@ -29,6 +29,15 @@
     --border-hover: #475569;
 }
 
+/* Dark theme link colors */
+[data-theme="dark"] a {
+    color: var(--secondary-color);
+}
+
+[data-theme="dark"] a:hover {
+    color: var(--accent-color);
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -440,6 +449,9 @@ body {
     font-size: 0.95rem;
 }
 
+code {
+     color: var(--text-secondary);
+}
 .code-block {
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);

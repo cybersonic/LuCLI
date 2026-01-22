@@ -138,7 +138,7 @@
     border-radius: 4px;
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.875em;
-    color: var(--primary-color);
+    color: var(--text-secondary);
 }
 
 .content-body pre {
@@ -371,7 +371,7 @@
 
 /* Section containers (folders) - add spacing */
 .sidebar .docs-nav > ul > li:has(strong) {
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
 }
 
 /* Section headers - match sidebar-title style exactly */
@@ -401,7 +401,7 @@
 /* Section items - match sidebar-link style exactly */
 .sidebar .docs-nav ul ul a {
     display: block;
-    padding: 0.5rem 0.75rem;
+    padding: 0.25rem 0.50rem;
     color: var(--text-secondary);
     text-decoration: none;
     border-radius: 8px;
