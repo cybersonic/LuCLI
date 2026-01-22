@@ -1,6 +1,0 @@
-{
-  "name" : "MySite-name of site",
-  "webroot" : "./public",
-  "openBrowser" : true,
-  "enableLucee": false
-}
