@@ -350,7 +350,7 @@ public class Terminal {
                 // Execute the CFML code
                 luceeEngine.evalWithBuiltinVariables(wrappedScript);
                 
-                System.out.flush();
+                System.out.println();
                 return baos.toString().trim();
                 
             } finally {
