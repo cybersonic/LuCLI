@@ -16,6 +16,17 @@
     },
     {
       "type": "java",
+      "name": "▶️ LucCLI cfml",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      // "args": ["terminal"],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "args": ["cfml", "now()"],
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "java",
       "name": "📄 LucCLI File (cfm)",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",
