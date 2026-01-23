@@ -1,35 +1,70 @@
 ---
 title: LuCLI Documentation
 layout: docs
-draft: false
 ---
+Welcome to the LuCLI docs. This site is organized by **what you want to do**: get started quickly, run CFML from the CLI, manage Lucee servers, and configure projects safely.
 
-# LuCLI Documentation
+Use the sidebar to browse, or start from one of the guided paths below.
 
-Welcome to the LuCLI documentation. LuCLI is a modern command-line interface that brings the power of Lucee CFML to your terminal.
+## New to LuCLI?
 
-## What is LuCLI?
+1. **Understand what LuCLI is**  
+   Read the high‑level overview:
+   - [Introduction](introduction/overview/)
 
-LuCLI integrates the Lucee CFML engine with advanced features including:
+2. **Install LuCLI and run your first server**  
+   - [Installation](installation/installation/)
+   - [First Run](installation/first-run/)
 
-- **Server Management** - Start and manage Lucee server instances
-- **CFML Execution** - Execute CFML scripts directly from the command line
-- **Module System** - Create and run reusable CFML modules  
-- **JMX Monitoring** - Real-time server performance monitoring
-- **Dependency Management** - Manage project dependencies efficiently
-- **Interactive REPL** - Interactive terminal for CFML development
+3. **Learn the basic command shape**  
+   - [CLI Basics](cli-basics/cli-basics/)
+   - [Help System](cli-basics/help-system/)
 
-## Getting Started
+## Running CFML from the command line
 
-New to LuCLI? Start with the [Introduction](getting-started/introduction/) to learn the basics.
+If you mainly want to run CFML scripts, components, or modules from the CLI:
 
-## Documentation Sections
+- [Shortcuts & Direct CFML Execution](cfml-execution/shortcuts-and-direct-execution/)
+- [Running Scripts and Components](cfml-execution/running-scripts-and-components/)
+- [Interactive Terminal & REPL](cfml-execution/interactive-terminal-and-repl/)
+- [CFML Modules](cfml-execution/modules/)
 
-Browse the documentation using the navigation menu on the left, or jump directly to:
+## Managing Lucee servers with `lucee.json`
 
-- **[Getting Started](getting-started/introduction/)** - Installation, quick start, and shortcuts
-- **[Core Features](core-features/executing-commands/)** - Command execution and help system
-- **[Server Management](server-management/configuration/)** - Configuration, environments, and deployment
-- **[Advanced Topics](advanced/url-rewriting/)** - URL rewriting, shell completion, and Docker
-- **[Development](development/server-command-development/)** - Extending LuCLI with custom commands
-- **[Command Reference](reference/command-reference/)** - Complete command and option reference
+For project/server configuration and environments:
+
+- [Server Configuration (lucee.json)](server-configuration/lucee-json-basics/)
+- [Environment Variables in lucee.json](server-configuration/environment-variables/)
+- [Environments and Configuration Overrides](server-configuration/environments-and-overrides/)
+
+Day‑to‑day server commands:
+
+- [Starting Servers](server-lifecycle/starting-servers/)
+- [Stopping Servers & Checking Status](server-lifecycle/stopping-and-status/)
+- [Logs and Opening in the Browser](server-lifecycle/logs-and-open/)
+- [Server Names & Multiple Servers](server-lifecycle/server-naming-and-multiple-servers/)
+
+Preview and audit configuration:
+
+- [Configuration Dry‑Run Preview](configuration-preview/dry-run-preview/)
+
+## Security, dependencies, and advanced config
+
+Keep configuration repeatable and secrets out of source control:
+
+- [Secrets Management](secure-configuration/secrets/)
+- [Server Locking](secure-configuration/server-lock/)
+- (Overview) Secure configuration page to be added.
+
+Manage libraries and extensions:
+
+- [Dependency Management](dependencies-and-extensions/dependency-management/)
+
+## Reference and contributing
+
+If you already know what you’re looking for:
+
+- [Command Reference](reference-and-examples/command-reference/)
+- [Contributing to Documentation](reference-and-examples/contributing-to-documentation/)
+
+You can always return to this page from the "Docs" home link in the navigation, and use the left sidebar to jump directly to any topic.

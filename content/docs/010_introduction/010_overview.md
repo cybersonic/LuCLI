@@ -12,7 +12,7 @@ LuCLI is a modern, feature-rich command line interface that brings the power of 
 **Key Features:**
 - Execute CFML scripts (.cfs, .cfm, .cfc) directly from the command line
 - Start and manage Lucee server instances with built-in monitoring
-- Create and run reusable CFML modules
+- Create and run reusable CFML modules to extend functionality
 - Interactive REPL for CFML development and testing
 - Framework-style URL routing for modern web applications
 - Comprehensive help system with context-sensitive guidance
