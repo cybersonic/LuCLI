@@ -22,12 +22,36 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  build:
+    name: Build Site and Docs
+    runs-on: ubuntu-latest
+    container:
+      image: markdrew/lucli:latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Markspresso
+        run: lucli module install markspresso
+
+      - name: Build Markspresso site
+        run: |
+          lucli markspresso build clean
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
   # Single deploy job since we're just deploying
   deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,13 +61,13 @@ jobs:
           mkdir -p site/schemas/v1
           cp -R schemas/v1/*.json site/schemas/v1/
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          # Upload entire repository
-          path: './site/'
+      # - name: Setup Pages
+      #   uses: actions/configure-pages@v5
+      # - name: Upload artifact
+      #   uses: actions/upload-pages-artifact@v3
+      #   with:
+      #     # Upload entire repository
+      #     path: './site/'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
