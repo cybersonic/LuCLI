@@ -4,15 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Download LuCLI — Lucee Command Line Interface</title>
-    <cfinclude template="partials/head.html">
+    <cfinclude template="partials/head.cfm">
     <link rel="stylesheet" href="/css/download.css">
 </head>
 <body>
-    <header class="header">
-        <div class="container">
-            <cfinclude template="partials/nav.html">
-        </div>
-    </header>
+    <cfinclude template="partials/nav.cfm">
 
 <main id="top">
     <section class="hero">

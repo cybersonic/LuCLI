@@ -1,11 +1,11 @@
 <footer class="footer">
         <div class="container">
             <div class="footer-content">
-                <p><strong>LuCLI</strong> — ❤️ Lucee in your terminal.</p>
-                <p>Copyright &copy; <a href="https://github.com/cybersonic/">Mark Drew</a> 2026</p>
+                <p><strong>LuCLI</strong> — Bringing love <i class="bi bi-heart-fill"></i> and Lucee <img src="/img/luceeicon.png" width="16" height="16"> to your terminal.</p>
+                <p>Copyright &copy; <a href="https://github.com/cybersonic/">Mark Drew</a> 2026 <i class="bi bi-lightbulb-fill"></i></p>
                 <div class="footer-links">
-                    <a href="/docs" class="footer-link">Documentation</a>
-                    <a href="https://github.com/cybersonic/LuCLI" class="footer-link" target="_blank">GitHub</a>
+                    <a href="/docs" class="footer-link"><i class="bi bi-mortarboard-fill"></i> Documentation</a>
+                    <a href="https://github.com/cybersonic/LuCLI" class="footer-link" target="_blank"><i class="bi bi-github"></i> GitHub</a>
                 </div>
             </div>
         </div>

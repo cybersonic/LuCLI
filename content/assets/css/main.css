@@ -1,4 +1,4 @@
-
+@import url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css");
 :root {
     --primary-color: #6366f1;
     --primary-dark: #4f46e5;
@@ -85,14 +85,14 @@ body {
 }
 
 /* Docs pages use a more left-aligned layout; override there */
-body.docs-body .header-content {
+/* body.docs-body .header-content {
     justify-content: flex-start;
     gap: 2rem;
 }
 
 body.docs-body .header-content .header-nav {
     margin: 0;
-}
+} */
 
 .logo {
     display: flex;

@@ -5,33 +5,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>#page.meta.title# -  LuCLI Documentation</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/css/main.css">
+    <cfinclude template="partials/head.cfm">
     <link rel="stylesheet" href="/css/docs.css">
 
 </head>
 <body class="docs-body">
+    <cfinclude template="partials/nav.cfm">
 
-     <header class="header">
-        <div class="container">
-            <cfinclude template="partials/nav.html">
-        </div>
-    </header>
-    <!-- <header class="header">
-        
-        <div class="header-content">
-            <a href="../index.html" class="logo">
-                <div class="logo-icon">L&gt;</div>
-                LuCLI
-            </a>
-            <nav class="header-nav">
-                <a href="../index.html" class="nav-link">Home</a>
-                <a href="../docs/index.html" class="nav-link active">Documentation</a>
-                <a href="https://github.com/cybersonic/LuCLI" class="nav-link" target="_blank">GitHub</a>
-            </nav>
-            <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
-        </div>
-    </header> -->
 
     <div class="docs-layout">
         <!-- Left Sidebar Navigation -->

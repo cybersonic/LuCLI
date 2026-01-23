@@ -1,0 +1,37 @@
+<header class="header">
+  <div class="container">
+    <div class="header-content">
+      <a href="/" class="logo"><img src="/img/lucli-logo40.png" width="40" height="40" alt="Lucee Icon">LuCLI</a>
+      <!--- <a href="/" class="logo">
+        <div class="logo-icon">L&gt;</div>
+        LuCLI
+      </a> --->
+
+      <nav class="header-nav">
+        <a href="/" class="nav-link">What is LuCLI?</a>
+        <!-- <a href="/#capabilities" class="nav-link">Capabilities</a>
+            <a href="/#getting-started" class="nav-link">Get started</a> -->
+        <a href="/download" class="nav-link">Download</a>
+        <a href="/docs/index.html" class="nav-link">Documentation</a>
+        <a href="/about" class="nav-link">About</a>
+        <a
+          href="https://github.com/cybersonic/LuCLI"
+          class="nav-link"
+          target="_blank"
+          >GitHub</a
+        >
+      </nav>
+      <div
+        class="docs-header-search"
+        onclick="window.MarkspressoOpenSearch && window.MarkspressoOpenSearch()"
+      >
+        <span class="docs-header-search-icon">🔍</span>
+        <span class="docs-header-search-text">Search</span>
+        <span class="docs-header-search-kbd">
+          <span class="kbd-key">⌘</span><span class="kbd-key">K</span>
+        </span>
+      </div>
+      <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
+    </div>
+  </div>
+</header>
