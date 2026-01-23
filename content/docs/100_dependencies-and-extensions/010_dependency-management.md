@@ -94,8 +94,11 @@ lucli deps install --production
 # Apply environment-specific dependencySettings & overrides
 lucli deps install --env prod
 
-# Preview what would be installed and the realized dependency config
+# Preview what would be installed and the realized dependency config for the root project
 lucli deps install --dry-run
+
+# Preview dependencies for the root project AND any nested projects that contain a lucee.json
+lucli deps install --dry-run --include-nested-deps
 ```
 
 Behaviour:
@@ -107,6 +110,34 @@ Behaviour:
   - `type: "extension"` – Lucee extensions installed via providers, URLs, or local `.lex` files.
 - Writes a normalized record for each dependency into `lucee-lock.json` (including version, source, install path, and, for extensions, their Lucee ID).
 - Prints the `LUCEE_EXTENSIONS` value that will be set when the server starts, built from all locked extension dependencies.
+
+### Nested dependency projects
+
+When a dependency's install directory contains its own `lucee.json`, LuCLI treats it as a nested project and can install its dependencies as well.
+
+- `lucli deps install` always works from the current directory as the **root project**.
+- For each installed (or reused) dependency with a directory install path:
+  - If `<installPath>/lucee.json` exists, that directory is treated as a nested LuCLI project.
+  - LuCLI runs the same resolution/install logic in that directory, writing a separate `lucee-lock.json` alongside the nested `lucee.json`.
+- Nested installs are **recursive but depth-limited** to avoid cycles and infinite graphs.
+- Each nested project manages its own `lucee-lock.json`; the root project's lock file is not flattened.
+- Server startup still uses **only the root project's** `lucee-lock.json` to compute `LUCEE_EXTENSIONS`.
+
+Dry-run semantics for nested projects:
+
+- `lucli deps install --dry-run`
+  - Shows only the root project's dependencies and realized `lucee.json` configuration.
+  - Does **not** list nested projects, to keep the output compact by default.
+- `lucli deps install --dry-run --include-nested-deps`
+  - Shows the root project first.
+  - Then prints an additional `"[Nested: <relative/path>] Would install:"` section for each nested project discovered from the current dependency graph, up to the depth limit.
+  - Still avoids any file system changes (no clones, no lock writes).
+
+Environment handling for nested projects:
+
+- The root project uses strict environment application: `--env foo` will fail if `foo` is not defined under `environments` in the root `lucee.json`.
+- Nested projects apply the same `--env` **leniently**:
+  - If the nested `lucee.json` does not define that environment, LuCLI logs a warning and continues with the base configuration for that project instead of failing the whole run.
 
 ### How extensions are activated at server startup
 
