@@ -152,8 +152,8 @@
                         <h3 class="feature-title">1. Install LuCLI</h3>
                         <p class="feature-description">Grab the latest JAR from GitHub releases:</p>
                         <div class="code-block">
-                            curl -L -o lucli.jar \
-<a href="https://github.com/cybersonic/LuCLI/releases/latest/download/lucli.jar">https://github.com/cybersonic/LuCLI/releases/latest/download/lucli.jar</a>
+                            curl -L -o lucli.jar \ <br>
+                            <a href="https://github.com/cybersonic/LuCLI/releases/latest/download/lucli.jar">https://github.com/cybersonic/LuCLI/releases/latest/download/lucli.jar</a>
                         </div>
                         <p class="feature-description" style="margin-top: 0.75rem;">
                             Then run it with Java (or place the <a href="https://github.com/cybersonic/LuCLI/releases/latest/">self‑contained binary</a> on your <code>PATH</code> to
@@ -204,10 +204,8 @@ lucli server start
         </section>
     </main>
 
-    <cfinclude template="partials/footer.html">
-
     
+    <cfinclude template="partials/footer.cfm">
 
-  
 </body>
 </html>

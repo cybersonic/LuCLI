@@ -152,7 +152,7 @@
         </div>
     </section>
 </main>
- <cfinclude template="partials/footer.html">
+ <cfinclude template="partials/footer.cfm">
 
  <script src="/js/download.js"></script>
 

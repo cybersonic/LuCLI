@@ -79,6 +79,21 @@ body {
     align-items: center;
 }
 
+/* Center the main navigation between logo and controls by default */
+.header-content .header-nav {
+    margin: 0 auto;
+}
+
+/* Docs pages use a more left-aligned layout; override there */
+body.docs-body .header-content {
+    justify-content: flex-start;
+    gap: 2rem;
+}
+
+body.docs-body .header-content .header-nav {
+    margin: 0;
+}
+
 .logo {
     display: flex;
     align-items: center;
@@ -535,4 +550,103 @@ code {
     .header-nav {
         display: none;
     }
+}
+
+
+
+/* Docs search overlay */
+.docs-search-overlay {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1300;
+    display: none;
+}
+
+.docs-search-overlay.is-open {
+    display: block;
+}
+
+.docs-search-backdrop {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background: rgba(15, 23, 42, 0.65);
+}
+
+.docs-search-dialog {
+    position: relative;
+    max-width: 640px;
+    margin: 8vh auto 0 auto;
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    padding: 1rem 1.25rem 1.25rem 1.25rem;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-xl);
+}
+
+.docs-search-input-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    padding: 0.45rem 0.75rem;
+}
+
+.docs-search-icon {
+    font-size: 0.95rem;
+    color: var(--text-tertiary);
+}
+
+.docs-search-input-row input[type="search"] {
+    flex: 1;
+    border: none;
+    background: transparent;
+    outline: none;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+
+.docs-search-input-row input[type="search"]::placeholder {
+    color: var(--text-tertiary);
+}
+
+.docs-search-close {
+    border: none;
+    background: transparent;
+    color: var(--text-tertiary);
+    font-size: 0.78rem;
+    cursor: pointer;
+    padding: 0.15rem 0.4rem;
+}
+
+.docs-search-results {
+    margin-top: 0.75rem;
+    max-height: 55vh;
+    overflow-y: auto;
+}
+
+.markspresso-search-result {
+    padding: 0.45rem 0.5rem;
+    border-radius: 8px;
+}
+
+.markspresso-search-result a {
+    text-decoration: none;
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+}
+
+.markspresso-search-result:hover {
+    background: var(--bg-tertiary);
+}
+
+.markspresso-search-result:hover a {
+    color: var(--text-primary);
 }
