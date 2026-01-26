@@ -1,7 +1,10 @@
-package org.lucee.lucli.server;
+package org.lucee.lucli.server.runtime;
 
 import java.io.IOException;
 import java.nio.file.Path;
+
+import org.lucee.lucli.server.LuceeServerConfig;
+import org.lucee.lucli.server.TomcatConfigGenerator;
 
 /**
  * Thin wrapper around the existing Tomcat configuration generator for the
@@ -12,7 +15,6 @@ import java.nio.file.Path;
 public class LuceeExpressConfigGenerator {
 
     private final TomcatConfigGenerator delegate = new TomcatConfigGenerator();
-
     
     public void generateConfiguration(Path serverInstanceDir,
                                       LuceeServerConfig.ServerConfig config,

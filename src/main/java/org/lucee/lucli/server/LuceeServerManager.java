@@ -23,6 +23,10 @@ import java.awt.Desktop;
 import java.awt.GraphicsEnvironment;
 
 import org.lucee.lucli.deps.ExtensionDependencyInstaller;
+import org.lucee.lucli.server.runtime.LuceeExpressRuntimeProvider;
+import org.lucee.lucli.server.runtime.RuntimeProvider;
+import org.lucee.lucli.server.runtime.TomcatRuntimeProvider;
+import org.lucee.lucli.server.runtime.DockerRuntimeProvider;
 
 /**
  * Manages Lucee server instances - downloading, configuring, starting, and stopping servers
@@ -82,6 +86,7 @@ public class LuceeServerManager {
         this.defaultRuntimeProvider = express;
         registerRuntimeProvider(express);
         registerRuntimeProvider(new TomcatRuntimeProvider());
+        registerRuntimeProvider(new DockerRuntimeProvider());
     }
     
     /**
@@ -196,41 +201,6 @@ public class LuceeServerManager {
         startServerInternal(projectDir, versionOverride, forceReplace, customName, agentOverrides, environment, configFileName, true);
     }
 
-/**
-     * Runtime provider abstraction used to support different backends
-     * (lucee-express, tomcat, docker, ...).
-     */
-    private interface RuntimeProvider {
-        String getType();
-        ServerInstance start(RuntimeContext context) throws Exception;
-    }
-
-    /**
-     * Context passed to runtime providers so they can perform startup logic
-     * without needing to know the full LuceeServerManager API surface.
-     */
-    private static final class RuntimeContext {
-        final LuceeServerConfig.ServerConfig config;
-        final Path projectDir;
-        final String environment;
-        final AgentOverrides agentOverrides;
-        final boolean foreground;
-        final boolean forceReplace;
-
-        RuntimeContext(LuceeServerConfig.ServerConfig config,
-                       Path projectDir,
-                       String environment,
-                       AgentOverrides agentOverrides,
-                       boolean foreground,
-                       boolean forceReplace) {
-            this.config = config;
-            this.projectDir = projectDir;
-            this.environment = environment;
-            this.agentOverrides = agentOverrides;
-            this.foreground = foreground;
-            this.forceReplace = forceReplace;
-        }
-    }
 
     private void registerRuntimeProvider(RuntimeProvider provider) {
         if (provider == null || provider.getType() == null) {
@@ -589,8 +559,7 @@ public class LuceeServerManager {
 
         LuceeServerConfig.RuntimeConfig runtimeConfig = LuceeServerConfig.getEffectiveRuntime(config);
         RuntimeProvider provider = getRuntimeProvider(runtimeConfig.type);
-        RuntimeContext context = new RuntimeContext(config, projectDir, environment, agentOverrides, foreground, forceReplace);
-        return provider.start(context);
+        return provider.start(this, config, projectDir, environment, agentOverrides, foreground, forceReplace);
     }
     
     /**
@@ -863,142 +832,7 @@ public class LuceeServerManager {
 
             System.out.println(portInfo.toString());
         }
-    /**
-     * Runtime provider for the default Lucee Express runtime. This preserves the
-     * existing behaviour of LuceeServerManager prior to introducing the runtime
-     * abstraction.
-     */
-    private final class LuceeExpressRuntimeProvider implements RuntimeProvider {
-        @Override
-        public String getType() {
-            return "lucee-express";
-        }
 
-        @Override
-        public ServerInstance start(RuntimeContext ctx) throws Exception {
-            LuceeServerConfig.ServerConfig config = ctx.config;
-            Path projectDir = ctx.projectDir;
-            String environment = ctx.environment;
-            AgentOverrides agentOverrides = ctx.agentOverrides;
-            boolean foreground = ctx.foreground;
-            boolean forceReplace = ctx.forceReplace;
-
-            // Ensure Lucee Express is available for the requested version
-            Path luceeExpressDir = ensureLuceeExpress(config.version);
-
-            // Resolve port conflicts right before starting server to avoid race conditions
-            LuceeServerConfig.PortConflictResult portResult = LuceeServerConfig.resolvePortConflicts(config, false, LuceeServerManager.this);
-
-            checkAndReportPortConflicts(config, portResult);
-
-            // Build port information message (unchanged behaviour)
-            displayPortDetails(config, foreground);
-
-            // Create server instance directory
-            Path serverInstanceDir = serversDir.resolve(config.name);
-            Files.createDirectories(serverInstanceDir);
-
-            // Generate Lucee Express-backed Tomcat configuration
-            LuceeExpressConfigGenerator configGenerator = new LuceeExpressConfigGenerator();
-            // When forceReplace is true (e.g. --force), also allow overwriting project-level
-            // WEB-INF config files (web.xml, urlrewrite.xml, UrlRewriteFilter JAR). Without
-            // --force, we preserve any existing project configuration files.
-            boolean overwriteProjectConfig = forceReplace;
-            configGenerator.generateConfiguration(serverInstanceDir, config, projectDir, luceeExpressDir, overwriteProjectConfig);
-
-            // Write CFConfig (.CFConfig.json) into the Lucee context if configured in lucee.json.
-            // This treats lucee.json as the source of truth and .CFConfig.json as a derived file.
-            LuceeServerConfig.writeCfConfigIfPresent(config, projectDir, serverInstanceDir);
-
-            // Deploy extension dependencies to lucee-server/deploy folder (always deploy)
-            deployExtensionsForServer(projectDir, serverInstanceDir);
-
-            // Launch the server process
-            ServerInstance instance = launchServerProcess(serverInstanceDir, config, projectDir, luceeExpressDir, agentOverrides, environment, foreground);
-
-            // For background mode only: wait for startup and open browser
-            if (!foreground) {
-                // Wait for server to start
-                waitForServerStartup(instance, 30); // 30 second timeout
-
-                // Open the browser if enabled
-                openBrowserForServer(instance, config);
-            }
-
-            return instance;
-        }
-
-       
-
-        
-    }
-
-    /**
-     * Runtime provider for the "tomcat" runtime type. For the first pass this
-     * behaves like the Lucee Express runtime but clearly indicates that the
-     * tomcat runtime is in preview so users can already configure it without
-     * surprising deployment behaviour.
-     */
-    private final class TomcatRuntimeProvider implements RuntimeProvider {
-        @Override
-        public String getType() {
-            return "tomcat";
-        }
-
-        @Override
-        public ServerInstance start(RuntimeContext ctx) throws Exception {
-            LuceeServerConfig.ServerConfig config = ctx.config;
-
-            boolean foreground = ctx.foreground;
-            
-            
-            // config.runtime.catalinaHome;
-            // config.runtime.catalinaBase;
-            String variant = config.runtime != null ? config.runtime.variant : "";
-
-            // Ensure Lucee JAR is available for the requested version and variant
-            Path luceeJarPath = ensureLuceeJar(config.version, config.runtime.variant);
-
-            // Resolve port conflicts right before starting server to avoid race conditions
-            LuceeServerConfig.PortConflictResult portResult = LuceeServerConfig.resolvePortConflicts(config, false, LuceeServerManager.this);
-
-            // Report any port conflicts
-            checkAndReportPortConflicts(config, portResult);
-
-            // Build port information message (unchanged behaviour)
-            displayPortDetails(config, foreground);
-
-
-            // Create server instance directory CATALINA_BASE
-            Path serverInstanceDir = serversDir.resolve(config.name);
-            Files.createDirectories(serverInstanceDir);
-
-
-            // Generate Tomcat configuration
-            TomcatConfigGenerator configGenerator = new TomcatConfigGenerator();
-            // When forceReplace is true (e.g. --force), also allow overwriting project-level
-            // WEB-INF config files (web.xml, urlrewrite.xml, UrlRewriteFilter JAR). Without
-            // --force, we preserve any existing project configuration files.
-            boolean overwriteProjectConfig = forceReplace;
-            configGenerator.generateConfiguration(serverInstanceDir, config, projectDir, luceeExpressDir, overwriteProjectConfig);
-
-            
-
-            // Resolve effective runtime so that any future tomcat-specific
-            // fields (catalinaHome, patchMode, etc.) are available, but for
-            // now we intentionally keep behaviour identical to the Lucee
-            // Express runtime and do not override webroot or other settings
-            // from runtime.installPath.
-            LuceeServerConfig.getEffectiveRuntime(config);
-
-            System.out.println("Using runtime.type=\"tomcat\"");
-
-            // Delegate to the default provider so process management and
-            // Tomcat configuration remain consistent with lucee-express.
-            throw new UnsupportedOperationException("tomcat runtime is not yet implemented");
-            // return defaultRuntimeProvider.start(ctx);
-        }
-    }
 
     /**
      * Check if a process is running
@@ -1357,7 +1191,7 @@ public class LuceeServerManager {
      * Open the configured browser URL (or default) for a started server.
      * This is best-effort and should not cause server startup to fail.
      */
-    private void openBrowserForServer(ServerInstance instance, LuceeServerConfig.ServerConfig config) {
+    public void openBrowserForServer(ServerInstance instance, LuceeServerConfig.ServerConfig config) {
         if (config == null || !config.openBrowser) {
             return;
         }
@@ -1719,7 +1553,7 @@ public class LuceeServerManager {
      * Deploy extension dependencies (.lex files) to server's lucee-server/deploy folder.
      * Called before server startup.
      */
-    private void deployExtensionsForServer(Path projectDir, Path serverInstanceDir) {
+    public void deployExtensionsForServer(Path projectDir, Path serverInstanceDir) {
         try {
             // Load lock file to get installed extension dependencies
             org.lucee.lucli.config.LuceeLockFile lockFile = org.lucee.lucli.config.LuceeLockFile.read(projectDir);
@@ -1818,7 +1652,7 @@ public class LuceeServerManager {
      * @param foreground If true, uses 'catalina run' and blocks; if false, uses 'startup' script and returns immediately
      * @return ServerInstance (only when foreground=false; foreground=true blocks until shutdown)
      */
-    private ServerInstance launchServerProcess(Path serverInstanceDir, LuceeServerConfig.ServerConfig config, 
+    public ServerInstance launchServerProcess(Path serverInstanceDir, LuceeServerConfig.ServerConfig config, 
                                              Path projectDir, Path luceeExpressDir,
                                              AgentOverrides agentOverrides, String environment, boolean foreground) throws Exception {
         
@@ -2103,7 +1937,7 @@ public class LuceeServerManager {
     /**
      * Wait for server to start up
      */
-    private void waitForServerStartup(ServerInstance instance, int timeoutSeconds) throws Exception {
+    public void waitForServerStartup(ServerInstance instance, int timeoutSeconds) throws Exception {
         long startTime = System.currentTimeMillis();
         long timeout = timeoutSeconds * 1000L;
         
