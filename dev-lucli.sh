@@ -14,7 +14,11 @@ else
   echo "Warning: SDKMAN! not found at \$HOME/.sdkman; using current Java:"
   java -version 2>&1 | head -n 1
 fi
-mvn exec:java --quiet -Dexec.mainClass="org.lucee.lucli.LuCLI"
+
+# Pass through any CLI arguments to LuCLI
+mvn exec:java --quiet \
+  -Dexec.mainClass="org.lucee.lucli.LuCLI" \
+  -Dexec.args="$*"
 
 # mvn clean package --activate-profiles binary --quiet
 # ./target/lucli

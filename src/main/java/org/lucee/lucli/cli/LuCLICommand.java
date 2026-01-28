@@ -15,6 +15,7 @@ import org.lucee.lucli.cli.commands.SecretsCommand;
 import org.lucee.lucli.cli.commands.ServerCommand;
 import org.lucee.lucli.cli.commands.VersionsListCommand;
 import org.lucee.lucli.cli.commands.XmlCommand;
+import org.lucee.lucli.cli.commands.DaemonCommand;
 import org.lucee.lucli.cli.commands.deps.DepsCommand;
 import org.lucee.lucli.cli.commands.deps.InstallCommand;
 
@@ -43,6 +44,7 @@ import picocli.CommandLine.Option;
         SecretsCommand.class,
         CommandLine.HelpCommand.class,
         RunCommand.class,
+        DaemonCommand.class,
         // Hidden/internal diagnostics
         XmlCommand.class
     },
@@ -93,6 +95,14 @@ public class LuCLICommand implements Callable<Integer> {
     @Option(names = {"--lucee-version"}, 
             description = "Show Lucee version")
     private boolean luceeVersionRequested = false;
+
+    @Option(
+        names = {"--timeout"},
+        paramLabel = "<seconds>",
+        description = "Fail if the command runs longer than this many seconds (0 = no timeout)",
+        defaultValue = "0"
+    )
+    private int timeoutSeconds;
 
     // Note: Parameters removed to prevent conflict with subcommands
     // Script execution will be handled differently

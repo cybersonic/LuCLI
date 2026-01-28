@@ -17,6 +17,7 @@ import org.lucee.lucli.config.DependencyConfig;
 import org.lucee.lucli.config.LuceeJsonConfig;
 import org.lucee.lucli.config.LuceeLockFile;
 import org.lucee.lucli.deps.ExtensionDependencyInstaller;
+import org.lucee.lucli.deps.FileDependencyInstaller;
 import org.lucee.lucli.deps.GitDependencyInstaller;
 import org.lucee.lucli.deps.LockedDependency;
 import org.lucee.lucli.server.LuceeServerManager;
@@ -346,6 +347,127 @@ public class InstallCommand implements Callable<Integer> {
     }
     
     /**
+     * Process a single dependency, including recursive resolution of nested
+     * lucee.json files for file-based module dependencies.
+     */
+    private void processDependency(
+        DependencyConfig dep,
+        boolean isDevDep,
+        LuceeLockFile existingLockFile,
+        java.util.Map<String, LockedDependency> installedProd,
+        java.util.Map<String, LockedDependency> installedDev,
+        GitDependencyInstaller gitInstaller,
+        ExtensionDependencyInstaller extInstaller,
+        FileDependencyInstaller fileInstaller,
+        int[] successCount,
+        int[] skipCount,
+        int[] unchangedCount,
+        java.nio.file.Path projectDir,
+        java.util.Set<java.nio.file.Path> visitedConfigs
+    ) {
+        boolean isGit = isGitDependency(dep);
+        boolean isExtension = isExtensionDependency(dep);
+        boolean isFileModule = isFileModuleDependency(dep);
+
+        if (isGit || isExtension || isFileModule) {
+            try {
+                // Check if dependency is already installed with same version/source
+                LockedDependency existing = isDevDep
+                    ? existingLockFile.getDevDependencies().get(dep.getName())
+                    : existingLockFile.getDependencies().get(dep.getName());
+
+                boolean needsInstall = force || existing == null || !matchesRequested(dep, existing);
+
+                LockedDependency effectiveLocked;
+                if (!needsInstall && installPathExists(existing.getInstallPath())) {
+                    // Already installed and matches - use existing
+                    if (isDevDep) {
+                        installedDev.put(dep.getName(), existing);
+                    } else {
+                        installedProd.put(dep.getName(), existing);
+                    }
+                    StringOutput.Quick.print("   " + dep.getName() + " - unchanged (" + existing.getVersion() + ")");
+                    unchangedCount[0]++;
+                    effectiveLocked = existing;
+                } else {
+                    // Install/reinstall via appropriate installer
+                    if (isGit) {
+                        effectiveLocked = gitInstaller.install(dep);
+                    } else if (isExtension) {
+                        effectiveLocked = extInstaller.install(dep);
+                    } else {
+                        effectiveLocked = fileInstaller.install(dep);
+                    }
+
+                    if (isDevDep) {
+                        installedDev.put(dep.getName(), effectiveLocked);
+                    } else {
+                        installedProd.put(dep.getName(), effectiveLocked);
+                    }
+
+                    successCount[0]++;
+                }
+
+                // For file-based module dependencies, look for nested lucee.json
+                // inside the installed directory and recursively install their
+                // dependencies as well.
+                if (isFileModule && effectiveLocked != null && effectiveLocked.getInstallPath() != null) {
+                    java.nio.file.Path nestedProjectDir = projectDir.resolve(effectiveLocked.getInstallPath()).normalize();
+                    java.nio.file.Path nestedConfigPath = nestedProjectDir.resolve("lucee.json").normalize();
+
+                    if (java.nio.file.Files.exists(nestedConfigPath) && visitedConfigs.add(nestedConfigPath)) {
+                        try {
+                            LuceeJsonConfig nestedConfig = LuceeJsonConfig.load(nestedProjectDir);
+                            java.util.List<DependencyConfig> nestedDeps = nestedConfig.parseDependencies();
+
+                            for (DependencyConfig nestedDep : nestedDeps) {
+                                // If nested dependency uses a relative path, resolve it
+                                // against the nested project directory so that it can be
+                                // installed correctly from the root project.
+                                if (nestedDep.getPath() != null) {
+                                    java.nio.file.Path raw = java.nio.file.Paths.get(nestedDep.getPath());
+                                    if (!raw.isAbsolute()) {
+                                        java.nio.file.Path abs = nestedProjectDir.resolve(raw).normalize();
+                                        nestedDep.setPath(abs.toString());
+                                    }
+                                }
+                                processDependency(
+                                    nestedDep,
+                                    false, // nested deps are treated as prod by default
+                                    existingLockFile,
+                                    installedProd,
+                                    installedDev,
+                                    gitInstaller,
+                                    extInstaller,
+                                    fileInstaller,
+                                    successCount,
+                                    skipCount,
+                                    unchangedCount,
+                                    projectDir,
+                                    visitedConfigs
+                                );
+                            }
+                        } catch (Exception e) {
+                            StringOutput.Quick.warning("  Failed to process nested dependencies for " + dep.getName() + ": " + e.getMessage());
+                            if (LuCLI.verbose || LuCLI.debug) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                StringOutput.Quick.error(" Failed to install " + dep.getName() + ": " + e.getMessage());
+                if (LuCLI.verbose || LuCLI.debug) {
+                    e.printStackTrace();
+                }
+            }
+        } else {
+            StringOutput.Quick.warning("  " + dep.getName() + " (" + dep.getSource() + ") - skipped (not implemented)");
+            skipCount[0]++;
+        }
+    }
+
+    /**
      * Check if requested dependency matches the locked version
      */
     private boolean matchesRequested(DependencyConfig requested, LockedDependency locked) {
@@ -361,6 +483,16 @@ public class InstallCommand implements Callable<Integer> {
                                    (requested.getUrl() != null && requested.getUrl().equals(locked.getSource())) ||
                                    (requested.getPath() != null && ("path:" + requested.getPath()).equals(locked.getSource()));
             return idMatches && sourceMatches;
+        }
+        // For non-extension file-based dependencies, compare configured path and installPath
+        if ("file".equals(requested.getSource()) && !"extension".equals(requested.getType())) {
+            String requestedPath = requested.getPath() != null ? requested.getPath().trim() : null;
+            String lockedResolved = locked.getResolved();
+            String lockedInstallPath = locked.getInstallPath();
+
+            boolean pathMatches = requestedPath != null && lockedResolved != null && lockedResolved.equals("file:" + requestedPath);
+            boolean installPathMatches = requested.getInstallPath() != null && requested.getInstallPath().equals(lockedInstallPath);
+            return pathMatches && installPathMatches;
         }
         return false;
     }
