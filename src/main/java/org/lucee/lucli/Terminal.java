@@ -185,8 +185,27 @@ public class Terminal {
      */
     private static String dispatchCommand(String commandLine) {
         try {
+            // Normalize: if user types a full "lucli ..." command inside
+            // the terminal, strip the leading "lucli" so we don't spawn
+            // another LuCLI process from within an existing session.
+            String effectiveLine = commandLine == null ? "" : commandLine.trim();
+            if (!effectiveLine.isEmpty()) {
+                String[] initial = parseCommandLine(effectiveLine);
+                if (initial.length > 0 && "lucli".equalsIgnoreCase(initial[0])) {
+                    if (initial.length == 1) {
+                        return ""; // bare "lucli" -> no-op
+                    }
+                    StringBuilder sb = new StringBuilder();
+                    for (int i = 1; i < initial.length; i++) {
+                        if (i > 1) sb.append(' ');
+                        sb.append(initial[i]);
+                    }
+                    effectiveLine = sb.toString();
+                }
+            }
+
             // Parse command line to get first word
-            String[] parts = parseCommandLine(commandLine);
+            String[] parts = parseCommandLine(effectiveLine);
             if (parts.length == 0) {
                 return "";
             }
@@ -220,7 +239,7 @@ public class Terminal {
             
             // Check if it's a terminal-only command (cd, ls, pwd, etc.)
             if (isTerminalOnlyCommand(command)) {
-                return commandProcessor.executeCommand(commandLine);
+                return commandProcessor.executeCommand(effectiveLine);
             }
             
             // Check if it's a Picocli command
@@ -236,7 +255,7 @@ public class Terminal {
             }
             
             // Fall back to external command processor
-            return externalCommandProcessor.executeCommand(commandLine);
+            return externalCommandProcessor.executeCommand(effectiveLine);
             
         } catch (Exception e) {
             return WindowsSupport.Symbols.ERROR + " Error: " + e.getMessage();

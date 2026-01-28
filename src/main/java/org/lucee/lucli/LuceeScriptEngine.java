@@ -297,6 +297,7 @@ public class LuceeScriptEngine {
                 System.out.println("=== Executing engine script /script_engine/executeModule.cfs ===");
             }
             engine.eval(script);
+            Object results = engine.get("results");
             Timer.stop("Module Execution: " + moduleName);
     }
 

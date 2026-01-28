@@ -65,7 +65,8 @@ public class ServerCommand implements Callable<Integer> {
     @Command(
         name = "start", 
         aliases = {"tart", "runny"},
-        description = "Start a Lucee server instance"
+        description = "Start a Lucee server instance",
+        mixinStandardHelpOptions = true
     )
     static class StartCommand implements Callable<Integer> {
 
@@ -183,6 +184,9 @@ public class ServerCommand implements Callable<Integer> {
         @Option(names = {"--sandbox"},
                 description = "Start a transient server in background without writing lucee.json or persisting the server instance")
         private boolean sandbox = false;
+
+        @Option(names = {"-h", "--help"}, usageHelp = true, description = "Show this help message and exit")
+        boolean helpRequested;
         
         @Parameters(paramLabel = "[PROJECT_DIR]", 
                     description = "Project directory (defaults to current directory)",

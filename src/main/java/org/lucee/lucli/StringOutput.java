@@ -212,6 +212,29 @@ public class StringOutput {
             return System.getenv(envVar);
         }
         
+        // LuCLI .lucli script result history helpers
+        // `_` returns the most recent result string from LuCLI.lucliResultHistory
+        // `last` / `last(n)` return entries from that history (1 = most recent).
+        if ("_".equals(placeholder)) {
+            String last = org.lucee.lucli.LuCLI.getLucliResult(1);
+            return last != null ? last : "";
+        }
+        if (placeholder.equals("last")) {
+            String last = org.lucee.lucli.LuCLI.getLucliResult(1);
+            return last != null ? last : "";
+        }
+        if (placeholder.startsWith("last(") && placeholder.endsWith(")")) {
+            String inside = placeholder.substring(5, placeholder.length() - 1).trim();
+            int pos = 1;
+            try {
+                pos = Integer.parseInt(inside);
+            } catch (NumberFormatException e) {
+                pos = 1;
+            }
+            String value = org.lucee.lucli.LuCLI.getLucliResult(pos);
+            return value != null ? value : "";
+        }
+
         // Fallback: treat ${FOO} as ${ENV_FOO} / ${FOO from env}
         String envValue = System.getenv(placeholder);
         if (envValue != null) {
