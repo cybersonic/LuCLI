@@ -379,7 +379,7 @@ public class InstallCommand implements Callable<Integer> {
                 boolean needsInstall = force || existing == null || !matchesRequested(dep, existing);
 
                 LockedDependency effectiveLocked;
-                if (!needsInstall && installPathExists(existing.getInstallPath())) {
+                if (!needsInstall && installPathExists(projectDir, existing.getInstallPath())) {
                     // Already installed and matches - use existing
                     if (isDevDep) {
                         installedDev.put(dep.getName(), existing);
@@ -472,11 +472,11 @@ public class InstallCommand implements Callable<Integer> {
      */
     private boolean matchesRequested(DependencyConfig requested, LockedDependency locked) {
         // For git sources, compare ref/version
-        if ("git".equals(requested.getSource())) {
+        if (isGitDependency(requested)) {
             return requested.getRef().equals(locked.getVersion());
         }
         // For extensions, compare ID and source
-        if ("extension".equals(requested.getType())) {
+        if (isExtensionDependency(requested)) {
             boolean idMatches = (requested.getId() == null && locked.getId() == null) ||
                                (requested.getId() != null && requested.getId().equals(locked.getId()));
             boolean sourceMatches = (requested.getUrl() == null && requested.getPath() == null && locked.getSource() != null && locked.getSource().equals("extension-provider")) ||
@@ -485,7 +485,7 @@ public class InstallCommand implements Callable<Integer> {
             return idMatches && sourceMatches;
         }
         // For non-extension file-based dependencies, compare configured path and installPath
-        if ("file".equals(requested.getSource()) && !"extension".equals(requested.getType())) {
+        if (isFileModuleDependency(requested)) {
             String requestedPath = requested.getPath() != null ? requested.getPath().trim() : null;
             String lockedResolved = locked.getResolved();
             String lockedInstallPath = locked.getInstallPath();
@@ -495,6 +495,18 @@ public class InstallCommand implements Callable<Integer> {
             return pathMatches && installPathMatches;
         }
         return false;
+    }
+
+    private boolean isGitDependency(DependencyConfig dep) {
+        return "git".equals(dep.getSource());
+    }
+
+    private boolean isExtensionDependency(DependencyConfig dep) {
+        return "extension".equals(dep.getType());
+    }
+
+    private boolean isFileModuleDependency(DependencyConfig dep) {
+        return "file".equals(dep.getSource()) && !"extension".equals(dep.getType());
     }
     
     /**

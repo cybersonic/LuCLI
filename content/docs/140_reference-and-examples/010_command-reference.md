@@ -749,13 +749,41 @@ lucli parrot [OPTIONS]
 
 **Options:**
 
-| Option | Description |
-|--------|-------------|
-| `-h, --help` | Show this help message and exit. |
-| `-V, --version` | Print version information and exit. |
+|| Option | Description |
+||--------|-------------|
+|| `-h, --help` | Show this help message and exit. |
+|| `-V, --version` | Print version information and exit. |
 
 ---
 
+### `lucli daemon`
+
+Run LuCLI in daemon mode, listening for JSON commands over TCP.
+
+**Usage:**
+```bash
+lucli daemon [--port <port>]
+```
+
+**Options:**
+
+|| Option | Description |
+||--------|-------------|
+|| `--port` | Port to listen on (default: `10000`, localhost only) |
+
+**Protocol:**
+
+The daemon listens on `127.0.0.1:<port>` and expects a single JSON line per TCP connection, for example:
+
+```json
+{"id":"1","argv":["modules","list"]}
+```
+
+Each request runs the same Picocli command pipeline as the normal CLI and returns a JSON response containing the original `id` (if provided), the exit code, and the combined stdout/stderr:
+
+```json
+{"id":"1","exitCode":0,"output":"..."}
+```
 
 ---
 

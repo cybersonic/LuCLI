@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.Callable;
 
 import org.lucee.lucli.LuCLI;
+import org.lucee.lucli.StringOutput;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -57,7 +58,11 @@ public class DaemonCommand implements Callable<Integer> {
                 try (Socket client = server.accept()) {
                     handleClient(client);
                 } catch (IOException e) {
-                    LuCLI.printError("Daemon client error: " + e.getMessage());
+                    String msg = e.getMessage();
+                    boolean isStreamClosed = msg != null && msg.contains("Stream closed");
+                    if (!isStreamClosed) {
+                        LuCLI.printError("Daemon client error: " + msg);
+                    }
                     if (LuCLI.debug) {
                         e.printStackTrace();
                     }
@@ -92,15 +97,21 @@ public class DaemonCommand implements Callable<Integer> {
             return;
         }
 
-        // Capture stdout/stderr for this request only.
+        // Capture stdout/stderr for this request only (including StringOutput).
         PrintStream originalOut = System.out;
         PrintStream originalErr = System.err;
+        StringOutput stringOutput = StringOutput.getInstance();
+        PrintStream originalStringOut = stringOutput.getOutputStream();
+        PrintStream originalStringErr = stringOutput.getErrorStream();
+
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         int exitCode;
         try {
             PrintStream capture = new PrintStream(baos, true, StandardCharsets.UTF_8);
             System.setOut(capture);
             System.setErr(capture);
+            stringOutput.setOutputStream(capture);
+            stringOutput.setErrorStream(capture);
 
             // Reuse the main Picocli command pipeline without System.exit().
             picocli.CommandLine cmd = new picocli.CommandLine(new org.lucee.lucli.cli.LuCLICommand());
@@ -114,6 +125,8 @@ public class DaemonCommand implements Callable<Integer> {
         } finally {
             System.setOut(originalOut);
             System.setErr(originalErr);
+            stringOutput.setOutputStream(originalStringOut);
+            stringOutput.setErrorStream(originalStringErr);
         }
 
         String output = baos.toString(StandardCharsets.UTF_8);
