@@ -2,6 +2,8 @@ package org.lucee.lucli.cli.commands;
 
 import java.util.concurrent.Callable;
 
+import javax.script.ScriptEngine;
+
 import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.LuceeScriptEngine;
 import org.lucee.lucli.StringOutput;
@@ -26,14 +28,17 @@ import picocli.CommandLine.Parameters;
         "  lucli cfml 'arrayNew(1)'              # Create array"
     }
 )
-public class CfmlCommand implements Callable<Integer> {
+public class CfmlCommand implements Callable<Object> {
 
-    @Option(names = {"-v", "--verbose"}, description = "Enable verbose output")
-    private boolean verbose = false;
+    // These are now in the root
+    // @Option(names = {"-v", "--verbose"}, description = "Enable verbose output")
+    // private boolean verbose = false;
 
-    @Option(names = {"-d", "--debug"}, description = "Enable debug output")
-    private boolean debug = false;
+    // @Option(names = {"-d", "--debug"}, description = "Enable debug output")
+    // private boolean debug = false;
 
+    // @Option(names = {"-t", "--timing"}, description = "Enable timing output")
+    // private boolean timing = false;
     @Parameters(
         paramLabel = "EXPRESSION", 
         description = "CFML expression or code to execute",
@@ -41,20 +46,12 @@ public class CfmlCommand implements Callable<Integer> {
     )
     private String[] cfmlParts;
 
-    @Option(names = {"-t", "--timing"}, description = "Enable timing output")
-    private boolean timing = false;
 
-    @Override
-    public Integer call() throws Exception {
-        // Set global flags for backward compatibility
-        LuCLI.verbose = LuCLI.verbose || verbose;
-        LuCLI.debug = LuCLI.debug || debug;
-        LuCLI.timing = LuCLI.timing || timing;
-        
+    public Object call() throws Exception {
+      
         // Initialize timing if requested
-        Timer.setEnabled(LuCLI.timing);
         Timer.start("CFML Command Execution");
-        
+        Object result = null;
         try {
             if (cfmlParts == null || cfmlParts.length == 0) {
                 System.err.println("Error: cfml command requires an expression. Example: cfml now()");
@@ -63,27 +60,27 @@ public class CfmlCommand implements Callable<Integer> {
 
             // Join all parts into a single CFML expression
             String cfmlCode = String.join(" ", cfmlParts);
-            
-            // Debug output
-            LuCLI.printDebug("CfmlCommand", "cfmlParts: " + java.util.Arrays.toString(cfmlParts));
-            LuCLI.printDebug("CfmlCommand", "cfmlCode: '" + cfmlCode + "'");
-            
-            // Execute the CFML code
-            executeCFMLNonInteractive(cfmlCode);
-            
-            return 0;
-        } finally {
+            // We can capture output here if needed
+            result = LuceeScriptEngine.getInstance().eval(cfmlCode);
+
+        } 
+        catch (Exception e) {
+            System.err.println("Error in cfml command: " + e.getMessage());
+            LuCLI.printDebugStackTrace(e);
+        }
+        finally {
             Timer.stop("CFML Command Execution");
         }
+        return result;
     }
 
     /**
      * Execute CFML code in non-interactive mode (one-shot command)
      * This is adapted from InteractiveTerminal.executeCFMLNonInteractive()
      */
-    private void executeCFMLNonInteractive(String cfmlCode) {
+    private Object executeCFMLNonInteractive(String cfmlCode) {
         Timer.start("CFML Execution");
-        
+        Object result = null;
         try {
             LuceeScriptEngine luceeEngine;
             
@@ -106,14 +103,17 @@ public class CfmlCommand implements Callable<Integer> {
             
             // Execute the CFML code with built-in variables
             Timer.start("Script Execution");
-            Object result = luceeEngine.evalScriptStatement(wrappedScript, null);
+            
+            result = luceeEngine.evalScriptStatement(wrappedScript, null);
+            
             // luceeEngine.eval(wrappedScript);
+            // Issue here is that it's a command. It returns a void! Unless we capture output differently.
             System.out.println(""); // Ensure newline after output
             Timer.stop("Script Execution");
             
             // The output should already be printed by writeOutput in the script
             // but we can also handle direct results if needed
-            LuCLI.printDebug("CfmlCommand", "Result: " + (result != null ? result.toString() : "null"));
+            // LuCLI.printDebug("CfmlCommand", "Result: " + (result != null ? result.toString() : "null"));
 
         } catch (Exception e) {
             System.err.println("Error executing CFML: " + e.getMessage());
@@ -124,6 +124,8 @@ public class CfmlCommand implements Callable<Integer> {
         } finally {
             Timer.stop("CFML Execution");
         }
+        return result;
+    
     }
     
     /**

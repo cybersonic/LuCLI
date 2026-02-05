@@ -175,8 +175,9 @@ public class LuceeScriptEngine {
         }
         
         // Execute the script statement
-        engine.eval("result=" + scriptStatement + ";");
+        engine.eval(scriptStatement);
         Object result = engine.get("result");
+        
         return result;
     }
     /**

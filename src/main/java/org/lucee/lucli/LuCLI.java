@@ -2,6 +2,7 @@ package org.lucee.lucli;
 
 import java.io.FileNotFoundException;
 import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -728,6 +729,7 @@ public class LuCLI {
                 picocli,
                 false
             );
+            System.out.println("");
         }
 
         // Scripts are best-effort; fail overall if any assertion failed
@@ -916,47 +918,79 @@ public class LuCLI {
                     return "";
                 }
 
-                if (captureOutput) {
+                StringWriter outWriter = null;
+                StringWriter errWriter = null;
+                PrintWriter out = null;
+                PrintWriter err = null;
 
-                    // Silent execution and gather output
-                    LuceeScriptEngine luceeEngine = LuceeScriptEngine.getInstance();
-                    Object ret = luceeEngine.evalScriptStatement(cfmlCode, null);
-                    if (ret != null) {
-                        recordLucliResult(ret.toString());
-                    }
-                    return ret.toString();
-
-                    // java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
-                    // java.io.PrintStream originalOut = System.out;
-                    // java.io.PrintStream originalErr = System.err;
-                    // try {
-                    //     System.setOut(new java.io.PrintStream(baos));
-                    //     System.setErr(new java.io.PrintStream(baos));
-                    //     // Execute cfml with the entire expression as a single argument so
-                    //     // inner quotes are preserved.
-                    //     // This doesnt need picocli, we can just do it direct
-                    //     // Execute it directly to avoid double-parsing issues
-                    //     // luceeEngine.evalScriptStatement(wrappedScript, null);
-                    //     // But this is not for everuthing then? It's running cfml only.
-                    //     picocli.execute("cfml", cfmlCode);
-                    // } 
-                    // catch(Exception e) {
-                    //     StringOutput.Quick.error("Error executing cfml command: " + e.getMessage());
-                    //     printDebugStackTrace(e);
-                    // }
-                    // finally {
-                    //     System.setOut(originalOut);
-                    //     System.setErr(originalErr);
-                    // }
-                    // String captured = baos.toString().trim();
-                    // if (captured != null && !captured.isEmpty()) {
-                    //     recordLucliResult(captured);
-                    // }
-                    // return "";
-                } else {
-                    picocli.execute("cfml", cfmlCode);
-                    return "";
+                if(captureOutput){
+                    outWriter = new StringWriter();
+                    errWriter = new StringWriter();
+                    out = new PrintWriter(outWriter);
+                    err = new PrintWriter(errWriter);
+                    picocli.setOut(out);
+                    picocli.setErr(err);
                 }
+
+                picocli.execute("cfml", cfmlCode);
+                Object res = picocli.getExecutionResult();
+                // System.out.println("Returned Variable:" + res.toString());
+
+                if(captureOutput){
+                    String stdOut = outWriter.toString();
+                    String stdErr = errWriter.toString();
+
+                    
+                }
+
+                
+                return (res != null ? res.toString() : "");
+
+
+
+                // if (captureOutput) {
+
+                //     // // Silent execution and gather output
+                //     // LuceeScriptEngine luceeEngine = LuceeScriptEngine.getInstance();
+                //     // Object ret = luceeEngine.evalScriptStatement(cfmlCode, null);
+                //     // if (ret != null) {
+                //     //     recordLucliResult(ret.toString());
+                //     // }
+                //     // return ret.toString();
+
+                //     // java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                //     // java.io.PrintStream originalOut = System.out;
+                //     // java.io.PrintStream originalErr = System.err;
+                //     // try {
+                //     //     System.setOut(new java.io.PrintStream(baos));
+                //     //     System.setErr(new java.io.PrintStream(baos));
+                //     //     // Execute cfml with the entire expression as a single argument so
+                //     //     // inner quotes are preserved.
+                //     //     // This doesnt need picocli, we can just do it direct
+                //     //     // Execute it directly to avoid double-parsing issues
+                //     //     // luceeEngine.evalScriptStatement(wrappedScript, null);
+                //     //     // But this is not for everuthing then? It's running cfml only.
+                //     //     picocli.execute("cfml", cfmlCode);
+                //     // } 
+                //     // catch(Exception e) {
+                //     //     StringOutput.Quick.error("Error executing cfml command: " + e.getMessage());
+                //     //     printDebugStackTrace(e);
+                //     // }
+                //     // finally {
+                //     //     System.setOut(originalOut);
+                //     //     System.setErr(originalErr);
+                //     // }
+                //     // String captured = baos.toString().trim();
+                //     // if (captured != null && !captured.isEmpty()) {
+                //     //     recordLucliResult(captured);
+                //     // }
+                //     // return "";
+                // } else {
+                    // picocli.execute("cfml", cfmlCode);
+                    // Object res = picocli.getExecutionResult();
+                    // System.out.println("Elvis!");
+                    // return "";
+                // }
 
             }
             
