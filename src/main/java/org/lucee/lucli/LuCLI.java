@@ -83,6 +83,7 @@ import picocli.CommandLine.Spec;
         "  lucli --verbose --version       # Show version with verbose output", 
         "  lucli --timing script.cfs       # Execute script with timing analysis",
         "  lucli script.cfs arg1 arg2      # Execute CFML script with arguments",
+        "  lucli myscript.lucli            # Execute a LuCLI command script",
         "  lucli cfml 'now()'              # Execute CFML expression",
         "  lucli server start --version 6.2.2.91  # Start server with specific Lucee version",
         "  lucli modules list              # List available modules"
@@ -222,7 +223,7 @@ public class LuCLI implements Callable<Integer> {
 
             // No argument provided - start interactive terminal
             if (firstArg == null || firstArg.trim().isEmpty()) {
-                printDebug("LuCLI", "No arguments provided, starting terminal mode");
+                debug("LuCLI", "No arguments provided, starting terminal mode");
                 Timer.start("Terminal Mode");
                 Terminal.main(new String[0]);
                 Timer.stop("Terminal Mode");
@@ -252,7 +253,7 @@ public class LuCLI implements Callable<Integer> {
 
         // Check if it's a .lucli script file
         if (file.exists() && (arg.endsWith(".lucli") || arg.endsWith(".luc"))) {
-            printDebug("LuCLI", "Routing to .lucli script: " + arg);
+            debug("LuCLI", "Routing to .lucli script: " + arg);
             Timer.start("LuCLI Script Execution");
             int exitCode = executeLucliScript(arg);
             Timer.stop("LuCLI Script Execution");
@@ -262,13 +263,13 @@ public class LuCLI implements Callable<Integer> {
         // Check if it's a CFML file (.cfm, .cfc, .cfs)
         if (file.exists() && (arg.endsWith(".cfm") || arg.endsWith(".cfc") || 
                               arg.endsWith(".cfs") || arg.endsWith(".cfml"))) {
-            printDebug("LuCLI", "Routing to run command: " + arg);
+            debug("LuCLI", "Routing to run command: " + arg);
             return executeViaRunCommand(arg, args);
         }
 
         // Check if it's a module name (and not an existing file)
         if (!file.exists() && ModuleCommand.moduleExists(arg)) {
-            printDebug("LuCLI", "Routing to module: " + arg);
+            debug("LuCLI", "Routing to module: " + arg);
             return executeViaModulesCommand(arg, args);
         }
 
@@ -299,7 +300,7 @@ public class LuCLI implements Callable<Integer> {
      * Execute a module via the modules run command
      */
     private Integer executeViaModulesCommand(String moduleName, String[] args) throws Exception {
-        printVerbose("Executing module shortcut: " + moduleName + 
+        verbose("Executing module shortcut: " + moduleName + 
             " (equivalent to 'lucli modules run " + moduleName + "')");
         
         List<String> cmdArgs = new ArrayList<>();
@@ -379,52 +380,127 @@ public class LuCLI implements Callable<Integer> {
         System.exit(exitCode);
     }
     
-        /**
-     * Print a message only if verbose mode is enabled
+    // ====================
+    // Output Methods
+    // ====================
+    
+    /**
+     * Print a verbose message (only if --verbose flag is enabled)
      * @param message The message to print
      */
-    public static void printVerbose(String message) {
+    public static void verbose(String message) {
         if (verbose) {
             System.out.println(message);
         }
     }
     
     /**
-     * Print a debug message only if debug mode is enabled
-     * Debug messages go to stderr with [DEBUG] prefix
+     * Print a verbose message with formatting (only if --verbose flag is enabled)
+     * @param format The format string
+     * @param args The arguments for the format string
+     */
+    public static void verbose(String format, Object... args) {
+        if (verbose) {
+            System.out.println(String.format(format, args));
+        }
+    }
+    
+    /**
+     * Print a debug message (only if --debug flag is enabled)
      * @param message The message to print
      */
-    public static void printDebug(String message) {
+    public static void debug(String message) {
         if (debug) {
             System.err.println("[DEBUG] " + message);
         }
     }
     
     /**
-     * Print a debug message with context only if debug mode is enabled
+     * Print a debug message with context (only if --debug flag is enabled)
      * @param context The context (e.g., class name or method name)
      * @param message The message to print
      */
-    public static void printDebug(String context, String message) {
+    public static void debug(String context, String message) {
         if (debug) {
             System.err.println("[DEBUG " + context + "] " + message);
         }
     }
     
     /**
-     * Print an info message (always shown, but can be used for consistency)
+     * Print a debug message with formatting (only if --debug flag is enabled)
+     * @param format The format string
+     * @param args The arguments for the format string
+     */
+    public static void debug(String format, Object... args) {
+        if (debug) {
+            System.err.println(String.format("[DEBUG] " + format, args));
+        }
+    }
+    
+    /**
+     * Print an exception stack trace (only if --debug flag is enabled)
+     * @param e The exception to print
+     */
+    public static void debugStack(Exception e) {
+        if (debug) {
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Print an info message (always shown)
      * @param message The message to print
      */
-    public static void printInfo(String message) {
+    public static void info(String message) {
         System.out.println(message);
     }
     
     /**
-     * Print an error message
+     * Print an error message (always shown)
      * @param message The error message
      */
-    public static void printError(String message) {
+    public static void error(String message) {
         System.err.println(message);
+    }
+    
+    // ====================
+    // Deprecated Methods (for backward compatibility)
+    // ====================
+    
+    /** @deprecated Use {@link #verbose(String)} instead */
+    @Deprecated
+    public static void verbose(String message) {
+        verbose(message);
+    }
+    
+    /** @deprecated Use {@link #debug(String)} instead */
+    @Deprecated
+    public static void debug(String message) {
+        debug(message);
+    }
+    
+    /** @deprecated Use {@link #debug(String, String)} instead */
+    @Deprecated
+    public static void debug(String context, String message) {
+        debug(context, message);
+    }
+    
+    /** @deprecated Use {@link #debugStack(Exception)} instead */
+    @Deprecated
+    public static void debugStack(Exception e) {
+        debugStack(e);
+    }
+    
+    /** @deprecated Use {@link #info(String)} instead */
+    @Deprecated
+    public static void printInfo(String message) {
+        info(message);
+    }
+    
+    /** @deprecated Use {@link #error(String)} instead */
+    @Deprecated
+    public static void printError(String message) {
+        error(message);
     }
 
     /**
@@ -507,7 +583,7 @@ public class LuCLI implements Callable<Integer> {
      * Print a stack trace only if debug mode is enabled
      * @param e The exception to print
      */
-    public static void printDebugStackTrace(Exception e) {
+    public static void debugStack(Exception e) {
         if (debug) {
             e.printStackTrace();
         }
@@ -672,12 +748,12 @@ public class LuCLI implements Callable<Integer> {
             throw new java.io.FileNotFoundException("Script file not found: " + scriptPath);
         }
 
-        printVerbose("Executing LuCLI script: " + scriptPath);
+        verbose("Executing LuCLI script: " + scriptPath);
 
         // Read all lines from the script file
         java.util.List<String> lines = Files.readAllLines(path, java.nio.charset.StandardCharsets.UTF_8);
         if (lines.isEmpty()) {
-            printVerbose("Script is empty: " + scriptPath);
+            verbose("Script is empty: " + scriptPath);
             return 0;
         }
 
@@ -690,7 +766,7 @@ public class LuCLI implements Callable<Integer> {
             // resolveSecretsInScriptLine() already printed a helpful error
             // message for missing/invalid secrets. Treat this as a fatal
             // error for the script.
-            printDebugStackTrace((Exception)(e instanceof Exception ? e : new Exception(e)));
+            debugStack((Exception)(e instanceof Exception ? e : new Exception(e)));
             return 1;
         }
 
@@ -725,14 +801,14 @@ public class LuCLI implements Callable<Integer> {
             
             // Treat lines starting with '#' as comments (including shebangs like '#!/usr/bin/env lucli')
             if (trimmed.startsWith("#")) {
-                printDebug("LuCLIScript", "Skipping comment line: " + line);
+                debug("LuCLIScript", "Skipping comment line: " + line);
                 continue;
             }
             
             // Early-exit command for .lucli scripts: "exit" or "exit <code>"
             if(isExitCommand(line)){
                 int exitCode = getExitCodeFromExitCommand(line);
-                printDebug("LuCLIScript", "Exit requested from script with code " + exitCode);
+                debug("LuCLIScript", "Exit requested from script with code " + exitCode);
                 return exitCode;
             }
             
@@ -788,13 +864,13 @@ public class LuCLI implements Callable<Integer> {
                         String valueWithSecrets = resolveSecretsInScriptLine(value);
                         String resolvedValue    = stringOutput.process(valueWithSecrets);
 
-                        printDebug("SET directive: " + key + " = " + resolvedValue);
+                        debug("SET directive: " + key + " = " + resolvedValue);
 
                         scriptEnvironment.put(key, resolvedValue);
                         stringOutput.addPlaceholder(key, resolvedValue);
                     } catch (Exception e) {
                         StringOutput.Quick.error("Error processing SET value for '" + key + "': " + e.getMessage());
-                        printDebugStackTrace(e);
+                        debugStack(e);
                     }
                     continue;
                 }
@@ -984,7 +1060,7 @@ public class LuCLI implements Callable<Integer> {
             true
         );
 
-        printDebug("LuCLIScript", "Captured output for variable '" + varName + "': " + captured);
+        debug("LuCLIScript", "Captured output for variable '" + varName + "': " + captured);
 
         scriptEnvironment.put(varName, captured);
         stringOutput.addPlaceholder(varName, captured);
@@ -1102,7 +1178,7 @@ public class LuCLI implements Callable<Integer> {
                 //     // } 
                 //     // catch(Exception e) {
                 //     //     StringOutput.Quick.error("Error executing cfml command: " + e.getMessage());
-                //     //     printDebugStackTrace(e);
+                //     //     debugStack(e);
                 //     // }
                 //     // finally {
                 //     //     System.setOut(originalOut);
@@ -1218,7 +1294,7 @@ public class LuCLI implements Callable<Integer> {
 
         } catch (Exception e) {
             StringOutput.Quick.error("Error executing script line '" + processedLine + "': " + e.getMessage());
-            printDebugStackTrace(e);
+            debugStack(e);
             return "";
         }
     }
