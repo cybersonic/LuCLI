@@ -9,7 +9,7 @@ public class SimpleLucee {
         ScriptEngine engine = manager.getEngineByName("CFML");
 
         // String script = readScriptTemplate("/examples/create_component.cfs");
-        engine.eval("<cfscript>echo(\"Hello, Lucee!\");</cfscript>");
+        engine.eval("echo(\"hello\")");
         return;
     }
 

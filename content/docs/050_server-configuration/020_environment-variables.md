@@ -1,16 +1,13 @@
 ---
-title: Environments and Environment Variables
+title:  Using Environment Variables
 layout: docs
 ---
-
-
-▪  Focused explanation of the environments section, deep merge rules, and --env.
-▪  You can largely lift the “Environment-Based Configuration” and examples from CONFIGURATION.md into this dedicated page.
-
 
 LuCLI supports environment variable substitution throughout your `lucee.json` configuration, allowing you to externalize sensitive data and make your configurations portable across different environments.
 
 ## Overview
+
+This page focuses on how environment variables and `.env` files are resolved into your configuration. For how environment blocks (`environments.<name>`) are merged with the base config (including load order and deep‑merge rules), see [Environments and Configuration Overrides](../050_server-configuration/030_environments-and-overrides/).
 
 Environment variables can be used in any string field within `lucee.json` using standard substitution syntax. Variables are resolved when the configuration is loaded, enabling dynamic server configuration.
 
@@ -186,37 +183,6 @@ lucli server config set port='${HTTP_PORT:-8080}' version='${LUCEE_VERSION:-6.2.
 # Preview changes without saving
 lucli server config set port='${HTTP_PORT:-8080}' --dry-run
 ```
-
-## Future: Java System Properties
-
-> ⚠️ **This feature is currently under consideration and not yet implemented.**
-
-**Proposed syntax** for Java system properties:
-
-```json
-{
-  "appName": "${java:app.name}",
-  "version": "${java:app.version}"
-}
-```
-
-This would allow access to Java system properties set via JVM arguments:
-
-```bash
-java -Dapp.name=myapp -Dapp.version=1.0 -jar lucli.jar ...
-```
-
-### Design
-
-The proposed `${java:...}` syntax provides:
-- Clear distinction from environment variables (which use `${VAR}`)
-- Access to Java system properties without conflict
-- Standard Java property notation
-
-Implementation would require:
-1. Detecting the `java:` prefix in variable substitution
-2. Resolving via `System.getProperty()` instead of `System.getenv()`
-3. Updated documentation and examples
 
 ## Best Practices
 

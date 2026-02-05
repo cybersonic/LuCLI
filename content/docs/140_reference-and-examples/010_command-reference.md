@@ -758,22 +758,24 @@ lucli parrot [OPTIONS]
 
 ### `lucli daemon`
 
-Run LuCLI in daemon mode, listening for JSON commands over TCP.
+Run LuCLI in daemon mode, either in simple JSON mode or as an LSP (Language Server Protocol) endpoint.
 
 **Usage:**
 ```bash
-lucli daemon [--port <port>]
+lucli daemon [--port <port>] [--lsp] [--module <name>]
 ```
 
 **Options:**
 
-|| Option | Description |
-||--------|-------------|
-|| `--port` | Port to listen on (default: `10000`, localhost only) |
+||| Option | Description |
+|||--------|-------------|
+||| `--port` | Port to listen on (default: `10000`, localhost only) |
+||| `--lsp` | Run in Language Server Protocol (LSP) mode instead of JSON mode |
+||| `--module <name>` | CFML module to use as the LSP endpoint (e.g. `LuceeLSP`) |
 
-**Protocol:**
+**JSON mode protocol:**
 
-The daemon listens on `127.0.0.1:<port>` and expects a single JSON line per TCP connection, for example:
+In the default JSON mode, the daemon listens on `127.0.0.1:<port>` and expects a single JSON line per TCP connection, for example:
 
 ```json
 {"id":"1","argv":["modules","list"]}
@@ -784,6 +786,10 @@ Each request runs the same Picocli command pipeline as the normal CLI and return
 ```json
 {"id":"1","exitCode":0,"output":"..."}
 ```
+
+**LSP mode:**
+
+When `--lsp` is specified, the daemon instead speaks the standard Language Server Protocol over TCP using the configured CFML module as its endpoint. In this mode, requests and responses follow LSP framing (`Content-Length` headers + JSON-RPC 2.0 messages) and the module is responsible for implementing all LSP methods.
 
 ---
 

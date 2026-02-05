@@ -449,6 +449,31 @@ lucli modules init data-processor
 lucli data-processor --input=data.json --format=xml
 ```
 
+### Daemon Mode (JSON over TCP)
+Run LuCLI as a long-lived daemon that accepts JSON commands over a local TCP socket.
+
+```bash
+# Start daemon on default port 10000 (blocks current terminal)
+lucli daemon
+
+# Start daemon on a custom port
+lucli daemon --port 11000
+```
+
+Each client connection sends a single JSON line with the argv to execute:
+
+```json
+{"id":"1","argv":["server","list"]}
+```
+
+The daemon executes the command through the normal Picocli pipeline and replies with JSON containing the exit code and combined stdout/stderr:
+
+```json
+{"id":"1","exitCode":0,"output":"..."}
+```
+
+You can talk to the daemon from any language that can open a TCP socket to `127.0.0.1:<port>` and read/write UTF-8 lines.
+
 ### Custom Prompt Themes
 JSON-based prompt system with 14+ built-in themes:
 ```json

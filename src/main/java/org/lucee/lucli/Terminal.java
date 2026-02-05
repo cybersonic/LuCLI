@@ -14,6 +14,7 @@ import org.jline.reader.impl.DefaultParser;
 import org.jline.reader.impl.completer.AggregateCompleter;
 import org.jline.terminal.TerminalBuilder;
 import org.lucee.lucli.cli.LuCLICommand;
+import org.lucee.lucli.cli.commands.fs.FileSystemCommands;
 import org.lucee.lucli.cli.completion.PicocliStyledCompleter;
 import org.lucee.lucli.modules.ModuleCommand;
 
@@ -86,6 +87,20 @@ public class Terminal {
         // Create Picocli CommandLine with root command
         LuCLICommand rootCommand = new LuCLICommand();
         picocliCommandLine = new CommandLine(rootCommand);
+
+        // Attach internal file system commands (ls, cd, etc.) via FileSystemCommands,
+        // so that they participate in Picocli help and documentation while still
+        // delegating to CommandProcessor for implementation.
+        FileSystemCommands fsGroup = new FileSystemCommands(commandProcessor);
+        CommandLine fsCmdLine = new CommandLine(fsGroup);
+        // Promote selected internal commands to top-level Picocli commands
+        String[] internalFsNames = {"ls", "dir", "cd", "pwd", "mkdir", "rmdir", "rm", "cp", "mv", "cat", "head", "tail", "wc"};
+        for (String name : internalFsNames) {
+            CommandLine sub = fsCmdLine.getSubcommands().get(name);
+            if (sub != null) {
+                picocliCommandLine.addSubcommand(name, sub);
+            }
+        }
         // Treat subcommands as top-level commands in the shell
         // Note: We don't use setCommandName("") anymore as it causes IllegalStateException in SystemCompleter
         // Instead, we build a custom JLine completer that wraps Picocli.
@@ -237,14 +252,16 @@ public class Terminal {
                     }
             }
             
-            // Check if it's a terminal-only command (cd, ls, pwd, etc.)
-            if (isTerminalOnlyCommand(command)) {
-                return commandProcessor.executeCommand(effectiveLine);
-            }
-            
-            // Check if it's a Picocli command
+            // Prefer Picocli commands when available so internal commands that
+            // are wired through Picocli (e.g. ls, cd) participate in help/docs.
             if (isPicocliCommand(command)) {
                 return executePicocliCommand(parts);
+            }
+            
+            // Terminal-only commands (pwd, mkdir, etc.) that are not yet
+            // wired through Picocli continue to delegate to CommandProcessor.
+            if (isTerminalOnlyCommand(command)) {
+                return commandProcessor.executeCommand(effectiveLine);
             }
             
             // Check if it's a module shortcut
@@ -275,7 +292,7 @@ public class Terminal {
                command.equals("wc") || command.equals("head") ||
                command.equals("tail") || command.equals("prompt") ||
                command.equals("edit") || command.equals("interactive") ||
-               command.equals("cflint") || command.equals("run");
+               command.equals("cflint");
     }
     
     /**

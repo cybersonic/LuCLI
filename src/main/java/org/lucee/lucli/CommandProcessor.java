@@ -121,15 +121,13 @@ public class CommandProcessor {
                 case "prompt":
                     result = promptCommand(args);
                     break;
-                case "run":
-                    result = runScriptCommand(args);
-                    break;
                 case "server":
                     result = serverCommand(args);
                     break;
                 case "edit":
                     result = editFile(args);
                     break;
+              
                 case "interactive":
                     result = interactiveCommand(args);
                     break;
@@ -906,49 +904,7 @@ public class CommandProcessor {
         }
     }
     
-    /**
-     * Execute a CFML script file using LuceeScriptEngine
-     */
-    private String runScriptCommand(String[] args) {
-        if (args.length == 0) {
-            return "❌ run: missing file operand\n💡 Usage: run <file.cfm|file.cfc|file.cfs> [arguments...]";
-        }
-        
-        String scriptFile = args[0];
-        String[] scriptArgs = Arrays.copyOfRange(args, 1, args.length);
-        
-        Path scriptPath = fileSystemState.resolvePath(scriptFile);
-        
-        if (!Files.exists(scriptPath)) {
-            return "❌ run: cannot find file '" + scriptFile + "'";
-        }
-        
-        if (Files.isDirectory(scriptPath)) {
-            return "❌ run: '" + scriptFile + "' is a directory";
-        }
-        
-        // Check if file has a supported CFML extension
-        String fileName = scriptPath.getFileName().toString().toLowerCase();
-        if (!fileName.endsWith(".cfm") && !fileName.endsWith(".cfc") && !fileName.endsWith(".cfs")) {
-            return "❌ run: '" + scriptFile + "' is not a CFML file (.cfm, .cfc, or .cfs)";
-        }
-        
-        try {
-            // Get or create the LuceeScriptEngine instance
-            LuceeScriptEngine luceeEngine = LuceeScriptEngine.getInstance(); // non-verbose for cleaner output
-            
-            // Execute the script file with arguments
-            luceeEngine.executeScript(scriptPath.toString(), scriptArgs);
-            
-            // Success - no output needed as script execution handles its own output
-            return "";
-            
-        } catch (Exception e) {
-            return "❌ Error executing CFML script '" + scriptFile + "': " + e.getMessage();
-        }
-    }
-    
-    /**
+/**
      * Get the appropriate emoji or text prefix for a file based on its type and extension
      */
     private String getFileEmoji(Path file) {
@@ -1260,9 +1216,8 @@ public class CommandProcessor {
                "  find [dir] [pattern]  🔍 Find files\n" +
                "  wc file...            📊 Count lines, words, characters\n" +
                "  head [-n num] file... ⬆️  Show first lines of file\n" +
-               "  tail [-n num] file... ⬇️  Show last lines of file\n" +
-               "  run file.cf[ms] [...] ⚡ Execute CFML script files\n" +
-               "  lint [cmd] [files...] 🔍 CFML code linting and analysis\n" +
+               "  tail [-n num] file... ⬇️  Show last lines of file\\n" +
+               "  lint [cmd] [files...] 🔍 CFML code linting and analysis\\n" +
                "                           check <files/dirs> | rules | config [init]\n" +
                "                           --format <text|json|xml> --verbose --config <file>\n" +
                "  server [cmd] [opts]   🖥️  Manage Lucee servers\n" +

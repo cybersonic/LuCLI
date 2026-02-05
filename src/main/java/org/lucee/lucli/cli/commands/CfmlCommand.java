@@ -106,9 +106,9 @@ public class CfmlCommand implements Callable<Integer> {
             
             // Execute the CFML code with built-in variables
             Timer.start("Script Execution");
-            Object result = luceeEngine.evalWithBuiltinVariables(wrappedScript);
+            Object result = luceeEngine.evalScriptStatement(wrappedScript, null);
             // luceeEngine.eval(wrappedScript);
-            System.out.println(); // Ensure newline after output
+            System.out.println(""); // Ensure newline after output
             Timer.stop("Script Execution");
             
             // The output should already be printed by writeOutput in the script

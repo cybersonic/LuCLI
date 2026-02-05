@@ -6,7 +6,7 @@ weight: 30
 
 LuCLI supports multiple environments (such as `dev`, `staging`, and `prod`) inside a single `lucee.json`. Environment blocks let you override the base configuration without duplicating everything.
 
-This page explains how environments work, how values are merged, and how to use them safely.
+This page is the canonical reference for configuration load order and deep‑merge behaviour. It explains how environments work, how values are merged, and how to use them safely.
 
 ## Base vs. environment configuration
 
