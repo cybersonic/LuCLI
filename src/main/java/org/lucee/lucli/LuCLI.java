@@ -469,25 +469,25 @@ public class LuCLI implements Callable<Integer> {
     
     /** @deprecated Use {@link #verbose(String)} instead */
     @Deprecated
-    public static void verbose(String message) {
+    public static void printVerbose(String message) {
         verbose(message);
     }
     
     /** @deprecated Use {@link #debug(String)} instead */
     @Deprecated
-    public static void debug(String message) {
+    public static void printDebug(String message) {
         debug(message);
     }
     
     /** @deprecated Use {@link #debug(String, String)} instead */
     @Deprecated
-    public static void debug(String context, String message) {
+    public static void printDebug(String context, String message) {
         debug(context, message);
     }
     
     /** @deprecated Use {@link #debugStack(Exception)} instead */
     @Deprecated
-    public static void debugStack(Exception e) {
+    public static void printDebugStackTrace(Exception e) {
         debugStack(e);
     }
     
@@ -579,15 +579,6 @@ public class LuCLI implements Callable<Integer> {
         lucliScriptSecretStore = new LocalSecretStore(storePath, passphrase);
     }
     
-    /**
-     * Print a stack trace only if debug mode is enabled
-     * @param e The exception to print
-     */
-    public static void debugStack(Exception e) {
-        if (debug) {
-            e.printStackTrace();
-        }
-    }
 
     
     /**
