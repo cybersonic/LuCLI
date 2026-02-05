@@ -18,6 +18,7 @@ import org.lucee.lucli.cli.commands.XmlCommand;
 import org.lucee.lucli.cli.commands.DaemonCommand;
 import org.lucee.lucli.cli.commands.deps.DepsCommand;
 import org.lucee.lucli.cli.commands.deps.InstallCommand;
+import org.lucee.lucli.cli.commands.logic.XSetCommand;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -46,7 +47,8 @@ import picocli.CommandLine.Option;
         RunCommand.class,
         DaemonCommand.class,
         // Hidden/internal diagnostics
-        XmlCommand.class
+        XmlCommand.class,
+        XSetCommand.class
     },
     footer = {
         "",
