@@ -5,7 +5,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.Callable;
 
-import org.lucee.lucli.cli.LuCLICommand;
+import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.cli.completion.LuceeVersionCandidates;
 import org.lucee.lucli.server.ServerCommandHandler;
 import org.lucee.lucli.config.editor.ConfigEditorRunner;
@@ -50,7 +50,7 @@ import picocli.CommandLine.Model.CommandSpec;
 public class ServerCommand implements Callable<Integer> {
 
     @ParentCommand 
-    private LuCLICommand parent;
+    private LuCLI parent;
 
     @Override
     public Integer call() throws Exception {

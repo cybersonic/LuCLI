@@ -18,6 +18,7 @@ import org.lucee.lucli.config.LuceeJsonConfig;
 import org.lucee.lucli.config.LuceeLockFile;
 import org.lucee.lucli.deps.ExtensionDependencyInstaller;
 import org.lucee.lucli.deps.FileDependencyInstaller;
+import org.lucee.lucli.deps.ForgeBoxDependencyInstaller;
 import org.lucee.lucli.deps.GitDependencyInstaller;
 import org.lucee.lucli.deps.LockedDependency;
 import org.lucee.lucli.server.LuceeServerManager;
@@ -132,6 +133,8 @@ public class InstallCommand implements Callable<Integer> {
         long gitDevCount = devDeps.stream().filter(d -> "git".equals(d.getSource())).count();
         long extCount = deps.stream().filter(d -> "extension".equals(d.getType())).count();
         long extDevCount = devDeps.stream().filter(d -> "extension".equals(d.getType())).count();
+        long forgeCount = deps.stream().filter(d -> "forgebox".equals(d.getSource())).count();
+        long forgeDevCount = devDeps.stream().filter(d -> "forgebox".equals(d.getSource())).count();
         
         // 6. Separate prod and dev dependencies for lock file / nested processing
         List<DependencyConfig> prodDeps = deps;
@@ -155,8 +158,8 @@ public class InstallCommand implements Callable<Integer> {
             }
             
             String indent = depth == 0 ? "  " : "    ";
-            StringOutput.Quick.print(indent + deps.size() + " production dependencies (" + gitCount + " git, " + extCount + " extensions)");
-            StringOutput.Quick.print(indent + devDeps.size() + " dev dependencies (" + gitDevCount + " git, " + extDevCount + " extensions)");
+            StringOutput.Quick.print(indent + deps.size() + " production dependencies (" + gitCount + " git, " + extCount + " extensions, " + forgeCount + " forgebox)");
+            StringOutput.Quick.print(indent + devDeps.size() + " dev dependencies (" + gitDevCount + " git, " + extDevCount + " extensions, " + forgeDevCount + " forgebox)");
             StringOutput.Quick.print("\n" + indent.substring(0, indent.length() - 2) + "Git dependencies:");
             deps.stream()
                 .filter(d -> "git".equals(d.getSource()))
@@ -176,8 +179,8 @@ public class InstallCommand implements Callable<Integer> {
             if (depth == 0) {
                 StringOutput.Quick.info("Note: Git sources and extension dependencies are supported.");
             }
-            if (deps.stream().anyMatch(d -> !"git".equals(d.getSource()) && !"extension".equals(d.getType())) ||
-                devDeps.stream().anyMatch(d -> !"git".equals(d.getSource()) && !"extension".equals(d.getType()))) {
+            if (deps.stream().anyMatch(d -> !"git".equals(d.getSource()) && !"extension".equals(d.getType()) && !"forgebox".equals(d.getSource())) ||
+                devDeps.stream().anyMatch(d -> !"git".equals(d.getSource()) && !"extension".equals(d.getType()) && !"forgebox".equals(d.getSource()))) {
                 StringOutput.Quick.print(indent.substring(0, indent.length() - 2) + "Other sources will be skipped:");
                 deps.stream()
                     .filter(d -> !"git".equals(d.getSource()) && !"extension".equals(d.getType()))
@@ -219,7 +222,7 @@ public class InstallCommand implements Callable<Integer> {
             return 0;
         }
         
-        boolean hasSupported = allDeps.stream().anyMatch(d -> "git".equals(d.getSource()) || "extension".equals(d.getType()));
+        boolean hasSupported = allDeps.stream().anyMatch(d -> "git".equals(d.getSource()) || "extension".equals(d.getType()) || "forgebox".equals(d.getSource()));
         if (!hasSupported) {
             StringOutput.Quick.info("\nℹ️  No git or extension dependencies to install");
             return 0;
@@ -231,6 +234,7 @@ public class InstallCommand implements Callable<Integer> {
         StringOutput.Quick.info(" Installing dependencies...");
         GitDependencyInstaller gitInstaller = new GitDependencyInstaller(projectDir);
         ExtensionDependencyInstaller extInstaller = new ExtensionDependencyInstaller(projectDir);
+        ForgeBoxDependencyInstaller forgeInstaller = new ForgeBoxDependencyInstaller(projectDir);
         
         java.util.Map<String, LockedDependency> installedProd = new java.util.LinkedHashMap<>();
         java.util.Map<String, LockedDependency> installedDev = new java.util.LinkedHashMap<>();
@@ -242,8 +246,9 @@ public class InstallCommand implements Callable<Integer> {
         for (DependencyConfig dep : allDeps) {
             boolean isGit = "git".equals(dep.getSource());
             boolean isExtension = "extension".equals(dep.getType());
+            boolean isForgeBox = "forgebox".equals(dep.getSource());
 
-            if (isGit || isExtension) {
+            if (isGit || isExtension || isForgeBox) {
                 try {
                     boolean isDevDep = devDepsList.contains(dep);
                     
@@ -271,7 +276,9 @@ public class InstallCommand implements Callable<Integer> {
                         // Install/reinstall via appropriate installer
                         LockedDependency locked = isGit
                             ? gitInstaller.install(dep)
-                            : extInstaller.install(dep);
+                            : (isExtension
+                                ? extInstaller.install(dep)
+                                : forgeInstaller.install(dep));
                         
                         if (isDevDep) {
                             installedDev.put(dep.getName(), locked);
@@ -484,6 +491,20 @@ public class InstallCommand implements Callable<Integer> {
                                    (requested.getPath() != null && ("path:" + requested.getPath()).equals(locked.getSource()));
             return idMatches && sourceMatches;
         }
+        // For ForgeBox dependencies, compare version (and source)
+        if (isForgeBoxDependency(requested)) {
+            if (locked.getSource() == null || !"forgebox".equals(locked.getSource())) {
+                return false;
+            }
+            String requestedVersion = requested.getVersion();
+            String lockedVersion = locked.getVersion();
+            if (requestedVersion == null || requestedVersion.isBlank()) {
+                // No explicit version requested: any forgebox-locked version is acceptable
+                return lockedVersion != null && !lockedVersion.isBlank();
+            }
+            return requestedVersion.equals(lockedVersion);
+        }
+        
         // For non-extension file-based dependencies, compare configured path and installPath
         if (isFileModuleDependency(requested)) {
             String requestedPath = requested.getPath() != null ? requested.getPath().trim() : null;
@@ -507,6 +528,10 @@ public class InstallCommand implements Callable<Integer> {
 
     private boolean isFileModuleDependency(DependencyConfig dep) {
         return "file".equals(dep.getSource()) && !"extension".equals(dep.getType());
+    }
+
+    private boolean isForgeBoxDependency(DependencyConfig dep) {
+        return dep != null && "forgebox".equals(dep.getSource());
     }
     
     /**

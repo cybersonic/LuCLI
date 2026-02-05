@@ -13,7 +13,7 @@ import org.jline.reader.UserInterruptException;
 import org.jline.reader.impl.DefaultParser;
 import org.jline.reader.impl.completer.AggregateCompleter;
 import org.jline.terminal.TerminalBuilder;
-import org.lucee.lucli.cli.LuCLICommand;
+import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.cli.commands.fs.FileSystemCommands;
 import org.lucee.lucli.cli.completion.PicocliStyledCompleter;
 import org.lucee.lucli.modules.ModuleCommand;
@@ -85,7 +85,7 @@ public class Terminal {
         externalCommandProcessor = new ExternalCommandProcessor(commandProcessor, commandProcessor.getSettings());
         
         // Create Picocli CommandLine with root command
-        LuCLICommand rootCommand = new LuCLICommand();
+        LuCLI rootCommand = new LuCLI();
         picocliCommandLine = new CommandLine(rootCommand);
 
         // Attach internal file system commands (ls, cd, etc.) via FileSystemCommands,

@@ -8,7 +8,7 @@ import java.util.concurrent.Callable;
 import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.LuceeScriptEngine;
 import org.lucee.lucli.StringOutput;
-import org.lucee.lucli.cli.LuCLICommand;
+import org.lucee.lucli.LuCLI;
 
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
@@ -41,7 +41,7 @@ import picocli.CommandLine.ParentCommand;
 public class RunCommand implements Callable<Integer> {
 
     @ParentCommand
-    private LuCLICommand parent;
+    private LuCLI parent;
 
     @Parameters(
         index = "0",

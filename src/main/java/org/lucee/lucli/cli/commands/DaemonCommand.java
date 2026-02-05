@@ -143,7 +143,7 @@ public class DaemonCommand implements Callable<Integer> {
             stringOutput.setErrorStream(capture);
 
             // Reuse the main Picocli command pipeline without System.exit().
-            picocli.CommandLine cmd = new picocli.CommandLine(new org.lucee.lucli.cli.LuCLICommand());
+            picocli.CommandLine cmd = new picocli.CommandLine(new org.lucee.lucli.LuCLI());
             exitCode = cmd.execute(request.argv);
         } catch (Exception e) {
             exitCode = 1;

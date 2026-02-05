@@ -12,7 +12,7 @@ import org.lucee.lucli.CommandProcessor;
 import org.lucee.lucli.ExternalCommandProcessor;
 import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.StringOutput;
-import org.lucee.lucli.cli.LuCLICommand;
+import org.lucee.lucli.LuCLI;
 
 @Command(name = "xset", description = "Experimental variable assigbment command xset name=value", hidden = true)
 
@@ -87,7 +87,7 @@ public class XSetCommand implements Callable<Integer> {
             CommandProcessor commandProcessor = new CommandProcessor();
             ExternalCommandProcessor external = new ExternalCommandProcessor(commandProcessor,
                     commandProcessor.getSettings());
-            CommandLine picocli = new CommandLine(new LuCLICommand());
+            CommandLine picocli = new CommandLine(new LuCLI());
 
             String[] parts = commandProcessor.parseCommand(commandLine);
             if (parts.length == 0) {

@@ -1,0 +1,35 @@
+{
+  "name" : "assets",
+  "version" : "6.2.2.91",
+  "port" : 8080,
+  "shutdownPort" : 9080,
+  "webroot" : "./",
+  "ajp" : {
+    "enabled" : false
+  },
+  "monitoring" : {
+    "enabled" : false,
+    "jmx" : {
+      "port" : 8999
+    }
+  },
+  "jvm" : {
+    "maxMemory" : "512m",
+    "minMemory" : "128m",
+    "additionalArgs" : [ ]
+  },
+  "urlRewrite" : {
+    "enabled" : true,
+    "routerFile" : "index.cfm"
+  },
+  "admin" : {
+    "enabled" : true,
+    "password" : ""
+  },
+  "enableLucee" : true,
+  "enableREST" : false,
+  "agents" : { },
+  "openBrowser" : true,
+  "envVars" : { },
+  "environments" : { }
+}

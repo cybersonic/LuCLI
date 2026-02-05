@@ -2,7 +2,7 @@ package org.lucee.lucli.cli.commands;
 
 import java.util.concurrent.Callable;
 
-import org.lucee.lucli.cli.LuCLICommand;
+import org.lucee.lucli.LuCLI;
 
 import picocli.CommandLine.Command;
 import picocli.CommandLine.ParentCommand;
@@ -27,7 +27,7 @@ import picocli.CommandLine.ParentCommand;
 public class ModulesCommand implements Callable<Integer> {
 
     @ParentCommand 
-    private LuCLICommand parent;
+    private LuCLI parent;
 
     @Override
     public Integer call() throws Exception {

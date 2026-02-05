@@ -13,8 +13,9 @@ import picocli.CommandLine.ParseResult;
  * 1. Setting global flags from parsed command options
  * 2. Timing command execution when --timing flag is enabled
  * 
- * This replaces the ad-hoc manual flag extraction and multiple
- * execution strategies in the original LuCLI.main() implementation.
+ * This strategy walks the command hierarchy to find the root LuCLI command
+ * and extracts global flags (verbose, debug, timing, preserveWhitespace) to
+ * maintain backward compatibility with code that checks static LuCLI fields.
  */
 public class LuCLIExecutionStrategy implements IExecutionStrategy {
     
@@ -53,7 +54,7 @@ public class LuCLIExecutionStrategy implements IExecutionStrategy {
      */
     private void setGlobalFlagsFromParseResult(ParseResult parseResult) {
         // The root command is always at the top of the hierarchy
-        // Walk backwards to find the root LuCLICommand
+        // Walk backwards to find the root LuCLI
         ParseResult root = parseResult;
         
         // Find the topmost parse result (root)
@@ -65,8 +66,8 @@ public class LuCLIExecutionStrategy implements IExecutionStrategy {
         // Extract flags from root command
         if (root != null) {
             Object userObject = root.commandSpec().userObject();
-            if (userObject instanceof LuCLICommand) {
-                LuCLICommand rootCmd = (LuCLICommand) userObject;
+            if (userObject instanceof LuCLI) {
+                LuCLI rootCmd = (LuCLI) userObject;
                 LuCLI.verbose = rootCmd.isVerbose();
                 LuCLI.debug = rootCmd.isDebug();
                 LuCLI.timing = rootCmd.isTiming();

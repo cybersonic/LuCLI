@@ -10,26 +10,29 @@ ${builtinVariablesSetup}
 
 // The expression will be injected here by the Java code
 // ${cfmlExpression} placeholder will be replaced
-
+cfmlExpressionAsString = '${cfmlExpression}';
 try {
     // The CFML expression gets injected here
     result = ${cfmlExpression};
+
     
-    if (isDefined('result')) {
-        if (isSimpleValue(result)) {
-            writeOutput(toString(result));
-        } else if (isArray(result)) {
-            writeOutput('[' & arrayToList(result, ', ') & ']');
-        } else if (isStruct(result)) {
-            writeOutput(serializeJSON(result));
-        } else if (isQuery(result)) {
-            writeOutput('Query with ' & result.recordCount & ' rows');
-        } else {
-            writeOutput(toString(result));
-        }
-    } else {
-        writeOutput('(undefined)');
-    }
+    // if (isDefined('result')) {
+    //     if (isSimpleValue(result)) {
+    //         writeOutput(toString(result));
+    //     } else if (isArray(result)) {
+    //         writeOutput('[' & arrayToList(result, ', ') & ']');
+    //     } else if (isStruct(result)) {
+    //         writeOutput(serializeJSON(result));
+    //     } else if (isQuery(result)) {
+    //         writeOutput('Query with ' & result.recordCount & ' rows');
+    //     } else {
+    //         writeOutput(toString(result));
+    //     }
+    // } else {
+    //     writeOutput('(undefined)');
+    // }
+
+    
 } catch (any e) {
     writeOutput('${EMOJI_ERROR} CFML Error: ' & e.message);
     if (len(e.detail)) {
