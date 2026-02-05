@@ -64,190 +64,31 @@ public class LuCLI {
     
 
     public static void main(String[] args) throws Exception {
-        // Check for timing flag early and enable Timer singleton
-        timing = java.util.Arrays.asList(args).contains("--timing") || java.util.Arrays.asList(args).contains("-t");
-        Timer.setEnabled(timing);
-        
         // Create Picocli CommandLine with our main command
         CommandLine cmd = new CommandLine(new LuCLICommand());
         
-        // Ensure help/usage output goes to the expected streams.
-        // (This also keeps `--help | grep ...` style usage working.)
+        // Configure output streams
         cmd.setOut(new PrintWriter(System.out, true));
         cmd.setErr(new PrintWriter(System.err, true));
         
-        // Set custom execution strategy to automatically time all commands
-        cmd.setExecutionStrategy(new TimingExecutionStrategy());
-        // Set custom execution strategy to set global flags
-        cmd.setExecutionStrategy(new GlobalOptionSettingExecutionStrategy());
+        // Set custom execution strategy that handles timing and global flags
+        cmd.setExecutionStrategy(new org.lucee.lucli.cli.LuCLIExecutionStrategy());
 
-        // Configure CommandLine behavior
-        cmd.setExecutionExceptionHandler(new CommandLine.IExecutionExceptionHandler() {
-            @Override
-            public int handleExecutionException(Exception ex,
-                                                CommandLine commandLine,
-                                                CommandLine.ParseResult parseResult) throws Exception {
-                StringOutput.Quick.error("Error: " + ex.getMessage());
-                if (verbose || debug) {
-                    ex.printStackTrace();
-                }
-                return 1;
+        // Configure exception handler
+        cmd.setExecutionExceptionHandler((ex, commandLine, parseResult) -> {
+            StringOutput.Quick.error("Error: " + ex.getMessage());
+            if (verbose || debug) {
+                ex.printStackTrace();
             }
+            return 1;
         });
         
-        // Handle parameter exceptions (like unknown options) more gracefully
-        cmd.setParameterExceptionHandler(new CommandLine.IParameterExceptionHandler() {
-            @Override
-            public int handleParseException(CommandLine.ParameterException ex, String[] args) {
-                // Extract debug, verbose, and timing flags from args for shortcut handling
-                boolean shortcutDebug = java.util.Arrays.asList(args).contains("--debug") || java.util.Arrays.asList(args).contains("-d");
-                boolean shortcutVerbose = java.util.Arrays.asList(args).contains("--verbose") || java.util.Arrays.asList(args).contains("-v");
-                boolean shortcutTiming = java.util.Arrays.asList(args).contains("--timing") || java.util.Arrays.asList(args).contains("-t");
-                boolean preserveWhitespace = java.util.Arrays.asList(args).contains("--whitespace") || java.util.Arrays.asList(args).contains("-w");
-                // set the defaults
-                LuCLI.verbose = shortcutVerbose;
-                LuCLI.debug = shortcutDebug;
-                LuCLI.timing = shortcutTiming;
-                LuCLI.preserveWhitespace = preserveWhitespace;
-                // We should clean them up before we send the rest along
-
-                Timer.setEnabled(LuCLI.timing);
-                // Check if this might be a shortcut (module or CFML file)
-                // BUT ONLY if it's not a recognized subcommand
-                if (ex instanceof CommandLine.UnmatchedArgumentException && args.length >= 1) {
-                    // Find the first non-flag argument
-                    String firstArg = null;
-                    int firstArgIndex = -1;
-                    for (int i = 0; i < args.length; i++) {
-                        if (!args[i].startsWith("-")) {
-                            firstArg = args[i];
-                            firstArgIndex = i;
-                            break;
-                        }
-                    }
-                    
-                    // Skip shortcuts if the first argument is a known subcommand
-                    if (firstArg != null && !isKnownSubcommand(firstArg)) {
-                        java.io.File file = new java.io.File(firstArg);
-                        
-                        // Extract remaining arguments (after the first non-flag arg), filtering out known flags
-                        java.util.List<String> remainingArgsList = new java.util.ArrayList<>();
-                        for (int i = firstArgIndex + 1; i < args.length; i++) {
-                            String arg = args[i];
-                            // Skip known flags that should be handled at the root level
-                            if (!arg.equals("--verbose") && !arg.equals("-v") &&
-                                !arg.equals("--debug") && !arg.equals("-d") &&
-                                !arg.equals("--whitespace") && !arg.equals("-w") &&
-                                !arg.equals("--timing") && !arg.equals("-t")) {
-                                remainingArgsList.add(arg);
-                            }
-                        }
-                        String[] remainingArgs = remainingArgsList.toArray(new String[0]);
-                        
-                        // Check if it's a LuCLI script file
-                        if (file.exists() && (firstArg.endsWith(".lucli") || firstArg.endsWith(".luc"))) {
-                            try {
-                                 Timer.start("LuCLI Script Shortcut Execution (" + firstArg + ")");
-                                 int ret = executeLucliScript(firstArg);
-                                 Timer.stop("LuCLI Script Shortcut Execution (" + firstArg + ")");
-                                 return ret;
-                            } catch (Exception scriptEx) {
-                                // If script execution fails, fall through to normal error handling
-                                if (shortcutVerbose || shortcutDebug) {
-                                    StringOutput.Quick.error("LuCLI script execution failed: " + scriptEx.getMessage());
-                                }
-                                return 1;
-                            }
-                        }
-                        // Check if it's an existing CFML file
-                        else if (file.exists() && (firstArg.endsWith(".cfs") || firstArg.endsWith(".cfm") || firstArg.endsWith(".cfml"))) {
-                            try {
-                                Timer.start("CFML File Shortcut Execution");
-                                int ret = executeCfmlFileShortcut(firstArg, remainingArgs, shortcutVerbose, shortcutDebug, shortcutTiming);
-                                Timer.stop("CFML File Shortcut Execution");
-                                return ret;
-                            } catch (Exception cfmlEx) {
-                                // If CFML file execution fails, fall through to normal error handling
-                                if (shortcutVerbose || shortcutDebug) {
-                                    StringOutput.Quick.error("CFML file execution failed: " + cfmlEx.getMessage());
-                                }
-                            }
-                        }
-                        
-                        else if( file.exists() && (firstArg.endsWith(".cfc")) ) {
-                            try {
-                                return executeCfmlFileShortcut(firstArg, remainingArgs, shortcutVerbose, shortcutDebug, shortcutTiming);
-                            } catch (Exception cfmlEx) {
-                                // If CFML file execution fails, fall through to normal error handling
-                                if (shortcutVerbose || shortcutDebug) {
-                                    StringOutput.Quick.error("CFML file execution failed: " + cfmlEx.getMessage());
-                                }
-                            }
-                        }
-                        // IF it is a real file but we dont know what to do with it... 
-
-                        // If it's not an existing file, try to execute as module shortcut
-                        else if (!file.exists()) {
-                            try {
-                                return executeModuleShortcut(firstArg, remainingArgs, shortcutVerbose, shortcutDebug, shortcutTiming);
-                            } catch (Exception moduleEx) {
-                                // If module execution fails, fall through to normal error handling
-                                if (shortcutVerbose || shortcutDebug) {
-                                    StringOutput.Quick.error("Module shortcut failed: " + moduleEx.getMessage());
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                // Default error handling
-                CommandLine commandLine = ex.getCommandLine();
-                CommandLine.UnmatchedArgumentException.printSuggestions(ex, commandLine.getErr());
-                commandLine.usage(commandLine.getErr());
-                return commandLine == cmd ? 2 : 1;
-            }
-        });
+        // Execute the command
+        int exitCode = cmd.execute(args);
         
-        // Execute the command with optional global timeout and exit with the returned code
-        int parsedTimeoutSeconds = 0;
-        for (int i = 0; i < args.length; i++) {
-            String a = args[i];
-            if ("--timeout".equals(a) && i + 1 < args.length) {
-                try {
-                    parsedTimeoutSeconds = Integer.parseInt(args[i + 1]);
-                } catch (NumberFormatException ignored) {
-                    // Ignore invalid timeout; treat as 0 (no timeout)
-                }
-            } else if (a.startsWith("--timeout=")) {
-                try {
-                    parsedTimeoutSeconds = Integer.parseInt(a.substring("--timeout=".length()));
-                } catch (NumberFormatException ignored) {
-                    // Ignore invalid timeout; treat as 0 (no timeout)
-                }
-            }
-        }
-
-        int exitCode;
-        if (parsedTimeoutSeconds > 0) {
-            java.util.concurrent.ExecutorService executor =
-                java.util.concurrent.Executors.newSingleThreadExecutor();
-            try {
-                java.util.concurrent.Future<Integer> future =
-                    executor.submit(() -> cmd.execute(args));
-                exitCode = future.get(parsedTimeoutSeconds, java.util.concurrent.TimeUnit.SECONDS);
-            } catch (java.util.concurrent.TimeoutException e) {
-                System.err.println(
-                    "Command timed out after " + parsedTimeoutSeconds
-                    + " seconds (use --timeout 0 to disable).");
-                exitCode = 124;
-            } finally {
-                executor.shutdownNow();
-            }
-        } else {
-            exitCode = cmd.execute(args);
-        }
-        
+        // Print timing results if enabled
         Timer.printResults();
+        
         System.exit(exitCode);
     }
     
@@ -1103,135 +944,4 @@ public class LuCLI {
 
 
 
-    /**
-     * Check if the given string is a known subcommand
-     * Uses PicocLI's API to query registered subcommands dynamically
-     * @param command The command to check
-     * @return true if it's a known subcommand, false otherwise
-     */
-    private static boolean isKnownSubcommand(String command) {
-        // Query PicocLI for registered subcommands instead of maintaining a manual list
-        CommandLine cmd = new CommandLine(new LuCLICommand());
-        return cmd.getSubcommands().containsKey(command);
-    }
-    
-    /**
-     * Execute a module shortcut by redirecting to "modules run <moduleName> [args...]"
-     * @param moduleName The name of the module to run
-     * @param args Additional arguments to pass to the module
-     * @param verbose Enable verbose output
-     * @param debug Enable debug output
-     * @param timing Enable timing output
-     * @return Exit code from module execution
-     */
-    private static int executeModuleShortcut(String moduleName, String[] args, boolean verbose, boolean debug, boolean timing) throws Exception {
-        // Set global flags
-        LuCLI.verbose = verbose;
-        LuCLI.debug = debug;
-        LuCLI.timing = timing;
-        
-        printVerbose("Executing module shortcut: " + moduleName + 
-            " (equivalent to 'lucli modules run " + moduleName + "')");
-        
-        // Build the new arguments array: [flags..., "modules", "run", moduleName, ...additionalArgs]
-        // Flags must come BEFORE the subcommand, not after
-        java.util.List<String> newArgs = new java.util.ArrayList<>();
-        
-        // Add flags first (before subcommands)
-        if (verbose) {
-            newArgs.add("--verbose");
-        }
-        if (debug) {
-            newArgs.add("--debug");
-        }
-        if (timing) {
-            newArgs.add("--timing");
-        }
-        
-        newArgs.add("modules");
-        newArgs.add("run");
-        newArgs.add(moduleName);
-        
-        // Add any additional arguments
-        if (args != null && args.length > 0) {
-            for (String arg : args) {
-                newArgs.add(arg);
-            }
-        }
-        
-        // Create a new CommandLine instance with the same configuration
-        CommandLine cmd = new CommandLine(new org.lucee.lucli.cli.LuCLICommand());
-
-        // Allow unknown options (like module-specific flags) to be treated as positional
-        // arguments so they can be forwarded to the module implementation instead of
-        // causing an "Unknown option" error at the LuCLI level.
-        // cmd.setUnmatchedArgumentsAllowed(true);
-        
-        
-        // Configure the same exception handlers
-        cmd.setExecutionExceptionHandler(new CommandLine.IExecutionExceptionHandler() {
-            @Override
-            public int handleExecutionException(Exception ex,
-                                                CommandLine commandLine,
-                                                CommandLine.ParseResult parseResult) throws Exception {
-                StringOutput.Quick.error("Error: " + ex.getMessage());
-                printDebugStackTrace(ex);
-                return 1;
-            }
-        });
-        
-        // Execute the modules run command
-        return cmd.execute(newArgs.toArray(new String[0]));
-    }
-    
-    /**
-     * Execute a CFML file shortcut by delegating to the Picocli RunCommand.
-     *
-     * This is used by the root command's shortcut handling so that invocations like
-     * `lucli somefile.cfm` or `lucli SomeComponent.cfc arg1` are treated as if the
-     * user had explicitly run `lucli run ...`.
-     */
-    private static int executeCfmlFileShortcut(String filePath, String[] args, boolean verbose, boolean debug, boolean timing) throws Exception {
-        // Root/main is responsible for initializing global flags; here we only
-        // reconstruct the argument vector for Picocli.
-
-        // Build arguments for the Picocli command: [global flags..., "run", filePath, args...]
-        java.util.List<String> newArgs = new java.util.ArrayList<>();
-        if (verbose) {
-            newArgs.add("--verbose");
-        }
-        if (debug) {
-            newArgs.add("--debug");
-        }
-        if (timing) {
-            newArgs.add("--timing");
-        }
-
-        newArgs.add("run");
-        newArgs.add(filePath);
-
-        if (args != null && args.length > 0) {
-            for (String arg : args) {
-                newArgs.add(arg);
-            }
-        }
-
-        // Delegate to a new Picocli CommandLine instance so we reuse the RunCommand
-        CommandLine cmd = new CommandLine(new org.lucee.lucli.cli.LuCLICommand());
-
-        cmd.setExecutionExceptionHandler(new CommandLine.IExecutionExceptionHandler() {
-            @Override
-            public int handleExecutionException(Exception ex,
-                                                CommandLine commandLine,
-                                                CommandLine.ParseResult parseResult) throws Exception {
-                StringOutput.Quick.error("Error: " + ex.getMessage());
-                if (verbose || debug) {
-                    ex.printStackTrace();
-                }
-                return 1;
-            }
-        });
-
-        return cmd.execute(newArgs.toArray(new String[0]));
-    }
 }

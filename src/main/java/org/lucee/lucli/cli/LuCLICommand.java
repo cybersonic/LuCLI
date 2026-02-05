@@ -1,5 +1,9 @@
 package org.lucee.lucli.cli;
 
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.Callable;
 
 import org.lucee.lucli.LuCLI;
@@ -20,10 +24,14 @@ import org.lucee.lucli.cli.commands.deps.DepsCommand;
 import org.lucee.lucli.cli.commands.deps.InstallCommand;
 import org.lucee.lucli.cli.commands.logic.IfCommand;
 import org.lucee.lucli.cli.commands.logic.XSetCommand;
+import org.lucee.lucli.modules.ModuleCommand;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.Parameters;
+import picocli.CommandLine.Spec;
+import picocli.CommandLine.Model.CommandSpec;
 
 /**
  * Main CLI command class using Picocli framework
@@ -108,8 +116,24 @@ public class LuCLICommand implements Callable<Integer> {
     )
     private int timeoutSeconds;
 
-    // Note: Parameters removed to prevent conflict with subcommands
-    // Script execution will be handled differently
+    @Parameters(
+        index = "0",
+        arity = "0..1",
+        paramLabel = "FILE_OR_MODULE",
+        description = "Optional: CFML/LuCLI file to execute, or module name to run"
+    )
+    private String firstArg;
+
+    @Parameters(
+        index = "1..*",
+        arity = "0..*",
+        paramLabel = "ARGS",
+        description = "Additional arguments to pass to the file or module"
+    )
+    private String[] additionalArgs = new String[0];
+
+    @Spec
+    private CommandSpec spec;
 
     /**
      * Main entry point when root command is executed
@@ -127,23 +151,23 @@ public class LuCLICommand implements Callable<Integer> {
         Timer.start("Total Execution");
 
         try {
-            // Configure Lucee directories BEFORE any Lucee initialization
-            
-
             // Handle special version command
             if (luceeVersionRequested) {
                 showLuceeVersionNonInteractive();
                 return 0;
             }
 
-            // If we get here, no subcommand was matched, so start interactive terminal mode
-            // Use the Picocli-integrated terminal so CLI and terminal share the same
-            // command definitions, options, and autocomplete.
-            Timer.start("Terminal Mode");
-            Terminal.main(new String[0]);
-            Timer.stop("Terminal Mode");
+            // No argument provided - start interactive terminal
+            if (firstArg == null || firstArg.trim().isEmpty()) {
+                LuCLI.printDebug("LuCLICommand", "No arguments provided, starting terminal mode");
+                Timer.start("Terminal Mode");
+                Terminal.main(new String[0]);
+                Timer.stop("Terminal Mode");
+                return 0;
+            }
 
-            return 0;
+            // Route based on what firstArg is
+            return routeCommand(firstArg, additionalArgs);
 
         } catch (Exception e) {
             StringOutput.Quick.error("Error: " + e.getMessage());
@@ -155,6 +179,74 @@ public class LuCLICommand implements Callable<Integer> {
             // Always stop total timer and show results before exit (if timing enabled)
             Timer.stop("Total Execution");
         }
+    }
+
+    /**
+     * Route a command based on the first argument (file or module name)
+     */
+    private Integer routeCommand(String arg, String[] args) throws Exception {
+        File file = new File(arg);
+
+        // Check if it's a .lucli script file
+        if (file.exists() && (arg.endsWith(".lucli") || arg.endsWith(".luc"))) {
+            LuCLI.printDebug("LuCLICommand", "Routing to .lucli script: " + arg);
+            Timer.start("LuCLI Script Execution");
+            int exitCode = LuCLI.executeLucliScript(arg);
+            Timer.stop("LuCLI Script Execution");
+            return exitCode;
+        }
+
+        // Check if it's a CFML file (.cfm, .cfc, .cfs)
+        if (file.exists() && (arg.endsWith(".cfm") || arg.endsWith(".cfc") || 
+                              arg.endsWith(".cfs") || arg.endsWith(".cfml"))) {
+            LuCLI.printDebug("LuCLICommand", "Routing to run command: " + arg);
+            return executeViaRunCommand(arg, args);
+        }
+
+        // Check if it's a module name (and not an existing file)
+        if (!file.exists() && ModuleCommand.moduleExists(arg)) {
+            LuCLI.printDebug("LuCLICommand", "Routing to module: " + arg);
+            return executeViaModulesCommand(arg, args);
+        }
+
+        // Unknown - throw error with helpful message
+        throw new CommandLine.ParameterException(
+            spec.commandLine(),
+            "Unknown command, file, or module: '" + arg + "'\n" +
+            "  - If it's a file, check the path and extension (.cfm, .cfc, .cfs, .lucli)\n" +
+            "  - If it's a module, run 'lucli modules list' to see available modules\n" +
+            "  - Run 'lucli --help' to see available commands"
+        );
+    }
+
+    /**
+     * Execute a file via the run command
+     */
+    private Integer executeViaRunCommand(String filePath, String[] args) throws Exception {
+        List<String> cmdArgs = new ArrayList<>();
+        cmdArgs.add("run");
+        cmdArgs.add(filePath);
+        if (args != null && args.length > 0) {
+            cmdArgs.addAll(Arrays.asList(args));
+        }
+        return spec.commandLine().execute(cmdArgs.toArray(new String[0]));
+    }
+
+    /**
+     * Execute a module via the modules run command
+     */
+    private Integer executeViaModulesCommand(String moduleName, String[] args) throws Exception {
+        LuCLI.printVerbose("Executing module shortcut: " + moduleName + 
+            " (equivalent to 'lucli modules run " + moduleName + "')");
+        
+        List<String> cmdArgs = new ArrayList<>();
+        cmdArgs.add("modules");
+        cmdArgs.add("run");
+        cmdArgs.add(moduleName);
+        if (args != null && args.length > 0) {
+            cmdArgs.addAll(Arrays.asList(args));
+        }
+        return spec.commandLine().execute(cmdArgs.toArray(new String[0]));
     }
 
 
@@ -191,5 +283,8 @@ public class LuCLICommand implements Callable<Integer> {
     public boolean isTiming() {
         return timing;
     }
-
+    
+    public boolean isPreserveWhitespace() {
+        return preserveWhitespace;
+    }
 }
