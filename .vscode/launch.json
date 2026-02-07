@@ -223,7 +223,7 @@
       "mainClass": "org.lucee.lucli.LuCLI",
       "projectName": "lucli",
       "console": "integratedTerminal",
-      "cwd": "${workspaceFolder}/demo_servers/runtime_demo/",
+      "cwd": "${workspaceFolder}/examples/server-runtimes/",
       "args": [ "server", "start"]
     },
     {

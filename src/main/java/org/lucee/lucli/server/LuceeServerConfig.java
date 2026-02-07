@@ -155,6 +155,12 @@ public class LuceeServerConfig {
     public static class UrlRewriteConfig {
         public boolean enabled = true;
         public String routerFile = "index.cfm";
+        /**
+         * Path to the urlrewrite.xml config file in the project.
+         * Relative paths are resolved against the project directory.
+         * Defaults to "urlrewrite.xml" in project root.
+         */
+        public String configFile = "urlrewrite.xml";
     }
     
     public static class MonitoringConfig {

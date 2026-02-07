@@ -1814,10 +1814,10 @@ public class LuceeServerManager {
     /**
      * Build JVM options (CATALINA_OPTS) including memory, JMX, Lucee extensions, and any configured agents.
      *
-     * Package-private so it can be reused by other server components and
-     * exercised directly from tests.
+     * Public so it can be reused by runtime providers and other server components,
+     * and exercised directly from tests.
      */
-    List<String> buildCatalinaOpts(LuceeServerConfig.ServerConfig config, AgentOverrides overrides, Path projectDir) {
+    public List<String> buildCatalinaOpts(LuceeServerConfig.ServerConfig config, AgentOverrides overrides, Path projectDir) {
         List<String> opts = new ArrayList<>();
         
         // Base memory settings
