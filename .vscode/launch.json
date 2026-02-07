@@ -16,6 +16,17 @@
     },
     {
       "type": "java",
+      "name": "▶️ LucCLI cfml",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      // "args": ["terminal"],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "args": ["cfml", "now()"],
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "java",
       "name": "📄 LucCLI File (cfm)",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",
@@ -95,10 +106,10 @@
     },
     {
       "type": "java",
-      "name": "📦 LucCLI Install Module",
+      "name": "📦 LucCLI Install Module versions",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",
-      "args": ["install", "name=hello-world"],
+      "args": ["examples/module_versions/test.lucli"],
       "projectName": "lucli",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal"
@@ -106,6 +117,16 @@
     {
       "type": "java",
       "name": "📦 LucCLI Module Calls LuCLI",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["module","run", "hello-world", "lucliCommand"],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "java",
+      "name": "📦 LucCLI Test Module Installs",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",
       "args": ["module","run", "hello-world", "lucliCommand"],

@@ -9,11 +9,11 @@ import java.util.Arrays;
 import java.util.Map;
 
 import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
 import org.lucee.lucli.modules.ModuleCommand;
 
+import lucee.runtime.script.LuceeScriptEngineFactory;
 import lucee.runtime.type.Array;
 
 /**
@@ -102,12 +102,12 @@ public class LuceeScriptEngine {
         configureLuceeDirectories();
         Timer.stop("Configure Lucee Directories");
         
-        Timer.start("Create ScriptEngineManager");
-        ScriptEngineManager manager = new ScriptEngineManager();
-        Timer.stop("Create ScriptEngineManager");
+        // Timer.start("Create ScriptEngineManager");
+        // ScriptEngineManager manager = new ScriptEngineManager();
+        // Timer.stop("Create ScriptEngineManager");
         
         Timer.start("Get CFML Engine by Name");
-        ScriptEngine engine = manager.getEngineByName(ENGINE_NAME);
+        ScriptEngine engine = new LuceeScriptEngineFactory().getScriptEngine();
         Timer.stop("Get CFML Engine by Name");
         
         if (engine == null) {
@@ -123,6 +123,7 @@ public class LuceeScriptEngine {
         engine.put("__verboseMode", verbose);
         engine.put("__debugMode", debug);
         engine.put("__preserveWhitespace", LuCLI.preserveWhitespace);
+        
         Timer.stop("Setup Engine Variables");
         
         Timer.start("Execute Initialization Script");
@@ -147,6 +148,63 @@ public class LuceeScriptEngine {
     public Object eval(String script) throws ScriptException {
         return engine.eval(script);
     }
+
+
+
+    /**
+     * Evaluate CFML statement, and return the result. If there is output, output to the output stream but also return the result.
+     * @param scriptContent
+     * @param scriptArgs
+     * @return
+     * @throws Exception
+     */
+    
+    public Object evalScriptStatement(String scriptStatement, String[] scriptArgs) throws Exception {
+        if (engine == null) {
+            throw new ScriptException("CFML ScriptEngine not found. Make sure Lucee is properly configured.");
+        }
+        
+        // Set up built-in variables using centralized manager
+        try {
+            BuiltinVariableManager variableManager = BuiltinVariableManager.getInstance(verbose, debug);
+            variableManager.setupBuiltinVariables(engine, null, scriptArgs);
+        } catch (IOException e) {
+            if (isDebugMode()) {
+                System.err.println("Warning: Failed to set up built-in variables: " + e.getMessage());
+            }
+        }
+        
+        // Execute the script statement
+        engine.eval("result=" + scriptStatement + ";");
+        Object result = engine.get("result");
+        return result;
+    }
+    /**
+     * Evaluate CFML script with built-in variables and specific script context
+     * 
+     * @param scriptContent The CFML script content to execute
+     * @param scriptFile The script file path (can be null for interactive mode)
+     * @param scriptArgs The script arguments (can be null)
+     * @return The result of script execution
+     * @throws Exception if script execution fails
+     */
+    public Object evalWithBuiltinVariables(String scriptContent, String scriptFile, String[] scriptArgs) throws Exception {
+        if (engine == null) {
+            throw new ScriptException("CFML ScriptEngine not found. Make sure Lucee is properly configured.");
+        }
+        
+        // Set up built-in variables using centralized manager
+       
+        BuiltinVariableManager variableManager = BuiltinVariableManager.getInstance(LuCLI.verbose, LuCLI.debug);
+        variableManager.setupBuiltinVariables(engine, scriptFile, scriptArgs);
+            
+        // Execute the script
+        engine.eval(scriptContent);
+        Object result = engine.get("result");
+        return result;
+    }
+    
+
     
     
     /**
@@ -289,12 +347,14 @@ public class LuceeScriptEngine {
             engine.put("verbose", LuCLI.verbose);
             engine.put("timing", LuCLI.timing);
             engine.put("timer", Timer.getInstance());
+            
 
             String script = readScriptTemplate("/script_engine/executeModule.cfs");
             if (isVerboseMode() || isDebugMode()) {
                 System.out.println("=== Executing engine script /script_engine/executeModule.cfs ===");
             }
             engine.eval(script);
+            Object results = engine.get("results");
             Timer.stop("Module Execution: " + moduleName);
     }
 
@@ -312,6 +372,7 @@ public class LuceeScriptEngine {
     /**
      * Main script execution entry point - determines file type and executes appropriately
      */
+    // TODO: rename to executeScriptFile
     public int executeScript(String scriptFile, String[] scriptArgs) throws Exception {
         Timer.start("File Validation");
         // Validate script file exists
@@ -1107,11 +1168,7 @@ public class LuceeScriptEngine {
         }
     }
 
-    public void evalFile(String command, String[] scriptArgs) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'evalFile'");
-    }
-    
+   
     /**
      * Read a script template from resources
      */
@@ -1277,17 +1334,7 @@ public class LuceeScriptEngine {
         return content;
     }
     
-    /**
-     * Evaluate CFML script with built-in variables available
-     * This method ensures built-in variables are available for interactive and CLI usage
-     * 
-     * @param scriptContent The CFML script content to execute
-     * @return The result of script execution
-     * @throws Exception if script execution fails
-     */
-    public Object evalWithBuiltinVariables(String scriptContent) throws Exception {
-        return evalWithBuiltinVariables(scriptContent, null, null);
-    }
+   
     
     /**
      * Create a script with built-in variables injected as CFML variables
@@ -1320,45 +1367,18 @@ public class LuceeScriptEngine {
             return scriptContent;
         }
     }
-    
-    /**
-     * Evaluate CFML script with built-in variables and specific script context
+
+
+     /**
+     * Evaluate CFML script with built-in variables available
+     * This method ensures built-in variables are available for interactive and CLI usage
      * 
      * @param scriptContent The CFML script content to execute
-     * @param scriptFile The script file path (can be null for interactive mode)
-     * @param scriptArgs The script arguments (can be null)
      * @return The result of script execution
      * @throws Exception if script execution fails
      */
-    public Object evalWithBuiltinVariables(String scriptContent, String scriptFile, String[] scriptArgs) throws Exception {
-        if (engine == null) {
-            throw new ScriptException("CFML ScriptEngine not found. Make sure Lucee is properly configured.");
-        }
-        
-        // Set up built-in variables using centralized manager
-        // try {
-        //     BuiltinVariableManager variableManager = BuiltinVariableManager.getInstance(verbose, debug);
-        //     variableManager.setupBuiltinVariables(engine, scriptFile, scriptArgs);
-            
-        //     // Set up component mapping for ~/.lucli directory
-        //     Path lucliHome = getLucliHomeDirectory();
-        //     String mappingScript = createLucliMappingScript(lucliHome);
-        //     if (isVerboseMode()) {
-        //         System.out.println("Setting up lucli mapping: " + lucliHome);
-        //     }
-        //     engine.eval(mappingScript);
-        // } catch (IOException e) {
-        //     if (isDebugMode()) {
-        //         System.err.println("Warning: Failed to set up built-in variables: " + e.getMessage());
-        //     }
-        // } catch (Exception e) {
-        //     if (isDebugMode()) {
-        //         System.err.println("Warning: Failed to set up lucli mapping: " + e.getMessage());
-        //     }
-        // }
-        
-        // Execute the script
-        return engine.eval(scriptContent);
+    public Object evalWithBuiltinVariables(String scriptContent) throws Exception {
+        return evalWithBuiltinVariables(scriptContent, null, null);
     }
     
     /**

@@ -3,16 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Download LuCLI - Lucee Command Line Interface</title>
-    {{ include "partials/head.html"}}
-    <link href="/css/download.css" rel="stylesheet">
+    <title>Download LuCLI — Lucee Command Line Interface</title>
+    <cfinclude template="partials/head.cfm">
+    <link rel="stylesheet" href="/css/download.css">
 </head>
 <body>
-<header class="header">
-    <div class="container">
-       {{ include "partials/nav.html"}}
-    </div>
-</header>
+    <cfinclude template="partials/nav.cfm">
 
 <main id="top">
     <section class="hero">
@@ -152,8 +148,9 @@
         </div>
     </section>
 </main>
-{{ include "partials/footer.html"}}
+ <cfinclude template="partials/footer.cfm">
 
+ <script src="/js/download.js"></script>
 
 </body>
 </html>

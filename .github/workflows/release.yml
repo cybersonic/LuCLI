@@ -197,9 +197,9 @@ jobs:
             
             ### Downloads
             - **lucli-${{ steps.version.outputs.VERSION }}.jar**/**lucli.jar** - Universal JAR (Java 17+, works everywhere)
-            - **lucli-${{ steps.version.outputs.VERSION }}-linux** - Self-contained Linux binary (no Java needed)
-            - **lucli-${{ steps.version.outputs.VERSION }}-macos** - Self-contained macOS binary (no Java needed)
-            - **lucli-${{ steps.version.outputs.VERSION }}.bat** - Self-contained Windows binary (no Java needed)
+            - **lucli-${{ steps.version.outputs.VERSION }}-linux** - Shell wrapper for Linux (Java 17+ required)
+            - **lucli-${{ steps.version.outputs.VERSION }}-macos** - Shell wrapper for macOS (Java 17+ required)
+            - **lucli-${{ steps.version.outputs.VERSION }}.bat** - Windows batch launcher (Java 17+ required)
             
-            All binaries are built with `mvn clean package -Pbinary`
+            All downloads require Java 17+ (binaries are small wrappers around the JAR) and are built with `mvn clean package -Pbinary`.
           files: release-files/*

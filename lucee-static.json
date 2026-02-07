@@ -1,5 +1,6 @@
 {
-    "name":"LuCLIStaticSite",
+    "name":"LuCLISite",
+    "port": "3000",
     "enableLucee": false,
     "openBrowser": false,
     "webroot": "./public/"

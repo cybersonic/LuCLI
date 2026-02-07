@@ -1,4 +1,4 @@
-
+@import url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css");
 :root {
     --primary-color: #6366f1;
     --primary-dark: #4f46e5;
@@ -29,6 +29,15 @@
     --border-hover: #475569;
 }
 
+/* Dark theme link colors */
+[data-theme="dark"] a {
+    color: var(--secondary-color);
+}
+
+[data-theme="dark"] a:hover {
+    color: var(--accent-color);
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -44,7 +53,7 @@ body {
 }
 
 .container {
-    max-width: 1100px;
+    /* max-width: 1100px; */
     margin: 0 auto;
     padding: 0 1.75rem;
 }
@@ -69,6 +78,21 @@ body {
     justify-content: space-between;
     align-items: center;
 }
+
+/* Center the main navigation between logo and controls by default */
+.header-content .header-nav {
+    margin: 0 auto;
+}
+
+/* Docs pages use a more left-aligned layout; override there */
+/* body.docs-body .header-content {
+    justify-content: flex-start;
+    gap: 2rem;
+}
+
+body.docs-body .header-content .header-nav {
+    margin: 0;
+} */
 
 .logo {
     display: flex;
@@ -97,6 +121,61 @@ body {
 .header-nav {
     display: flex;
     gap: 1.5rem;
+}
+
+.docs-header-search {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: 1rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    cursor: pointer;
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+
+.docs-header-search:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--border-hover);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+}
+
+.docs-header-search-icon {
+    font-size: 0.95rem;
+}
+
+.docs-header-search-text {
+    display: none;
+}
+
+.docs-header-search-kbd {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+}
+
+.kbd-key {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.2rem;
+    padding: 0.1rem 0.25rem;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+}
+
+@media (min-width: 768px) {
+    .docs-header-search-text {
+        display: inline;
+    }
 }
 
 .nav-link {
@@ -385,6 +464,9 @@ body {
     font-size: 0.95rem;
 }
 
+code {
+     color: var(--text-secondary);
+}
 .code-block {
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
@@ -468,4 +550,103 @@ body {
     .header-nav {
         display: none;
     }
+}
+
+
+
+/* Docs search overlay */
+.docs-search-overlay {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1300;
+    display: none;
+}
+
+.docs-search-overlay.is-open {
+    display: block;
+}
+
+.docs-search-backdrop {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background: rgba(15, 23, 42, 0.65);
+}
+
+.docs-search-dialog {
+    position: relative;
+    max-width: 640px;
+    margin: 8vh auto 0 auto;
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    padding: 1rem 1.25rem 1.25rem 1.25rem;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-xl);
+}
+
+.docs-search-input-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    padding: 0.45rem 0.75rem;
+}
+
+.docs-search-icon {
+    font-size: 0.95rem;
+    color: var(--text-tertiary);
+}
+
+.docs-search-input-row input[type="search"] {
+    flex: 1;
+    border: none;
+    background: transparent;
+    outline: none;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+
+.docs-search-input-row input[type="search"]::placeholder {
+    color: var(--text-tertiary);
+}
+
+.docs-search-close {
+    border: none;
+    background: transparent;
+    color: var(--text-tertiary);
+    font-size: 0.78rem;
+    cursor: pointer;
+    padding: 0.15rem 0.4rem;
+}
+
+.docs-search-results {
+    margin-top: 0.75rem;
+    max-height: 55vh;
+    overflow-y: auto;
+}
+
+.markspresso-search-result {
+    padding: 0.45rem 0.5rem;
+    border-radius: 8px;
+}
+
+.markspresso-search-result a {
+    text-decoration: none;
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+}
+
+.markspresso-search-result:hover {
+    background: var(--bg-tertiary);
+}
+
+.markspresso-search-result:hover a {
+    color: var(--text-primary);
 }

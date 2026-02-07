@@ -813,14 +813,29 @@ public static void installModule(String moduleName, String gitUrl, boolean force
     
     /**
      * Clone a repository into a temporary directory using git and return the repo root.
+     *
+     * When a specific ref (tag/branch/SHA) is requested, we cannot safely use a
+     * shallow clone of the default branch and then checkout the ref – older tags
+     * like v1.0.0 may not be reachable from the shallow history and checkout
+     * would fail. Instead, we ask git to clone that ref directly.
      */
     private static Path cloneWithGit(Path tempDir, String baseUrl, String ref) throws Exception {
         Path cloneDir = tempDir.resolve("repo");
-        runGitCommand(null, new String[]{"git", "clone", "--depth", "1", baseUrl, cloneDir.toString()});
 
-        // Checkout specific ref if provided
         if (ref != null && !ref.isEmpty()) {
-            runGitCommand(cloneDir, new String[]{"git", "checkout", ref});
+            // Clone the requested ref (tag/branch) directly; depth 1 is safe here
+            // because git will fetch history for that ref instead of the default
+            // branch, avoiding checkout failures for older tags.
+            runGitCommand(
+                null,
+                new String[]{"git", "clone", "--depth", "1", "--branch", ref, baseUrl, cloneDir.toString()}
+            );
+        } else {
+            // No specific ref requested – use a shallow clone of the default branch
+            runGitCommand(
+                null,
+                new String[]{"git", "clone", "--depth", "1", baseUrl, cloneDir.toString()}
+            );
         }
 
         return cloneDir;

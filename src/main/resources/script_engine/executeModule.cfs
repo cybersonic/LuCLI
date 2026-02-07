@@ -11,7 +11,7 @@ if(fileExists( moduleConfigFilePath )){
     moduleConfig = FileRead( moduleConfigFilePath );
     moduleConfigStruct = deserializeJSON( moduleConfig );
     if( structKeyExists( moduleConfigStruct, "configuration" ) ){
-        systemOutput("Importing module configuration for module: #moduleName#", true, false );
+        // systemOutput("Importing module configuration for module: #moduleName#", true, false );
         configImport(
             data=moduleConfigStruct.configuration,
             password=request.SERVERADMINPASSWORD,
@@ -19,7 +19,10 @@ if(fileExists( moduleConfigFilePath )){
             flushExistingData=false
             );
         }
-        systemOutput("Imported module configuration for module: #moduleName#", true, false );
+
+        if(verbose){
+            echo("Imported module configuration for module: #moduleName#");
+        }
 }
 
 

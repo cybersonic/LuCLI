@@ -2,7 +2,7 @@
 /* Layout */
 .docs-layout {
     display: flex;
-    max-width: 1400px;
+    /* max-width: 1400px; */
     margin: 0 auto;
     min-height: calc(100vh - 120px);
 }
@@ -138,7 +138,7 @@
     border-radius: 4px;
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.875em;
-    color: var(--primary-color);
+    color: var(--text-secondary);
 }
 
 .content-body pre {
@@ -263,38 +263,64 @@
     color: var(--text-primary);
 }
 
-/* Footer */
-.footer {
-    background: var(--bg-secondary);
-    border-top: 1px solid var(--border-color);
-    padding: 2rem 0;
-    margin-top: 3rem;
-}
 
-.footer-content {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 0 1.75rem;
-    text-align: center;
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-}
-
-.footer-links {
+/* Docs prev/next pagination */
+.docs-pagination {
     display: flex;
-    justify-content: center;
-    gap: 1.5rem;
-    margin-top: 1rem;
-    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
 }
 
-.footer-link {
-    color: var(--primary-color);
+.docs-pagination__link {
+    display: inline-flex;
+    align-items: center;
+    max-width: 48%;
+    padding: 0.6rem 1rem;
+    border-radius: 999px;
     text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
 }
 
-.footer-link:hover {
-    color: var(--text-primary);
+.docs-pagination__link:hover {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: #fff;
+    transform: translateY(-1px);
+}
+
+.docs-pagination__prev {
+    justify-content: flex-start;
+}
+
+.docs-pagination__next {
+    justify-content: flex-end;
+    margin-left: auto;
+}
+
+/* Stack buttons on narrow screens */
+@media (max-width: 768px) {
+    .docs-pagination {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .docs-pagination__link {
+        max-width: 100%;
+        justify-content: center;
+    }
+
+    .docs-pagination__next {
+        margin-left: 0;
+    }
 }
 
 /* Markspresso Navigation Styling */
@@ -345,7 +371,7 @@
 
 /* Section containers (folders) - add spacing */
 .sidebar .docs-nav > ul > li:has(strong) {
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
 }
 
 /* Section headers - match sidebar-title style exactly */
@@ -375,7 +401,7 @@
 /* Section items - match sidebar-link style exactly */
 .sidebar .docs-nav ul ul a {
     display: block;
-    padding: 0.5rem 0.75rem;
+    padding: 0.25rem 0.50rem;
     color: var(--text-secondary);
     text-decoration: none;
     border-radius: 8px;
@@ -412,9 +438,5 @@
 
     .content-title {
         font-size: 2rem;
-    }
-
-    .header-nav {
-        display: none;
     }
 }

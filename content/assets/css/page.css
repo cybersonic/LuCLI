@@ -1,0 +1,74 @@
+/* Page layout overrides for generic content pages */
+
+/* Use a narrower max-width and left-align the header/content, similar to docs */
+
+main#top {
+    padding-top: 3rem;
+}
+
+main#top .section {
+    padding-top: 0;
+}
+
+main#top .section-header {
+    text-align: left;
+    margin-bottom: 2rem;
+}
+
+main#top .section-title {
+    font-size: 2.25rem;
+}
+
+main#top .section-description {
+    margin-left: 0;
+    margin-right: 0;
+    max-width: 640px;
+}
+
+/* Constrain content width for readability */
+
+main#top .container {
+    max-width: 900px;
+}
+
+main#top .content-body {
+    font-size: 1rem;
+    line-height: 1.75;
+}
+
+main#top .content-body p {
+    max-width: 70ch;
+}
+
+main#top .content-body h2 {
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+}
+
+main#top .content-body h3 {
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+}
+
+/* Lists inside content: better indentation and vertical spacing */
+main#top .content-body ul,
+main#top .content-body ol {
+    padding-left: 1.5rem;
+    margin-top: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+
+main#top .content-body li {
+    margin-bottom: 0.35rem;
+}
+
+@media (max-width: 768px) {
+    main#top .container {
+        padding-left: 1.25rem;
+        padding-right: 1.25rem;
+    }
+
+    main#top .section-title {
+        font-size: 1.9rem;
+    }
+}

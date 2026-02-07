@@ -4,15 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LuCLI — Lucee Command Line Interface</title>
-    <cfinclude template="partials/head.html">
+    <cfinclude template="partials/head.cfm">
     
 </head>
 <body>
-    <header class="header">
-        <div class="container">
-            <cfinclude template="partials/nav.html">
-        </div>
-    </header>
+
+    <cfinclude template="partials/nav.cfm">
+
+
+
     <main id="top">
         <section class="hero">
             <div class="container">
@@ -32,7 +32,7 @@
                     <a href="download/" class="cta-button cta-primary">
                         <span>⬇️</span> Download for your OS
                     </a>
-                    <a href="../docs/" class="cta-button cta-secondary">
+                    <a href="/docs/" class="cta-button cta-secondary">
                         <span>📖</span> View full documentation
                     </a>
                     <a href="https://github.com/cybersonic/LuCLI" class="cta-button cta-secondary" target="_blank">
@@ -82,9 +82,9 @@
                 <div class="section-header">
                     <h2 class="section-title">What is LuCLI?</h2>
                     <p class="section-description">
-                        LuCLI is a command line interface that embeds the Lucee CFML engine and exposes it as a
-                        minimal, script-friendly tool. Use it as an interactive terminal or as a one-shot CLI
-                        to integrate Lucee into your workflows. It provides a modilar structure allowing you to exectute .cfc and .cfm files as well as manage Lucee servers. And More!
+                        LuCLI is a small command line interface built around the Lucee CFML engine. It gives you
+                        an interactive Lucee‑backed terminal, one‑shot CFML commands, and simple per‑project
+                        servers driven by a <code>lucee.json</code> file.
                     </p>
                 </div>
             </div>
@@ -100,19 +100,19 @@
                 <div class="features-grid">
                     <div class="feature-card">
                         <span class="feature-icon">🖥️</span>
-                        <h3 class="feature-title">Interactive Lucee terminal</h3>
+                        <h3 class="feature-title">Run CFML from your terminal</h3>
                         <p class="feature-description">
-                            Start a Lucee-backed terminal session, run CFML scripts and components, explore your
-                            project, and keep state between commands.
+                            Start a Lucee‑backed terminal session, run CFML expressions, scripts and components,
+                            and keep state between commands for quick experimentation.
                         </p>
                     </div>
 
                     <div class="feature-card">
                         <span class="feature-icon">🌐</span>
-                        <h3 class="feature-title">Embedded dev server</h3>
+                        <h3 class="feature-title">Per‑project Lucee servers</h3>
                         <p class="feature-description">
-                            Spin up a Lucee server for the current directory with a single command, manage
-                            versions, and stop or restart as needed.
+                            Spin up Lucee/Tomcat servers with a single command, configured by a
+                            <code>lucee.json</code> file for ports, URL rewriting, HTTPS, environments and more.
                         </p>
                     </div>
 
@@ -120,17 +120,17 @@
                         <span class="feature-icon">📦</span>
                         <h3 class="feature-title">Modules & automation</h3>
                         <p class="feature-description">
-                            Add LuCLI modules to script repeatable tasks—database jobs, deployment helpers,
-                            code generators, and more.
+                            Package reusable CFML tools as LuCLI modules or <code>.lucli</code> scripts to
+                            automate tests, deployments, and maintenance tasks across projects.
                         </p>
                     </div>
 
                     <div class="feature-card">
-                        <span class="feature-icon">📝</span>
-                        <h3 class="feature-title">Documentation & tooling</h3>
+                        <span class="feature-icon">📊</span>
+                        <h3 class="feature-title">Monitoring & advanced tooling</h3>
                         <p class="feature-description">
-                            Generate documentation from CFML components, inspect configuration and environment
-                            details, and keep project tooling in one place.
+                            Use the built‑in JMX dashboard, Java agents and rich CLI output (emoji‑aware prompts,
+                            placeholders, shell completion) to observe and debug your Lucee servers.
                         </p>
                     </div>
                 </div>
@@ -142,39 +142,48 @@
                 <div class="section-header">
                     <h2 class="section-title">Getting started</h2>
                     <p class="section-description">
-                        Download the jar, run it with Java, and you are ready to work with Lucee from the
-                        command line.
+                        Download the jar or self‑contained binary, run it with Java, and you are ready to run CFML
+                        and manage Lucee servers from your terminal.
                     </p>
                 </div>
 
                 <div class="features-grid" style="margin-top: 1rem;">
                     <div class="feature-card">
-                        <h3 class="feature-title">1. Download LuCLI</h3>
-                        <p class="feature-description">Grab the latest jar from GitHub releases:</p>
+                        <h3 class="feature-title">1. Install LuCLI</h3>
+                        <p class="feature-description">Grab the latest JAR from GitHub releases:</p>
                         <div class="code-block">
-                            curl -L -o lucli.jar \
-https://github.com/cybersonic/LuCLI/releases/latest/download/lucli.jar
+                            curl -L -o lucli.jar \ <br>
+                            <a href="https://github.com/cybersonic/LuCLI/releases/latest/download/lucli.jar">https://github.com/cybersonic/LuCLI/releases/latest/download/lucli.jar</a>
                         </div>
+                        <p class="feature-description" style="margin-top: 0.75rem;">
+                            Then run it with Java (or place the <a href="https://github.com/cybersonic/LuCLI/releases/latest/">self‑contained binary</a> on your <code>PATH</code> to
+                            use the shorter <code>lucli</code> command.
+                        </p>
                     </div>
 
                     <div class="feature-card">
-                        <h3 class="feature-title">2. Run the terminal</h3>
-                        <p class="feature-description">Start the interactive LuCLI session:</p>
+                        <h3 class="feature-title">2. Start a server</h3>
+                        <p class="feature-description">From your project directory, start Lucee for that folder:</p>
                         <div class="code-block">
-                            java -jar lucli.jar terminal
+                            java -jar lucli.jar server start
+
+# once installed on PATH:
+lucli server start
                         </div>
                         <ul class="list">
                             <li class="list-item">
                                 <span class="list-bullet">•</span>
-                                <span>Use <code>server start</code> to launch a local Lucee server.</span>
+                                <span>Open <code>http://localhost:8080</code> (or the port you configured).</span>
                             </li>
                             <li class="list-item">
                                 <span class="list-bullet">•</span>
-                                <span>Run CFML with <code>run MyScript.cfm</code> from your project folder.</span>
+                                <span>Add a <code>lucee.json</code> file later to control ports, URL rewriting,
+                                    HTTPS, environments, and more.</span>
                             </li>
                             <li class="list-item">
                                 <span class="list-bullet">•</span>
-                                <span>Type <code>help</code> inside the terminal for a list of commands.</span>
+                                <span>Use <code>lucli server status</code> and <code>lucli server log --follow</code>
+                                    to inspect and debug.</span>
                             </li>
                         </ul>
                     </div>
@@ -186,7 +195,7 @@ https://github.com/cybersonic/LuCLI/releases/latest/download/lucli.jar
                         full documentation.
                     </p>
                     <div style="margin-top: 1rem;">
-                        <a href="../docs/index.html" class="cta-button cta-secondary">
+                        <a href="/docs/" class="cta-button cta-secondary">
                             Open LuCLI documentation →
                         </a>
                     </div>
@@ -195,10 +204,8 @@ https://github.com/cybersonic/LuCLI/releases/latest/download/lucli.jar
         </section>
     </main>
 
-    <cfinclude template="partials/footer.html">
-
     
+    <cfinclude template="partials/footer.cfm">
 
-  
 </body>
 </html>

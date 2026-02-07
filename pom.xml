@@ -6,7 +6,7 @@
 
   <groupId>org.lucee</groupId>
   <artifactId>lucli</artifactId>
-  <version>0.1.268-SNAPSHOT</version>
+  <version>0.1.280</version>
 
   <name>LuCLI</name>
   <description>A CLI for Lucee</description>
@@ -20,7 +20,8 @@
     <maven.compiler.target>21</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <jline.version>3.26.3</jline.version>
-    <lucee.version>7.0.1.93-SNAPSHOT</lucee.version>
+    <lucee.version>7.0.1.100-RC</lucee.version>
+    <!-- <lucee.classifier></lucee.classifier> -->
     <lucee.classifier>zero</lucee.classifier>
   </properties>
 

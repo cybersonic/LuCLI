@@ -1,10 +1,22 @@
 package org.lucee.lucli;
 
+import java.io.FileNotFoundException;
 import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.lucee.lucli.cli.LuCLICommand;
+import org.lucee.lucli.secrets.LocalSecretStore;
+import org.lucee.lucli.secrets.SecretStore;
+import org.lucee.lucli.secrets.SecretStoreException;
 
 import picocli.CommandLine;
 
@@ -18,7 +30,37 @@ public class LuCLI {
     
     public static Map<String, String> scriptEnvironment = new HashMap<>(System.getenv());
     
+    /**
+     * Commands that are treated as internal file-system style commands, routed
+     * through {@link org.lucee.lucli.CommandProcessor} both in the interactive
+     * terminal and in .lucli script execution.
+     *
+     * Exposed as a public constant so other components can share the same
+     * definition instead of duplicating the list.
+     */
+    public static final Set<String> internalFileSystemCommands = Set.of(
+        "ls", "dir",
+        "cd", "pwd",
+        "mkdir", "rmdir",
+        "rm", "cp",
+        "mv", "cat",
+        "touch", "find",
+        "wc", "head", "tail",
+        "prompt", "edit", "interactive",
+        "cflint"
+    );
+    
+    // Result history for .lucli scripts and LuCLI batch execution
+    // We keep the last few command outputs so scripts can reference them
+    // via placeholders like ${_} and ${last(2)}.
+    private static final java.util.List<String> lucliResultHistory = new java.util.ArrayList<>();
+    private static final int LUCLI_RESULT_HISTORY_LIMIT = 20;
 
+    // Secret placeholder support for .lucli scripts: ${secret:NAME}
+    private static final Pattern LUCLI_SECRET_PATTERN = Pattern.compile("\\$\\{secret:([^}]+)\\}");
+    private static SecretStore lucliScriptSecretStore;
+    private static boolean lucliScriptSecretsInitialized = false;
+    
 
     public static void main(String[] args) throws Exception {
         // Check for timing flag early and enable Timer singleton
@@ -102,7 +144,7 @@ public class LuCLI {
                         String[] remainingArgs = remainingArgsList.toArray(new String[0]);
                         
                         // Check if it's a LuCLI script file
-                        if (file.exists() && firstArg.endsWith(".lucli")) {
+                        if (file.exists() && (firstArg.endsWith(".lucli") || firstArg.endsWith(".luc"))) {
                             try {
                                  Timer.start("LuCLI Script Shortcut Execution (" + firstArg + ")");
                                  int ret = executeLucliScript(firstArg);
@@ -165,8 +207,44 @@ public class LuCLI {
             }
         });
         
-        // Execute the command and exit with the returned code
-        int exitCode = cmd.execute(args);
+        // Execute the command with optional global timeout and exit with the returned code
+        int parsedTimeoutSeconds = 0;
+        for (int i = 0; i < args.length; i++) {
+            String a = args[i];
+            if ("--timeout".equals(a) && i + 1 < args.length) {
+                try {
+                    parsedTimeoutSeconds = Integer.parseInt(args[i + 1]);
+                } catch (NumberFormatException ignored) {
+                    // Ignore invalid timeout; treat as 0 (no timeout)
+                }
+            } else if (a.startsWith("--timeout=")) {
+                try {
+                    parsedTimeoutSeconds = Integer.parseInt(a.substring("--timeout=".length()));
+                } catch (NumberFormatException ignored) {
+                    // Ignore invalid timeout; treat as 0 (no timeout)
+                }
+            }
+        }
+
+        int exitCode;
+        if (parsedTimeoutSeconds > 0) {
+            java.util.concurrent.ExecutorService executor =
+                java.util.concurrent.Executors.newSingleThreadExecutor();
+            try {
+                java.util.concurrent.Future<Integer> future =
+                    executor.submit(() -> cmd.execute(args));
+                exitCode = future.get(parsedTimeoutSeconds, java.util.concurrent.TimeUnit.SECONDS);
+            } catch (java.util.concurrent.TimeoutException e) {
+                System.err.println(
+                    "Command timed out after " + parsedTimeoutSeconds
+                    + " seconds (use --timeout 0 to disable).");
+                exitCode = 124;
+            } finally {
+                executor.shutdownNow();
+            }
+        } else {
+            exitCode = cmd.execute(args);
+        }
         
         Timer.printResults();
         System.exit(exitCode);
@@ -219,6 +297,82 @@ public class LuCLI {
     public static void printError(String message) {
         System.err.println(message);
     }
+
+    /**
+     * Resolve ${secret:NAME} placeholders in a .lucli script line using the
+     * LuCLI secrets manager. This is evaluated after normal StringOutput
+     * placeholders and uses the same local encrypted store as lucee.json.
+     */
+    private static String resolveSecretsInScriptLine(String line) throws Exception {
+        if (line == null || line.isEmpty()) {
+            return line;
+        }
+        Matcher matcher = LUCLI_SECRET_PATTERN.matcher(line);
+        if (!matcher.find()) {
+            return line; // fast path: no ${secret:...}
+        }
+
+        // Lazily initialize the secret store once per script execution.
+        if (!lucliScriptSecretsInitialized) {
+            initializeLucliScriptSecretStore();
+            lucliScriptSecretsInitialized = true;
+        }
+
+        // If initialization failed, initializeLucliScriptSecretStore() will have thrown
+        // and aborted the script. At this point we expect a usable store instance.
+
+        matcher = LUCLI_SECRET_PATTERN.matcher(line);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            String name = matcher.group(1).trim();
+            try {
+                java.util.Optional<char[]> value = lucliScriptSecretStore.get(name);
+                if (value.isEmpty()) {
+                    throw new SecretStoreException("Secret '" + name + "' not found for placeholder in script");
+                }
+                String replacement = new String(value.get());
+                matcher.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(replacement));
+            } catch (SecretStoreException e) {
+                // Fatal for .lucli scripts: stop execution when a required secret
+                // cannot be resolved.
+                StringOutput.Quick.error(e.getMessage());
+                throw new RuntimeException(e);
+            }
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
+    }
+
+    /**
+     * Initialize the secret store for .lucli scripts using the same conventions as
+     * `lucli secrets` and `lucee.json` secret resolution.
+     */
+    private static void initializeLucliScriptSecretStore() throws Exception {
+        // Derive LuCLI home similar to SecretsCommand.getDefaultStorePath
+        String home = System.getProperty("lucli.home");
+        if (home == null) home = System.getenv("LUCLI_HOME");
+        if (home == null) home = System.getProperty("user.home") + "/.lucli";
+        Path storePath = Paths.get(home).resolve("secrets").resolve("local.json");
+
+        if (!Files.exists(storePath)) {
+            throw new IllegalStateException("Script references ${secret:...} but local secret store does not exist. Run 'lucli secrets init' and define the required secrets.");
+        }
+
+        // Prefer non-interactive passphrase from environment when available
+        char[] passphrase = null;
+        String envPass = System.getenv("LUCLI_SECRETS_PASSPHRASE");
+        if (envPass != null && !envPass.isEmpty()) {
+            passphrase = envPass.toCharArray();
+        } else if (System.console() != null) {
+            passphrase = System.console().readPassword("Enter secrets passphrase to unlock script secrets: ");
+        }
+
+        if (passphrase == null || passphrase.length == 0) {
+            throw new IllegalStateException("Script requires secrets but no passphrase is available. Set LUCLI_SECRETS_PASSPHRASE or run with an interactive console.");
+        }
+
+        lucliScriptSecretStore = new LocalSecretStore(storePath, passphrase);
+    }
     
     /**
      * Print a stack trace only if debug mode is enabled
@@ -240,21 +394,55 @@ public class LuCLI {
     }
     
     /**
+     * Record a command result string into the .lucli result history.
+     * Empty or null results are ignored.
+     */
+    public static void recordLucliResult(String result) {
+        if (result == null) {
+            return;
+        }
+        String trimmed = result.trim();
+        if (trimmed.isEmpty()) {
+            return;
+        }
+
+        synchronized (lucliResultHistory) {
+            // Prepend newest result
+            lucliResultHistory.add(0, trimmed);
+            // Enforce max history size
+            while (lucliResultHistory.size() > LUCLI_RESULT_HISTORY_LIMIT) {
+                lucliResultHistory.remove(lucliResultHistory.size() - 1);
+            }
+
+            // Also keep the most recent result available in scriptEnvironment
+            // so it can be referenced as ${_} from .lucli scripts.
+            scriptEnvironment.put("_", trimmed);
+        }
+    }
+
+    /**
+     * Get the Nth result from history (1 = most recent).
+     * Returns null if there is no such entry.
+     */
+    public static String getLucliResult(int position) {
+        if (position < 1) {
+            position = 1;
+        }
+        synchronized (lucliResultHistory) {
+            if (position > lucliResultHistory.size()) {
+                return null;
+            }
+            return lucliResultHistory.get(position - 1);
+        }
+    }
+    
+    /**
      * Determine if a given command name should be treated as a file-system style
      * command within a .lucli script. These are the same commands that the
      * interactive terminal routes through {@link CommandProcessor}.
      */
     private static boolean isFileSystemStyleCommand(String command) {
-        return command.equals("ls") || command.equals("dir") ||
-               command.equals("cd") || command.equals("pwd") ||
-               command.equals("mkdir") || command.equals("rmdir") ||
-               command.equals("rm") || command.equals("cp") ||
-               command.equals("mv") || command.equals("cat") ||
-               command.equals("touch") || command.equals("find") ||
-               command.equals("wc") || command.equals("head") ||
-               command.equals("tail") || command.equals("prompt") ||
-               command.equals("edit") || command.equals("interactive") ||
-               command.equals("cflint");
+        return internalFileSystemCommands.contains(command);
     }
     
     /**
@@ -268,6 +456,13 @@ public class LuCLI {
      */
     public static String getVersionInfo(boolean includeLucee) {
         StringBuilder info = new StringBuilder();
+
+        // Version information header first so tools/tests that only see the
+        // first few lines can still parse the version without needing to
+        // strip the ASCII art banner.
+        String ver = getVersion();
+        info.append("LuCLI Version: ").append(ver).append("\n");
+        // info.append("Version: ").append(ver).append("\n");
         
         // ASCII art banner
         info.append("\n");
@@ -277,9 +472,6 @@ public class LuCLI {
         info.append("| |__| |_| | |___| |___ | | \n");
         info.append("|_____\\__,_|\\____|_____|___|\n");
         info.append("\n");
-        
-        // Version information
-        info.append("Version: ").append(getVersion()).append("\n");
         
         if (includeLucee) {
             try {
@@ -345,8 +537,8 @@ public class LuCLI {
         // Mark that we're running in non-interactive script mode
         LuCLI.lucliScript = true;
 
-        java.nio.file.Path path = java.nio.file.Paths.get(scriptPath);
-        if (!java.nio.file.Files.exists(path)) {
+        Path path = Paths.get(scriptPath);
+        if (!Files.exists(path)) {
             StringOutput.Quick.error("Script not found: " + scriptPath);
             throw new java.io.FileNotFoundException("Script file not found: " + scriptPath);
         }
@@ -354,10 +546,23 @@ public class LuCLI {
         printVerbose("Executing LuCLI script: " + scriptPath);
 
         // Read all lines from the script file
-        java.util.List<String> lines = java.nio.file.Files.readAllLines(path, java.nio.charset.StandardCharsets.UTF_8);
+        java.util.List<String> lines = Files.readAllLines(path, java.nio.charset.StandardCharsets.UTF_8);
         if (lines.isEmpty()) {
             printVerbose("Script is empty: " + scriptPath);
             return 0;
+        }
+
+        // Pre-scan script for ${secret:...} placeholders so we can prompt for
+        // the secrets passphrase (or fail fast on missing secrets) before any
+        // commands are executed. 
+        try {
+            preResolveSecretsInScript(lines);
+        } catch (Exception e) {
+            // resolveSecretsInScriptLine() already printed a helpful error
+            // message for missing/invalid secrets. Treat this as a fatal
+            // error for the script.
+            printDebugStackTrace((Exception)(e instanceof Exception ? e : new Exception(e)));
+            return 1;
         }
 
         // Set up a lightweight command environment similar to Terminal.dispatchCommand
@@ -367,26 +572,51 @@ public class LuCLI {
         CommandLine picocli = new CommandLine(new org.lucee.lucli.cli.LuCLICommand());
 
         StringOutput stringOutput = StringOutput.getInstance();
+        boolean assertionFailed = false;
+
+        // Pattern for simple variable assignments with command substitution: NAME=$(command ...)
+        Pattern assignmentPattern = Pattern.compile("^(?i)(?:set\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?:\\$\\((.*)\\)|(.+))\\s*$");
+
+        // Make the latest history entry available as ${_} before script lines run
+        if (!lucliResultHistory.isEmpty()) {
+            String last = lucliResultHistory.get(0);
+            scriptEnvironment.put("_", last);
+        }
 
         for (String line : lines) {
             if (line == null) {
                 continue;
             }
-
+            
             String trimmed = line.trim();
             if (trimmed.isEmpty()) {
                 // Skip blank lines in scripts
                 continue;
             }
-
+            
             // Treat lines starting with '#' as comments (including shebangs like '#!/usr/bin/env lucli')
             if (trimmed.startsWith("#")) {
                 printDebug("LuCLIScript", "Skipping comment line: " + line);
                 continue;
             }
+            
+            // Early-exit command for .lucli scripts: "exit" or "exit <code>"
+            if(isExitCommand(line)){
+                int exitCode = getExitCodeFromExitCommand(line);
+                printDebug("LuCLIScript", "Exit requested from script with code " + exitCode);
+                return exitCode;
+            }
+            
 
             // Check if this is a SET directive (case-insensitive)
             if (trimmed.toLowerCase().startsWith("set ")) {
+
+                // Quick validation: must have '=' after 'set '
+                if (trimmed.indexOf('=') < 1) {
+                    StringOutput.Quick.error("SET directive syntax error: " + line);
+                    continue;
+                }
+
                 // Parse: set KEY=VALUE or set KEY="VALUE" or set KEY='VALUE'
                 String afterSet = trimmed.substring(4).trim();
                 
@@ -408,16 +638,61 @@ public class LuCLI {
                         }
                     }
                     
-                    printDebug("SET directive: " + key + " = " + value);
-                    
-                    scriptEnvironment.put(key, value);
-                    stringOutput.addPlaceholder(key, value);
+                    // 1) Command substitution in SET: set NAME=$(command ...)
+                    if (isExecEvaluation(value)) {
+                        String innerCommand = getExecEvaluationInnerCommand(value);
+                        handleCommandSubstitutionAssignment(
+                            key,
+                            innerCommand,
+                            commandProcessor,
+                            externalCommandProcessor,
+                            picocli,
+                            stringOutput
+                        );
+                        continue;
+                    }
+
+                    // 2) Normal SET value: resolve secrets and placeholders so
+                    //    constructs like set var2=${var1} and
+                    //    set mySecret=${secret:NAME} behave as expected.
+                    try {
+                        String valueWithSecrets = resolveSecretsInScriptLine(value);
+                        String resolvedValue    = stringOutput.process(valueWithSecrets);
+
+                        printDebug("SET directive: " + key + " = " + resolvedValue);
+
+                        scriptEnvironment.put(key, resolvedValue);
+                        stringOutput.addPlaceholder(key, resolvedValue);
+                    } catch (Exception e) {
+                        StringOutput.Quick.error("Error processing SET value for '" + key + "': " + e.getMessage());
+                        printDebugStackTrace(e);
+                    }
                     continue;
                 }
             }
 
+            // Check for simple variable assignment with command substitution: NAME=$(command ...)
+            java.util.regex.Matcher assignmentMatcher = assignmentPattern.matcher(trimmed);
+            if (assignmentMatcher.matches()) {
+                String varName = assignmentMatcher.group(1);
+                String innerCommand = assignmentMatcher.group(2).trim();
+
+                handleCommandSubstitutionAssignment(
+                    varName,
+                    innerCommand,
+                    commandProcessor,
+                    externalCommandProcessor,
+                    picocli,
+                    stringOutput
+                );
+                continue;
+            }
+
+            // First resolve ${secret:NAME} placeholders using the LuCLI secrets store
+            String lineWithSecrets = resolveSecretsInScriptLine(line);
+
             // Apply StringOutput placeholder processing
-            String processedLine = stringOutput.process(line);
+            String processedLine = stringOutput.process(lineWithSecrets);
 
             // Parse command into parts using the same parser as the terminal
             String[] parts = commandProcessor.parseCommand(processedLine);
@@ -427,50 +702,373 @@ public class LuCLI {
 
             String command = parts[0].toLowerCase();
 
-            try {
-                // 1) Picocli subcommands (server, modules, cfml, run, etc.)
-                if (picocli.getSubcommands().containsKey(command)) {
-                    picocli.execute(parts); // Picocli writes directly to System.out/err
-                    continue;
-                }
+            // Built-in testing/assertion command: assert <actual> <expected>
+            if ("assert".equals(command)) {
+                if (parts.length < 3) {
+                    StringOutput.Quick.error("assert: usage: assert <actual> <expected>");
+                } else {
+                    String actual = parts[1];
+                    String expected = parts[2];
 
-                // 2) Module shortcuts (hello-world, lint, etc.)
-                if (org.lucee.lucli.modules.ModuleCommand.moduleExists(command)) {
-                    String[] moduleArgs = new String[parts.length - 1];
-                    if (moduleArgs.length > 0) {
-                        System.arraycopy(parts, 1, moduleArgs, 0, moduleArgs.length);
+                    if (actual.equals(expected)) {
+                        System.out.println("✅ assert passed: expected '" + expected + "'");
+                    } else {
+                        System.out.println("❌ assert failed: expected '" + expected + "' but got '" + actual + "'");
+                        assertionFailed = true;
                     }
-                    // Module implementations handle their own output
-                    org.lucee.lucli.modules.ModuleCommand.executeModuleByName(command, moduleArgs);
-                    continue;
+                }
+                continue;
+            }
+
+            // Delegate all other commands to the shared dispatcher
+            executeLucliScriptCommand(
+                processedLine,
+                commandProcessor,
+                externalCommandProcessor,
+                picocli,
+                false
+            );
+        }
+
+        // Scripts are best-effort; fail overall if any assertion failed
+        return assertionFailed ? 1 : 0;
+    }
+//  ExecFile, ExecLine, ExecVar, ExecEval
+    
+    /**
+     * Determines whether the provided command string is wrapped for execution evaluation. 
+     *
+     * @param command the command string to inspect
+     * @return {@code true} if the command starts with "$(" and ends with ")", otherwise {@code false}
+     */
+    private static boolean isExecEvaluation(String command) {
+        return command.startsWith("$(") && command.endsWith(")");
+    }
+
+    private static boolean isExitCommand(String line) {
+        String trimmed = line.trim();
+        return trimmed.equalsIgnoreCase("exit") || trimmed.toLowerCase().startsWith("exit ");
+    }
+
+    private static int getExitCodeFromExitCommand(String line) {
+        String trimmed = line.trim();
+        int exitCode = 0;
+        String[] parts = trimmed.split("\\s+");
+        if (parts.length > 1) {
+            try {
+                exitCode = Integer.parseInt(parts[1]);
+            } catch (NumberFormatException e) {
+                exitCode = 1;
+            }
+        }
+        return exitCode;
+    }
+
+    /**
+     * Determines whether a LuCLI exec line should be treated as empty or ignorable.
+     * <p>
+     * A line is considered empty if it is {@code null}, contains only whitespace,
+     * or begins with the comment character {@code '#'} after trimming.
+     * </p>
+     *
+     * @param line the input line to evaluate
+     * @return {@code true} if the line is {@code null}, blank, or a comment; otherwise {@code false}
+     */
+    private static boolean isEmptyLucliExecLine(String line) {
+        if(line == null) {
+            return true;
+        }
+        String trimmed = line.trim();
+        if(trimmed.isEmpty()) {
+            return true;
+        }
+        if(trimmed.startsWith("#")) {
+            return true;
+        }
+        return false;
+    }
+
+
+    private static String getExecEvaluationInnerCommand(String command) {
+        return command.substring(2, command.length() - 1).trim();
+    }
+    /**
+     * Pre-scan a .lucli script for ${secret:...} placeholders so that we can
+     * unlock the secret store and validate that all referenced secrets exist
+     * before executing any commands.
+     */
+    private static void preResolveSecretsInScript(java.util.List<String> lines) throws Exception {
+        if (lines == null || lines.isEmpty()) {
+            return;
+        }
+
+        for (String line : lines) {
+            if (line == null) {
+                continue;
+            }
+            String trimmed = line.trim();
+            if (trimmed.isEmpty()) {
+                continue; // skip blank
+            }
+            // Skip full-line comments / shebangs
+            if (trimmed.startsWith("#")) {
+                continue;
+            }
+            // Fast path: only bother when we see the secret placeholder prefix
+            if (trimmed.contains("${secret:")) {
+                // We don't need the resolved value here; calling this once per
+                // relevant line is enough to trigger secret store
+                // initialization and to validate that referenced secrets
+                // exist. Any failures here should abort the script before
+                // executing commands.
+                resolveSecretsInScriptLine(line);
+            }
+        }
+    }
+ 
+    /**
+     * Helper to execute a command inside $(...) for variable assignment and record its result
+     * into the script environment and placeholder system.
+     */
+    private static void handleCommandSubstitutionAssignment(
+            String varName,
+            String innerCommand,
+            org.lucee.lucli.CommandProcessor commandProcessor,
+            org.lucee.lucli.ExternalCommandProcessor externalCommandProcessor,
+            CommandLine picocli,
+            StringOutput stringOutput) throws Exception {
+
+        // Resolve ${secret:NAME} placeholders before normal processing
+        String innerWithSecrets = resolveSecretsInScriptLine(innerCommand);
+
+        // Process ${PLACEHOLDER} values (environment, previous results, etc.)
+        String processedInner = stringOutput.process(innerWithSecrets);
+
+
+
+        String captured = executeLucliScriptCommand(
+            processedInner,
+            commandProcessor,
+            externalCommandProcessor,
+            picocli,
+            true
+        );
+
+        printDebug("LuCLIScript", "Captured output for variable '" + varName + "': " + captured);
+
+        scriptEnvironment.put(varName, captured);
+        stringOutput.addPlaceholder(varName, captured);
+
+        // Also update the generic result history so ${_} and last(n)
+        // can see values coming from explicit assignments.
+        recordLucliResult(captured);
+    }
+ 
+    /**
+     * Shared dispatcher for executing a single script line in the LuCLI script environment.
+     * This mirrors the behavior of the interactive terminal, with optional output capture
+     * for use in variable assignment (e.g., FOO=$(command ...)).
+     */
+    private static String executeLucliScriptCommand(
+        String processedLine,
+        org.lucee.lucli.CommandProcessor commandProcessor,
+        org.lucee.lucli.ExternalCommandProcessor externalCommandProcessor,
+        CommandLine picocli,
+        boolean captureOutput) {
+
+        // Normalise script line: if the user copied a full "lucli ..." command
+        // into the script, strip the leading "lucli" so we don't recursively
+        // invoke LuCLI from within itself.
+        String scriptLine = processedLine == null ? "" : processedLine.trim();
+
+        // Should be fairly unreachable since this is pre-checked, but guard against empty lines
+        if(scriptLine.trim().isEmpty()) {
+            return "";
+        }
+
+
+        String[] firstTokens = commandProcessor.parseCommand(scriptLine);
+        if (firstTokens.length > 0 && "lucli".equalsIgnoreCase(firstTokens[0])) {
+            if (firstTokens.length == 1) {
+                return ""; // bare "lucli"
+            }
+            StringBuilder sb = new StringBuilder();
+            for (int i = 1; i < firstTokens.length; i++) {
+                if (i > 1) sb.append(' ');
+                sb.append(firstTokens[i]);
+            }
+            scriptLine = sb.toString();
+        }
+        
+
+        try {
+            // QUICK PATH: handle cfml without using parseCommand for its expression,
+            // so that inner quotes are fully preserved.
+            String lower = scriptLine.toLowerCase();
+            int spaceIdx = lower.indexOf(' ');
+            String cmdName = (spaceIdx == -1) ? lower : lower.substring(0, spaceIdx);
+
+            if ("cfml".equals(cmdName)) {
+                int firstSpace = scriptLine.indexOf(' ');
+                String cfmlCode = scriptLine.substring(firstSpace + 1).trim();
+                if (cfmlCode.isEmpty()) {
+                    StringOutput.Quick.error("cfml: missing expression");
+                    return "";
                 }
 
-                // 3) File-system style commands (ls, cd, rm, etc.)
-                if (isFileSystemStyleCommand(command)) {
-                    String fsResult = commandProcessor.executeCommand(processedLine);
+                if (captureOutput) {
+
+                    // Silent execution and gather output
+                    LuceeScriptEngine luceeEngine = LuceeScriptEngine.getInstance();
+                    Object ret = luceeEngine.evalScriptStatement(cfmlCode, null);
+                    if (ret != null) {
+                        recordLucliResult(ret.toString());
+                    }
+                    return ret.toString();
+
+                    // java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                    // java.io.PrintStream originalOut = System.out;
+                    // java.io.PrintStream originalErr = System.err;
+                    // try {
+                    //     System.setOut(new java.io.PrintStream(baos));
+                    //     System.setErr(new java.io.PrintStream(baos));
+                    //     // Execute cfml with the entire expression as a single argument so
+                    //     // inner quotes are preserved.
+                    //     // This doesnt need picocli, we can just do it direct
+                    //     // Execute it directly to avoid double-parsing issues
+                    //     // luceeEngine.evalScriptStatement(wrappedScript, null);
+                    //     // But this is not for everuthing then? It's running cfml only.
+                    //     picocli.execute("cfml", cfmlCode);
+                    // } 
+                    // catch(Exception e) {
+                    //     StringOutput.Quick.error("Error executing cfml command: " + e.getMessage());
+                    //     printDebugStackTrace(e);
+                    // }
+                    // finally {
+                    //     System.setOut(originalOut);
+                    //     System.setErr(originalErr);
+                    // }
+                    // String captured = baos.toString().trim();
+                    // if (captured != null && !captured.isEmpty()) {
+                    //     recordLucliResult(captured);
+                    // }
+                    // return "";
+                } else {
+                    picocli.execute("cfml", cfmlCode);
+                    return "";
+                }
+
+            }
+            
+
+            // For all non-cfml commands, it is safe to parse the line into parts.
+            String[] parts = commandProcessor.parseCommand(scriptLine);
+            if (parts.length == 0) {
+                return "";
+            }
+
+            String command = parts[0].toLowerCase();
+
+            // 1) Picocli subcommands (server, modules, run, etc.)
+            if (picocli.getSubcommands().containsKey(command)) {
+                if (captureOutput) {
+                    java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                    java.io.PrintStream originalOut = System.out;
+                    java.io.PrintStream originalErr = System.err;
+                    try {
+                        System.setOut(new java.io.PrintStream(baos));
+                        System.setErr(new java.io.PrintStream(baos));
+                        picocli.execute(parts); // Picocli writes directly to System.out/err
+                    } finally {
+                        System.setOut(originalOut);
+                        System.setErr(originalErr);
+                    }
+                    String captured = baos.toString().trim();
+                    if (captured != null && !captured.isEmpty()) {
+                        recordLucliResult(captured);
+                    }
+                    return "";
+                } else {
+                    picocli.execute(parts);
+                    return "";
+                }
+            }
+
+            // 2) Module shortcuts (hello-world, lint, etc.)
+            if (org.lucee.lucli.modules.ModuleCommand.moduleExists(command)) {
+                String[] moduleArgs = new String[parts.length - 1];
+                if (moduleArgs.length > 0) {
+                    System.arraycopy(parts, 1, moduleArgs, 0, moduleArgs.length);
+                }
+
+                if (captureOutput) {
+                    java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                    java.io.PrintStream originalOut = System.out;
+                    java.io.PrintStream originalErr = System.err;
+                    try {
+                        System.setOut(new java.io.PrintStream(baos));
+                        System.setErr(new java.io.PrintStream(baos));
+                        org.lucee.lucli.modules.ModuleCommand.executeModuleByName(command, moduleArgs);
+                    } finally {
+                        System.setOut(originalOut);
+                        System.setErr(originalErr);
+                    }
+                    String captured = baos.toString().trim();
+                    if (captured != null && !captured.isEmpty()) {
+                        recordLucliResult(captured);
+                    }
+                    return captured;
+                } else {
+                    org.lucee.lucli.modules.ModuleCommand.executeModuleByName(command, moduleArgs);
+                    return "";
+                }
+            }
+
+            // 3) File-system style commands (ls, cd, rm, etc.)
+            if (isFileSystemStyleCommand(command)) {
+                String fsResult = commandProcessor.executeCommand(scriptLine);
+                if (fsResult != null) {
+                    recordLucliResult(fsResult);
+                }
+                if (captureOutput) {
+                    return fsResult != null ? fsResult : "";
+                } else {
                     if (fsResult != null && !fsResult.isEmpty()) {
                         System.out.println(fsResult);
                     }
-                    continue;
+                    return "";
                 }
+            }
 
-                // 4) Fallback to external command processor (git, echo, etc.)
-                String extResult = externalCommandProcessor.executeCommand(processedLine);
+            // 4) Fallback to external command processor (git, echo, etc.)
+            String extResult = externalCommandProcessor.executeCommand(scriptLine);
+            if (extResult != null) {
+                recordLucliResult(extResult);
+            }
+            if (captureOutput) {
+                return extResult != null ? extResult : "";
+            } else {
                 if (extResult != null && !extResult.isEmpty()) {
                     System.out.println(extResult);
                 }
-
-            } catch (Exception e) {
-                // Log script-level errors but continue with subsequent lines
-                StringOutput.Quick.error("Error executing script line '" + processedLine + "': " + e.getMessage());
-                printDebugStackTrace(e);
+                return "";
             }
-        }
 
-        // Scripts are best-effort; overall success as long as we didn't hit a fatal error above
-        return 0;
+        } catch (Exception e) {
+            StringOutput.Quick.error("Error executing script line '" + processedLine + "': " + e.getMessage());
+            printDebugStackTrace(e);
+            return "";
+        }
     }
-    
+
+
+
+
+
+
+
+
+
     /**
      * Check if the given string is a known subcommand
      * Uses PicocLI's API to query registered subcommands dynamically

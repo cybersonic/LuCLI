@@ -1,0 +1,9 @@
+cfml now()
+cfml echo("Current time is: " & now() );
+set var1=$(cfml now() )
+set var2=${var1}
+xset var11="someting"
+
+echo "var1 ${var1}"
+echo "var2 ${var2}"
+echo "xset var11 ${var11}"

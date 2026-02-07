@@ -22,15 +22,11 @@ component extends="modules.BaseModule" {
         return this;
     }
     
-    function main(string myArgument="") {
+    function main() {
         // Main module logic goes here
         out("Hello from {{MODULE_NAME}} module!");
         out("Arguments passed:");
-        out(arguments);
-
-        for(var argName in arguments){
-            out("  " & argName & ": " & arguments[argName]);
-        }
+        out(__arguments ?: []);
         return "Module executed successfully";
     }
     

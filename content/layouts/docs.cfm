@@ -5,80 +5,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>#page.meta.title# -  LuCLI Documentation</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/css/main.css">
+    <cfinclude template="partials/head.cfm">
     <link rel="stylesheet" href="/css/docs.css">
 
 </head>
-<body>
+<body class="docs-body">
+    <cfinclude template="partials/nav.cfm">
 
-    <cfinclude template="partials/nav.html">
-    <!-- <header class="header">
-        
-        <div class="header-content">
-            <a href="../index.html" class="logo">
-                <div class="logo-icon">L&gt;</div>
-                LuCLI
-            </a>
-            <nav class="header-nav">
-                <a href="../index.html" class="nav-link">Home</a>
-                <a href="../docs/index.html" class="nav-link active">Documentation</a>
-                <a href="https://github.com/cybersonic/LuCLI" class="nav-link" target="_blank">GitHub</a>
-            </nav>
-            <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
-        </div>
-    </header> -->
 
     <div class="docs-layout">
         <!-- Left Sidebar Navigation -->
         <aside class="sidebar">
             #data.navigation#
-
-            <!--- <nav class="sidebar-section">
-                <h3 class="sidebar-title">Getting Started</h3>
-                <nav class="header-nav">
-                    <a href="/##what" class="nav-link">What it is</a>
-                    <a href="/##capabilities" class="nav-link">Capabilities</a>
-                    <a href="/##getting-started" class="nav-link">Get started</a>
-                    <a href="/download" class="nav-link">Download</a>
-                </nav>
-            </nav>
-
-            <nav class="sidebar-section">
-                <h3 class="sidebar-title">Core Features</h3>
-                <ul class="sidebar-nav">
-                    <li class="sidebar-item"><a href="terminal.html" class="sidebar-link">Interactive Terminal</a></li>
-                    <li class="sidebar-item"><a href="server-management.html" class="sidebar-link">Server Management</a></li>
-                    <li class="sidebar-item"><a href="script-execution.html" class="sidebar-link">Script Execution</a></li>
-                    <li class="sidebar-item"><a href="modules.html" class="sidebar-link">Modules</a></li>
-                </ul>
-            </nav>
-
-            <nav class="sidebar-section">
-                <h3 class="sidebar-title">Configuration</h3>
-                <ul class="sidebar-nav">
-                    <li class="sidebar-item"><a href="configuration.html" class="sidebar-link">Configuration Files</a></li>
-                    <li class="sidebar-item"><a href="environments.html" class="sidebar-link">Environments</a></li>
-                    <li class="sidebar-item"><a href="settings.html" class="sidebar-link">Settings</a></li>
-                </ul>
-            </nav>
-
-            <nav class="sidebar-section">
-                <h3 class="sidebar-title">Advanced</h3>
-                <ul class="sidebar-nav">
-                    <li class="sidebar-item"><a href="monitoring.html" class="sidebar-link">JMX Monitoring</a></li>
-                    <li class="sidebar-item"><a href="customization.html" class="sidebar-link">Customization</a></li>
-                    <li class="sidebar-item"><a href="troubleshooting.html" class="sidebar-link">Troubleshooting</a></li>
-                </ul>
-            </nav>
-
-            <nav class="sidebar-section">
-                <h3 class="sidebar-title">Reference</h3>
-                <ul class="sidebar-nav">
-                    <li class="sidebar-item"><a href="command-reference.html" class="sidebar-link">Command Reference</a></li>
-                    <li class="sidebar-item"><a href="api.html" class="sidebar-link">API Documentation</a></li>
-                </ul>
-            </nav> --->
         </aside>
 
         <!-- Main Content Area -->
@@ -92,6 +30,18 @@
 
             <div class="content-body">
                 #content#
+
+                <!-- Docs prev/next pagination (driven by Markspresso meta: prev_url/next_url) -->
+                <cfif (structKeyExists(data, "prev_url") and len(data.prev_url)) or (structKeyExists(data, "next_url") and len(data.next_url))>
+                    <nav class="docs-pagination">
+                        <cfif structKeyExists(data, "prev_url") and len(data.prev_url)>
+                            <a href="#data.prev_url#" class="docs-pagination__link docs-pagination__prev">&larr; #htmlEditFormat(data.prev_title)#</a>
+                        </cfif>
+                        <cfif structKeyExists(data, "next_url") and len(data.next_url)>
+                            <a href="#data.next_url#" class="docs-pagination__link docs-pagination__next">#htmlEditFormat(data.next_title)# &rarr;</a>
+                        </cfif>
+                    </nav>
+                </cfif>
             </div>
         </main>
 
@@ -103,11 +53,10 @@
             </ul>
         </aside>
     </div>
+    
 
-    <cfinclude template="partials/footer.html">
-
+    <cfinclude template="partials/footer.cfm">
     <script src="/js/main.js"></script>
     </cfoutput>
-    <!--- <cfdump var="#local#"> --->
 </body>
 </html>

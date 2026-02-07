@@ -65,6 +65,7 @@ echo ""
 
 run_suite "Simple Smoke Tests" "tests/test-simple.sh"
 run_suite "Modules Commands" "tests/test-modules.sh"
+run_suite "Dependency Management" "tests/test-deps.sh"
 run_suite "CFML Execution" "tests/test_cfml_comprehensive.sh"
 run_suite "CLI vs Terminal Consistency" "tests/test_consistency.sh"
 run_suite "Tilde Expansion" "tests/test_tilde_fix.sh"

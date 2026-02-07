@@ -124,4 +124,69 @@ document.addEventListener('DOMContentLoaded', function() {
     updateActiveSidebarLink();
     generateToc();
     initTocHighlighting();
+    addSearchFunctionality();
 });
+
+
+function addSearchFunctionality() {
+        console.log("Initializing search functionality...");
+        var overlay = document.getElementById('docs-search-overlay');
+        var input = document.getElementById('markspresso-search-input');
+        var closeBtn = overlay ? overlay.querySelector('.docs-search-close') : null;
+        var activeBefore = null;
+
+        function openSearch() {
+            if (!overlay) return;
+            activeBefore = document.activeElement;
+            overlay.classList.add('is-open');
+            overlay.setAttribute('aria-hidden', 'false');
+            if (input) {
+                setTimeout(function () { input.focus(); }, 0);
+            }
+        }
+
+        function closeSearch() {
+            if (!overlay) return;
+            overlay.classList.remove('is-open');
+            overlay.setAttribute('aria-hidden', 'true');
+            if (activeBefore && typeof activeBefore.focus === 'function') {
+                activeBefore.focus();
+            }
+        }
+
+        // Expose a hook for header search control
+        window.MarkspressoOpenSearch = openSearch;
+
+        document.addEventListener('keydown', function (e) {
+            var isMac = navigator.platform && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+            var metaOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+
+            // Cmd/Ctrl + K opens search
+            if (metaOrCtrl && (e.key === 'k' || e.key === 'K')) {
+                e.preventDefault();
+                openSearch();
+                return;
+            }
+
+            // Esc closes when overlay is open
+            if (e.key === 'Escape' && overlay && overlay.classList.contains('is-open')) {
+                e.preventDefault();
+                closeSearch();
+            }
+        });
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                closeSearch();
+            });
+        }
+
+        if (overlay) {
+            overlay.addEventListener('click', function (e) {
+                if (e.target === overlay || e.target.classList.contains('docs-search-backdrop')) {
+                    closeSearch();
+                }
+            });
+        }
+};

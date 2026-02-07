@@ -1,0 +1,19 @@
+   #!/bin/sh
+
+   # Allowed prefixes
+   ALLOWED_PREFIXES="site: bug: feat: feature: ci:"
+
+   # First line of the commit message
+   SUBJECT="$(sed -n '1p' "$1")"
+
+   case "$SUBJECT" in
+     site:\ *|bug:\ *|feat:\ *|feature:\ *|ci:\ *)
+       # OK
+       exit 0
+       ;;
+     *)
+       echo "ERROR: Commit message must start with one of: $ALLOWED_PREFIXES" >&2
+       echo "Got: \"$SUBJECT\"" >&2
+       exit 1
+       ;;
+   esac
