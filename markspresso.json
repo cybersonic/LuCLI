@@ -9,7 +9,14 @@
     "posts": {
       "permalink": "/posts/:slug/",
       "path": "content/posts",
-      "layout": "post"
+      "layout": "post",
+      "feed": {
+        "enabled": true,
+        "formats": ["rss", "atom"],
+        "limit": 20,
+        "title": "LuCLI Blog",
+        "description": "Latest posts about the development of LuCLI"
+      }
     }
   },
   "navigation": {
