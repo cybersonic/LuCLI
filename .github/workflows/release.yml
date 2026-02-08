@@ -79,6 +79,12 @@ jobs:
         if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
         uses: actions/download-artifact@v4
 
+      - name: Setup JAR signing keystore
+        if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
+        run: |
+          echo "${{ secrets.JARSIGNER_KEYSTORE_BASE64 }}" | base64 -d > $HOME/.lucli-keystore.jks
+          ls -la $HOME/.lucli-keystore.jks
+
       - name: Organize release files
         if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
         run: |
@@ -116,6 +122,43 @@ jobs:
           done
           
           echo "Release files prepared:"
+          ls -lh release-files/
+
+      - name: Sign JAR files
+        if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
+        env:
+          JARSIGNER_STOREPASS: ${{ secrets.JARSIGNER_STOREPASS }}
+          JARSIGNER_KEYPASS: ${{ secrets.JARSIGNER_KEYPASS }}
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          
+          # Sign the versioned JAR
+          if [ -f "release-files/lucli-$VERSION.jar" ]; then
+            echo "Signing lucli-$VERSION.jar..."
+            jarsigner -keystore $HOME/.lucli-keystore.jks \
+              -storepass "$JARSIGNER_STOREPASS" \
+              -keypass "$JARSIGNER_KEYPASS" \
+              -tsa http://timestamp.digicert.com \
+              release-files/lucli-$VERSION.jar lucli
+            
+            # Verify signature
+            jarsigner -verify -verbose release-files/lucli-$VERSION.jar
+          fi
+          
+          # Sign the unversioned JAR
+          if [ -f "release-files/lucli.jar" ]; then
+            echo "Signing lucli.jar..."
+            jarsigner -keystore $HOME/.lucli-keystore.jks \
+              -storepass "$JARSIGNER_STOREPASS" \
+              -keypass "$JARSIGNER_KEYPASS" \
+              -tsa http://timestamp.digicert.com \
+              release-files/lucli.jar lucli
+            
+            # Verify signature
+            jarsigner -verify -verbose release-files/lucli.jar
+          fi
+          
+          echo "✅ JAR signing complete"
 
       - name: Create git tag
         if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
@@ -196,10 +239,10 @@ jobs:
             ## LuCLI v${{ steps.version.outputs.VERSION }}
             
             ### Downloads
-            - **lucli-${{ steps.version.outputs.VERSION }}.jar**/**lucli.jar** - Universal JAR (Java 17+, works everywhere)
+            - **lucli-${{ steps.version.outputs.VERSION }}.jar**/**lucli.jar** - Universal JAR (Java 17+, works everywhere) ✅ Signed
             - **lucli-${{ steps.version.outputs.VERSION }}-linux** - Shell wrapper for Linux (Java 17+ required)
             - **lucli-${{ steps.version.outputs.VERSION }}-macos** - Shell wrapper for macOS (Java 17+ required)
             - **lucli-${{ steps.version.outputs.VERSION }}.bat** - Windows batch launcher (Java 17+ required)
             
-            All downloads require Java 17+ (binaries are small wrappers around the JAR) and are built with `mvn clean package -Pbinary`.
+            All downloads require Java 17+. JAR files are cryptographically signed for authenticity.
           files: release-files/*
