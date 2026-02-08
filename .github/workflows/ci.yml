@@ -9,6 +9,9 @@ on:
 jobs:
   test:
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      checks: write
     strategy:
       fail-fast: false
       matrix:
@@ -58,12 +61,13 @@ jobs:
       continue-on-error: true
 
     - name: Upload bash test results
-      if: runner.os != 'Windows'
+      if: runner.os != 'Windows' && always()
       uses: actions/upload-artifact@v4
       with:
         name: bash-test-results-${{ matrix.os }}-java${{ matrix.java }}
         path: bash-test-results.xml
         retention-days: 7
+        if-no-files-found: warn
 
     - name: Publish Test Results
       if: runner.os != 'Windows' && always()

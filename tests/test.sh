@@ -76,6 +76,7 @@ else
 fi
 TEST_SUITE_NAME="LuCLI Test Suite"
 TEST_SUITE_START_TIME=$(date +%s)
+ORIGINAL_DIR="$(pwd)"
 
 # Arrays to store test results for JUnit XML
 declare -a JUNIT_TEST_NAMES
@@ -165,6 +166,18 @@ EOF
     
     echo -e "${GREEN}✅ JUnit XML report written to: $output_file${NC}"
 }
+
+# Trap to ensure JUnit XML is written even on early exit
+cleanup_and_write_junit() {
+    local exit_code=$?
+    # Return to original directory to write JUnit XML
+    cd "$ORIGINAL_DIR" 2>/dev/null || true
+    if [[ -n "$JUNIT_XML_OUTPUT" ]]; then
+        write_junit_xml "$JUNIT_XML_OUTPUT" 2>/dev/null || true
+    fi
+    exit $exit_code
+}
+trap cleanup_and_write_junit EXIT
 
 echo -e "${BLUE}🧪 LuCLI Comprehensive Test Suite${NC}"
 echo -e "${BLUE}===================================${NC}"
@@ -884,10 +897,7 @@ echo "Test cleanup completed."
 cd ..
 rm -rf "$TEST_DIR"
 
-# Write JUnit XML report if requested
-if [[ -n "$JUNIT_XML_OUTPUT" ]]; then
-    write_junit_xml "$JUNIT_XML_OUTPUT"
-fi
+# JUnit XML is written by the EXIT trap (cleanup_and_write_junit)
 
 # Test Results Summary
 echo ""
