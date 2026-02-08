@@ -50,11 +50,33 @@ jobs:
         chmod +x target/lucli
         ./target/lucli --version || echo "Binary version command not implemented yet"
 
-    - name: Upload test results
+    - name: Run bash test suite (Unix)
+      if: runner.os != 'Windows'
+      run: |
+        chmod +x tests/*.sh
+        JUNIT_XML_OUTPUT=bash-test-results.xml ./tests/test.sh
+      continue-on-error: true
+
+    - name: Upload bash test results
+      if: runner.os != 'Windows'
+      uses: actions/upload-artifact@v4
+      with:
+        name: bash-test-results-${{ matrix.os }}-java${{ matrix.java }}
+        path: bash-test-results.xml
+        retention-days: 7
+
+    - name: Publish Test Results
+      if: runner.os != 'Windows' && always()
+      uses: EnricoMi/publish-unit-test-result-action@v2
+      with:
+        files: bash-test-results.xml
+        check_name: Bash Tests (${{ matrix.os }}, Java ${{ matrix.java }})
+
+    - name: Upload Maven test results
       uses: actions/upload-artifact@v4
       if: failure()
       with:
-        name: test-results-${{ matrix.os }}-java${{ matrix.java }}
+        name: maven-test-results-${{ matrix.os }}-java${{ matrix.java }}
         path: |
           target/surefire-reports/
           target/failsafe-reports/

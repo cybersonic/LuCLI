@@ -1,7 +1,6 @@
 project:
   # These can be omitted; Maven plugin will fill in from pom.xml.
   name: LuCLI
-  version: 1.0.0
   description: A CLI for Lucee
   authors:
     - Mark Drew
@@ -64,9 +63,9 @@ packagers:
   #     - path: target/lucli.bat
   #       platform: windows-x86_64
 
-announce:
-  active: ALWAYS
-  linkedin:
-    active: RELEASE
-    accessToken: "{{JRELEASER_LINKEDIN_ACCESS_TOKEN}}"
-    message: "Announcing the release of LuCLI {{projectVersion}}! Check it out at"
+# announce:
+#   active: ALWAYS
+#   linkedin:
+#     active: RELEASE
+#     accessToken: "{{JRELEASER_LINKEDIN_ACCESS_TOKEN}}"
+#     message: "Announcing the release of LuCLI {{projectVersion}}! Check it out at"

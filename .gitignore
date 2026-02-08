@@ -33,3 +33,5 @@ examples/
 content/layouts/old/
 scripts/extensions.cfs
 tomcat_tests/
+test-results.xml
+out/
