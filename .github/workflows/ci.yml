@@ -70,7 +70,7 @@ jobs:
         if-no-files-found: warn
 
     - name: Publish Test Results
-      if: runner.os != 'Windows' && always()
+      if: runner.os == 'Linux' && always()
       uses: EnricoMi/publish-unit-test-result-action@v2
       with:
         files: bash-test-results.xml
