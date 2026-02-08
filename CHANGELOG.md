@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+- **Code Refactoring:** Major internal refactoring of LuCLI main entry point and command handling:
+  - Merged LuCLICommand into LuCLI to eliminate code duplication
+  - Cleaned up main() method and moved routing logic for better maintainability
+  - Added cleaner output methods with format string support
+  - Fixed deprecated method names after refactoring
+- **Documentation:** Added blog layout templates and navigation components. Added TODO document for picocli enhancements and remaining refactoring tasks.
 - **Git Dependency Caching:** Added persistent git dependency cache under `~/.lucli/deps/git-cache` (configurable via `usePersistentGitCache`) and a new `lucli deps prune` command to clear cached git clones.
 
 ## 0.1.266
