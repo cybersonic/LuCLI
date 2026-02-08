@@ -35,8 +35,8 @@ public class LuceeServerConfigTest {
         assertEquals(tempDir.getFileName().toString(), config.name);
         // Note: Default version may change - just verify it's set
         assertNotNull(config.version);
-        // Default port is 8000 (not 8080)
-        assertEquals(8000, config.port);
+        // Default port is 8080
+        assertEquals(8080, config.port);
         assertEquals("./", config.webroot);
         assertTrue(config.enableLucee);
         assertFalse(config.enableREST);
