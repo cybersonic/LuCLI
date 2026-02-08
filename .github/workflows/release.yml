@@ -18,7 +18,7 @@ jobs:
 
       - uses: actions/setup-java@v4
         with:
-          java-version: 17
+          java-version: 21
           distribution: temurin
 
       - name: Cache Maven
@@ -51,7 +51,7 @@ jobs:
 
       - uses: actions/setup-java@v4
         with:
-          java-version: 17
+          java-version: 21
           distribution: temurin
 
       - name: Get version
@@ -239,10 +239,10 @@ jobs:
             ## LuCLI v${{ steps.version.outputs.VERSION }}
             
             ### Downloads
-            - **lucli-${{ steps.version.outputs.VERSION }}.jar**/**lucli.jar** - Universal JAR (Java 17+, works everywhere) ✅ Signed
-            - **lucli-${{ steps.version.outputs.VERSION }}-linux** - Shell wrapper for Linux (Java 17+ required)
-            - **lucli-${{ steps.version.outputs.VERSION }}-macos** - Shell wrapper for macOS (Java 17+ required)
-            - **lucli-${{ steps.version.outputs.VERSION }}.bat** - Windows batch launcher (Java 17+ required)
+            - **lucli-${{ steps.version.outputs.VERSION }}.jar**/**lucli.jar** - Universal JAR (Java 21+, works everywhere) ✅ Signed
+            - **lucli-${{ steps.version.outputs.VERSION }}-linux** - Shell wrapper for Linux (Java 21+ required)
+            - **lucli-${{ steps.version.outputs.VERSION }}-macos** - Shell wrapper for macOS (Java 21+ required)
+            - **lucli-${{ steps.version.outputs.VERSION }}.bat** - Windows batch launcher (Java 21+ required)
             
-            All downloads require Java 17+. JAR files are cryptographically signed for authenticity.
+            All downloads require Java 21+. JAR files are cryptographically signed for authenticity.
           files: release-files/*
