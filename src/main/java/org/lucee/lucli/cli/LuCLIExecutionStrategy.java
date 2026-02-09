@@ -72,6 +72,7 @@ public class LuCLIExecutionStrategy implements IExecutionStrategy {
                 LuCLI.debug = rootCmd.isDebug();
                 LuCLI.timing = rootCmd.isTiming();
                 LuCLI.preserveWhitespace = rootCmd.isPreserveWhitespace();
+                LuCLI.currentEnvironment = rootCmd.getEnvOption();
                 Timer.setEnabled(rootCmd.isTiming());
             }
         }

@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+- **REPL Command:** Added `lucli repl` command for an interactive CFML read-eval-print loop. Provides a focused CFML-only environment for quick experimentation with history support, separate from the full terminal mode.
+- **Script Preprocessor:** New `LucliScriptPreprocessor` for `.lucli` script files with support for:
+  - Line continuation using backslash (`\`) at end of line
+  - Comment stripping (lines starting with `#`)
+  - Environment conditional blocks (`#@env:dev ... #@end`, `#@prod`, `#@env:!prod`)
+  - Secret resolution (`${secret:NAME}`)
+  - Placeholder substitution
+- **Environment Flag:** Added `--env`/`-e` option to set the execution environment (dev, staging, prod) for `.lucli` scripts. Also reads from `LUCLI_ENV` environment variable as fallback.
 - **Code Refactoring:** Major internal refactoring of LuCLI main entry point and command handling:
   - Merged LuCLICommand into LuCLI to eliminate code duplication
   - Cleaned up main() method and moved routing logic for better maintainability

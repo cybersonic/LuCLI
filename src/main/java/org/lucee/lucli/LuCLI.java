@@ -24,6 +24,7 @@ import org.lucee.lucli.cli.commands.CompletionCommand;
 import org.lucee.lucli.cli.commands.DaemonCommand;
 import org.lucee.lucli.cli.commands.ModulesCommand;
 import org.lucee.lucli.cli.commands.ParrotCommand;
+import org.lucee.lucli.cli.commands.ReplCommand;
 import org.lucee.lucli.cli.commands.RunCommand;
 import org.lucee.lucli.cli.commands.SecretsCommand;
 import org.lucee.lucli.cli.commands.ServerCommand;
@@ -34,6 +35,7 @@ import org.lucee.lucli.cli.commands.deps.InstallCommand;
 import org.lucee.lucli.cli.commands.logic.IfCommand;
 import org.lucee.lucli.cli.commands.logic.XSetCommand;
 import org.lucee.lucli.modules.ModuleCommand;
+import org.lucee.lucli.script.LucliScriptPreprocessor;
 import org.lucee.lucli.secrets.LocalSecretStore;
 import org.lucee.lucli.secrets.SecretStore;
 import org.lucee.lucli.secrets.SecretStoreException;
@@ -60,6 +62,7 @@ import picocli.CommandLine.Spec;
         DepsCommand.class,
         InstallCommand.class,  // Shortcut for deps install
         CfmlCommand.class,
+        ReplCommand.class,
         CompletionCommand.class,
         VersionsListCommand.class,
         ParrotCommand.class,
@@ -133,6 +136,13 @@ public class LuCLI implements Callable<Integer> {
     )
     private int timeoutSeconds;
 
+    @Option(
+        names = {"--env", "-e"},
+        paramLabel = "<environment>",
+        description = "Set the execution environment (e.g., dev, staging, prod) for .lucli scripts"
+    )
+    private String envOption;
+
     @Parameters(
         index = "0",
         arity = "0..1",
@@ -160,6 +170,7 @@ public class LuCLI implements Callable<Integer> {
     public static boolean debug = false;
     public static boolean timing = false;
     public static boolean preserveWhitespace = false;
+    public static String currentEnvironment = null;
     private static boolean lucliScript = false;
     
     public static Map<String, String> scriptEnvironment = new HashMap<>(System.getenv());
@@ -345,6 +356,31 @@ public class LuCLI implements Callable<Integer> {
     
     public boolean isPreserveWhitespace() {
         return preserveWhitespaceOption;
+    }
+    
+    public String getEnvOption() {
+        return envOption;
+    }
+    
+    /**
+     * Get the current execution environment.
+     * Resolution order: --env flag > LUCLI_ENV environment variable > null
+     * 
+     * @return The environment name (e.g., "dev", "prod") or null if not set
+     */
+    public static String getCurrentEnvironment() {
+        // First check static field (set by execution strategy from --env flag)
+        if (currentEnvironment != null && !currentEnvironment.trim().isEmpty()) {
+            return currentEnvironment.trim();
+        }
+        
+        // Then check LUCLI_ENV environment variable
+        String envVar = System.getenv("LUCLI_ENV");
+        if (envVar != null && !envVar.trim().isEmpty()) {
+            return envVar.trim();
+        }
+        
+        return null;
     }
     
     // ====================
@@ -740,12 +776,26 @@ public class LuCLI implements Callable<Integer> {
         }
 
         verbose("Executing LuCLI script: " + scriptPath);
+        String env = getCurrentEnvironment();
+        if (env != null) {
+            verbose("Executing with environment: " + env);
+        }
 
         // Read all lines from the script file
         java.util.List<String> lines = Files.readAllLines(path, java.nio.charset.StandardCharsets.UTF_8);
         if (lines.isEmpty()) {
             verbose("Script is empty: " + scriptPath);
             return 0;
+        }
+
+        // Preprocess: line continuation and environment blocks
+        // (Comments and placeholders are handled per-line during execution)
+        try {
+            lines = LucliScriptPreprocessor.joinContinuationLines(lines);
+            lines = LucliScriptPreprocessor.processEnvBlocks(lines, env);
+        } catch (LucliScriptPreprocessor.PreprocessorException e) {
+            StringOutput.Quick.error("Script preprocessing error: " + e.getMessage());
+            return 1;
         }
 
         // Pre-scan script for ${secret:...} placeholders so we can prompt for
