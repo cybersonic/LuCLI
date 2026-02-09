@@ -289,6 +289,11 @@ public class LuceeServerManager {
             // Deploy any extension dependencies to the sandbox server
             deployExtensionsForServer(projectDir, serverInstanceDir);
 
+            // Copy welcome index.cfm if Lucee is enabled and no index.cfm exists in webroot
+            if (config.enableLucee) {
+                copyWelcomeIndexIfMissing(config, projectDir);
+            }
+
             // Launch foreground process; this blocks until shutdown
             launchServerProcess(serverInstanceDir, config, projectDir, luceeExpressDir,
                                 agentOverrides, environment, true);
@@ -384,6 +389,11 @@ public class LuceeServerManager {
 
         // Deploy any extension dependencies to the sandbox server
         deployExtensionsForServer(projectDir, serverInstanceDir);
+
+        // Copy welcome index.cfm if Lucee is enabled and no index.cfm exists in webroot
+        if (config.enableLucee) {
+            copyWelcomeIndexIfMissing(config, projectDir);
+        }
 
         // Launch background process; this returns immediately
         ServerInstance instance = launchServerProcess(serverInstanceDir, config, projectDir, luceeExpressDir,
@@ -624,6 +634,11 @@ public class LuceeServerManager {
         
         // Deploy extension dependencies to lucee-server/deploy folder (always deploy)
         deployExtensionsForServer(projectDir, serverInstanceDir);
+        
+        // Copy welcome index.cfm if Lucee is enabled and no index.cfm exists in webroot
+        if (config.enableLucee) {
+            copyWelcomeIndexIfMissing(config, projectDir);
+        }
         
         // Launch the server process
         ServerInstance instance = launchServerProcess(serverInstanceDir, config, projectDir, luceeExpressDir, agentOverrides, environment, foreground);
@@ -1566,6 +1581,41 @@ public class LuceeServerManager {
         } catch (Exception e) {
             // Log but don't fail server startup if extension deployment fails
             System.err.println("Warning: Failed to deploy extensions: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Copy the welcome index.cfm to the webroot if it doesn't exist.
+     * This provides a helpful landing page for new projects.
+     * 
+     * @param config Server configuration containing webroot
+     * @param projectDir Project directory
+     */
+    private void copyWelcomeIndexIfMissing(LuceeServerConfig.ServerConfig config, Path projectDir) {
+        try {
+            Path webroot = LuceeServerConfig.resolveWebroot(config, projectDir);
+            Path indexFile = webroot.resolve("index.cfm");
+            
+            // Only copy if index.cfm doesn't exist
+            if (Files.exists(indexFile)) {
+                return;
+            }
+            
+            // Ensure webroot directory exists
+            Files.createDirectories(webroot);
+            
+            // Copy welcome-index.cfm from resources
+            try (InputStream is = getClass().getResourceAsStream("/examples/welcome-index.cfm")) {
+                if (is == null) {
+                    // Resource not found, skip silently
+                    return;
+                }
+                Files.copy(is, indexFile);
+                System.out.println("📄 Created welcome index.cfm in webroot");
+            }
+        } catch (Exception e) {
+            // Log but don't fail server startup
+            System.err.println("Warning: Could not create welcome index.cfm: " + e.getMessage());
         }
     }
     
