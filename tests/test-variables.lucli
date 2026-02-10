@@ -9,3 +9,7 @@ echo ${var1}
 # echo "var1 ${var1}"
 # echo "var2 ${var2}"
 # echo "xset var11 ${var11}"
+#@env:dev
+echo "hello from the dev environment"
+#@end
+
