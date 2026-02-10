@@ -1,7 +1,8 @@
 cfml elvis="elvis"
 cfml writeoutput(elvis);
 cfml echo("Current time is: " & now() )
-# set var1=$(cfml now() )
+set var1=$(cfml now() & " - elvis")
+echo ${var1}
 # set var2=${var1}
 # xset var11="someting"
 # if $(cfml now()) $(cfml echo("In IF block"))

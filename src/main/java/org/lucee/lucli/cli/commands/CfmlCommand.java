@@ -9,9 +9,12 @@ import org.lucee.lucli.LuceeScriptEngine;
 import org.lucee.lucli.StringOutput;
 import org.lucee.lucli.Timer;
 
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
+import picocli.CommandLine.Spec;
+import picocli.CommandLine.Model.CommandSpec;
 
 /**
  * CFML command for executing CFML expressions directly from command line
@@ -29,6 +32,9 @@ import picocli.CommandLine.Parameters;
     }
 )
 public class CfmlCommand implements Callable<Object> {
+
+    @Spec
+    CommandSpec spec;
 
     // These are now in the root
     // @Option(names = {"-v", "--verbose"}, description = "Enable verbose output")
@@ -70,6 +76,10 @@ public class CfmlCommand implements Callable<Object> {
         }
         finally {
             Timer.stop("CFML Command Execution");
+        }
+        // Explicitly set the execution result so picocli.getExecutionResult() returns it
+        if (spec != null && spec.commandLine() != null) {
+            spec.commandLine().setExecutionResult(result);
         }
         return result;
     }

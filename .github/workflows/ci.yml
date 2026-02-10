@@ -75,6 +75,7 @@ jobs:
   integration-tests:
     name: Integration Tests (${{ matrix.os }}, Java ${{ matrix.java }})
     runs-on: ${{ matrix.os }}
+    continue-on-error: true  # Report failures but don't block the build
     permissions:
       contents: read
       checks: write

@@ -967,14 +967,21 @@ public class LuCLI implements Callable<Integer> {
             }
 
             // Delegate all other commands to the shared dispatcher
-            executeLucliScriptCommand(
+            String result = executeLucliScriptCommand(
                 processedLine,
                 commandProcessor,
                 externalCommandProcessor,
                 picocli,
-                false
+                true
             );
-            System.out.println("");
+
+            if(result != null && !result.trim().isEmpty()) {
+                recordLucliResult(result);
+                // Todo: add this to our StringOutput system
+                System.out.println(result);
+                
+            }
+
         }
 
         // Scripts are best-effort; fail overall if any assertion failed
@@ -1163,33 +1170,10 @@ public class LuCLI implements Callable<Integer> {
                     return "";
                 }
 
-                StringWriter outWriter = null;
-                StringWriter errWriter = null;
-                PrintWriter out = null;
-                PrintWriter err = null;
-
-                if(captureOutput){
-                    outWriter = new StringWriter();
-                    errWriter = new StringWriter();
-                    out = new PrintWriter(outWriter);
-                    err = new PrintWriter(errWriter);
-                    picocli.setOut(out);
-                    picocli.setErr(err);
-                }
-
-                picocli.execute("cfml", cfmlCode);
-                Object res = picocli.getExecutionResult();
-                // System.out.println("Returned Variable:" + res.toString());
-
-                if(captureOutput){
-                    String stdOut = outWriter.toString();
-                    String stdErr = errWriter.toString();
-
-                    
-                }
-
-                
-                return (res != null ? res.toString() : "");
+                // Call Lucee directly instead of going through picocli
+                // This avoids issues with getExecutionResult() not propagating from subcommands
+                Object result = LuceeScriptEngine.getInstance().eval(cfmlCode);
+                return (result != null ? result.toString() : "");
 
 
 
