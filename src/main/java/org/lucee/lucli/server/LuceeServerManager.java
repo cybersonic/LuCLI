@@ -22,6 +22,7 @@ import java.net.URI;
 import java.awt.Desktop;
 import java.awt.GraphicsEnvironment;
 
+import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.deps.ExtensionDependencyInstaller;
 
 /**
@@ -467,7 +468,7 @@ public class LuceeServerManager {
 
             // Apply environment overrides if specified
             if (environment != null && !environment.trim().isEmpty()) {
-                config = LuceeServerConfig.applyEnvironment(config, environment);
+                config = LuceeServerConfig.applyEnvironment(config, environment, projectDir);
             }
         }
         
@@ -1598,6 +1599,7 @@ public class LuceeServerManager {
             
             // Only copy if index.cfm doesn't exist
             if (Files.exists(indexFile)) {
+                LuCLI.printDebug("LuceeServerManager", "index.cfm already exists at: " + indexFile);
                 return;
             }
             
@@ -1607,7 +1609,8 @@ public class LuceeServerManager {
             // Copy welcome-index.cfm from resources
             try (InputStream is = getClass().getResourceAsStream("/examples/welcome-index.cfm")) {
                 if (is == null) {
-                    // Resource not found, skip silently
+                    // Resource not found - log for debugging
+                    LuCLI.printDebug("LuceeServerManager", "Welcome index template not found in resources at /examples/welcome-index.cfm");
                     return;
                 }
                 Files.copy(is, indexFile);

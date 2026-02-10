@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+- **Emoji Support Refactoring:** Created new `EmojiSupport` class with centralized global emoji control. Single `showEmojis` setting in `~/.lucli/settings.json` now affects all output. Use `EmojiSupport.process()` to replace emojis with text fallbacks when disabled. Simplified `PromptConfig` and `Terminal` to use this unified approach.
+- **Fix: Prompt Display Bug:** Fixed broken Unicode regex patterns that were stripping letters from paths in prompts (e.g., showing `//` instead of `~/Code/LuCLI`).
+- **Fix: Environment Configuration Merge:** Fixed issue where environment-specific config in `lucee.json` (e.g., `--env=prod`) would revert to defaults instead of properly overriding base config values. Now reads raw JSON from file for correct deep merging.
+- **Fix: Terminal Exception Handling:** Added general exception handler to the REPL loop so uncaught exceptions display an error message and continue instead of crashing the terminal.
+- **Fix: Tab Completion for File Paths:** Fixed tab completion for `ls`, `cat`, `cd`, `head`, `tail`, etc. - completion now triggers correctly after typing a command with a trailing space. Also fixed `~/` path completion to preserve the tilde prefix instead of expanding to the full home path.
+- **External Command File Completion:** Added file path completion as fallback for external commands like `code`, `vim`, `open`, etc.
 - **Welcome Page:** When starting a Lucee server with `enableLucee=true` (the default), LuCLI now automatically creates a welcome `index.cfm` in the webroot if one doesn't exist. The page displays server info, helpful commands, and links to documentation. Existing `index.cfm` files are never overwritten.
 - **Fix:** resolved an issue after refactoring where the values are not returned from the `executeLucliScriptCommand` method, causing CFML command outputs to not be displayed in the terminal. The method now returns the command output as a string, which is printed to the terminal if not empty.
 

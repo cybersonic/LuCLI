@@ -388,6 +388,9 @@ public class LuCLI implements Callable<Integer> {
     // ====================
 
     public static void main(String[] args) throws Exception {
+        // Suppress JLine "Unable to create a system terminal" warning
+        java.util.logging.Logger.getLogger("org.jline").setLevel(java.util.logging.Level.SEVERE);
+        
         // Create Picocli CommandLine with our main command
         CommandLine cmd = new CommandLine(new LuCLI());
         

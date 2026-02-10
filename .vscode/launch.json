@@ -227,6 +227,16 @@
     },
     {
       "type": "java",
+      "name": "🌍 Lucli Server Start No Index",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "projectName": "lucli",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/examples/server-no-index",
+      "args": [ "server", "start"]
+    },
+    {
+      "type": "java",
       "name": "🧩 Lucli Module Timing ",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",
