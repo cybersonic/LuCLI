@@ -5,9 +5,8 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 - **Welcome Page:** When starting a Lucee server with `enableLucee=true` (the default), LuCLI now automatically creates a welcome `index.cfm` in the webroot if one doesn't exist. The page displays server info, helpful commands, and links to documentation. Existing `index.cfm` files are never overwritten.
-
-## unreleased
 - **Fix:** resolved an issue after refactoring where the values are not returned from the `executeLucliScriptCommand` method, causing CFML command outputs to not be displayed in the terminal. The method now returns the command output as a string, which is printed to the terminal if not empty.
+
 ## 0.1.293
 - **REPL Command:** Added `lucli repl` command for an interactive CFML read-eval-print loop. Provides a focused CFML-only environment for quick experimentation with history support, separate from the full terminal mode.
 - **Script Preprocessor:** New `LucliScriptPreprocessor` for `.lucli` script files with support for:
