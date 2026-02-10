@@ -280,7 +280,7 @@ class WindowsSupportTest {
     void testConsistencyBetweenMethods() {
         // If supportsEmojis is true, symbols should be emojis
         boolean supportsEmojis = WindowsSupport.supportsEmojis();
-        String successSymbol = WindowsSupport.Symbols.SUCCESS;
+        String successSymbol = WindowsSupport.Symbols.SUCCESS();  // Use method, not deprecated field
         
         if (supportsEmojis) {
             // Should contain emoji character
