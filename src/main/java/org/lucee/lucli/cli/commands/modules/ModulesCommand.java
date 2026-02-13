@@ -1,4 +1,4 @@
-package org.lucee.lucli.cli.commands;
+package org.lucee.lucli.cli.commands.modules;
 
 import java.util.concurrent.Callable;
 
@@ -14,13 +14,15 @@ import picocli.CommandLine.ParentCommand;
         name = "modules",
         aliases = {"module"},
         description = "Manage LuCLI modules",
+        mixinStandardHelpOptions = true,
         subcommands = {
             ModulesListCommandImpl.class,
             ModulesInitCommandImpl.class,
             ModulesRunCommandImpl.class,
             ModulesInstallCommandImpl.class,
             ModulesUninstallCommandImpl.class,
-            ModulesUpdateCommandImpl.class
+            ModulesUpdateCommandImpl.class,
+            ModuleHelpCommandImpl.class
         }
 
 )

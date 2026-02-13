@@ -165,7 +165,7 @@ public class CompletionCommand implements Callable<Integer> {
             CommandLine.Model.CommandSpec spec = cmd.getCommandSpec();
             for (CommandLine.Model.OptionSpec option : spec.options()) {
                 if (option.hidden()) continue;
-                String names = String.join(", ", option.names());
+                // String names = String.join(", ", option.names());
                 String shortOpt = "";
                 String longOpt = "";
                 

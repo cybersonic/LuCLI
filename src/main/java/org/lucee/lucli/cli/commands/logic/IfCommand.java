@@ -10,7 +10,6 @@ import org.lucee.lucli.CommandProcessor;
 import org.lucee.lucli.ExternalCommandProcessor;
 import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.StringOutput;
-import org.lucee.lucli.LuCLI;
 
 /**
  * Experimental logical IF command.
@@ -179,7 +178,7 @@ public class IfCommand implements Callable<Integer> {
 
         } catch (Exception e) {
             StringOutput.Quick.error("if: error executing command in $(...): " + e.getMessage());
-            LuCLI.printDebugStackTrace(e);
+            LuCLI.debugStack(e);
             return "";
         }
     }

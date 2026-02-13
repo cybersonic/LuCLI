@@ -1778,6 +1778,42 @@ public class ServerCommandHandler {
                 }
             }
             
+            // Special key: environments -> export environments map as JSON
+            if ("environments".equals(key)) {
+                try {
+                    com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                    mapper.enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT);
+                    String jsonString = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(config.environments);
+                    return formatOutput(jsonString, false);
+                } catch (Exception e) {
+                    return formatOutput("❌ Error serializing environments: " + e.getMessage(), true);
+                }
+            }
+            
+            // Special key: envVars -> export environment variables map as JSON
+            if ("envVars".equals(key)) {
+                try {
+                    com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                    mapper.enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT);
+                    String jsonString = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(config.envVars);
+                    return formatOutput(jsonString, false);
+                } catch (Exception e) {
+                    return formatOutput("❌ Error serializing envVars: " + e.getMessage(), true);
+                }
+            }
+            
+            // Special key: agents -> export agents map as JSON
+            if ("agents".equals(key)) {
+                try {
+                    com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                    mapper.enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT);
+                    String jsonString = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(config.agents);
+                    return formatOutput(jsonString, false);
+                } catch (Exception e) {
+                    return formatOutput("❌ Error serializing agents: " + e.getMessage(), true);
+                }
+            }
+            
             String value = null;
             
             // Handle virtual keys that don't exist in config but are computed
@@ -1790,26 +1826,30 @@ public class ServerCommandHandler {
                 value = configHelper.getConfigValue(config, key);
             }
             
-            StringBuilder result = new StringBuilder();
-            
-            // Warn if key is unknown but might still exist in the config
-            if (!configHelper.isKnownKey(key) && !"serverDir".equals(key)) {
-                result.append("⚠️  Unknown configuration key (may not be officially supported):\\n");
-                result.append("  ⚠️  ").append(key).append("\\n\\n");
-            }
-            
+            // Output raw value for pipeline use - no formatting, emojis, or labels
             if (value != null) {
-                result.append("✅ ").append(key).append("=\\n");
-                result.append("   Value: ").append(value);
-                return formatOutput(result.toString(), false);
+                return value;
             } else {
-                result.append("❌ Configuration key '" + key + "' not found\\n\\n");
-                result.append("Available keys:\\n");
-                for (String availKey : configHelper.getAvailableKeys()) {
-                    result.append("  • ").append(availKey).append("\\n");
+                // Check if the key is valid but has a null value
+                if (configHelper.isKnownKey(key) || "configuration".equals(key) || 
+                    "environments".equals(key) || "envVars".equals(key) || "agents".equals(key)) {
+                    // Key exists but value is null - return empty string
+                    return "";
                 }
-                result.append("\\nVirtual keys (read-only, computed values):\\n");
-                result.append("  • serverDir - Location of Tomcat server instance (~/.lucli/servers/<name>)\\n");
+                
+                // Only show verbose error when key not found
+                StringBuilder result = new StringBuilder();
+                result.append("❌ Configuration key '" + key + "' not found\n\n");
+                result.append("Available keys:\n");
+                for (String availKey : configHelper.getAvailableKeys()) {
+                    result.append("  • ").append(availKey).append("\n");
+                }
+                result.append("\nVirtual keys (read-only, computed values):\n");
+                result.append("  • serverDir - Location of Tomcat server instance (~/.lucli/servers/<name>)\n");
+                result.append("  • configuration - Lucee server configuration (CFConfig JSON)\n");
+                result.append("  • environments - Environment-specific configuration overrides (JSON)\n");
+                result.append("  • envVars - Additional environment variables (JSON)\n");
+                result.append("  • agents - JVM agent configurations (JSON)\n");
                 return formatOutput(result.toString(), true);
             }
         } catch (Exception e) {
@@ -1884,9 +1924,10 @@ public class ServerCommandHandler {
                 String value = parts[1].trim();
                 
                 // Check for virtual/read-only keys
-                if ("serverDir".equals(key)) {
-                    return formatOutput("❌ Cannot set 'serverDir' - it is a virtual read-only key computed from the server name\n" +
-                        "💡 serverDir is always: ~/.lucli/servers/<server-name>", true);
+                if ("serverDir".equals(key) || "configuration".equals(key) || 
+                    "environments".equals(key) || "envVars".equals(key) || "agents".equals(key)) {
+                    return formatOutput("❌ Cannot set '" + key + "' via config set - it is a read-only or complex key\n" +
+                        "💡 Edit lucee.json directly to modify complex configuration structures", true);
                 }
                 
                 // Warn if key is not known, but set it anyway

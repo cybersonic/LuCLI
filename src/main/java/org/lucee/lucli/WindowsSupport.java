@@ -208,17 +208,17 @@ public class WindowsSupport {
         public static String BULB() { return EmojiSupport.emoji("💡", "[TIP]"); }
         
         // Keep old field names as deprecated for backwards compatibility
-        @Deprecated public static final String SUCCESS = "✅";
-        @Deprecated public static final String ERROR = "❌";
-        @Deprecated public static final String WARNING = "⚠️";
-        @Deprecated public static final String INFO = "ℹ️";
-        @Deprecated public static final String ROCKET = "🚀";
-        @Deprecated public static final String FOLDER = "📁";
-        @Deprecated public static final String COMPUTER = "💻";
-        @Deprecated public static final String TOOL = "🔧";
-        @Deprecated public static final String ART = "🎨";
-        @Deprecated public static final String WAVE = "👋";
-        @Deprecated public static final String BULB = "💡";
+        // @Deprecated public static final String SUCCESS = "✅";
+        // @Deprecated public static final String ERROR = "❌";
+        // @Deprecated public static final String WARNING = "⚠️";
+        // @Deprecated public static final String INFO = "ℹ️";
+        // @Deprecated public static final String ROCKET = "🚀";
+        // @Deprecated public static final String FOLDER = "📁";
+        // @Deprecated public static final String COMPUTER = "💻";
+        // @Deprecated public static final String TOOL = "🔧";
+        // @Deprecated public static final String ART = "🎨";
+        // @Deprecated public static final String WAVE = "👋";
+        // @Deprecated public static final String BULB = "💡";
     }
     
     /**

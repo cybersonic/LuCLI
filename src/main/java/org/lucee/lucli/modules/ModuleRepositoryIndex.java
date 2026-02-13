@@ -28,12 +28,14 @@ public class ModuleRepositoryIndex {
         private final String description;
         private final String url;
         private final String repository;
+        private final String version;
 
-        public RepoModule(String name, String description, String url, String repository) {
+        public RepoModule(String name, String description, String url, String repository, String version) {
             this.name = name;
             this.description = description;
             this.url = url;
             this.repository = repository;
+            this.version = version;
         }
 
         public String getName() {
@@ -50,6 +52,10 @@ public class ModuleRepositoryIndex {
 
         public String getRepository() {
             return repository;
+        }
+
+        public String getVersion() {
+            return version;
         }
     }
 
@@ -157,6 +163,7 @@ public class ModuleRepositoryIndex {
         }
 
         String repoName = overrideName != null ? overrideName : root.path("repository").asText("external");
+        String version = root.path("version").asText("N/A");
         JsonNode modulesNode = root.path("modules");
         if (!modulesNode.isArray()) {
             return;
@@ -175,7 +182,7 @@ public class ModuleRepositoryIndex {
                 continue;
             }
 
-            RepoModule rm = new RepoModule(name, description, url, repoName);
+            RepoModule rm = new RepoModule(name, description, url, repoName, version);
             byName.put(name, rm);
         }
     }

@@ -1,10 +1,7 @@
 package org.lucee.lucli;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -22,7 +19,7 @@ import org.lucee.lucli.cli.LuCLIVersionProvider;
 import org.lucee.lucli.cli.commands.CfmlCommand;
 import org.lucee.lucli.cli.commands.CompletionCommand;
 import org.lucee.lucli.cli.commands.DaemonCommand;
-import org.lucee.lucli.cli.commands.ModulesCommand;
+import org.lucee.lucli.cli.commands.modules.ModulesCommand;
 import org.lucee.lucli.cli.commands.ParrotCommand;
 import org.lucee.lucli.cli.commands.ReplCommand;
 import org.lucee.lucli.cli.commands.RunCommand;
@@ -216,10 +213,10 @@ public class LuCLI implements Callable<Integer> {
     @Override
     public Integer call() throws Exception {
         // Set global flags for backward compatibility
-        verbose = verboseOption;
-        debug = debugOption;
-        timing = timingOption;
-        preserveWhitespace = preserveWhitespaceOption;
+        LuCLI.verbose = verboseOption;
+        LuCLI.debug = debugOption;
+        LuCLI.timing = timingOption;
+        LuCLI.preserveWhitespace = preserveWhitespaceOption;
 
         // Initialize timing if requested
         Timer.setEnabled(timing);
@@ -312,7 +309,7 @@ public class LuCLI implements Callable<Integer> {
      */
     private Integer executeViaModulesCommand(String moduleName, String[] args) throws Exception {
         verbose("Executing module shortcut: " + moduleName + 
-            " (equivalent to 'lucli modules run " + moduleName + "')");
+            " (equivalent to 'lucli modules run " + moduleName + " " + String.join(" ", args) + "')");
         
         List<String> cmdArgs = new ArrayList<>();
         cmdArgs.add("modules");

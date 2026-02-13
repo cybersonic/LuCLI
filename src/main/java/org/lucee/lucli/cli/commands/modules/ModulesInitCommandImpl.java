@@ -1,4 +1,4 @@
-package org.lucee.lucli.cli.commands;
+package org.lucee.lucli.cli.commands.modules;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -57,7 +57,7 @@ public class ModulesInitCommandImpl implements Callable<Integer> {
             Scanner scanner = new Scanner(System.in);
             System.out.print("Enter module name: ");
             moduleName = scanner.nextLine().trim();
-            
+            scanner.close();
             if (moduleName.isEmpty()) {
                 System.err.println("Module name cannot be empty.");
                 System.exit(1);
@@ -100,6 +100,7 @@ public class ModulesInitCommandImpl implements Callable<Integer> {
         System.out.println("  1. Edit " + moduleDir.resolve("Module.cfc") + " to implement your module");
         System.out.println("  2. Update " + moduleDir.resolve("module.json") + " with module metadata");
         System.out.println("  3. Test your module with: lucli " + moduleDir.resolve("Module.cfc"));
+       
     }
 
     /**

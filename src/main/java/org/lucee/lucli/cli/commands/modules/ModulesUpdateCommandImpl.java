@@ -1,4 +1,4 @@
-package org.lucee.lucli.cli.commands;
+package org.lucee.lucli.cli.commands.modules;
 
 import java.util.concurrent.Callable;
 

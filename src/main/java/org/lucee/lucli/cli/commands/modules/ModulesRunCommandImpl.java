@@ -1,4 +1,4 @@
-package org.lucee.lucli.cli.commands;
+package org.lucee.lucli.cli.commands.modules;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -16,7 +16,8 @@ import picocli.CommandLine.Parameters;
  */
 @Command(
     name = "run",
-    description = "Run a module"
+    description = "Run a module",
+    mixinStandardHelpOptions = true
 )
 public class ModulesRunCommandImpl implements Callable<Integer> {
 

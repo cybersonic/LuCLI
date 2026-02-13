@@ -2,16 +2,11 @@ package org.lucee.lucli.cli.commands;
 
 import java.util.concurrent.Callable;
 
-import javax.script.ScriptEngine;
-
 import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.LuceeScriptEngine;
-import org.lucee.lucli.StringOutput;
 import org.lucee.lucli.Timer;
 
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.Spec;
 import picocli.CommandLine.Model.CommandSpec;
@@ -72,7 +67,7 @@ public class CfmlCommand implements Callable<Object> {
         } 
         catch (Exception e) {
             System.err.println("Error in cfml command: " + e.getMessage());
-            LuCLI.printDebugStackTrace(e);
+            LuCLI.debugStack(e);
         }
         finally {
             Timer.stop("CFML Command Execution");
@@ -84,125 +79,4 @@ public class CfmlCommand implements Callable<Object> {
         return result;
     }
 
-    /**
-     * Execute CFML code in non-interactive mode (one-shot command)
-     * This is adapted from InteractiveTerminal.executeCFMLNonInteractive()
-     */
-    private Object executeCFMLNonInteractive(String cfmlCode) {
-        Timer.start("CFML Execution");
-        Object result = null;
-        try {
-            LuceeScriptEngine luceeEngine;
-            
-            // Initialize Lucee engine
-            Timer.start("Lucee Engine Initialization");
-            LuCLI.printVerbose("Initializing Lucee CFML engine...");
-            
-            luceeEngine = LuceeScriptEngine.getInstance();
-            LuCLI.printVerbose("Lucee engine ready.");
-            Timer.stop("Lucee Engine Initialization");
-            
-            // Wrap the expression to capture and return the result
-            Timer.start("Script Generation");
-            String wrappedScript = createOutputScript(cfmlCode);
-            
-            // Debug output
-            LuCLI.printDebug("CfmlCommand", "Wrapped script:\n" + wrappedScript + "\n[DEBUG CfmlCommand] End wrapped script");
-            
-            Timer.stop("Script Generation");
-            
-            // Execute the CFML code with built-in variables
-            Timer.start("Script Execution");
-            
-            result = luceeEngine.evalScriptStatement(wrappedScript, null);
-            
-            // luceeEngine.eval(wrappedScript);
-            // Issue here is that it's a command. It returns a void! Unless we capture output differently.
-            System.out.println(""); // Ensure newline after output
-            Timer.stop("Script Execution");
-            
-            // The output should already be printed by writeOutput in the script
-            // but we can also handle direct results if needed
-            // LuCLI.printDebug("CfmlCommand", "Result: " + (result != null ? result.toString() : "null"));
-
-        } catch (Exception e) {
-            System.err.println("Error executing CFML: " + e.getMessage());
-            if (e.getCause() != null && (LuCLI.verbose || LuCLI.debug)) {
-                System.err.println("Cause: " + e.getCause().getMessage());
-            }
-            LuCLI.printDebugStackTrace(e);
-        } finally {
-            Timer.stop("CFML Execution");
-        }
-        return result;
-    
-    }
-    
-    /**
-     * Create a CFML script that wraps the expression for output
-     * This is adapted from InteractiveTerminal.createOutputScript()
-     */
-    private String createOutputScript(String cfmlExpression) {
-        try {
-            // Read the external script template
-            String scriptTemplate = readScriptTemplate("/script_engine/cfmlOutput.cfs");
-            
-            // Get built-in variables setup (no script file or args for CLI mode)
-            try {
-                org.lucee.lucli.BuiltinVariableManager variableManager = org.lucee.lucli.BuiltinVariableManager.getInstance(LuCLI.verbose, LuCLI.debug);
-                String builtinSetup = variableManager.createVariableSetupScript(null, null);
-                
-                // Replace placeholders with the actual expression and built-in variables
-                String result = scriptTemplate
-                    .replace("${builtinVariablesSetup}", builtinSetup)
-                    .replace("${cfmlExpression}", cfmlExpression);
-                
-                // Post-process through StringOutput for emoji and placeholder handling
-                return org.lucee.lucli.StringOutput.getInstance().process(result);
-            } catch (Exception e) {
-                LuCLI.printDebug("CfmlCommand", "Warning: Failed to inject built-in variables: " + e.getMessage());
-                // Fallback: just replace the expression without built-in variables
-                String result = scriptTemplate.replace("${cfmlExpression}", cfmlExpression);
-                return org.lucee.lucli.StringOutput.getInstance().process(result);
-            }
-            
-        } catch (Exception e) {
-            // Fallback to inline generation if reading external script fails
-            LuCLI.printDebug("CfmlCommand", "Warning: Failed to read external script template, using fallback: " + e.getMessage());
-            
-            StringBuilder script = new StringBuilder();
-            script.append("try {\\n");
-            script.append("  result = ").append(cfmlExpression).append(";\\n");
-            script.append("  if (isDefined('result')) {\\n");
-            script.append("    if (isSimpleValue(result)) {\\n");
-            script.append("      writeOutput(result);\\n");
-            script.append("    } else if (isArray(result)) {\\n");
-            script.append("      writeOutput('[' & arrayToList(result, ', ') & ']');\\n");
-            script.append("    } else if (isStruct(result)) {\\n");
-            script.append("      writeOutput(serializeJSON(result));\\n");
-            script.append("    } else {\\n");
-            script.append("      writeOutput(toString(result));\\n");
-            script.append("    }\\n");
-            script.append("  }\\n");
-            script.append("} catch (any e) {\\n");
-            script.append("  writeOutput('CFML Error: ' & e.message);\\n");
-            script.append("  if (len(e.detail)) {\\n");
-            script.append("    writeOutput(' - ' & e.detail);\\n");
-            script.append("  }\\n");
-            script.append("}\\n");
-            return script.toString();
-        }
-    }
-    
-    /**
-     * Read a script template from resources
-     */
-    private String readScriptTemplate(String templatePath) throws Exception {
-        try (java.io.InputStream is = CfmlCommand.class.getResourceAsStream(templatePath)) {
-            if (is == null) {
-                throw new java.io.FileNotFoundException("Script template not found: " + templatePath);
-            }
-            return new String(is.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-        }
-    }
 }

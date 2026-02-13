@@ -44,6 +44,7 @@ import picocli.CommandLine.Model.CommandSpec;
         ServerCommand.UnlockCommand.class,
         ServerCommand.InfoCommand.class,
         ServerCommand.EnvCommand.class,
+        ServerCommand.ConfigCommand.class,
         ServerMonitorCommandImpl.class
     }
 )
@@ -1263,6 +1264,150 @@ public class ServerCommand implements Callable<Integer> {
             }
 
             return 0;
+        }
+    }
+
+    /**
+     * Server config subcommand - parent command for get/set configuration
+     */
+    @Command(
+        name = "config",
+        description = "Get or set server configuration values",
+        mixinStandardHelpOptions = true,
+        subcommands = {
+            ServerCommand.ConfigCommand.ConfigGetCommand.class,
+            ServerCommand.ConfigCommand.ConfigSetCommand.class
+        }
+    )
+    static class ConfigCommand implements Callable<Integer> {
+
+        @ParentCommand
+        private ServerCommand parent;
+
+        @Override
+        public Integer call() throws Exception {
+            // If config command is called without subcommand, show help
+            new picocli.CommandLine(this).usage(System.out);
+            return 0;
+        }
+
+        /**
+         * Config get subcommand for reading configuration
+         */
+        @Command(
+            name = "get",
+            description = "Get configuration values from lucee.json or derived Lucee configuration",
+            mixinStandardHelpOptions = true
+        )
+        static class ConfigGetCommand implements Callable<Integer> {
+
+            @ParentCommand
+            private ConfigCommand parent;
+
+            @Parameters(paramLabel = "KEY",
+                        description = "Configuration key to retrieve (e.g., port, admin.enabled, configuration)",
+                        arity = "1")
+            private String key;
+
+            @Option(names = {"-d", "--directory"},
+                    description = "Project directory (defaults to current directory)")
+            private String projectDir;
+
+            @Option(names = {"--env", "--environment"},
+                    description = "Environment to use (e.g., prod, dev, staging)")
+            private String environment;
+
+            @Option(names = {"-c", "--config"},
+                    description = "Configuration file to use (defaults to lucee.json)")
+            private String configFile;
+
+            @Override
+            public Integer call() throws Exception {
+                Path currentDir = projectDir != null ?
+                    Paths.get(projectDir) :
+                    Paths.get(System.getProperty("user.dir"));
+
+                ServerCommandHandler executor = new ServerCommandHandler(false, currentDir);
+
+                java.util.List<String> args = new java.util.ArrayList<>();
+                args.add("config");
+                args.add("get");
+                args.add(key);
+
+                if (environment != null && !environment.trim().isEmpty()) {
+                    args.add("--env");
+                    args.add(environment.trim());
+                }
+
+                if (configFile != null && !configFile.trim().isEmpty()) {
+                    args.add("--config");
+                    args.add(configFile.trim());
+                }
+
+                String result = executor.executeCommand("server", args.toArray(new String[0]));
+                if (result != null && !result.isEmpty()) {
+                    System.out.println(result);
+                }
+
+                return 0;
+            }
+        }
+
+        /**
+         * Config set subcommand for setting configuration values
+         */
+        @Command(
+            name = "set",
+            description = "Set configuration values in lucee.json",
+            mixinStandardHelpOptions = true
+        )
+        static class ConfigSetCommand implements Callable<Integer> {
+
+            @ParentCommand
+            private ConfigCommand parent;
+
+            @Option(names = {"--dry-run"},
+                    description = "Show what would be set without actually saving")
+            private boolean dryRun = false;
+
+            @Parameters(paramLabel = "KEY=VALUE",
+                        description = "Configuration key=value pair (e.g., port=8080, admin.enabled=false)",
+                        arity = "1..*")
+            private String[] configPairs;
+
+            @Option(names = {"-d", "--directory"},
+                    description = "Project directory (defaults to current directory)")
+            private String projectDir;
+
+            @Override
+            public Integer call() throws Exception {
+                Path currentDir = projectDir != null ?
+                    Paths.get(projectDir) :
+                    Paths.get(System.getProperty("user.dir"));
+
+                ServerCommandHandler executor = new ServerCommandHandler(false, currentDir);
+
+                java.util.List<String> args = new java.util.ArrayList<>();
+                args.add("config");
+                args.add("set");
+
+                if (configPairs != null) {
+                    for (String pair : configPairs) {
+                        args.add(pair);
+                    }
+                }
+
+                if (dryRun) {
+                    args.add("--dry-run");
+                }
+
+                String result = executor.executeCommand("server", args.toArray(new String[0]));
+                if (result != null && !result.isEmpty()) {
+                    System.out.println(result);
+                }
+
+                return 0;
+            }
         }
     }
 

@@ -30,13 +30,11 @@ import lucee.runtime.type.Array;
  */
 public class LuceeScriptEngine {
     
-    private static final String ENGINE_NAME = "CFML";
+    
     private static LuceeScriptEngine instance;
     private static final Object lock = new Object();
     
     private ScriptEngine engine;
-    private boolean verbose;
-    private boolean debug;
     
     // Ensure we only perform BaseModule synchronization once per JVM
     private boolean baseModuleEnsured = false;
@@ -44,11 +42,11 @@ public class LuceeScriptEngine {
     // Helper methods - moved from LuCLI
     
     private boolean isVerboseMode() {
-        return verbose;
+        return LuCLI.verbose;
     }
     
     private boolean isDebugMode() {
-        return debug;
+        return LuCLI.debug;
     }
 
 
@@ -57,10 +55,8 @@ public class LuceeScriptEngine {
      * @throws IOException 
      */
     private LuceeScriptEngine() throws IOException {
-        this.verbose = LuCLI.verbose;
-        this.debug = LuCLI.debug;
         
-        if (verbose) {
+        if (isVerboseMode()) {
             StringOutput.getInstance().println("${EMOJI_TOOL} Initializing LuceeScriptEngine singleton...");
         }
         
@@ -70,7 +66,7 @@ public class LuceeScriptEngine {
             e.printStackTrace();
         }
         
-        if (verbose) {
+        if (isVerboseMode()) {
             StringOutput.Quick.success("LuceeScriptEngine initialized successfully");
         }
     }
@@ -120,8 +116,8 @@ public class LuceeScriptEngine {
 
         engine.put("lucli_modules_path", modulepath.toString());
         engine.put("lucli_home_path", getLucliHomeDirectory().toString());
-        engine.put("__verboseMode", verbose);
-        engine.put("__debugMode", debug);
+        engine.put("__verboseMode", isVerboseMode());
+        engine.put("__debugMode", isDebugMode());
         engine.put("__preserveWhitespace", LuCLI.preserveWhitespace);
         
         Timer.stop("Setup Engine Variables");
@@ -166,7 +162,7 @@ public class LuceeScriptEngine {
         
         // Set up built-in variables using centralized manager
         try {
-            BuiltinVariableManager variableManager = BuiltinVariableManager.getInstance(verbose, debug);
+            BuiltinVariableManager variableManager = BuiltinVariableManager.getInstance(isVerboseMode(), isDebugMode());
             variableManager.setupBuiltinVariables(engine, null, scriptArgs);
         } catch (IOException e) {
             if (isDebugMode()) {
@@ -438,7 +434,8 @@ public class LuceeScriptEngine {
      * Execute script content directly (for .cfs files)
      */
     private void executeScriptContent(String scriptFile, String scriptContent, String[] scriptArgs) throws Exception {
-        if (verbose) {
+        
+        if (isVerboseMode()) {
             StringOutput.getInstance().println("${EMOJI_GEAR} Executing CFS script: " + scriptFile);
             StringOutput.getInstance().println("${EMOJI_INFO} Arguments: " + Arrays.toString(scriptArgs));
         }
@@ -561,7 +558,7 @@ public class LuceeScriptEngine {
         
         // Set up built-in variables using centralized manager
         try {
-            BuiltinVariableManager variableManager = BuiltinVariableManager.getInstance(verbose, debug);
+            BuiltinVariableManager variableManager = BuiltinVariableManager.getInstance(isVerboseMode(), isDebugMode());
             variableManager.setupBuiltinVariables(engine, scriptFile, scriptArgs);
             
             // Set up component mapping for ~/.lucli directory
@@ -783,7 +780,7 @@ public class LuceeScriptEngine {
             }
             
             // Get built-in variables setup
-            BuiltinVariableManager variableManager = BuiltinVariableManager.getInstance(verbose, debug);
+            BuiltinVariableManager variableManager = BuiltinVariableManager.getInstance(isVerboseMode(), isDebugMode());
             String builtinSetup = variableManager.createVariableSetupScript(null, scriptArgs);
             
             // Replace placeholders and post-process
@@ -840,7 +837,7 @@ public class LuceeScriptEngine {
             }
             
             // Get built-in variables setup
-            BuiltinVariableManager variableManager = BuiltinVariableManager.getInstance(verbose, debug);
+            BuiltinVariableManager variableManager = BuiltinVariableManager.getInstance(isVerboseMode(), isDebugMode());
             String builtinSetup = variableManager.createVariableSetupScript(scriptFile, scriptArgs);
             
             // Replace placeholders and post-process
@@ -1350,7 +1347,7 @@ public class LuceeScriptEngine {
     public String injectBuiltinVariables(String scriptContent, String scriptFile, String[] scriptArgs) throws Exception {
         try {
             Timer.start("injectBuiltinVariables");
-            BuiltinVariableManager variableManager = BuiltinVariableManager.getInstance(verbose, debug);
+            BuiltinVariableManager variableManager = BuiltinVariableManager.getInstance(isVerboseMode(), isDebugMode());
             String variableSetup = variableManager.createVariableSetupScript(scriptFile, scriptArgs);
             
             // Prepend the variable setup to the script content
@@ -1428,7 +1425,7 @@ public class LuceeScriptEngine {
         java.nio.file.Files.createDirectories(luceeServerDir);
         java.nio.file.Files.createDirectories(patchesDir);
         
-        if (verbose || debug) {
+        if (isVerboseMode() || isDebugMode()) {
             System.out.println(StringOutput.msg("config.lucee.directories"));
             System.out.println("  " + StringOutput.msg("config.lucli.home", lucliHome.toString()));
             System.out.println("  " + StringOutput.msg("config.lucee.server", luceeServerDir.toString()));

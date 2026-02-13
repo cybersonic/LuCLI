@@ -7,12 +7,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import static org.junit.jupiter.api.Assertions.*;
 
-// Explicit imports to ensure test compilation sees main classes
-import org.lucee.lucli.LucliCompleter;
-import org.lucee.lucli.CommandProcessor;
-import org.lucee.lucli.FileSystemState;
-import org.lucee.lucli.Settings;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;

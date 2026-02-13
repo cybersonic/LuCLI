@@ -12,7 +12,6 @@ import org.lucee.lucli.CommandProcessor;
 import org.lucee.lucli.ExternalCommandProcessor;
 import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.StringOutput;
-import org.lucee.lucli.LuCLI;
 
 @Command(name = "xset", description = "Experimental variable assigbment command xset name=value", hidden = true)
 
@@ -119,7 +118,7 @@ public class XSetCommand implements Callable<Integer> {
 
         } catch (Exception e) {
             StringOutput.Quick.error("xset: error executing command in $(...): " + e.getMessage());
-            LuCLI.printDebugStackTrace(e);
+            LuCLI.debugStack(e);
             return "";
         }
     }

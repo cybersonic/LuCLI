@@ -82,75 +82,75 @@ class WindowsSupportTest {
 
     @Test
     void testSymbolsSuccess() {
-        String symbol = WindowsSupport.Symbols.SUCCESS;
+        String symbol =  WindowsSupport.Symbols.SUCCESS();
         assertNotNull(symbol);
         assertFalse(symbol.isEmpty());
     }
 
     @Test
     void testSymbolsError() {
-        String symbol = WindowsSupport.Symbols.ERROR;
+        String symbol = WindowsSupport.Symbols.ERROR();
         assertNotNull(symbol);
         assertFalse(symbol.isEmpty());
     }
 
     @Test
     void testSymbolsWarning() {
-        String symbol = WindowsSupport.Symbols.WARNING;
+        String symbol = WindowsSupport.Symbols.WARNING();
         assertNotNull(symbol);
         assertFalse(symbol.isEmpty());
     }
 
     @Test
     void testSymbolsInfo() {
-        String symbol = WindowsSupport.Symbols.INFO;
+        String symbol = WindowsSupport.Symbols.INFO();
         assertNotNull(symbol);
         assertFalse(symbol.isEmpty());
     }
 
     @Test
     void testSymbolsRocket() {
-        String symbol = WindowsSupport.Symbols.ROCKET;
+        String symbol = WindowsSupport.Symbols.ROCKET();
         assertNotNull(symbol);
     }
 
     @Test
     void testSymbolsFolder() {
-        String symbol = WindowsSupport.Symbols.FOLDER;
+        String symbol = WindowsSupport.Symbols.FOLDER();
         assertNotNull(symbol);
     }
 
     @Test
     void testSymbolsComputer() {
-        String symbol = WindowsSupport.Symbols.COMPUTER;
+        String symbol = WindowsSupport.Symbols.COMPUTER();
         assertNotNull(symbol);
         assertFalse(symbol.isEmpty());
     }
 
     @Test
     void testSymbolsTool() {
-        String symbol = WindowsSupport.Symbols.TOOL;
+        String symbol = WindowsSupport.Symbols.TOOL();
         assertNotNull(symbol);
         assertFalse(symbol.isEmpty());
     }
 
     @Test
     void testSymbolsArt() {
-        String symbol = WindowsSupport.Symbols.ART;
+        String symbol = WindowsSupport.Symbols.ART();
         assertNotNull(symbol);
         assertFalse(symbol.isEmpty());
     }
 
     @Test
     void testSymbolsWave() {
-        String symbol = WindowsSupport.Symbols.WAVE;
+        String symbol = WindowsSupport.Symbols.WAVE();
         assertNotNull(symbol);
         assertFalse(symbol.isEmpty());
     }
 
     @Test
     void testSymbolsBulb() {
-        String symbol = WindowsSupport.Symbols.BULB;
+        String symbol = WindowsSupport.Symbols.BULB();
         assertNotNull(symbol);
         assertFalse(symbol.isEmpty());
     }
@@ -280,7 +280,7 @@ class WindowsSupportTest {
     void testConsistencyBetweenMethods() {
         // If supportsEmojis is true, symbols should be emojis
         boolean supportsEmojis = WindowsSupport.supportsEmojis();
-        String successSymbol = WindowsSupport.Symbols.SUCCESS();  // Use method, not deprecated field
+        String successSymbol =  WindowsSupport.Symbols.SUCCESS();  // Use method, not deprecated field
         
         if (supportsEmojis) {
             // Should contain emoji character

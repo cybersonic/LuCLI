@@ -66,8 +66,8 @@ public class ReplCommand implements Callable<Integer> {
                 .build();
             
             // Print welcome banner
-            terminal.writer().println(WindowsSupport.Symbols.ROCKET + " CFML REPL - LuCLI " + LuCLI.getVersion());
-            terminal.writer().println(WindowsSupport.Symbols.INFO + " Type CFML expressions to evaluate. Type 'exit' or Ctrl+D to quit.");
+            terminal.writer().println(WindowsSupport.Symbols.ROCKET() + " CFML REPL - LuCLI " + LuCLI.getVersion());
+            terminal.writer().println(WindowsSupport.Symbols.INFO() + " Type CFML expressions to evaluate. Type 'exit' or Ctrl+D to quit.");
             terminal.writer().println();
             terminal.writer().flush();
             
@@ -109,7 +109,7 @@ public class ReplCommand implements Callable<Integer> {
                             terminal.writer().println(result);
                         }
                     } catch (Exception e) {
-                        terminal.writer().println(WindowsSupport.Symbols.ERROR + " " + e.getMessage());
+                        terminal.writer().println(WindowsSupport.Symbols.ERROR() + " " + e.getMessage());
                         if (LuCLI.debug && e.getCause() != null) {
                             terminal.writer().println("  Cause: " + e.getCause().getMessage());
                         }
@@ -128,7 +128,7 @@ public class ReplCommand implements Callable<Integer> {
             }
             
             terminal.writer().println();
-            terminal.writer().println(WindowsSupport.Symbols.WAVE + " Goodbye!");
+            terminal.writer().println(WindowsSupport.Symbols.WAVE() + " Goodbye!");
             terminal.writer().flush();
             
         } finally {
@@ -145,7 +145,7 @@ public class ReplCommand implements Callable<Integer> {
      */
     private void printHelp(Terminal terminal) {
         terminal.writer().println();
-        terminal.writer().println(WindowsSupport.Symbols.INFO + " CFML REPL Help");
+        terminal.writer().println(WindowsSupport.Symbols.INFO() + " CFML REPL Help");
         terminal.writer().println("  Enter any CFML expression to evaluate it.");
         terminal.writer().println();
         terminal.writer().println("  Special commands:");

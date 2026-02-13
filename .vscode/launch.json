@@ -145,6 +145,16 @@
     },
     {
       "type": "java",
+      "name": "📦 LucCLI Module List",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["module","list"],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "java",
       "name": "🔍 LucCLI Help",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",
@@ -257,10 +267,10 @@
     },
     {
       "type": "java",
-      "name": "🧩 Module MarkSpresso commands ",
+      "name": "🧩 Module MarkSpresso pdf command ",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",
-      "args": ["--verbose", "markspresso", "new", "type=post", "title='Hello World'"],
+      "args": ["--verbose", "markspresso", "pdf"],
       "projectName": "lucli",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal"

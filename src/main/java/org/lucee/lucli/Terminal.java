@@ -13,7 +13,6 @@ import org.jline.reader.UserInterruptException;
 import org.jline.reader.impl.DefaultParser;
 import org.jline.reader.impl.completer.AggregateCompleter;
 import org.jline.terminal.TerminalBuilder;
-import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.cli.commands.fs.FileSystemCommands;
 import org.lucee.lucli.cli.completion.PicocliStyledCompleter;
 import org.lucee.lucli.modules.ModuleCommand;
@@ -283,7 +282,7 @@ public class Terminal {
             return externalCommandProcessor.executeCommand(effectiveLine);
             
         } catch (Exception e) {
-            return WindowsSupport.Symbols.ERROR + " Error: " + e.getMessage();
+            return WindowsSupport.Symbols.ERROR() + " Error: " + e.getMessage();
         }
     }
     
@@ -355,7 +354,7 @@ public class Terminal {
             return baos.toString().trim();
             
         } catch (Exception e) {
-            return WindowsSupport.Symbols.ERROR + " Error executing module '" + moduleName + "': " + e.getMessage();
+            return WindowsSupport.Symbols.ERROR() + " Error executing module '" + moduleName + "': " + e.getMessage();
         } finally {
             System.setOut(originalOut);
             System.setErr(originalErr);
@@ -370,14 +369,14 @@ public class Terminal {
             // Initialize Lucee engine if not already done
             if (luceeEngine == null) {
                 if (LuCLI.verbose) {
-                    terminal.writer().println(WindowsSupport.Symbols.TOOL + " Initializing Lucee CFML engine...");
+                    terminal.writer().println(WindowsSupport.Symbols.TOOL() + " Initializing Lucee CFML engine...");
                     terminal.writer().flush();
                 }
                 
                 luceeEngine = LuceeScriptEngine.getInstance();
                 
                 if (LuCLI.verbose) {
-                    terminal.writer().println(WindowsSupport.Symbols.SUCCESS + " Lucee engine ready.");
+                    terminal.writer().println( WindowsSupport.Symbols.SUCCESS() + " Lucee engine ready.");
                 }
             }
             
@@ -402,7 +401,7 @@ public class Terminal {
             }
             
         } catch (Exception e) {
-            return WindowsSupport.Symbols.ERROR + " Error executing CFML: " + e.getMessage();
+            return WindowsSupport.Symbols.ERROR() + " Error executing CFML: " + e.getMessage();
         }
     }
     
@@ -454,7 +453,7 @@ public class Terminal {
             String luceeVersion = LuceeScriptEngine.getInstance().getVersion();
             return "Lucee Version: " + luceeVersion;
         } catch (Exception e) {
-            return WindowsSupport.Symbols.ERROR + " Error getting Lucee version: " + e.getMessage();
+            return WindowsSupport.Symbols.ERROR() + " Error getting Lucee version: " + e.getMessage();
         }
     }
     
