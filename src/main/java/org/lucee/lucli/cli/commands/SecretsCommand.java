@@ -22,6 +22,7 @@ import picocli.CommandLine.ParentCommand;
  */
 @Command(
     name = "secrets",
+    aliases = "secret",
     description = "Manage secrets for LuCLI projects",
     mixinStandardHelpOptions = true,
     subcommands = {

@@ -24,6 +24,7 @@ import picocli.CommandLine.Model.CommandSpec;
  */
     @Command(
         name = "server",
+        aliases = {"servers"},
         description = "Manage Lucee server instances",
         mixinStandardHelpOptions = true,
         subcommands = {
