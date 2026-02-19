@@ -30,6 +30,9 @@ TODO.md
 WARP.md
 WEB-INF/
 examples/
+!src/main/resources/examples/
 content/layouts/old/
 scripts/extensions.cfs
 tomcat_tests/
+test-results.xml
+out/

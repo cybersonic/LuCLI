@@ -10,7 +10,6 @@ import org.lucee.lucli.CommandProcessor;
 import org.lucee.lucli.ExternalCommandProcessor;
 import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.StringOutput;
-import org.lucee.lucli.cli.LuCLICommand;
 
 /**
  * Experimental logical IF command.
@@ -24,30 +23,40 @@ import org.lucee.lucli.cli.LuCLICommand;
  */
 @Command(
     name = "if",
-    description = "Experimental logical if command: if $(cond) $(then)",
+    description = "Experimental logical if command: if $(COND) $(THEN)",
     hidden = true
 )
 public class IfCommand implements Callable<Integer> {
 
-    @Parameters(index = "0", paramLabel = "COND", description = "Condition expression: $(command ...)")
-    private String conditionExpr;
-
-    @Parameters(index = "1", paramLabel = "THEN", description = "Then expression: $(command ...)")
-    private String thenExpr;
+    @Parameters(
+        index = "0..*",
+        paramLabel = "EXPR",
+        description = "Condition and then expressions, typically: $(COND) $(THEN)"
+    )
+    private java.util.List<String> args;
 
     @Override
     public Integer call() throws Exception {
-        // Basic validation: both parameters must be present and of the form $(...)
-        if (!isExecEvaluation(conditionExpr) || !isExecEvaluation(thenExpr)) {
-            StringOutput.Quick.error(
-                "if: both arguments must be exec expressions of the form $(command ...)");
+        // Reconstruct exactly two $(...) groups from the token list
+        String[] groups = splitIntoCondAndThen(args);
+        if (groups == null || groups.length != 2) {
+            StringOutput.Quick.error("if: expected syntax: if $(COND) $(THEN)");
             StringOutput.Quick.info(
-                "Usage: if $(cfml fileExists(\"somefile\")) $(echo \"The file exists\")");
+                "Example: if $(cfml fileExists(\"somefile\")) $(cfml echo(\"In IF block\"))");
             return 1;
         }
 
-        String condInner   = getExecEvaluationInnerCommand(conditionExpr);
-        String condResult  = executeAndCapture(condInner);
+        String conditionExpr = groups[0];
+        String thenExpr      = groups[1];
+
+        if (!isExecEvaluation(conditionExpr) || !isExecEvaluation(thenExpr)) {
+            StringOutput.Quick.error(
+                "if: both expressions must be exec expressions of the form $(command ...)");
+            return 1;
+        }
+
+        String condInner  = getExecEvaluationInnerCommand(conditionExpr);
+        String condResult = executeAndCapture(condInner);
 
         if (isTruthy(condResult)) {
             String thenInner = getExecEvaluationInnerCommand(thenExpr);
@@ -55,6 +64,50 @@ public class IfCommand implements Callable<Integer> {
         }
 
         return 0;
+    }
+
+    /**
+     * Split the raw token list into exactly two $(...) groups, allowing spaces
+     * within each group (e.g., cfml expressions, echo commands, etc.).
+     */
+    private String[] splitIntoCondAndThen(java.util.List<String> tokens) {
+        if (tokens == null || tokens.isEmpty()) {
+            return null;
+        }
+
+        java.util.List<String> groups = new java.util.ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        int depth = 0;
+
+        for (String token : tokens) {
+            if (current.length() > 0) {
+                current.append(' ');
+            }
+            current.append(token);
+
+            // Scan this token for $( and ) to maintain nesting depth
+            for (int i = 0; i < token.length(); i++) {
+                char c = token.charAt(i);
+                if (c == '$' && i + 1 < token.length() && token.charAt(i + 1) == '(') {
+                    depth++;
+                } else if (c == ')') {
+                    if (depth > 0) {
+                        depth--;
+                    }
+                }
+            }
+
+            // When depth returns to zero, we have a complete $(...) group
+            if (depth == 0 && current.length() > 0) {
+                groups.add(current.toString().trim());
+                current.setLength(0);
+            }
+        }
+
+        if (groups.size() != 2) {
+            return null;
+        }
+        return new String[] { groups.get(0), groups.get(1) };
     }
 
     private boolean isExecEvaluation(String value) {
@@ -94,7 +147,7 @@ public class IfCommand implements Callable<Integer> {
             CommandProcessor commandProcessor = new CommandProcessor();
             ExternalCommandProcessor external =
                 new ExternalCommandProcessor(commandProcessor, commandProcessor.getSettings());
-            CommandLine picocli = new CommandLine(new LuCLICommand());
+            CommandLine picocli = new CommandLine(new LuCLI());
 
             String[] parts = commandProcessor.parseCommand(commandLine);
             if (parts.length == 0) {
@@ -125,7 +178,7 @@ public class IfCommand implements Callable<Integer> {
 
         } catch (Exception e) {
             StringOutput.Quick.error("if: error executing command in $(...): " + e.getMessage());
-            LuCLI.printDebugStackTrace(e);
+            LuCLI.debugStack(e);
             return "";
         }
     }

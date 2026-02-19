@@ -1,4 +1,4 @@
-package org.lucee.lucli.cli.commands;
+package org.lucee.lucli.cli.commands.modules;
 
 import java.io.IOException;
 import java.nio.file.Files;

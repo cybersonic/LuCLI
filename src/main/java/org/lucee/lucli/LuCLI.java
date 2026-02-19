@@ -1,31 +1,173 @@
 package org.lucee.lucli;
 
-import java.io.FileNotFoundException;
+import java.io.File;
 import java.io.PrintWriter;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.lucee.lucli.cli.LuCLICommand;
+import org.lucee.lucli.cli.LuCLIVersionProvider;
+import org.lucee.lucli.cli.commands.CfmlCommand;
+import org.lucee.lucli.cli.commands.CompletionCommand;
+import org.lucee.lucli.cli.commands.DaemonCommand;
+import org.lucee.lucli.cli.commands.modules.ModulesCommand;
+import org.lucee.lucli.cli.commands.ParrotCommand;
+import org.lucee.lucli.cli.commands.ReplCommand;
+import org.lucee.lucli.cli.commands.RunCommand;
+import org.lucee.lucli.cli.commands.SecretsCommand;
+import org.lucee.lucli.cli.commands.ServerCommand;
+import org.lucee.lucli.cli.commands.VersionsListCommand;
+import org.lucee.lucli.cli.commands.XmlCommand;
+import org.lucee.lucli.cli.commands.deps.DepsCommand;
+import org.lucee.lucli.cli.commands.deps.InstallCommand;
+import org.lucee.lucli.cli.commands.logic.IfCommand;
+import org.lucee.lucli.cli.commands.logic.XSetCommand;
+import org.lucee.lucli.modules.ModuleCommand;
+import org.lucee.lucli.script.LucliScriptPreprocessor;
 import org.lucee.lucli.secrets.LocalSecretStore;
 import org.lucee.lucli.secrets.SecretStore;
 import org.lucee.lucli.secrets.SecretStoreException;
 
 import picocli.CommandLine;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.Option;
+import picocli.CommandLine.Parameters;
+import picocli.CommandLine.Spec;
 
-public class LuCLI {
+/**
+ * Main CLI command class using Picocli framework.
+ * Defines the root command interface and delegates to appropriate subcommands or modes.
+ */
+@Command(
+    name = "lucli",
+    description = "🚀 LuCLI - A terminal application with Lucee CFML integration",
+    mixinStandardHelpOptions = true,
+    versionProvider = LuCLIVersionProvider.class,
+    subcommands = {
+        ServerCommand.class,
+        ModulesCommand.class,
+        DepsCommand.class,
+        InstallCommand.class,  // Shortcut for deps install
+        CfmlCommand.class,
+        ReplCommand.class,
+        CompletionCommand.class,
+        VersionsListCommand.class,
+        ParrotCommand.class,
+        SecretsCommand.class,
+        CommandLine.HelpCommand.class,
+        RunCommand.class,
+        DaemonCommand.class,
+        // Hidden/internal diagnostics
+        XmlCommand.class,
+        XSetCommand.class,
+        IfCommand.class
+    },
+    footer = {
+        "",
+        "Configuration:",
+        "  Lucee server files are stored in ~/.lucli/lucee-server by default",
+        "  Override with LUCLI_HOME environment variable or -Dlucli.home system property",
+        "",
+        "Examples:",
+        "  lucli                           # Start interactive terminal",
+        "  lucli --verbose --version       # Show version with verbose output", 
+        "  lucli --timing script.cfs       # Execute script with timing analysis",
+        "  lucli script.cfs arg1 arg2      # Execute CFML script with arguments",
+        "  lucli myscript.lucli            # Execute a LuCLI command script",
+        "  lucli cfml 'now()'              # Execute CFML expression",
+        "  lucli server start --version 6.2.2.91  # Start server with specific Lucee version",
+        "  lucli modules list              # List available modules"
+    }
+)
+public class LuCLI implements Callable<Integer> {
 
+    // ====================
+    // Picocli Options
+    // ====================
+    
+    @Option(names = {"-v", "--verbose"}, 
+            description = "Enable verbose output")
+    private boolean verboseOption = false;
+
+    @Option(names = {"-d", "--debug"}, 
+            description = "Enable debug output") 
+    private boolean debugOption = false;
+
+    @Option(names = {"-t", "--timing"}, 
+            description = "Enable timing output for performance analysis")
+    private boolean timingOption = false;
+
+    @Option(names = {"-w", "--whitespace"}, 
+            description = "Preserve whitespace in script output")
+    private boolean preserveWhitespaceOption = true;
+
+    @Option(names = {"-h", "--help"},
+            usageHelp = true,
+            description = "Show this help message and exit")
+    private boolean helpRequested = false;
+
+    @Option(names = {"--version"}, 
+            description = "Show application version",
+            versionHelp = true)
+    private boolean versionRequested = false;
+
+    @Option(names = {"--lucee-version"}, 
+            description = "Show Lucee version")
+    private boolean luceeVersionRequested = false;
+
+    @Option(
+        names = {"--timeout"},
+        paramLabel = "<seconds>",
+        description = "Fail if the command runs longer than this many seconds (0 = no timeout)",
+        defaultValue = "0"
+    )
+    private int timeoutSeconds;
+
+    @Option(
+        names = {"--env", "-e"},
+        paramLabel = "<environment>",
+        description = "Set the execution environment (e.g., dev, staging, prod) for .lucli scripts"
+    )
+    private String envOption;
+
+    @Parameters(
+        index = "0",
+        arity = "0..1",
+        paramLabel = "FILE_OR_MODULE",
+        description = "Optional: CFML/LuCLI file to execute, or module name to run"
+    )
+    private String firstArg;
+
+    @Parameters(
+        index = "1..*",
+        arity = "0..*",
+        paramLabel = "ARGS",
+        description = "Additional arguments to pass to the file or module"
+    )
+    private String[] additionalArgs = new String[0];
+
+    @Spec
+    private CommandSpec spec;
+
+    // ====================
+    // Static Global State
+    // ====================
+    
     public static boolean verbose = false;
     public static boolean debug = false;
     public static boolean timing = false;
     public static boolean preserveWhitespace = false;
+    public static String currentEnvironment = null;
     private static boolean lucliScript = false;
     
     public static Map<String, String> scriptEnvironment = new HashMap<>(System.getenv());
@@ -61,241 +203,340 @@ public class LuCLI {
     private static SecretStore lucliScriptSecretStore;
     private static boolean lucliScriptSecretsInitialized = false;
     
+    // ====================
+    // Picocli Command Implementation
+    // ====================
+    
+    /**
+     * Main entry point when root command is executed via picocli
+     */
+    @Override
+    public Integer call() throws Exception {
+        // Set global flags for backward compatibility
+        LuCLI.verbose = verboseOption;
+        LuCLI.debug = debugOption;
+        LuCLI.timing = timingOption;
+        LuCLI.preserveWhitespace = preserveWhitespaceOption;
+
+        // Initialize timing if requested
+        Timer.setEnabled(timing);
+        Timer.start("Total Execution");
+
+        try {
+            // Handle special version command
+            if (luceeVersionRequested) {
+                showLuceeVersionNonInteractive();
+                return 0;
+            }
+
+            // No argument provided - start interactive terminal
+            if (firstArg == null || firstArg.trim().isEmpty()) {
+                debug("LuCLI", "No arguments provided, starting terminal mode");
+                Timer.start("Terminal Mode");
+                Terminal.main(new String[0]);
+                Timer.stop("Terminal Mode");
+                return 0;
+            }
+
+            // Route based on what firstArg is
+            return routeCommand(firstArg, additionalArgs);
+
+        } catch (Exception e) {
+            StringOutput.Quick.error("Error: " + e.getMessage());
+            if (verbose || debug) {
+                e.printStackTrace();
+            }
+            return 1;
+        } finally {
+            // Always stop total timer and show results before exit (if timing enabled)
+            Timer.stop("Total Execution");
+        }
+    }
+
+    /**
+     * Route a command based on the first argument (file or module name)
+     */
+    private Integer routeCommand(String arg, String[] args) throws Exception {
+        File file = new File(arg);
+
+        // Check if it's a .lucli script file
+        if (file.exists() && (arg.endsWith(".lucli") || arg.endsWith(".luc"))) {
+            debug("LuCLI", "Routing to .lucli script: " + arg);
+            Timer.start("LuCLI Script Execution");
+            int exitCode = executeLucliScript(arg);
+            Timer.stop("LuCLI Script Execution");
+            return exitCode;
+        }
+
+        // Check if it's a CFML file (.cfm, .cfc, .cfs)
+        if (file.exists() && (arg.endsWith(".cfm") || arg.endsWith(".cfc") || 
+                              arg.endsWith(".cfs") || arg.endsWith(".cfml"))) {
+            debug("LuCLI", "Routing to run command: " + arg);
+            return executeViaRunCommand(arg, args);
+        }
+
+        // Check if it's a module name (and not an existing file)
+        if (!file.exists() && ModuleCommand.moduleExists(arg)) {
+            debug("LuCLI", "Routing to module: " + arg);
+            return executeViaModulesCommand(arg, args);
+        }
+
+        // Unknown - throw error with helpful message
+        throw new CommandLine.ParameterException(
+            spec.commandLine(),
+            "Unknown command, file, or module: '" + arg + "'\n" +
+            "  - If it's a file, check the path and extension (.cfm, .cfc, .cfs, .lucli)\n" +
+            "  - If it's a module, run 'lucli modules list' to see available modules\n" +
+            "  - Run 'lucli --help' to see available commands"
+        );
+    }
+
+    /**
+     * Execute a file via the run command
+     */
+    private Integer executeViaRunCommand(String filePath, String[] args) throws Exception {
+        List<String> cmdArgs = new ArrayList<>();
+        cmdArgs.add("run");
+        cmdArgs.add(filePath);
+        if (args != null && args.length > 0) {
+            cmdArgs.addAll(Arrays.asList(args));
+        }
+        return spec.commandLine().execute(cmdArgs.toArray(new String[0]));
+    }
+
+    /**
+     * Execute a module via the modules run command
+     */
+    private Integer executeViaModulesCommand(String moduleName, String[] args) throws Exception {
+        verbose("Executing module shortcut: " + moduleName + 
+            " (equivalent to 'lucli modules run " + moduleName + " " + String.join(" ", args) + "')");
+        
+        List<String> cmdArgs = new ArrayList<>();
+        cmdArgs.add("modules");
+        cmdArgs.add("run");
+        cmdArgs.add(moduleName);
+        if (args != null && args.length > 0) {
+            cmdArgs.addAll(Arrays.asList(args));
+        }
+        return spec.commandLine().execute(cmdArgs.toArray(new String[0]));
+    }
+
+    /**
+     * Show Lucee version in non-interactive mode
+     */
+    private void showLuceeVersionNonInteractive() {
+        try {
+            System.out.println("Initializing Lucee CFML engine...");
+            Terminal.main(new String[]{"--lucee-version"});
+        } catch (Exception e) {
+            System.err.println("Error getting Lucee version: " + e.getMessage());
+            if (debug) {
+                e.printStackTrace();
+            }
+        }
+    }
+    
+    /**
+     * Getter methods for subcommands to access flags
+     */
+    public boolean isVerbose() {
+        return verboseOption;
+    }
+    
+    public boolean isDebug() {
+        return debugOption;
+    }
+    
+    public boolean isTiming() {
+        return timingOption;
+    }
+    
+    public boolean isPreserveWhitespace() {
+        return preserveWhitespaceOption;
+    }
+    
+    public String getEnvOption() {
+        return envOption;
+    }
+    
+    /**
+     * Get the current execution environment.
+     * Resolution order: --env flag > LUCLI_ENV environment variable > null
+     * 
+     * @return The environment name (e.g., "dev", "prod") or null if not set
+     */
+    public static String getCurrentEnvironment() {
+        // First check static field (set by execution strategy from --env flag)
+        if (currentEnvironment != null && !currentEnvironment.trim().isEmpty()) {
+            return currentEnvironment.trim();
+        }
+        
+        // Then check LUCLI_ENV environment variable
+        String envVar = System.getenv("LUCLI_ENV");
+        if (envVar != null && !envVar.trim().isEmpty()) {
+            return envVar.trim();
+        }
+        
+        return null;
+    }
+    
+    // ====================
+    // Main Entry Point
+    // ====================
 
     public static void main(String[] args) throws Exception {
-        // Check for timing flag early and enable Timer singleton
-        timing = java.util.Arrays.asList(args).contains("--timing") || java.util.Arrays.asList(args).contains("-t");
-        Timer.setEnabled(timing);
+        // Suppress JLine "Unable to create a system terminal" warning
+        java.util.logging.Logger.getLogger("org.jline").setLevel(java.util.logging.Level.SEVERE);
         
         // Create Picocli CommandLine with our main command
-        CommandLine cmd = new CommandLine(new LuCLICommand());
+        CommandLine cmd = new CommandLine(new LuCLI());
         
-        // Ensure help/usage output goes to the expected streams.
-        // (This also keeps `--help | grep ...` style usage working.)
+        // Configure output streams
         cmd.setOut(new PrintWriter(System.out, true));
         cmd.setErr(new PrintWriter(System.err, true));
         
-        // Set custom execution strategy to automatically time all commands
-        cmd.setExecutionStrategy(new TimingExecutionStrategy());
-        // Set custom execution strategy to set global flags
-        cmd.setExecutionStrategy(new GlobalOptionSettingExecutionStrategy());
+        // Set custom execution strategy that handles timing and global flags
+        cmd.setExecutionStrategy(new org.lucee.lucli.cli.LuCLIExecutionStrategy());
 
-        // Configure CommandLine behavior
-        cmd.setExecutionExceptionHandler(new CommandLine.IExecutionExceptionHandler() {
-            @Override
-            public int handleExecutionException(Exception ex,
-                                                CommandLine commandLine,
-                                                CommandLine.ParseResult parseResult) throws Exception {
-                StringOutput.Quick.error("Error: " + ex.getMessage());
-                if (verbose || debug) {
-                    ex.printStackTrace();
-                }
-                return 1;
+        // Configure exception handler
+        cmd.setExecutionExceptionHandler((ex, commandLine, parseResult) -> {
+            StringOutput.Quick.error("Error: " + ex.getMessage());
+            if (verbose || debug) {
+                ex.printStackTrace();
             }
+            return 1;
         });
         
-        // Handle parameter exceptions (like unknown options) more gracefully
-        cmd.setParameterExceptionHandler(new CommandLine.IParameterExceptionHandler() {
-            @Override
-            public int handleParseException(CommandLine.ParameterException ex, String[] args) {
-                // Extract debug, verbose, and timing flags from args for shortcut handling
-                boolean shortcutDebug = java.util.Arrays.asList(args).contains("--debug") || java.util.Arrays.asList(args).contains("-d");
-                boolean shortcutVerbose = java.util.Arrays.asList(args).contains("--verbose") || java.util.Arrays.asList(args).contains("-v");
-                boolean shortcutTiming = java.util.Arrays.asList(args).contains("--timing") || java.util.Arrays.asList(args).contains("-t");
-                boolean preserveWhitespace = java.util.Arrays.asList(args).contains("--whitespace") || java.util.Arrays.asList(args).contains("-w");
-                // set the defaults
-                LuCLI.verbose = shortcutVerbose;
-                LuCLI.debug = shortcutDebug;
-                LuCLI.timing = shortcutTiming;
-                LuCLI.preserveWhitespace = preserveWhitespace;
-                // We should clean them up before we send the rest along
-
-                Timer.setEnabled(LuCLI.timing);
-                // Check if this might be a shortcut (module or CFML file)
-                // BUT ONLY if it's not a recognized subcommand
-                if (ex instanceof CommandLine.UnmatchedArgumentException && args.length >= 1) {
-                    // Find the first non-flag argument
-                    String firstArg = null;
-                    int firstArgIndex = -1;
-                    for (int i = 0; i < args.length; i++) {
-                        if (!args[i].startsWith("-")) {
-                            firstArg = args[i];
-                            firstArgIndex = i;
-                            break;
-                        }
-                    }
-                    
-                    // Skip shortcuts if the first argument is a known subcommand
-                    if (firstArg != null && !isKnownSubcommand(firstArg)) {
-                        java.io.File file = new java.io.File(firstArg);
-                        
-                        // Extract remaining arguments (after the first non-flag arg), filtering out known flags
-                        java.util.List<String> remainingArgsList = new java.util.ArrayList<>();
-                        for (int i = firstArgIndex + 1; i < args.length; i++) {
-                            String arg = args[i];
-                            // Skip known flags that should be handled at the root level
-                            if (!arg.equals("--verbose") && !arg.equals("-v") &&
-                                !arg.equals("--debug") && !arg.equals("-d") &&
-                                !arg.equals("--whitespace") && !arg.equals("-w") &&
-                                !arg.equals("--timing") && !arg.equals("-t")) {
-                                remainingArgsList.add(arg);
-                            }
-                        }
-                        String[] remainingArgs = remainingArgsList.toArray(new String[0]);
-                        
-                        // Check if it's a LuCLI script file
-                        if (file.exists() && (firstArg.endsWith(".lucli") || firstArg.endsWith(".luc"))) {
-                            try {
-                                 Timer.start("LuCLI Script Shortcut Execution (" + firstArg + ")");
-                                 int ret = executeLucliScript(firstArg);
-                                 Timer.stop("LuCLI Script Shortcut Execution (" + firstArg + ")");
-                                 return ret;
-                            } catch (Exception scriptEx) {
-                                // If script execution fails, fall through to normal error handling
-                                if (shortcutVerbose || shortcutDebug) {
-                                    StringOutput.Quick.error("LuCLI script execution failed: " + scriptEx.getMessage());
-                                }
-                                return 1;
-                            }
-                        }
-                        // Check if it's an existing CFML file
-                        else if (file.exists() && (firstArg.endsWith(".cfs") || firstArg.endsWith(".cfm") || firstArg.endsWith(".cfml"))) {
-                            try {
-                                Timer.start("CFML File Shortcut Execution");
-                                int ret = executeCfmlFileShortcut(firstArg, remainingArgs, shortcutVerbose, shortcutDebug, shortcutTiming);
-                                Timer.stop("CFML File Shortcut Execution");
-                                return ret;
-                            } catch (Exception cfmlEx) {
-                                // If CFML file execution fails, fall through to normal error handling
-                                if (shortcutVerbose || shortcutDebug) {
-                                    StringOutput.Quick.error("CFML file execution failed: " + cfmlEx.getMessage());
-                                }
-                            }
-                        }
-                        
-                        else if( file.exists() && (firstArg.endsWith(".cfc")) ) {
-                            try {
-                                return executeCfmlFileShortcut(firstArg, remainingArgs, shortcutVerbose, shortcutDebug, shortcutTiming);
-                            } catch (Exception cfmlEx) {
-                                // If CFML file execution fails, fall through to normal error handling
-                                if (shortcutVerbose || shortcutDebug) {
-                                    StringOutput.Quick.error("CFML file execution failed: " + cfmlEx.getMessage());
-                                }
-                            }
-                        }
-                        // IF it is a real file but we dont know what to do with it... 
-
-                        // If it's not an existing file, try to execute as module shortcut
-                        else if (!file.exists()) {
-                            try {
-                                return executeModuleShortcut(firstArg, remainingArgs, shortcutVerbose, shortcutDebug, shortcutTiming);
-                            } catch (Exception moduleEx) {
-                                // If module execution fails, fall through to normal error handling
-                                if (shortcutVerbose || shortcutDebug) {
-                                    StringOutput.Quick.error("Module shortcut failed: " + moduleEx.getMessage());
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                // Default error handling
-                CommandLine commandLine = ex.getCommandLine();
-                CommandLine.UnmatchedArgumentException.printSuggestions(ex, commandLine.getErr());
-                commandLine.usage(commandLine.getErr());
-                return commandLine == cmd ? 2 : 1;
-            }
-        });
+        // Execute the command
+        int exitCode = cmd.execute(args);
         
-        // Execute the command with optional global timeout and exit with the returned code
-        int parsedTimeoutSeconds = 0;
-        for (int i = 0; i < args.length; i++) {
-            String a = args[i];
-            if ("--timeout".equals(a) && i + 1 < args.length) {
-                try {
-                    parsedTimeoutSeconds = Integer.parseInt(args[i + 1]);
-                } catch (NumberFormatException ignored) {
-                    // Ignore invalid timeout; treat as 0 (no timeout)
-                }
-            } else if (a.startsWith("--timeout=")) {
-                try {
-                    parsedTimeoutSeconds = Integer.parseInt(a.substring("--timeout=".length()));
-                } catch (NumberFormatException ignored) {
-                    // Ignore invalid timeout; treat as 0 (no timeout)
-                }
-            }
-        }
-
-        int exitCode;
-        if (parsedTimeoutSeconds > 0) {
-            java.util.concurrent.ExecutorService executor =
-                java.util.concurrent.Executors.newSingleThreadExecutor();
-            try {
-                java.util.concurrent.Future<Integer> future =
-                    executor.submit(() -> cmd.execute(args));
-                exitCode = future.get(parsedTimeoutSeconds, java.util.concurrent.TimeUnit.SECONDS);
-            } catch (java.util.concurrent.TimeoutException e) {
-                System.err.println(
-                    "Command timed out after " + parsedTimeoutSeconds
-                    + " seconds (use --timeout 0 to disable).");
-                exitCode = 124;
-            } finally {
-                executor.shutdownNow();
-            }
-        } else {
-            exitCode = cmd.execute(args);
-        }
-        
+        // Print timing results if enabled
         Timer.printResults();
+        
         System.exit(exitCode);
     }
     
-        /**
-     * Print a message only if verbose mode is enabled
+    // ====================
+    // Output Methods
+    // ====================
+    
+    /**
+     * Print a verbose message (only if --verbose flag is enabled)
      * @param message The message to print
      */
-    public static void printVerbose(String message) {
+    public static void verbose(String message) {
         if (verbose) {
             System.out.println(message);
         }
     }
     
     /**
-     * Print a debug message only if debug mode is enabled
-     * Debug messages go to stderr with [DEBUG] prefix
+     * Print a verbose message with formatting (only if --verbose flag is enabled)
+     * @param format The format string
+     * @param args The arguments for the format string
+     */
+    public static void verbose(String format, Object... args) {
+        if (verbose) {
+            System.out.println(String.format(format, args));
+        }
+    }
+    
+    /**
+     * Print a debug message (only if --debug flag is enabled)
      * @param message The message to print
      */
-    public static void printDebug(String message) {
+    public static void debug(String message) {
         if (debug) {
             System.err.println("[DEBUG] " + message);
         }
     }
     
     /**
-     * Print a debug message with context only if debug mode is enabled
+     * Print a debug message with context (only if --debug flag is enabled)
      * @param context The context (e.g., class name or method name)
      * @param message The message to print
      */
-    public static void printDebug(String context, String message) {
+    public static void debug(String context, String message) {
         if (debug) {
             System.err.println("[DEBUG " + context + "] " + message);
         }
     }
     
     /**
-     * Print an info message (always shown, but can be used for consistency)
+     * Print a debug message with formatting (only if --debug flag is enabled)
+     * @param format The format string
+     * @param args The arguments for the format string
+     */
+    public static void debug(String format, Object... args) {
+        if (debug) {
+            System.err.println(String.format("[DEBUG] " + format, args));
+        }
+    }
+    
+    /**
+     * Print an exception stack trace (only if --debug flag is enabled)
+     * @param e The exception to print
+     */
+    public static void debugStack(Exception e) {
+        if (debug) {
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Print an info message (always shown)
      * @param message The message to print
      */
-    public static void printInfo(String message) {
+    public static void info(String message) {
         System.out.println(message);
     }
     
     /**
-     * Print an error message
+     * Print an error message (always shown)
      * @param message The error message
      */
-    public static void printError(String message) {
+    public static void error(String message) {
         System.err.println(message);
+    }
+    
+    // ====================
+    // Deprecated Methods (for backward compatibility)
+    // ====================
+    
+    /** @deprecated Use {@link #verbose(String)} instead */
+    @Deprecated
+    public static void printVerbose(String message) {
+        verbose(message);
+    }
+    
+    /** @deprecated Use {@link #debug(String)} instead */
+    @Deprecated
+    public static void printDebug(String message) {
+        debug(message);
+    }
+    
+    /** @deprecated Use {@link #debug(String, String)} instead */
+    @Deprecated
+    public static void printDebug(String context, String message) {
+        debug(context, message);
+    }
+    
+    /** @deprecated Use {@link #debugStack(Exception)} instead */
+    @Deprecated
+    public static void printDebugStackTrace(Exception e) {
+        debugStack(e);
+    }
+    
+    /** @deprecated Use {@link #info(String)} instead */
+    @Deprecated
+    public static void printInfo(String message) {
+        info(message);
+    }
+    
+    /** @deprecated Use {@link #error(String)} instead */
+    @Deprecated
+    public static void printError(String message) {
+        error(message);
     }
 
     /**
@@ -374,15 +615,6 @@ public class LuCLI {
         lucliScriptSecretStore = new LocalSecretStore(storePath, passphrase);
     }
     
-    /**
-     * Print a stack trace only if debug mode is enabled
-     * @param e The exception to print
-     */
-    public static void printDebugStackTrace(Exception e) {
-        if (debug) {
-            e.printStackTrace();
-        }
-    }
 
     
     /**
@@ -543,13 +775,27 @@ public class LuCLI {
             throw new java.io.FileNotFoundException("Script file not found: " + scriptPath);
         }
 
-        printVerbose("Executing LuCLI script: " + scriptPath);
+        verbose("Executing LuCLI script: " + scriptPath);
+        String env = getCurrentEnvironment();
+        if (env != null) {
+            verbose("Executing with environment: " + env);
+        }
 
         // Read all lines from the script file
         java.util.List<String> lines = Files.readAllLines(path, java.nio.charset.StandardCharsets.UTF_8);
         if (lines.isEmpty()) {
-            printVerbose("Script is empty: " + scriptPath);
+            verbose("Script is empty: " + scriptPath);
             return 0;
+        }
+
+        // Preprocess: line continuation and environment blocks
+        // (Comments and placeholders are handled per-line during execution)
+        try {
+            lines = LucliScriptPreprocessor.joinContinuationLines(lines);
+            lines = LucliScriptPreprocessor.processEnvBlocks(lines, env);
+        } catch (LucliScriptPreprocessor.PreprocessorException e) {
+            StringOutput.Quick.error("Script preprocessing error: " + e.getMessage());
+            return 1;
         }
 
         // Pre-scan script for ${secret:...} placeholders so we can prompt for
@@ -561,7 +807,7 @@ public class LuCLI {
             // resolveSecretsInScriptLine() already printed a helpful error
             // message for missing/invalid secrets. Treat this as a fatal
             // error for the script.
-            printDebugStackTrace((Exception)(e instanceof Exception ? e : new Exception(e)));
+            debugStack((Exception)(e instanceof Exception ? e : new Exception(e)));
             return 1;
         }
 
@@ -569,7 +815,7 @@ public class LuCLI {
         org.lucee.lucli.CommandProcessor commandProcessor = new org.lucee.lucli.CommandProcessor();
         org.lucee.lucli.ExternalCommandProcessor externalCommandProcessor =
             new org.lucee.lucli.ExternalCommandProcessor(commandProcessor, commandProcessor.getSettings());
-        CommandLine picocli = new CommandLine(new org.lucee.lucli.cli.LuCLICommand());
+        CommandLine picocli = new CommandLine(new org.lucee.lucli.LuCLI());
 
         StringOutput stringOutput = StringOutput.getInstance();
         boolean assertionFailed = false;
@@ -596,14 +842,14 @@ public class LuCLI {
             
             // Treat lines starting with '#' as comments (including shebangs like '#!/usr/bin/env lucli')
             if (trimmed.startsWith("#")) {
-                printDebug("LuCLIScript", "Skipping comment line: " + line);
+                debug("LuCLIScript", "Skipping comment line: " + line);
                 continue;
             }
             
             // Early-exit command for .lucli scripts: "exit" or "exit <code>"
             if(isExitCommand(line)){
                 int exitCode = getExitCodeFromExitCommand(line);
-                printDebug("LuCLIScript", "Exit requested from script with code " + exitCode);
+                debug("LuCLIScript", "Exit requested from script with code " + exitCode);
                 return exitCode;
             }
             
@@ -659,13 +905,13 @@ public class LuCLI {
                         String valueWithSecrets = resolveSecretsInScriptLine(value);
                         String resolvedValue    = stringOutput.process(valueWithSecrets);
 
-                        printDebug("SET directive: " + key + " = " + resolvedValue);
+                        debug("SET directive: " + key + " = " + resolvedValue);
 
                         scriptEnvironment.put(key, resolvedValue);
                         stringOutput.addPlaceholder(key, resolvedValue);
                     } catch (Exception e) {
                         StringOutput.Quick.error("Error processing SET value for '" + key + "': " + e.getMessage());
-                        printDebugStackTrace(e);
+                        debugStack(e);
                     }
                     continue;
                 }
@@ -721,13 +967,21 @@ public class LuCLI {
             }
 
             // Delegate all other commands to the shared dispatcher
-            executeLucliScriptCommand(
+            String result = executeLucliScriptCommand(
                 processedLine,
                 commandProcessor,
                 externalCommandProcessor,
                 picocli,
-                false
+                true
             );
+
+            if(result != null && !result.trim().isEmpty()) {
+                recordLucliResult(result);
+                // Todo: add this to our StringOutput system
+                System.out.println(result);
+                
+            }
+
         }
 
         // Scripts are best-effort; fail overall if any assertion failed
@@ -854,7 +1108,7 @@ public class LuCLI {
             true
         );
 
-        printDebug("LuCLIScript", "Captured output for variable '" + varName + "': " + captured);
+        debug("LuCLIScript", "Captured output for variable '" + varName + "': " + captured);
 
         scriptEnvironment.put(varName, captured);
         stringOutput.addPlaceholder(varName, captured);
@@ -916,47 +1170,56 @@ public class LuCLI {
                     return "";
                 }
 
-                if (captureOutput) {
+                // Call Lucee directly instead of going through picocli
+                // This avoids issues with getExecutionResult() not propagating from subcommands
+                Object result = LuceeScriptEngine.getInstance().eval(cfmlCode);
+                return (result != null ? result.toString() : "");
 
-                    // Silent execution and gather output
-                    LuceeScriptEngine luceeEngine = LuceeScriptEngine.getInstance();
-                    Object ret = luceeEngine.evalScriptStatement(cfmlCode, null);
-                    if (ret != null) {
-                        recordLucliResult(ret.toString());
-                    }
-                    return ret.toString();
 
-                    // java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
-                    // java.io.PrintStream originalOut = System.out;
-                    // java.io.PrintStream originalErr = System.err;
-                    // try {
-                    //     System.setOut(new java.io.PrintStream(baos));
-                    //     System.setErr(new java.io.PrintStream(baos));
-                    //     // Execute cfml with the entire expression as a single argument so
-                    //     // inner quotes are preserved.
-                    //     // This doesnt need picocli, we can just do it direct
-                    //     // Execute it directly to avoid double-parsing issues
-                    //     // luceeEngine.evalScriptStatement(wrappedScript, null);
-                    //     // But this is not for everuthing then? It's running cfml only.
-                    //     picocli.execute("cfml", cfmlCode);
-                    // } 
-                    // catch(Exception e) {
-                    //     StringOutput.Quick.error("Error executing cfml command: " + e.getMessage());
-                    //     printDebugStackTrace(e);
-                    // }
-                    // finally {
-                    //     System.setOut(originalOut);
-                    //     System.setErr(originalErr);
-                    // }
-                    // String captured = baos.toString().trim();
-                    // if (captured != null && !captured.isEmpty()) {
-                    //     recordLucliResult(captured);
-                    // }
+
+                // if (captureOutput) {
+
+                //     // // Silent execution and gather output
+                //     // LuceeScriptEngine luceeEngine = LuceeScriptEngine.getInstance();
+                //     // Object ret = luceeEngine.evalScriptStatement(cfmlCode, null);
+                //     // if (ret != null) {
+                //     //     recordLucliResult(ret.toString());
+                //     // }
+                //     // return ret.toString();
+
+                //     // java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                //     // java.io.PrintStream originalOut = System.out;
+                //     // java.io.PrintStream originalErr = System.err;
+                //     // try {
+                //     //     System.setOut(new java.io.PrintStream(baos));
+                //     //     System.setErr(new java.io.PrintStream(baos));
+                //     //     // Execute cfml with the entire expression as a single argument so
+                //     //     // inner quotes are preserved.
+                //     //     // This doesnt need picocli, we can just do it direct
+                //     //     // Execute it directly to avoid double-parsing issues
+                //     //     // luceeEngine.evalScriptStatement(wrappedScript, null);
+                //     //     // But this is not for everuthing then? It's running cfml only.
+                //     //     picocli.execute("cfml", cfmlCode);
+                //     // } 
+                //     // catch(Exception e) {
+                //     //     StringOutput.Quick.error("Error executing cfml command: " + e.getMessage());
+                //     //     debugStack(e);
+                //     // }
+                //     // finally {
+                //     //     System.setOut(originalOut);
+                //     //     System.setErr(originalErr);
+                //     // }
+                //     // String captured = baos.toString().trim();
+                //     // if (captured != null && !captured.isEmpty()) {
+                //     //     recordLucliResult(captured);
+                //     // }
+                //     // return "";
+                // } else {
+                    // picocli.execute("cfml", cfmlCode);
+                    // Object res = picocli.getExecutionResult();
+                    // System.out.println("Elvis!");
                     // return "";
-                } else {
-                    picocli.execute("cfml", cfmlCode);
-                    return "";
-                }
+                // }
 
             }
             
@@ -1056,7 +1319,7 @@ public class LuCLI {
 
         } catch (Exception e) {
             StringOutput.Quick.error("Error executing script line '" + processedLine + "': " + e.getMessage());
-            printDebugStackTrace(e);
+            debugStack(e);
             return "";
         }
     }
@@ -1069,135 +1332,4 @@ public class LuCLI {
 
 
 
-    /**
-     * Check if the given string is a known subcommand
-     * Uses PicocLI's API to query registered subcommands dynamically
-     * @param command The command to check
-     * @return true if it's a known subcommand, false otherwise
-     */
-    private static boolean isKnownSubcommand(String command) {
-        // Query PicocLI for registered subcommands instead of maintaining a manual list
-        CommandLine cmd = new CommandLine(new LuCLICommand());
-        return cmd.getSubcommands().containsKey(command);
-    }
-    
-    /**
-     * Execute a module shortcut by redirecting to "modules run <moduleName> [args...]"
-     * @param moduleName The name of the module to run
-     * @param args Additional arguments to pass to the module
-     * @param verbose Enable verbose output
-     * @param debug Enable debug output
-     * @param timing Enable timing output
-     * @return Exit code from module execution
-     */
-    private static int executeModuleShortcut(String moduleName, String[] args, boolean verbose, boolean debug, boolean timing) throws Exception {
-        // Set global flags
-        LuCLI.verbose = verbose;
-        LuCLI.debug = debug;
-        LuCLI.timing = timing;
-        
-        printVerbose("Executing module shortcut: " + moduleName + 
-            " (equivalent to 'lucli modules run " + moduleName + "')");
-        
-        // Build the new arguments array: [flags..., "modules", "run", moduleName, ...additionalArgs]
-        // Flags must come BEFORE the subcommand, not after
-        java.util.List<String> newArgs = new java.util.ArrayList<>();
-        
-        // Add flags first (before subcommands)
-        if (verbose) {
-            newArgs.add("--verbose");
-        }
-        if (debug) {
-            newArgs.add("--debug");
-        }
-        if (timing) {
-            newArgs.add("--timing");
-        }
-        
-        newArgs.add("modules");
-        newArgs.add("run");
-        newArgs.add(moduleName);
-        
-        // Add any additional arguments
-        if (args != null && args.length > 0) {
-            for (String arg : args) {
-                newArgs.add(arg);
-            }
-        }
-        
-        // Create a new CommandLine instance with the same configuration
-        CommandLine cmd = new CommandLine(new org.lucee.lucli.cli.LuCLICommand());
-
-        // Allow unknown options (like module-specific flags) to be treated as positional
-        // arguments so they can be forwarded to the module implementation instead of
-        // causing an "Unknown option" error at the LuCLI level.
-        // cmd.setUnmatchedArgumentsAllowed(true);
-        
-        
-        // Configure the same exception handlers
-        cmd.setExecutionExceptionHandler(new CommandLine.IExecutionExceptionHandler() {
-            @Override
-            public int handleExecutionException(Exception ex,
-                                                CommandLine commandLine,
-                                                CommandLine.ParseResult parseResult) throws Exception {
-                StringOutput.Quick.error("Error: " + ex.getMessage());
-                printDebugStackTrace(ex);
-                return 1;
-            }
-        });
-        
-        // Execute the modules run command
-        return cmd.execute(newArgs.toArray(new String[0]));
-    }
-    
-    /**
-     * Execute a CFML file shortcut by delegating to the Picocli RunCommand.
-     *
-     * This is used by the root command's shortcut handling so that invocations like
-     * `lucli somefile.cfm` or `lucli SomeComponent.cfc arg1` are treated as if the
-     * user had explicitly run `lucli run ...`.
-     */
-    private static int executeCfmlFileShortcut(String filePath, String[] args, boolean verbose, boolean debug, boolean timing) throws Exception {
-        // Root/main is responsible for initializing global flags; here we only
-        // reconstruct the argument vector for Picocli.
-
-        // Build arguments for the Picocli command: [global flags..., "run", filePath, args...]
-        java.util.List<String> newArgs = new java.util.ArrayList<>();
-        if (verbose) {
-            newArgs.add("--verbose");
-        }
-        if (debug) {
-            newArgs.add("--debug");
-        }
-        if (timing) {
-            newArgs.add("--timing");
-        }
-
-        newArgs.add("run");
-        newArgs.add(filePath);
-
-        if (args != null && args.length > 0) {
-            for (String arg : args) {
-                newArgs.add(arg);
-            }
-        }
-
-        // Delegate to a new Picocli CommandLine instance so we reuse the RunCommand
-        CommandLine cmd = new CommandLine(new org.lucee.lucli.cli.LuCLICommand());
-
-        cmd.setExecutionExceptionHandler(new CommandLine.IExecutionExceptionHandler() {
-            @Override
-            public int handleExecutionException(Exception ex,
-                                                CommandLine commandLine,
-                                                CommandLine.ParseResult parseResult) throws Exception {
-                StringOutput.Quick.error("Error: " + ex.getMessage());
-                if (verbose || debug) {
-                    ex.printStackTrace();
-                }
-                return 1;
-            }
-        });
-
-        return cmd.execute(newArgs.toArray(new String[0]));
-    }
 }

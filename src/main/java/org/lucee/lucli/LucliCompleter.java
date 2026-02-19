@@ -43,8 +43,13 @@ public class LucliCompleter implements Completer {
     @Override
     public void complete(LineReader reader, ParsedLine line, List<Candidate> candidates) {
         String buffer = line.line();
+        String trimmedBuffer = buffer.trim();
         
-        if (buffer.trim().isEmpty() || line.words().size() == 1) {
+        // Check if we're completing arguments (command followed by space)
+        boolean hasTrailingSpace = buffer.length() > 0 && Character.isWhitespace(buffer.charAt(buffer.length() - 1));
+        boolean completingArguments = line.words().size() > 1 || (line.words().size() == 1 && hasTrailingSpace);
+        
+        if (trimmedBuffer.isEmpty() || (!completingArguments)) {
             // Complete internal terminal commands (PicoCLI handles server, modules, cfml, help)
             String partial = line.words().isEmpty() ? "" : line.words().get(0);
             String lowerPartial = partial.toLowerCase();
@@ -95,6 +100,12 @@ public class LucliCompleter implements Completer {
             else if (isFileCommand(command)) {
                 String partial = line.words().size() > 1 ? line.words().get(line.words().size() - 1) : "";
                 completeFilePaths(partial, candidates, command);
+            }
+            else {
+                // Fallback: provide file completion for external/unknown commands
+                // This allows commands like `code`, `vim`, `open`, etc. to have path completion
+                String partial = line.words().size() > 1 ? line.words().get(line.words().size() - 1) : "";
+                completeFilePaths(partial, candidates, "external");
             }
         }
     }
@@ -244,17 +255,17 @@ public class LucliCompleter implements Completer {
                 basePath = currentDir;
             } else if (partial.equals("~")) {
                 basePath = commandProcessor.getFileSystemState().getHomeDirectory();
-                prefix = commandProcessor.getFileSystemState().getHomeDirectory().toString() + "/";
+                prefix = "~/";  // Keep ~/ prefix for JLine to recognize
             } else if (partial.startsWith("~/")) {
                 Path homePath = commandProcessor.getFileSystemState().getHomeDirectory();
                 String relativePart = partial.substring(2);
                 int lastSlash = relativePart.lastIndexOf('/');
                 if (lastSlash >= 0) {
                     basePath = homePath.resolve(relativePart.substring(0, lastSlash));
-                    prefix = homePath.toString() + "/" + relativePart.substring(0, lastSlash + 1);
+                    prefix = "~/" + relativePart.substring(0, lastSlash + 1);  // Keep ~/ prefix
                 } else {
                     basePath = homePath;
-                    prefix = homePath.toString() + "/";
+                    prefix = "~/";  // Keep ~/ prefix
                 }
             } else if (partial.startsWith("/")) {
                 // Absolute path

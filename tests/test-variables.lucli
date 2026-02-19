@@ -1,9 +1,15 @@
-cfml now()
-cfml echo("Current time is: " & now() );
-set var1=$(cfml now() )
-set var2=${var1}
-xset var11="someting"
+cfml elvis="elvis"
+cfml writeoutput(elvis);
+cfml echo("Current time is: " & now() )
+set var1=$(cfml now() & " - elvis")
+echo ${var1}
+# set var2=${var1}
+# xset var11="someting"
+# if $(cfml now()) $(cfml echo("In IF block"))
+# echo "var1 ${var1}"
+# echo "var2 ${var2}"
+# echo "xset var11 ${var11}"
+#@env:dev
+echo "hello from the dev environment"
+#@end
 
-echo "var1 ${var1}"
-echo "var2 ${var2}"
-echo "xset var11 ${var11}"

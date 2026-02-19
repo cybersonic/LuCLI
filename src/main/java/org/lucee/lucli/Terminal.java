@@ -13,7 +13,6 @@ import org.jline.reader.UserInterruptException;
 import org.jline.reader.impl.DefaultParser;
 import org.jline.reader.impl.completer.AggregateCompleter;
 import org.jline.terminal.TerminalBuilder;
-import org.lucee.lucli.cli.LuCLICommand;
 import org.lucee.lucli.cli.commands.fs.FileSystemCommands;
 import org.lucee.lucli.cli.completion.PicocliStyledCompleter;
 import org.lucee.lucli.modules.ModuleCommand;
@@ -85,7 +84,7 @@ public class Terminal {
         externalCommandProcessor = new ExternalCommandProcessor(commandProcessor, commandProcessor.getSettings());
         
         // Create Picocli CommandLine with root command
-        LuCLICommand rootCommand = new LuCLICommand();
+        LuCLI rootCommand = new LuCLI();
         picocliCommandLine = new CommandLine(rootCommand);
 
         // Attach internal file system commands (ls, cd, etc.) via FileSystemCommands,
@@ -112,7 +111,7 @@ public class Terminal {
         
         // Configure Picocli for terminal mode (don't exit on errors)
         picocliCommandLine.setExecutionExceptionHandler((ex, commandLine, parseResult) -> {
-            terminal.writer().println(WindowsSupport.Symbols.ERROR + " " + ex.getMessage());
+            terminal.writer().println(WindowsSupport.Symbols.ERROR() + " " + ex.getMessage());
             if (LuCLI.verbose || LuCLI.debug) {
                 ex.printStackTrace(terminal.writer());
             }
@@ -132,15 +131,15 @@ public class Terminal {
                 .variable(LineReader.HISTORY_FILE_SIZE, 2000)
                 .build();
         
-        // Print welcome message
-        terminal.writer().println(WindowsSupport.Symbols.ROCKET + " LuCLI Terminal " + LuCLI.getVersion() + "  Type 'exit' or 'quit' to leave.");
-        terminal.writer().println(WindowsSupport.Symbols.FOLDER + " Working Directory: " + commandProcessor.getFileSystemState().getCurrentWorkingDirectory());
+        // Print welcome message (use EmojiSupport.process for emoji handling)
+        terminal.writer().println(EmojiSupport.process("🚀 LuCLI Terminal " + LuCLI.getVersion() + "  Type 'exit' or 'quit' to leave."));
+        terminal.writer().println(EmojiSupport.process("📁 Working Directory: " + commandProcessor.getFileSystemState().getCurrentWorkingDirectory()));
         
         if (LuCLI.verbose) {
-            terminal.writer().println(WindowsSupport.Symbols.COMPUTER + " Use 'cfml <expression>' to execute CFML code, e.g., 'cfml now()'");
-            terminal.writer().println(WindowsSupport.Symbols.FOLDER + " File system commands available: ls, cd, pwd, mkdir, cp, mv, rm, cat, etc.");
-            terminal.writer().println(WindowsSupport.Symbols.TOOL + " Server commands: server start, server stop, server list, etc.");
-            terminal.writer().println(WindowsSupport.Symbols.ART + " Type 'help' for more information!");
+            terminal.writer().println(EmojiSupport.process("💻 Use 'cfml <expression>' to execute CFML code, e.g., 'cfml now()'"));
+            terminal.writer().println(EmojiSupport.process("📁 File system commands available: ls, cd, pwd, mkdir, cp, mv, rm, cat, etc."));
+            terminal.writer().println(EmojiSupport.process("🔧 Server commands: server start, server stop, server list, etc."));
+            terminal.writer().println(EmojiSupport.process("🎨 Type 'help' for more information!"));
         }
         terminal.writer().flush();
         
@@ -180,10 +179,18 @@ public class Terminal {
             } catch (EndOfFileException e) {
                 // Ctrl-D / EOF: exit
                 break;
+            } catch (Exception e) {
+                // Handle any other exception gracefully - don't exit the terminal
+                terminal.writer().println(EmojiSupport.process("❌ Error: " + e.getMessage()));
+                if (LuCLI.verbose || LuCLI.debug) {
+                    e.printStackTrace(terminal.writer());
+                }
+                terminal.writer().flush();
+                continue;
             }
         }
         
-        terminal.writer().println(WindowsSupport.Symbols.WAVE + " Goodbye!");
+        terminal.writer().println(EmojiSupport.process("👋 Goodbye!"));
         terminal.writer().flush();
         terminal.close();
     }
@@ -248,7 +255,7 @@ public class Terminal {
                         String cfmlCode = commandLine.substring(5).trim();
                         return executeCFML(cfmlCode);
                     } else {
-                        return WindowsSupport.Symbols.ERROR + " cfml command requires an expression. Example: cfml now()";
+                    return EmojiSupport.process("❌ cfml command requires an expression. Example: cfml now()");
                     }
             }
             
@@ -275,7 +282,7 @@ public class Terminal {
             return externalCommandProcessor.executeCommand(effectiveLine);
             
         } catch (Exception e) {
-            return WindowsSupport.Symbols.ERROR + " Error: " + e.getMessage();
+            return WindowsSupport.Symbols.ERROR() + " Error: " + e.getMessage();
         }
     }
     
@@ -347,7 +354,7 @@ public class Terminal {
             return baos.toString().trim();
             
         } catch (Exception e) {
-            return WindowsSupport.Symbols.ERROR + " Error executing module '" + moduleName + "': " + e.getMessage();
+            return WindowsSupport.Symbols.ERROR() + " Error executing module '" + moduleName + "': " + e.getMessage();
         } finally {
             System.setOut(originalOut);
             System.setErr(originalErr);
@@ -362,14 +369,14 @@ public class Terminal {
             // Initialize Lucee engine if not already done
             if (luceeEngine == null) {
                 if (LuCLI.verbose) {
-                    terminal.writer().println(WindowsSupport.Symbols.TOOL + " Initializing Lucee CFML engine...");
+                    terminal.writer().println(WindowsSupport.Symbols.TOOL() + " Initializing Lucee CFML engine...");
                     terminal.writer().flush();
                 }
                 
                 luceeEngine = LuceeScriptEngine.getInstance();
                 
                 if (LuCLI.verbose) {
-                    terminal.writer().println(WindowsSupport.Symbols.SUCCESS + " Lucee engine ready.");
+                    terminal.writer().println( WindowsSupport.Symbols.SUCCESS() + " Lucee engine ready.");
                 }
             }
             
@@ -394,7 +401,7 @@ public class Terminal {
             }
             
         } catch (Exception e) {
-            return WindowsSupport.Symbols.ERROR + " Error executing CFML: " + e.getMessage();
+            return WindowsSupport.Symbols.ERROR() + " Error executing CFML: " + e.getMessage();
         }
     }
     
@@ -446,7 +453,7 @@ public class Terminal {
             String luceeVersion = LuceeScriptEngine.getInstance().getVersion();
             return "Lucee Version: " + luceeVersion;
         } catch (Exception e) {
-            return WindowsSupport.Symbols.ERROR + " Error getting Lucee version: " + e.getMessage();
+            return WindowsSupport.Symbols.ERROR() + " Error getting Lucee version: " + e.getMessage();
         }
     }
     

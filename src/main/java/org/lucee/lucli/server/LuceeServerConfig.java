@@ -1330,6 +1330,19 @@ public class LuceeServerConfig {
      * @throws IllegalArgumentException if the environment name is not found
      */
     public static ServerConfig applyEnvironment(ServerConfig base, String envName) {
+        return applyEnvironment(base, envName, null);
+    }
+    
+    /**
+     * Apply environment-specific overrides to a base ServerConfig.
+     * 
+     * @param base The base ServerConfig loaded from lucee.json
+     * @param envName The environment name to apply (e.g., "prod", "dev", "staging")
+     * @param projectDir The project directory (used to read raw environment JSON)
+     * @return A new ServerConfig with environment overrides deep-merged into the base
+     * @throws IllegalArgumentException if the environment name is not found
+     */
+    public static ServerConfig applyEnvironment(ServerConfig base, String envName, Path projectDir) {
         if (envName == null || envName.trim().isEmpty()) {
             return base; // No environment specified
         }
@@ -1349,9 +1362,8 @@ public class LuceeServerConfig {
             throw new IllegalArgumentException(errorMsg.toString());
         }
         
-        ServerConfig envOverrides = base.environments.get(envName);
-        
         // Prevent recursive environment definitions
+        ServerConfig envOverrides = base.environments.get(envName);
         if (envOverrides.environments != null && !envOverrides.environments.isEmpty()) {
             throw new IllegalArgumentException(
                 "Environment '" + envName + "' cannot contain nested 'environments' definitions"
@@ -1359,7 +1371,20 @@ public class LuceeServerConfig {
         }
         
         try {
-            return deepMergeConfigs(base, envOverrides);
+            // Try to read raw environment JSON from file to get only explicitly set fields
+            JsonNode rawEnvNode = null;
+            if (projectDir != null) {
+                Path configFile = projectDir.resolve("lucee.json");
+                if (Files.exists(configFile)) {
+                    JsonNode rootNode = objectMapper.readTree(configFile.toFile());
+                    JsonNode envsNode = rootNode.get("environments");
+                    if (envsNode != null && envsNode.has(envName)) {
+                        rawEnvNode = envsNode.get(envName);
+                    }
+                }
+            }
+            
+            return deepMergeConfigs(base, rawEnvNode);
         } catch (IOException e) {
             throw new RuntimeException("Failed to merge environment configuration: " + e.getMessage(), e);
         }
@@ -1374,10 +1399,22 @@ public class LuceeServerConfig {
      * @param overrides The override configuration  
      * @return A new ServerConfig with overrides merged into base
      */
-    private static ServerConfig deepMergeConfigs(ServerConfig base, ServerConfig overrides) throws IOException {
-        // Convert both configs to JSON
+    /**
+     * Deep merge using raw JSON node for overrides.
+     * This ensures only fields explicitly present in the environment JSON are merged,
+     * rather than default values from deserialized objects.
+     */
+    private static ServerConfig deepMergeConfigs(ServerConfig base, JsonNode rawOverrideNode) throws IOException {
+        // Convert base config to JSON (include all values)
         JsonNode baseNode = objectMapper.valueToTree(base);
-        JsonNode overrideNode = objectMapper.valueToTree(overrides);
+        
+        if (rawOverrideNode == null || rawOverrideNode.isNull() || rawOverrideNode.isEmpty()) {
+            // No overrides to apply
+            return base;
+        }
+        
+        // Make a copy to avoid modifying the original
+        JsonNode overrideNode = rawOverrideNode.deepCopy();
         
         // Remove 'environments' from the override node to prevent copying
         if (overrideNode.isObject()) {

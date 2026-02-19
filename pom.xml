@@ -6,7 +6,7 @@
 
   <groupId>org.lucee</groupId>
   <artifactId>lucli</artifactId>
-  <version>0.1.280</version>
+  <version>0.1.298-SNAPSHOT</version>
 
   <name>LuCLI</name>
   <description>A CLI for Lucee</description>
@@ -23,6 +23,13 @@
     <lucee.version>7.0.1.100-RC</lucee.version>
     <!-- <lucee.classifier></lucee.classifier> -->
     <lucee.classifier>zero</lucee.classifier>
+    
+    <!-- JAR Signing Properties -->
+    <jarsigner.skip>false</jarsigner.skip>
+    <jarsigner.keystore>${user.home}/.lucli-keystore.jks</jarsigner.keystore>
+    <jarsigner.alias>lucli</jarsigner.alias>
+    <jarsigner.storepass></jarsigner.storepass>
+    <jarsigner.keypass></jarsigner.keypass>
   </properties>
 
 
@@ -177,14 +184,35 @@
         <artifactId>maven-compiler-plugin</artifactId>
         <version>3.13.0</version>
         <configuration>
-          <source>17</source>
-          <target>17</target>
+          <source>21</source>
+          <target>21</target>
         </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <version>3.2.5</version>
+      </plugin>
+      <!-- JaCoCo for code coverage -->
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>0.8.14</version>
+        <executions>
+          <execution>
+            <id>prepare-agent</id>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>report</id>
+            <phase>test</phase>
+            <goals>
+              <goal>report</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -289,6 +317,27 @@
             </configuration>
           </execution>
         </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jarsigner-plugin</artifactId>
+        <version>3.0.0</version>
+        <executions>
+          <execution>
+            <id>sign</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>sign</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <skip>${jarsigner.skip}</skip>
+          <keystore>${jarsigner.keystore}</keystore>
+          <alias>${jarsigner.alias}</alias>
+          <storepass>${jarsigner.storepass}</storepass>
+          <keypass>${jarsigner.keypass}</keypass>
+        </configuration>
       </plugin>
       
     </plugins>

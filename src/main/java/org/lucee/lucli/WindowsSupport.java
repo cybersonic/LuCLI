@@ -10,7 +10,8 @@ public class WindowsSupport {
     private static final boolean IS_CONSOLE_HOST = IS_WINDOWS && !IS_WINDOWS_TERMINAL;
     
     /**
-     * Check if the current environment supports emojis
+     * Check if the current terminal environment supports emojis.
+     * Can be used to auto-disable emojis on Windows: EmojiSupport.setEnabled(supportsEmojis())
      */
     public static boolean supportsEmojis() {
         // Windows Terminal and newer PowerShell versions support emojis
@@ -126,10 +127,10 @@ public class WindowsSupport {
     }
     
     /**
-     * Get emoji or fallback text based on Windows compatibility
+     * Get emoji or fallback text based on EmojiSupport state
      */
     public static String getEmoji(String emoji, String fallback) {
-        return supportsEmojis() ? emoji : fallback;
+        return EmojiSupport.emoji(emoji, fallback);
     }
     
     /**
@@ -190,20 +191,34 @@ public class WindowsSupport {
     }
     
     /**
-     * Get Windows-friendly status symbols
+     * Get Windows-friendly status symbols (uses EmojiSupport for dynamic state)
      */
     public static class Symbols {
-        public static final String SUCCESS = getEmoji("✅", "[OK]");
-        public static final String ERROR = getEmoji("❌", "[ERROR]");
-        public static final String WARNING = getEmoji("⚠️", "[WARNING]");
-        public static final String INFO = getEmoji("ℹ️", "[INFO]");
-        public static final String ROCKET = getEmoji("🚀", "");
-        public static final String FOLDER = getEmoji("📁", "");
-        public static final String COMPUTER = getEmoji("💻", "[CMD]");
-        public static final String TOOL = getEmoji("🔧", "[TOOL]");
-        public static final String ART = getEmoji("🎨", "[STYLE]");
-        public static final String WAVE = getEmoji("👋", "[BYE]");
-        public static final String BULB = getEmoji("💡", "[TIP]");
+        // Use EmojiSupport for dynamic emoji state
+        public static String SUCCESS() { return EmojiSupport.emoji("✅", "[OK]"); }
+        public static String ERROR() { return EmojiSupport.emoji("❌", "[ERROR]"); }
+        public static String WARNING() { return EmojiSupport.emoji("⚠️", "[WARN]"); }
+        public static String INFO() { return EmojiSupport.emoji("ℹ️", "[INFO]"); }
+        public static String ROCKET() { return EmojiSupport.emoji("🚀", ""); }
+        public static String FOLDER() { return EmojiSupport.emoji("📁", ""); }
+        public static String COMPUTER() { return EmojiSupport.emoji("💻", ">"); }
+        public static String TOOL() { return EmojiSupport.emoji("🔧", "[TOOL]"); }
+        public static String ART() { return EmojiSupport.emoji("🎨", ""); }
+        public static String WAVE() { return EmojiSupport.emoji("👋", "Bye!"); }
+        public static String BULB() { return EmojiSupport.emoji("💡", "[TIP]"); }
+        
+        // Keep old field names as deprecated for backwards compatibility
+        // @Deprecated public static final String SUCCESS = "✅";
+        // @Deprecated public static final String ERROR = "❌";
+        // @Deprecated public static final String WARNING = "⚠️";
+        // @Deprecated public static final String INFO = "ℹ️";
+        // @Deprecated public static final String ROCKET = "🚀";
+        // @Deprecated public static final String FOLDER = "📁";
+        // @Deprecated public static final String COMPUTER = "💻";
+        // @Deprecated public static final String TOOL = "🔧";
+        // @Deprecated public static final String ART = "🎨";
+        // @Deprecated public static final String WAVE = "👋";
+        // @Deprecated public static final String BULB = "💡";
     }
     
     /**
@@ -219,11 +234,11 @@ public class WindowsSupport {
     public static void printStatus(String type, String message) {
         String symbol;
         switch (type.toLowerCase()) {
-            case "success": symbol = Symbols.SUCCESS; break;
-            case "error": symbol = Symbols.ERROR; break;
-            case "warning": symbol = Symbols.WARNING; break;
-            case "info": symbol = Symbols.INFO; break;
-            default: symbol = Symbols.INFO; break;
+            case "success": symbol = Symbols.SUCCESS(); break;
+            case "error": symbol = Symbols.ERROR(); break;
+            case "warning": symbol = Symbols.WARNING(); break;
+            case "info": symbol = Symbols.INFO(); break;
+            default: symbol = Symbols.INFO(); break;
         }
         System.out.println(symbol + " " + message);
     }

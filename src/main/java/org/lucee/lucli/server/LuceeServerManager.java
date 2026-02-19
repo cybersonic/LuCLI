@@ -22,6 +22,7 @@ import java.net.URI;
 import java.awt.Desktop;
 import java.awt.GraphicsEnvironment;
 
+import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.deps.ExtensionDependencyInstaller;
 import org.lucee.lucli.server.runtime.LuceeExpressRuntimeProvider;
 import org.lucee.lucli.server.runtime.RuntimeProvider;
@@ -329,6 +330,11 @@ public class LuceeServerManager {
             // Deploy any extension dependencies to the sandbox server
             deployExtensionsForServer(projectDir, serverInstanceDir);
 
+            // Copy welcome index.cfm if Lucee is enabled and no index.cfm exists in webroot
+            if (config.enableLucee) {
+                copyWelcomeIndexIfMissing(config, projectDir);
+            }
+
             // Launch foreground process; this blocks until shutdown
             launchServerProcess(serverInstanceDir, config, projectDir, luceeExpressDir,
                                 agentOverrides, environment, true);
@@ -425,6 +431,11 @@ public class LuceeServerManager {
         // Deploy any extension dependencies to the sandbox server
         deployExtensionsForServer(projectDir, serverInstanceDir);
 
+        // Copy welcome index.cfm if Lucee is enabled and no index.cfm exists in webroot
+        if (config.enableLucee) {
+            copyWelcomeIndexIfMissing(config, projectDir);
+        }
+
         // Launch background process; this returns immediately
         ServerInstance instance = launchServerProcess(serverInstanceDir, config, projectDir, luceeExpressDir,
                                                      agentOverrides, environment, false);
@@ -497,7 +508,7 @@ public class LuceeServerManager {
 
             // Apply environment overrides if specified
             if (environment != null && !environment.trim().isEmpty()) {
-                config = LuceeServerConfig.applyEnvironment(config, environment);
+                config = LuceeServerConfig.applyEnvironment(config, environment, projectDir);
             }
         }
         
@@ -1580,6 +1591,43 @@ public class LuceeServerManager {
         } catch (Exception e) {
             // Log but don't fail server startup if extension deployment fails
             System.err.println("Warning: Failed to deploy extensions: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Copy the welcome index.cfm to the webroot if it doesn't exist.
+     * This provides a helpful landing page for new projects.
+     * 
+     * @param config Server configuration containing webroot
+     * @param projectDir Project directory
+     */
+    private void copyWelcomeIndexIfMissing(LuceeServerConfig.ServerConfig config, Path projectDir) {
+        try {
+            Path webroot = LuceeServerConfig.resolveWebroot(config, projectDir);
+            Path indexFile = webroot.resolve("index.cfm");
+            
+            // Only copy if index.cfm doesn't exist
+            if (Files.exists(indexFile)) {
+                LuCLI.printDebug("LuceeServerManager", "index.cfm already exists at: " + indexFile);
+                return;
+            }
+            
+            // Ensure webroot directory exists
+            Files.createDirectories(webroot);
+            
+            // Copy welcome-index.cfm from resources
+            try (InputStream is = getClass().getResourceAsStream("/examples/welcome-index.cfm")) {
+                if (is == null) {
+                    // Resource not found - log for debugging
+                    LuCLI.printDebug("LuceeServerManager", "Welcome index template not found in resources at /examples/welcome-index.cfm");
+                    return;
+                }
+                Files.copy(is, indexFile);
+                System.out.println("📄 Created welcome index.cfm in webroot");
+            }
+        } catch (Exception e) {
+            // Log but don't fail server startup
+            System.err.println("Warning: Could not create welcome index.cfm: " + e.getMessage());
         }
     }
     

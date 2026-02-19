@@ -3,7 +3,35 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **New Aliases** Added plural aliases for better discoverability: `lucli server` → `lucli servers`, `lucli module` → `lucli modules`, `lucli secret` → `lucli secrets`.
+- **Reusable Table UI Component:** Added `org.lucee.lucli.ui.Table` class for consistent CLI table rendering across commands. Features include multiple title rows, auto-sizing columns, full-width separators, optional footer, and configurable border styles (BOX, ASCII, NONE). Uses builder pattern for fluent API.
+- **ModuleConfig Loader:** Added `org.lucee.lucli.modules.ModuleConfig` class that loads `module.json` once with sensible defaults. Eliminates redundant JSON parsing (was reading file 3x per module) and provides status detection (DEV/INSTALLED/AVAILABLE).
+- **Modules Refactoring:** Moved module commands to `cli/commands/modules/` subpackage. Refactored `ModulesListCommandImpl` to use new Table and ModuleConfig classes for cleaner, more maintainable code.
+- **Code Cleanup:** Removed unused imports across codebase, fixed WindowsSupport statics, general import organization.
+- **Emoji Support Refactoring:** Created new `EmojiSupport` class with centralized global emoji control. Single `showEmojis` setting in `~/.lucli/settings.json` now affects all output. Use `EmojiSupport.process()` to replace emojis with text fallbacks when disabled. Simplified `PromptConfig` and `Terminal` to use this unified approach.
+- **Fix: Prompt Display Bug:** Fixed broken Unicode regex patterns that were stripping letters from paths in prompts (e.g., showing `//` instead of `~/Code/LuCLI`).
+- **Fix: Environment Configuration Merge:** Fixed issue where environment-specific config in `lucee.json` (e.g., `--env=prod`) would revert to defaults instead of properly overriding base config values. Now reads raw JSON from file for correct deep merging.
+- **Fix: Terminal Exception Handling:** Added general exception handler to the REPL loop so uncaught exceptions display an error message and continue instead of crashing the terminal.
+- **Fix: Tab Completion for File Paths:** Fixed tab completion for `ls`, `cat`, `cd`, `head`, `tail`, etc. - completion now triggers correctly after typing a command with a trailing space. Also fixed `~/` path completion to preserve the tilde prefix instead of expanding to the full home path.
+- **External Command File Completion:** Added file path completion as fallback for external commands like `code`, `vim`, `open`, etc.
+- **Welcome Page:** When starting a Lucee server with `enableLucee=true` (the default), LuCLI now automatically creates a welcome `index.cfm` in the webroot if one doesn't exist. The page displays server info, helpful commands, and links to documentation. Existing `index.cfm` files are never overwritten.
+- **Fix:** resolved an issue after refactoring where the values are not returned from the `executeLucliScriptCommand` method, causing CFML command outputs to not be displayed in the terminal. The method now returns the command output as a string, which is printed to the terminal if not empty.
 
+## 0.1.293
+- **REPL Command:** Added `lucli repl` command for an interactive CFML read-eval-print loop. Provides a focused CFML-only environment for quick experimentation with history support, separate from the full terminal mode.
+- **Script Preprocessor:** New `LucliScriptPreprocessor` for `.lucli` script files with support for:
+  - Line continuation using backslash (`\`) at end of line
+  - Comment stripping (lines starting with `#`)
+  - Environment conditional blocks (`#@env:dev ... #@end`, `#@prod`, `#@env:!prod`)
+  - Secret resolution (`${secret:NAME}`)
+  - Placeholder substitution
+- **Environment Flag:** Added `--env`/`-e` option to set the execution environment (dev, staging, prod) for `.lucli` scripts. Also reads from `LUCLI_ENV` environment variable as fallback.
+- **Code Refactoring:** Major internal refactoring of LuCLI main entry point and command handling:
+  - Merged LuCLICommand into LuCLI to eliminate code duplication
+  - Cleaned up main() method and moved routing logic for better maintainability
+  - Added cleaner output methods with format string support
+  - Fixed deprecated method names after refactoring
+- **Documentation:** Added blog layout templates and navigation components. Added TODO document for picocli enhancements and remaining refactoring tasks.
 - **Git Dependency Caching:** Added persistent git dependency cache under `~/.lucli/deps/git-cache` (configurable via `usePersistentGitCache`) and a new `lucli deps prune` command to clear cached git clones.
 
 ## 0.1.266

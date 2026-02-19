@@ -61,8 +61,21 @@ public class Settings {
                 saveSettings();
             }
         } catch (IOException e) {
-            System.err.println("⚠️  Warning: Could not load settings, using defaults: " + e.getMessage());
+            System.err.println("Warning: Could not load settings, using defaults: " + e.getMessage());
             settings = createDefaultSettings();
+        }
+        
+        // Sync emoji preference to global state
+        syncEmojiPreference();
+    }
+    
+    /**
+     * Sync the showEmojis setting to EmojiSupport global state
+     */
+    private void syncEmojiPreference() {
+        JsonNode emojiNode = settings.path("showEmojis");
+        if (!emojiNode.isMissingNode()) {
+            EmojiSupport.setEnabled(emojiNode.asBoolean());
         }
     }
     
@@ -229,6 +242,8 @@ public class Settings {
      */
     public void setShowEmojis(boolean showEmojis) {
         setBoolean("showEmojis", showEmojis);
+        // Sync to global state
+        EmojiSupport.setEnabled(showEmojis);
     }
     
     /**

@@ -60,23 +60,23 @@ public class DaemonCommand implements Callable<Integer> {
 
     /** JSON daemon mode (existing behaviour) */
     private Integer runJsonDaemon() throws Exception {
-        LuCLI.printInfo("Starting LuCLI JSON daemon on 127.0.0.1:" + port + " ...");
+        LuCLI.info("Starting LuCLI JSON daemon on 127.0.0.1:" + port + " ...");
 
         try (ServerSocket server = new ServerSocket(port, 50, InetAddress.getByName("127.0.0.1"))) {
-            LuCLI.printInfo("LuCLI JSON daemon listening on 127.0.0.1:" + port);
+            LuCLI.info("LuCLI JSON daemon listening on 127.0.0.1:" + port);
 
             // Simple, single-threaded loop: handle one connection at a time.
             while (true) {
                 try (Socket client = server.accept()) {
                     if (LuCLI.debug) {
-                        LuCLI.printDebug("Daemon", "Accepted connection from " + client.getRemoteSocketAddress());
+                        LuCLI.debug("Daemon", "Accepted connection from " + client.getRemoteSocketAddress());
                     }
                     handleJsonClient(client);
                 } catch (IOException e) {
                     String msg = e.getMessage();
                     boolean isStreamClosed = msg != null && msg.contains("Stream closed");
                     if (!isStreamClosed) {
-                        LuCLI.printError("Daemon client error: " + msg);
+                        LuCLI.error("Daemon client error: " + msg);
                     }
                     if (LuCLI.debug) {
                         e.printStackTrace();
@@ -96,13 +96,13 @@ public class DaemonCommand implements Callable<Integer> {
         if (line == null || line.trim().isEmpty()) {
             // Nothing to do; close connection.
             if (LuCLI.debug) {
-                LuCLI.printDebug("Daemon", "Received empty request from " + client.getRemoteSocketAddress());
+                LuCLI.debug("Daemon", "Received empty request from " + client.getRemoteSocketAddress());
             }
             return;
         }
 
         if (LuCLI.debug) {
-            LuCLI.printDebug("Daemon", "Raw request from " + client.getRemoteSocketAddress() + ": " + line);
+            LuCLI.debug("Daemon", "Raw request from " + client.getRemoteSocketAddress() + ": " + line);
         }
 
         ObjectMapper mapper = new ObjectMapper();
@@ -111,7 +111,7 @@ public class DaemonCommand implements Callable<Integer> {
             request = mapper.readValue(line, DaemonRequest.class);
         } catch (Exception e) {
             if (LuCLI.debug) {
-                LuCLI.printDebug("Daemon", "Failed to parse JSON request: " + e.getMessage());
+                LuCLI.debug("Daemon", "Failed to parse JSON request: " + e.getMessage());
             }
             writeJsonErrorResponse(writer, 1, "Invalid JSON request: " + e.getMessage());
             return;
@@ -123,7 +123,7 @@ public class DaemonCommand implements Callable<Integer> {
         }
 
         if (LuCLI.debug) {
-            LuCLI.printDebug("Daemon", "Executing request id=" + request.id + " argv=" + Arrays.toString(request.argv));
+            LuCLI.debug("Daemon", "Executing request id=" + request.id + " argv=" + Arrays.toString(request.argv));
         }
 
         // Capture stdout/stderr for this request only (including StringOutput).
@@ -143,7 +143,7 @@ public class DaemonCommand implements Callable<Integer> {
             stringOutput.setErrorStream(capture);
 
             // Reuse the main Picocli command pipeline without System.exit().
-            picocli.CommandLine cmd = new picocli.CommandLine(new org.lucee.lucli.cli.LuCLICommand());
+            picocli.CommandLine cmd = new picocli.CommandLine(new org.lucee.lucli.LuCLI());
             exitCode = cmd.execute(request.argv);
         } catch (Exception e) {
             exitCode = 1;
@@ -161,7 +161,7 @@ public class DaemonCommand implements Callable<Integer> {
         String output = baos.toString(StandardCharsets.UTF_8);
 
         if (LuCLI.debug) {
-            LuCLI.printDebug("Daemon", "Command exitCode=" + exitCode + ", output:\n" + output);
+            LuCLI.debug("Daemon", "Command exitCode=" + exitCode + ", output:\n" + output);
         }
 
         DaemonResponse response = new DaemonResponse();
@@ -171,7 +171,7 @@ public class DaemonCommand implements Callable<Integer> {
 
         if (LuCLI.debug) {
             try {
-                LuCLI.printDebug("Daemon", "Sending response: " + mapper.writeValueAsString(response));
+                LuCLI.debug("Daemon", "Sending response: " + mapper.writeValueAsString(response));
             } catch (Exception ignored) {
                 // Ignore debug serialization errors
             }
@@ -194,24 +194,24 @@ public class DaemonCommand implements Callable<Integer> {
 
     /** LSP daemon mode: minimal echo implementation via a CFML module. */
     private Integer runLspDaemon() throws Exception {
-        LuCLI.printInfo("Starting LuCLI LSP daemon on 127.0.0.1:" + port + " using module '" + lspModuleName + "' ...");
+        LuCLI.info("Starting LuCLI LSP daemon on 127.0.0.1:" + port + " using module '" + lspModuleName + "' ...");
 
         // Ensure Lucee engine + directories are initialized so modules can run.
         LuceeScriptEngine.getInstance();
 
         if (!ModuleCommand.moduleExists(lspModuleName)) {
-            LuCLI.printError("LSP module '" + lspModuleName + "' not found under ~/.lucli/modules.");
-            LuCLI.printError("Install or create it with 'lucli modules init " + lspModuleName + "'.");
+            LuCLI.error("LSP module '" + lspModuleName + "' not found under ~/.lucli/modules.");
+            LuCLI.error("Install or create it with 'lucli modules init " + lspModuleName + "'.");
             return 1;
         }
 
         try (ServerSocket server = new ServerSocket(port, 50, InetAddress.getByName("127.0.0.1"))) {
-            LuCLI.printInfo("LuCLI LSP daemon listening on 127.0.0.1:" + port);
+            LuCLI.info("LuCLI LSP daemon listening on 127.0.0.1:" + port);
 
             while (true) {
                 Socket client = server.accept();
                 if (LuCLI.debug) {
-                    LuCLI.printDebug("LSP", "Accepted connection from " + client.getRemoteSocketAddress());
+                    LuCLI.debug("LSP", "Accepted connection from " + client.getRemoteSocketAddress());
                 }
                 // Handle client in-place (single-threaded for now)
                 try {
@@ -252,7 +252,7 @@ public class DaemonCommand implements Callable<Integer> {
                     try {
                         contentLength = Integer.parseInt(value);
                     } catch (NumberFormatException nfe) {
-                        LuCLI.printError("Invalid Content-Length header: " + header);
+                        LuCLI.error("Invalid Content-Length header: " + header);
                         return;
                     }
                 }
@@ -275,7 +275,7 @@ public class DaemonCommand implements Callable<Integer> {
 
             String json = new String(buf, 0, read);
             if (LuCLI.debug) {
-                LuCLI.printDebug("LSP", "Received LSP message: " + json);
+                LuCLI.debug("LSP", "Received LSP message: " + json);
             }
 
             // Pass raw JSON text into the CFML module as a named argument
@@ -294,7 +294,7 @@ public class DaemonCommand implements Callable<Integer> {
                     responseJson = cfResult.toString();
                 }
             } catch (Exception e) {
-                LuCLI.printError("Error executing LSP module '" + lspModuleName + "': " + e.getMessage());
+                LuCLI.error("Error executing LSP module '" + lspModuleName + "': " + e.getMessage());
                 if (LuCLI.debug) {
                     e.printStackTrace();
                 }

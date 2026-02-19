@@ -64,7 +64,7 @@ public class CompletionCommand implements Callable<Integer> {
         private static String generateBashCompletion() {
             // Use picocli's built-in AutoComplete generator so completion scripts
             // follow the standard, well-tested format understood by bash and zsh.
-            CommandLine cmd = new CommandLine(new org.lucee.lucli.cli.LuCLICommand());
+            CommandLine cmd = new CommandLine(new org.lucee.lucli.LuCLI());
             String baseScript = AutoComplete.bash("lucli", cmd);
             
             // Post-process to make version completion dynamic
@@ -90,7 +90,7 @@ public class CompletionCommand implements Callable<Integer> {
         private static String generateZshCompletion() {
             // Picocli's generated bash completion script is also compatible with zsh
             // (it contains the bashcompinit glue), so we can reuse the same script.
-            CommandLine cmd = new CommandLine(new org.lucee.lucli.cli.LuCLICommand());
+            CommandLine cmd = new CommandLine(new org.lucee.lucli.LuCLI());
             String baseScript = AutoComplete.bash("lucli", cmd);
             
             // Post-process to make version completion dynamic
@@ -145,7 +145,7 @@ public class CompletionCommand implements Callable<Integer> {
         }
 
         private static String generateMarkdownDoc() {
-            CommandLine cmd = new CommandLine(new org.lucee.lucli.cli.LuCLICommand());
+            CommandLine cmd = new CommandLine(new org.lucee.lucli.LuCLI());
             StringBuilder md = new StringBuilder();
             
             // Add front matter and title
@@ -165,7 +165,7 @@ public class CompletionCommand implements Callable<Integer> {
             CommandLine.Model.CommandSpec spec = cmd.getCommandSpec();
             for (CommandLine.Model.OptionSpec option : spec.options()) {
                 if (option.hidden()) continue;
-                String names = String.join(", ", option.names());
+                // String names = String.join(", ", option.names());
                 String shortOpt = "";
                 String longOpt = "";
                 

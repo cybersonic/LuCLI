@@ -13,8 +13,16 @@
 # - Template-based Tomcat configuration
 # - Version bumping system
 # - Command consistency between CLI and terminal modes
+#
+# JUnit XML output:
+#   By default, writes test-results.xml in the current directory
+#   Set JUNIT_XML_OUTPUT to a different path, or set NO_JUNIT_XML=1 to disable
 # Try to load SDKMAN! and apply .sdkmanrc, but don't hard-fail if missing
-if [ -s "$HOME/.sdkman/bin/sdkman-init.sh" ]; then
+# Skip SDKMAN in CI environments (GitHub Actions sets CI=true)
+if [[ "${CI:-}" == "true" ]]; then
+  echo "CI environment detected, skipping SDKMAN (using pre-configured Java):"
+  java -version 2>&1 | head -n 1
+elif [ -s "$HOME/.sdkman/bin/sdkman-init.sh" ]; then
   # shellcheck source=/dev/null
   source "$HOME/.sdkman/bin/sdkman-init.sh"
   if command -v sdk >/dev/null 2>&1; then
@@ -27,7 +35,14 @@ else
   echo "Warning: SDKMAN! not found at \$HOME/.sdkman; using current Java:"
   java -version 2>&1 | head -n 1
 fi
-mvn clean package -DskipTests -Pbinary # Ensure the LuCLI JAR is built before running tests
+
+# Build the JAR unless running in CI (where it's already built by the workflow)
+if [[ "${CI:-}" == "true" ]]; then
+  echo "CI environment detected, skipping Maven build (JAR already built by workflow)"
+else
+  mvn clean package -DskipTests -Pbinary # Ensure the LuCLI JAR is built before running tests
+fi
+
 set -e  # Exit on any error
 
 # Colors for output
@@ -52,6 +67,118 @@ export LUCLI_HOME="$LUCLI_HOME_TEST"
 # Optional: filter tests by name (substring match, case-insensitive)
 TEST_FILTER="${TEST_FILTER:-}"
 
+# JUnit XML output configuration
+# Default to test-results.xml unless NO_JUNIT_XML=1 is set
+if [[ -n "${NO_JUNIT_XML:-}" ]]; then
+    JUNIT_XML_OUTPUT=""
+else
+    JUNIT_XML_OUTPUT="${JUNIT_XML_OUTPUT:-test-results.xml}"
+fi
+TEST_SUITE_NAME="LuCLI Test Suite"
+TEST_SUITE_START_TIME=$(date +%s)
+ORIGINAL_DIR="$(pwd)"
+
+# Arrays to store test results for JUnit XML
+declare -a JUNIT_TEST_NAMES
+declare -a JUNIT_TEST_TIMES
+declare -a JUNIT_TEST_STATUSES  # "passed", "failed", "skipped"
+declare -a JUNIT_TEST_MESSAGES
+declare -a JUNIT_TEST_CLASSNAMES
+CURRENT_CLASSNAME="LuCLI"
+
+# Function to escape XML special characters
+xml_escape() {
+    local str="$1"
+    str="${str//&/&amp;}"
+    str="${str//</&lt;}"
+    str="${str//>/&gt;}"
+    str="${str//\"/&quot;}"
+    str="${str//\'/&apos;}"
+    # Remove ANSI color codes
+    str=$(echo "$str" | sed 's/\x1b\[[0-9;]*m//g')
+    printf '%s' "$str"
+}
+
+# Function to record a test result for JUnit XML
+record_test_result() {
+    local test_name="$1"
+    local status="$2"      # "passed", "failed", "skipped"
+    local duration="$3"    # in seconds
+    local message="$4"     # failure/skip message (optional)
+    
+    JUNIT_TEST_NAMES+=("$test_name")
+    JUNIT_TEST_TIMES+=("$duration")
+    JUNIT_TEST_STATUSES+=("$status")
+    JUNIT_TEST_MESSAGES+=("$message")
+    JUNIT_TEST_CLASSNAMES+=("$CURRENT_CLASSNAME")
+}
+
+# Function to write JUnit XML report
+write_junit_xml() {
+    local output_file="$1"
+    local total_time=$(($(date +%s) - TEST_SUITE_START_TIME))
+    local test_count=${#JUNIT_TEST_NAMES[@]}
+    local failure_count=0
+    local skip_count=0
+    
+    # Count failures and skips
+    for status in "${JUNIT_TEST_STATUSES[@]}"; do
+        case "$status" in
+            failed) failure_count=$((failure_count + 1)) ;;
+            skipped) skip_count=$((skip_count + 1)) ;;
+        esac
+    done
+    
+    # Write XML header
+    cat > "$output_file" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="$(xml_escape "$TEST_SUITE_NAME")" tests="$test_count" failures="$failure_count" skipped="$skip_count" time="$total_time" timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)">
+EOF
+    
+    # Write each test case
+    for i in "${!JUNIT_TEST_NAMES[@]}"; do
+        local name=$(xml_escape "${JUNIT_TEST_NAMES[$i]}")
+        local classname=$(xml_escape "${JUNIT_TEST_CLASSNAMES[$i]}")
+        local time="${JUNIT_TEST_TIMES[$i]}"
+        local status="${JUNIT_TEST_STATUSES[$i]}"
+        local message=$(xml_escape "${JUNIT_TEST_MESSAGES[$i]}")
+        
+        echo "    <testcase name=\"$name\" classname=\"$classname\" time=\"$time\">" >> "$output_file"
+        
+        case "$status" in
+            failed)
+                echo "      <failure message=\"Test failed\">$message</failure>" >> "$output_file"
+                ;;
+            skipped)
+                echo "      <skipped message=\"$message\"/>" >> "$output_file"
+                ;;
+        esac
+        
+        echo "    </testcase>" >> "$output_file"
+    done
+    
+    # Close XML
+    cat >> "$output_file" << EOF
+  </testsuite>
+</testsuites>
+EOF
+    
+    echo -e "${GREEN}✅ JUnit XML report written to: $output_file${NC}"
+}
+
+# Trap to ensure JUnit XML is written even on early exit
+cleanup_and_write_junit() {
+    local exit_code=$?
+    # Return to original directory to write JUnit XML
+    cd "$ORIGINAL_DIR" 2>/dev/null || true
+    if [[ -n "$JUNIT_XML_OUTPUT" ]]; then
+        write_junit_xml "$JUNIT_XML_OUTPUT" 2>/dev/null || true
+    fi
+    exit $exit_code
+}
+trap cleanup_and_write_junit EXIT
+
 echo -e "${BLUE}🧪 LuCLI Comprehensive Test Suite${NC}"
 echo -e "${BLUE}===================================${NC}"
 echo ""
@@ -61,10 +188,12 @@ run_test() {
     local test_name="$1"
     local command="$2"
     local expected_exit_code="${3:-0}"
+    local start_time=$(date +%s)
 
     # If TEST_FILTER is set and this test name doesn't match, skip it
     if [[ -n "$TEST_FILTER" ]] && ! echo "$test_name" | grep -iq -- "$TEST_FILTER"; then
         echo -e "${BLUE}↷ Skipping: ${test_name} (does not match filter '${TEST_FILTER}')${NC}"
+        record_test_result "$test_name" "skipped" "0" "Filtered out by TEST_FILTER"
         return
     fi
     
@@ -72,21 +201,21 @@ run_test() {
     echo -e "${YELLOW}Command: ${command}${NC}"
     
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
+    local output
+    output=$(eval "$command" 2>&1)
+    local actual_exit_code=$?
+    local duration=$(($(date +%s) - start_time))
     
-    if eval "$command" > /dev/null 2>&1; then
-        if [ $? -eq $expected_exit_code ]; then
-            echo -e "${GREEN}✅ PASSED${NC}"
-        else
-            echo -e "${RED}❌ FAILED (wrong exit code)${NC}"
-            FAILED_TESTS=$((FAILED_TESTS + 1))
-        fi
+    if [ $actual_exit_code -eq $expected_exit_code ]; then
+        echo -e "${GREEN}✅ PASSED${NC}"
+        record_test_result "$test_name" "passed" "$duration" ""
+    elif [ $expected_exit_code -ne 0 ] && [ $actual_exit_code -ne 0 ]; then
+        echo -e "${GREEN}✅ PASSED (expected failure)${NC}"
+        record_test_result "$test_name" "passed" "$duration" ""
     else
-        if [ $expected_exit_code -ne 0 ]; then
-            echo -e "${GREEN}✅ PASSED (expected failure)${NC}"
-        else
-            echo -e "${RED}❌ FAILED${NC}"
-            FAILED_TESTS=$((FAILED_TESTS + 1))
-        fi
+        echo -e "${RED}❌ FAILED (exit code: $actual_exit_code, expected: $expected_exit_code)${NC}"
+        FAILED_TESTS=$((FAILED_TESTS + 1))
+        record_test_result "$test_name" "failed" "$duration" "Exit code: $actual_exit_code, expected: $expected_exit_code. Output: $output"
     fi
     echo ""
 }
@@ -96,10 +225,12 @@ run_test_with_output() {
     local test_name="$1"
     local command="$2"
     local expected_pattern="$3"
+    local start_time=$(date +%s)
 
     # If TEST_FILTER is set and this test name doesn't match, skip it
     if [[ -n "$TEST_FILTER" ]] && ! echo "$test_name" | grep -iq -- "$TEST_FILTER"; then
         echo -e "${BLUE}↷ Skipping: ${test_name} (does not match filter '${TEST_FILTER}')${NC}"
+        record_test_result "$test_name" "skipped" "0" "Filtered out by TEST_FILTER"
         return
     fi
     
@@ -110,15 +241,18 @@ run_test_with_output() {
     
     local output=$(eval "$command" 2>&1)
     local exit_code=$?
+    local duration=$(($(date +%s) - start_time))
     
     if [ $exit_code -eq 0 ] && echo "$output" | grep -q "$expected_pattern"; then
         echo -e "${GREEN}✅ PASSED${NC}"
         echo -e "${PURPLE}Output sample: $(echo "$output" | head -n 1)${NC}"
+        record_test_result "$test_name" "passed" "$duration" ""
     else
         echo -e "${RED}❌ FAILED${NC}"
         echo -e "${RED}Exit code: $exit_code${NC}"
         echo -e "${RED}Output: $output${NC}"
         FAILED_TESTS=$((FAILED_TESTS + 1))
+        record_test_result "$test_name" "failed" "$duration" "Exit code: $exit_code. Pattern '$expected_pattern' not found. Output: $output"
     fi
     echo ""
 }
@@ -128,10 +262,12 @@ run_help_test() {
     local test_name="$1"
     local command="$2"
     local expected_pattern="$3"
+    local start_time=$(date +%s)
 
     # If TEST_FILTER is set and this test name doesn't match, skip it
     if [[ -n "$TEST_FILTER" ]] && ! echo "$test_name" | grep -iq -- "$TEST_FILTER"; then
         echo -e "${BLUE}↷ Skipping: ${test_name} (does not match filter '${TEST_FILTER}')${NC}"
+        record_test_result "$test_name" "skipped" "0" "Filtered out by TEST_FILTER"
         return
     fi
     
@@ -142,16 +278,19 @@ run_help_test() {
     
     local output=$(eval "$command" 2>&1)
     local exit_code=$?
+    local duration=$(($(date +%s) - start_time))
     
     # Help commands can exit with 0, 1, or 2, all are acceptable
     if ([ $exit_code -eq 0 ] || [ $exit_code -eq 1 ] || [ $exit_code -eq 2 ]) && echo "$output" | grep -q "$expected_pattern"; then
         echo -e "${GREEN}✅ PASSED${NC}"
         echo -e "${PURPLE}Output sample: $(echo "$output" | head -n 1)${NC}"
+        record_test_result "$test_name" "passed" "$duration" ""
     else
         echo -e "${RED}❌ FAILED${NC}"
         echo -e "${RED}Exit code: $exit_code${NC}"
         echo -e "${RED}Output: $output${NC}"
         FAILED_TESTS=$((FAILED_TESTS + 1))
+        record_test_result "$test_name" "failed" "$duration" "Exit code: $exit_code. Pattern '$expected_pattern' not found. Output: $output"
     fi
     echo ""
 }
@@ -471,6 +610,8 @@ if command -v curl &> /dev/null; then
     # Skip both tests together if they don't match TEST_FILTER
     if [[ -n "$TEST_FILTER" ]] && ! echo "$SANDBOX_TEST_NAME_PORT $SANDBOX_TEST_NAME_CLEANUP" | grep -iq -- "$TEST_FILTER"; then
         echo -e "${BLUE}↷ Skipping sandbox server tests (do not match filter '${TEST_FILTER}')${NC}"
+        record_test_result "$SANDBOX_TEST_NAME_PORT" "skipped" "0" "Filtered out by TEST_FILTER"
+        record_test_result "$SANDBOX_TEST_NAME_CLEANUP" "skipped" "0" "Filtered out by TEST_FILTER"
     else
         SANDBOX_PROJECT="sandbox_project"
         SANDBOX_PORT=9099
@@ -495,7 +636,7 @@ if command -v curl &> /dev/null; then
 
         echo -e "${CYAN}Starting sandbox server in foreground (inside timeout)...${NC}"
         (
-          cd "$SANDBOX_PROJECT" && timeout 30 java -jar ../$LUCLI_JAR server run --sandbox --disable-lucee --port "$SANDBOX_PORT"
+          cd "$SANDBOX_PROJECT" && timeout 30 java -jar ../$LUCLI_JAR server run --sandbox --disable-lucee --port "$SANDBOX_PORT" --open-browser false
         ) > sandbox_run.log 2>&1 &
         SANDBOX_RUN_PID=$!
 
@@ -503,11 +644,13 @@ if command -v curl &> /dev/null; then
         TOTAL_TESTS=$((TOTAL_TESTS + 1))
         if wait_for_sandbox_port "$SANDBOX_PORT" 20; then
             echo -e "${GREEN}✅ ${SANDBOX_TEST_NAME_PORT}${NC}"
+            record_test_result "$SANDBOX_TEST_NAME_PORT" "passed" "0" ""
         else
             echo -e "${RED}❌ ${SANDBOX_TEST_NAME_PORT}${NC}"
             echo -e "${YELLOW}💡 Sandbox run log:${NC}"
             [ -f sandbox_run.log ] && sed -e '1,40p' sandbox_run.log || true
             FAILED_TESTS=$((FAILED_TESTS + 1))
+            record_test_result "$SANDBOX_TEST_NAME_PORT" "failed" "0" "Port $SANDBOX_PORT did not respond"
         fi
 
         # Allow the timeout or manual stop to complete, then give sandbox cleanup some time
@@ -519,10 +662,12 @@ if command -v curl &> /dev/null; then
         AFTER_SANDBOX_COUNT=$(find "$LUCLI_HOME_TEST/servers" -maxdepth 1 -type d -name 'sandbox_project-sandbox*' 2>/dev/null | wc -l || echo 0)
         if [ "$AFTER_SANDBOX_COUNT" -eq "$BEFORE_SANDBOX_COUNT" ]; then
             echo -e "${GREEN}✅ ${SANDBOX_TEST_NAME_CLEANUP}${NC}"
+            record_test_result "$SANDBOX_TEST_NAME_CLEANUP" "passed" "0" ""
         else
             echo -e "${RED}❌ ${SANDBOX_TEST_NAME_CLEANUP}${NC}"
             echo -e "${YELLOW}Before count: ${BEFORE_SANDBOX_COUNT}, After count: ${AFTER_SANDBOX_COUNT}${NC}"
             FAILED_TESTS=$((FAILED_TESTS + 1))
+            record_test_result "$SANDBOX_TEST_NAME_CLEANUP" "failed" "0" "Before: $BEFORE_SANDBOX_COUNT, After: $AFTER_SANDBOX_COUNT"
         fi
 
         rm -rf "$SANDBOX_PROJECT"
@@ -532,23 +677,27 @@ else
 fi
 
 # Test 5: Invalid environment error handling
+TOTAL_TESTS=$((TOTAL_TESTS + 1))
 if java -jar ../$LUCLI_JAR server start --env=invalid --dry-run env_test_project 2>&1 | grep -q "not found in lucee.json"; then
     echo -e "${GREEN}✅ PASSED - Invalid environment error handled correctly${NC}"
+    record_test_result "Invalid environment error handled correctly" "passed" "0" ""
 else
     echo -e "${RED}❌ FAILED - Invalid environment should show error${NC}"
     FAILED_TESTS=$((FAILED_TESTS + 1))
+    record_test_result "Invalid environment error handled correctly" "failed" "0" "Expected 'not found in lucee.json' message"
 fi
-TOTAL_TESTS=$((TOTAL_TESTS + 1))
 echo ""
 
 # Test 6: Environment display shows available environments
+TOTAL_TESTS=$((TOTAL_TESTS + 1))
 if java -jar ../$LUCLI_JAR server start --env=nonexistent --dry-run env_test_project 2>&1 | grep -q "Available environments:"; then
     echo -e "${GREEN}✅ PASSED - Error message lists available environments${NC}"
+    record_test_result "Error message lists available environments" "passed" "0" ""
 else
     echo -e "${RED}❌ FAILED - Should list available environments${NC}"
     FAILED_TESTS=$((FAILED_TESTS + 1))
+    record_test_result "Error message lists available environments" "failed" "0" "Expected 'Available environments:' message"
 fi
-TOTAL_TESTS=$((TOTAL_TESTS + 1))
 echo ""
 
 # Test 7: Deep merge preserves nested values
@@ -634,7 +783,7 @@ run_test "Re-lock configuration" "(cd lock_test_project && java -jar ../../$LUCL
 # Change lucee.json to introduce drift
 run_test "Modify lucee.json to cause drift" "(cd lock_test_project && sed -i '' 's/8082/8083/' lucee.json)"
 # Start server and expect LOCKED warning (start may time out or be stopped externally, that's fine)
-run_test_with_output "server start logs lock drift warning" "(cd lock_test_project && timeout 60 java -jar ../../$LUCLI_JAR server start 2>&1 || true)" "Server configuration is LOCKED for env '_default' (lucee-lock.json)"
+run_test_with_output "server start logs lock drift warning" "(cd lock_test_project && timeout 60 java -jar ../../$LUCLI_JAR server start --open-browser false 2>&1 || true)" "Server configuration is LOCKED for env '_default' (lucee-lock.json)"
 
 # Clean up lock test project
 rm -rf lock_test_project
@@ -673,13 +822,15 @@ run_test_with_output "Version command returns LuCLI banner" "java -jar ../$LUCLI
 # Check that binary and JAR versions match
 BINARY_VERSION=$(../$LUCLI_BINARY --version | grep -o 'LuCLI [0-9.]*' | cut -d' ' -f2)
 JAR_VERSION=$(java -jar ../$LUCLI_JAR --version | grep -o 'LuCLI [0-9.]*' | cut -d' ' -f2)
+TOTAL_TESTS=$((TOTAL_TESTS + 1))
 if [ "$BINARY_VERSION" = "$JAR_VERSION" ]; then
     echo -e "${GREEN}✅ Binary and JAR versions match: $BINARY_VERSION${NC}"
+    record_test_result "Binary and JAR versions match" "passed" "0" ""
 else
     echo -e "${RED}❌ Version mismatch - Binary: $BINARY_VERSION, JAR: $JAR_VERSION${NC}"
     FAILED_TESTS=$((FAILED_TESTS + 1))
+    record_test_result "Binary and JAR versions match" "failed" "0" "Binary: $BINARY_VERSION, JAR: $JAR_VERSION"
 fi
-TOTAL_TESTS=$((TOTAL_TESTS + 1))
 echo ""
 
 # Test 21: Performance and Stress Tests
@@ -692,15 +843,18 @@ run_test "JAR file size reasonable" "test $(stat -f%z ../$LUCLI_JAR) -lt 1000000
 echo -e "${BLUE}=== Server CFML Integration Tests ===${NC}"
 if command -v curl &> /dev/null; then
     echo -e "${CYAN}Running comprehensive server and CFML tests...${NC}"
+    TOTAL_TESTS=$((TOTAL_TESTS + 1))
     if ../tests/test-server-cfml.sh; then
         echo -e "${GREEN}✅ Server CFML tests completed successfully${NC}"
+        record_test_result "Server CFML Integration Tests" "passed" "0" ""
     else
         echo -e "${RED}❌ Server CFML tests failed${NC}"
         FAILED_TESTS=$((FAILED_TESTS + 1))
+        record_test_result "Server CFML Integration Tests" "failed" "0" "test-server-cfml.sh failed"
     fi
-    TOTAL_TESTS=$((TOTAL_TESTS + 1))
 else
     echo -e "${YELLOW}⚠️ curl not available, skipping server HTTP tests${NC}"
+    record_test_result "Server CFML Integration Tests" "skipped" "0" "curl not available"
     run_test "Server functionality test (basic)" "java -jar ../$LUCLI_JAR server --help > /dev/null"
 fi
 
@@ -708,15 +862,18 @@ fi
 echo -e "${BLUE}=== URL Rewrite Integration Tests ===${NC}"
 if command -v curl &> /dev/null; then
     echo -e "${CYAN}Running URL rewrite and framework routing tests...${NC}"
+    TOTAL_TESTS=$((TOTAL_TESTS + 1))
     if ../tests/test-urlrewrite-integration.sh; then
         echo -e "${GREEN}✅ URL rewrite tests completed successfully${NC}"
+        record_test_result "URL Rewrite Integration Tests" "passed" "0" ""
     else
         echo -e "${RED}❌ URL rewrite tests failed${NC}"
         FAILED_TESTS=$((FAILED_TESTS + 1))
+        record_test_result "URL Rewrite Integration Tests" "failed" "0" "test-urlrewrite-integration.sh failed"
     fi
-    TOTAL_TESTS=$((TOTAL_TESTS + 1))
 else
     echo -e "${YELLOW}⚠️ curl not available, skipping URL rewrite HTTP tests${NC}"
+    record_test_result "URL Rewrite Integration Tests" "skipped" "0" "curl not available"
     run_test "URL rewrite functionality test (basic)" "jar -tf ../$LUCLI_JAR | grep -q 'urlrewrite.xml' || echo 'URL rewrite templates found'"
 fi
 
@@ -739,6 +896,8 @@ echo "Test cleanup completed."
 # Clean up test directories
 cd ..
 rm -rf "$TEST_DIR"
+
+# JUnit XML is written by the EXIT trap (cleanup_and_write_junit)
 
 # Test Results Summary
 echo ""

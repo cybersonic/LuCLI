@@ -7,7 +7,7 @@ import java.util.Optional;
 import java.util.concurrent.Callable;
 
 import org.lucee.lucli.StringOutput;
-import org.lucee.lucli.cli.LuCLICommand;
+import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.secrets.LocalSecretStore;
 import org.lucee.lucli.secrets.SecretStore;
 import org.lucee.lucli.secrets.SecretStoreException;
@@ -22,6 +22,7 @@ import picocli.CommandLine.ParentCommand;
  */
 @Command(
     name = "secrets",
+    aliases = "secret",
     description = "Manage secrets for LuCLI projects",
     mixinStandardHelpOptions = true,
     subcommands = {
@@ -36,7 +37,7 @@ import picocli.CommandLine.ParentCommand;
 public class SecretsCommand implements Callable<Integer> {
 
     @ParentCommand
-    private LuCLICommand parent;
+    private LuCLI parent;
 
     @Override
     public Integer call() throws Exception {

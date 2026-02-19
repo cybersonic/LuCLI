@@ -65,6 +65,7 @@ public class ServerConfigHelper {
         keys.add("monitoring.enabled");
         keys.add("monitoring.jmx.port");
         keys.add("admin.enabled");
+        keys.add("admin.password");
         keys.add("enableLucee");
         keys.add("enableREST");
         keys.add("urlRewrite.enabled");
@@ -74,6 +75,10 @@ public class ServerConfigHelper {
         keys.add("https.enabled");
         keys.add("https.port");
         keys.add("https.redirect");
+        keys.add("ajp.enabled");
+        keys.add("ajp.port");
+        keys.add("configurationFile");
+        keys.add("envFile");
         return keys;
     }
     
@@ -166,6 +171,8 @@ public class ServerConfigHelper {
                     return config.version;
                 case "port":
                     return String.valueOf(config.port);
+                case "shutdownPort":
+                    return config.shutdownPort != null ? String.valueOf(config.shutdownPort) : null;
                 case "name":
                     return config.name;
                 case "host":
@@ -176,6 +183,14 @@ public class ServerConfigHelper {
                     return String.valueOf(config.enableLucee);
                 case "enableREST":
                     return String.valueOf(config.enableREST);
+                case "openBrowser":
+                    return String.valueOf(config.openBrowser);
+                case "openBrowserURL":
+                    return config.openBrowserURL;
+                case "configurationFile":
+                    return config.configurationFile;
+                case "envFile":
+                    return config.envFile;
             }
         } else if (keyPath.length == 2) {
             String category = keyPath[0];
@@ -186,10 +201,14 @@ public class ServerConfigHelper {
                     return getJVMConfigValue(config.jvm, key);
                 case "monitoring":
                     return getMonitoringConfigValue(config.monitoring, key);
+                case "admin":
+                    return getAdminConfigValue(config.admin, key);
                 case "urlRewrite":
                     return getUrlRewriteConfigValue(config.urlRewrite, key);
                 case "https":
                     return getHttpsConfigValue(config.https, key);
+                case "ajp":
+                    return getAjpConfigValue(config.ajp, key);
             }
         } else if (keyPath.length == 3) {
             String category = keyPath[0];
@@ -221,6 +240,13 @@ public class ServerConfigHelper {
                         System.err.println("Invalid port number: " + value);
                     }
                     break;
+                case "shutdownPort":
+                    try {
+                        config.shutdownPort = Integer.parseInt(value);
+                    } catch (NumberFormatException e) {
+                        System.err.println("Invalid shutdown port number: " + value);
+                    }
+                    break;
                 case "name":
                     config.name = value;
                     break;
@@ -232,6 +258,21 @@ public class ServerConfigHelper {
                     break;
                 case "enableLucee":
                     config.enableLucee = Boolean.parseBoolean(value);
+                    break;
+                case "enableREST":
+                    config.enableREST = Boolean.parseBoolean(value);
+                    break;
+                case "openBrowser":
+                    config.openBrowser = Boolean.parseBoolean(value);
+                    break;
+                case "openBrowserURL":
+                    config.openBrowserURL = value;
+                    break;
+                case "configurationFile":
+                    config.configurationFile = value;
+                    break;
+                case "envFile":
+                    config.envFile = value;
                     break;
             }
         } else if (keyPath.length == 2) {
@@ -247,6 +288,10 @@ public class ServerConfigHelper {
                     if (config.monitoring == null) config.monitoring = new LuceeServerConfig.MonitoringConfig();
                     setMonitoringConfigValue(config.monitoring, key, value);
                     break;
+                case "admin":
+                    if (config.admin == null) config.admin = new LuceeServerConfig.AdminConfig();
+                    setAdminConfigValue(config.admin, key, value);
+                    break;
                 case "urlRewrite":
                     if (config.urlRewrite == null) config.urlRewrite = new LuceeServerConfig.UrlRewriteConfig();
                     setUrlRewriteConfigValue(config.urlRewrite, key, value);
@@ -254,6 +299,10 @@ public class ServerConfigHelper {
                 case "https":
                     if (config.https == null) config.https = new LuceeServerConfig.HttpsConfig();
                     setHttpsConfigValue(config.https, key, value);
+                    break;
+                case "ajp":
+                    if (config.ajp == null) config.ajp = new LuceeServerConfig.AjpConfig();
+                    setAjpConfigValue(config.ajp, key, value);
                     break;
             }
         } else if (keyPath.length == 3) {
@@ -304,6 +353,46 @@ public class ServerConfigHelper {
     private void setMonitoringConfigValue(LuceeServerConfig.MonitoringConfig monitoring, String key, String value) {
         switch (key) {
             case "enabled": monitoring.enabled = Boolean.parseBoolean(value); break;
+        }
+    }
+    
+    private String getAdminConfigValue(LuceeServerConfig.AdminConfig admin, String key) {
+        if (admin == null) return null;
+        switch (key) {
+            case "enabled": return String.valueOf(admin.enabled);
+            case "password": return admin.password;
+            default: return null;
+        }
+    }
+    
+    private void setAdminConfigValue(LuceeServerConfig.AdminConfig admin, String key, String value) {
+        switch (key) {
+            case "enabled": admin.enabled = Boolean.parseBoolean(value); break;
+            case "password": admin.password = value; break;
+        }
+    }
+    
+    private String getAjpConfigValue(LuceeServerConfig.AjpConfig ajp, String key) {
+        if (ajp == null) return null;
+        switch (key) {
+            case "enabled": return String.valueOf(ajp.enabled);
+            case "port": return ajp.port != null ? String.valueOf(ajp.port) : null;
+            default: return null;
+        }
+    }
+    
+    private void setAjpConfigValue(LuceeServerConfig.AjpConfig ajp, String key, String value) {
+        switch (key) {
+            case "enabled":
+                ajp.enabled = Boolean.parseBoolean(value);
+                break;
+            case "port":
+                try {
+                    ajp.port = Integer.parseInt(value);
+                } catch (NumberFormatException e) {
+                    System.err.println("Invalid AJP port number: " + value);
+                }
+                break;
         }
     }
     

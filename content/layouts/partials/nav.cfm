@@ -13,6 +13,7 @@
             <a href="/#getting-started" class="nav-link">Get started</a> -->
         <a href="/download" class="nav-link">Download</a>
         <a href="/docs/index.html" class="nav-link">Documentation</a>
+        <a href="/posts/" class="nav-link">Blog</a>
         <a href="/about" class="nav-link">About</a>
         <a
           href="https://github.com/cybersonic/LuCLI"

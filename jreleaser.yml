@@ -1,16 +1,35 @@
 project:
   # These can be omitted; Maven plugin will fill in from pom.xml.
-  name: lucli
+  name: LuCLI
   description: A CLI for Lucee
   authors:
     - Mark Drew
   license: MIT
+  copyright: 2025 Mark Drew
+  links:
+    homepage: https://lucli.dev/
+    documentation: https://lucli.dev/docs/
 
 release:
   github:
     owner: cybersonic
-    name: lucli
+    name: LuCLI
 
+
+distributions:
+  lucli:
+    type: BINARY
+    executable:
+      name: lucli
+    artifacts:
+      - path: target/lucli
+        platform: osx-x86_64
+      - path: target/lucli
+        platform: osx-aarch_64
+      - path: target/lucli
+        platform: linux-x86_64
+        
+        
 packagers:
   brew:
     # Enable Homebrew packaging for all distributions
@@ -18,28 +37,35 @@ packagers:
     repository:
       owner: cybersonic
       name: homebrew-tap
-distributions:
-  lucli:
-    type: SINGLE_JAR
-    stereotype: CLI
-    java:
-      groupId: org.lucee
-      artifactId: lucli
-      mainClass: org.lucee.lucli.LuCLI
-      version: "17"
-    artifacts:
-      - path: target/lucli.jar
-  lucli-unix:
-    type: BINARY
-    stereotype: CLI
-    artifacts:
-      - path: target/lucli
-        platform: osx-x86_64 # or generic if you want
-      # you can add linux/x86_64 etc. if you build per-platform
+      
+  # lucli:
+  #   type: SINGLE_JAR
+  #   stereotype: CLI
+  #   java:
+  #     groupId: org.lucee
+  #     artifactId: lucli
+  #     mainClass: org.lucee.lucli.LuCLI
+  #     version: "17"
+  #   artifacts:
+  #     - path: target/lucli.jar
+  # lucli-unix:
+  #   type: BINARY
+  #   stereotype: CLI
+  #   artifacts:
+  #     - path: target/lucli
+  #       platform: osx-x86_64 # or generic if you want
+  #     # you can add linux/x86_64 etc. if you build per-platform
 
-  lucli-windows:
-    type: BINARY
-    stereotype: CLI
-    artifacts:
-      - path: target/lucli.bat
-        platform: windows-x86_64
+  # lucli-windows:
+  #   type: BINARY
+  #   stereotype: CLI
+  #   artifacts:
+  #     - path: target/lucli.bat
+  #       platform: windows-x86_64
+
+# announce:
+#   active: ALWAYS
+#   linkedin:
+#     active: RELEASE
+#     accessToken: "{{JRELEASER_LINKEDIN_ACCESS_TOKEN}}"
+#     message: "Announcing the release of LuCLI {{projectVersion}}! Check it out at"

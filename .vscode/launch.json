@@ -45,7 +45,7 @@
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal"
     },
-        {
+    {
       "type": "java",
       "name": "📄 LucCLI File (cfc)",
       "request": "launch",
@@ -53,6 +53,15 @@
       "projectName": "lucli",
       "console": "integratedTerminal",
       "args": ["tests/cfml/Run.cfc", "sayHello", "name=Mark"]
+    },
+    {
+      "type": "java",
+      "name": "📄 LucCLI File (lucli)",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "projectName": "lucli",
+      "console": "integratedTerminal",
+      "args": "tests/test-variables.lucli"
     },
     {
       "type": "java",
@@ -130,6 +139,16 @@
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",
       "args": ["module","run", "hello-world", "lucliCommand"],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "java",
+      "name": "📦 LucCLI Module List",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["module","list"],
       "projectName": "lucli",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal"
@@ -248,10 +267,10 @@
     },
     {
       "type": "java",
-      "name": "🧩 Module MarkSpresso commands ",
+      "name": "🧩 Module MarkSpresso pdf command ",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",
-      "args": ["--verbose", "markspresso", "new", "type=post", "title='Hello World'"],
+      "args": ["--verbose", "markspresso", "pdf"],
       "projectName": "lucli",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal"
@@ -332,7 +351,17 @@
     },
     {
       "type": "java",
-      "name": "🧩 Lucli Deps Install",
+      "name": "🧩 Lucli Deps Install Git",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "projectName": "lucli",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/demo_servers/dependencies_demo",
+      "args": [ "--verbose", "deps", "install"]
+    },
+    {
+      "type": "java",
+      "name": "🧩 Lucli Deps Install File",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",
       "projectName": "lucli",
@@ -349,6 +378,16 @@
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}/examples/dependency-extensions/",
       "args": ["deps", "install"]
+    },
+    {
+      "type": "java",
+      "name": "🧩 Lucli Deps Install Forgebox",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "projectName": "lucli",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/examples/dependency-forgebox/",
+      "args": ["--debug","deps", "install"]
     },
     {
       "type": "java",

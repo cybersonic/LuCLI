@@ -10,26 +10,37 @@ ${builtinVariablesSetup}
 
 // The expression will be injected here by the Java code
 // ${cfmlExpression} placeholder will be replaced
-
+cfmlExpressionAsString = '${cfmlExpression}';
 try {
     // The CFML expression gets injected here
-    result = ${cfmlExpression};
-    
+    result = "";
+    resultOutput = ""
+    savecontent variable="resultOutput" { result = ${cfmlExpression}; }
+
+
+    if(isDefined('resultOutput') && len(resultOutput)) {
+        // If there was output captured, use that as the result to display
+        result = resultOutput;
+    }
+
     if (isDefined('result')) {
+        // Skip boolean true - typically returned by void-like functions (writeOutput, etc.)
         if (isSimpleValue(result)) {
-            writeOutput(toString(result));
+            writeOutput(toString(result) & chr(10));
         } else if (isArray(result)) {
-            writeOutput('[' & arrayToList(result, ', ') & ']');
+            writeOutput('[' & arrayToList(result, ', ') & ']' & chr(10));
         } else if (isStruct(result)) {
-            writeOutput(serializeJSON(result));
+            writeOutput(serializeJSON(result) & chr(10));
         } else if (isQuery(result)) {
-            writeOutput('Query with ' & result.recordCount & ' rows');
+            writeOutput('Query with ' & result.recordCount & ' rows' & chr(10));
         } else {
-            writeOutput(toString(result));
+            writeOutput(toString(result) & chr(10));
         }
     } else {
-        writeOutput('(undefined)');
+        writeOutput('(undefined)' & chr(10));
     }
+
+    
 } catch (any e) {
     writeOutput('${EMOJI_ERROR} CFML Error: ' & e.message);
     if (len(e.detail)) {
