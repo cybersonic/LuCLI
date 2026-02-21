@@ -336,8 +336,8 @@ public class ServerCommandHandler {
                 : serverManager.getServersDir().resolve(finalConfig.name);
 
             try {
-                TomcatConfigGenerator generator = new TomcatConfigGenerator();
-                generator.generateConfiguration(serverInstanceDir, finalConfig, projectDir, sourceDir, false);
+                org.lucee.lucli.server.runtime.CatalinaBaseConfigGenerator generator = new org.lucee.lucli.server.runtime.CatalinaBaseConfigGenerator();
+                generator.generateConfiguration(serverInstanceDir, finalConfig, projectDir, sourceDir, 0, false);
             } catch (IOException e) {
                 return formatOutput("❌ Failed to generate server configuration: " + e.getMessage(), true);
             }
@@ -394,7 +394,7 @@ public class ServerCommandHandler {
                 try {
                     // Get the Lucee Express directory
                     Path luceeExpressDir = serverManager.ensureLuceeExpress(finalConfig.version);
-                    TomcatConfigGenerator tomcatGen = new TomcatConfigGenerator();
+                    org.lucee.lucli.server.runtime.CatalinaBaseConfigGenerator tomcatGen = new org.lucee.lucli.server.runtime.CatalinaBaseConfigGenerator();
                     Path serverInstanceDir = serverManager.getServersDir().resolve(finalConfig.name);
 
                     if(includeLuceeConfig) {

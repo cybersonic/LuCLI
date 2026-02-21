@@ -11,6 +11,7 @@ LuCLI supports multiple runtime providers for running your CFML applications. Th
 |---------|----------|---------------|------------------|
 | **Lucee Express** (default) | Development, quick start | Any | None |
 | **External Tomcat** | Production, enterprise | 7.x for Tomcat 10+, 6.x for Tomcat 9 | Medium |
+| **Docker** *(experimental)* | Containers, CI/CD | Determined by image | Low |
 
 ## Lucee Express (Default)
 
@@ -203,6 +204,96 @@ lucli server start --env dev
 lucli server start --env prod
 ```
 
+## Docker *(Experimental)*
+
+Run your CFML application inside a Docker container using the official `lucee/lucee` image. LuCLI manages the container lifecycle so `server start`, `server stop`, `server status`, and `server list` all work as expected.
+
+> **Note:** Docker runtime is experimental and may not cover all image variants or advanced Docker configurations yet.
+
+### When to Use Docker
+
+- **Container-based workflows** - CI/CD pipelines, Kubernetes, Docker Compose
+- **Consistent environments** - Same image in dev and production
+- **Isolation** - No local Java or Tomcat installation required
+- **Quick experimentation** - Try different Lucee versions via image tags
+
+### Prerequisites
+
+- Docker must be installed and running on your machine
+- The `docker` CLI must be available on your `PATH`
+
+### Configuration
+
+The simplest form — just set the runtime to `"docker"`:
+
+```json
+{
+  "name": "my-app",
+  "port": 8380,
+  "runtime": "docker"
+}
+```
+
+Or with more control:
+
+```json
+{
+  "name": "my-app",
+  "port": 8380,
+  "runtime": {
+    "type": "docker",
+    "image": "lucee/lucee",
+    "tag": "6.2.2.91",
+    "containerName": "my-custom-name"
+  }
+}
+```
+
+### Runtime Options
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `runtime.image` | `lucee/lucee` | Docker image to use. |
+| `runtime.tag` | `latest` | Image tag / version. |
+| `runtime.containerName` | `lucli-{name}` | Docker container name. Defaults to `lucli-` followed by the server name. |
+
+### How It Works
+
+When you run `lucli server start` with a Docker runtime:
+
+1. LuCLI removes any stale container with the same name
+2. Runs `docker run -d` with:
+   - Port mapping: your configured `port` → container port 8888
+   - Volume mount: your project directory → `/var/www` (the Lucee webroot)
+3. Waits for the server to become available on the mapped port
+4. Tracks the container via a `.docker-container` marker file
+
+`server stop` sends `docker stop` followed by `docker rm`. `server status` and `server list` check the container state via `docker inspect`.
+
+### Environment Variables
+
+LuCLI passes several environment variables to the container automatically:
+
+- `LUCEE_ADMIN_PASSWORD` — from `admin.password` in `lucee.json`
+- `LUCEE_EXTENSIONS` — from your dependency lock file
+- Any custom variables defined in `envVars` in `lucee.json`
+
+### Choosing an Image Tag
+
+The `lucee/lucee` image publishes tags for specific versions:
+
+```json
+{"runtime": {"type": "docker", "tag": "6.2.2.91"}}
+```
+
+Use `latest` for the most recent stable release, or pin to a specific version for reproducibility.
+
+### Limitations
+
+- Foreground mode (`server run`) is not yet supported for Docker — servers always start in the background
+- The server instance directory is not mounted into the container (Tomcat configuration inside the container is managed by the image)
+- Advanced Docker options (networks, extra volumes, resource limits) are not yet configurable via `lucee.json`
+
 ## URL Rewriting
 
 URL rewriting configuration depends on your Tomcat version.
@@ -245,6 +336,8 @@ Start
   │
   ├─► Production with existing Tomcat? ──► External Tomcat
   │
+  ├─► Container-based / CI/CD workflow? ──► Docker
+  │
   ├─► Simple deployment, self-contained? ──► Lucee Express
   │
   └─► Enterprise IT policies require Tomcat? ──► External Tomcat
@@ -252,15 +345,15 @@ Start
 
 ### Quick Comparison
 
-| Feature | Lucee Express | External Tomcat |
-|---------|---------------|-----------------|
-| Setup time | Instant | Requires Tomcat install |
-| Tomcat version | Bundled | Your choice |
-| Tomcat customization | Limited | Full control |
-| Lucee/Tomcat coupling | Tied together | Independent |
-| Multiple apps | Separate instances | Can share |
-| Production hardening | Basic | Your configuration |
-| Upgrade path | Replace download | Upgrade independently |
+| Feature | Lucee Express | External Tomcat | Docker |
+|---------|---------------|-----------------|--------|
+| Setup time | Instant | Requires Tomcat install | Requires Docker |
+| Tomcat version | Bundled | Your choice | Determined by image |
+| Tomcat customization | Limited | Full control | Via Dockerfile |
+| Lucee/Tomcat coupling | Tied together | Independent | Managed by image |
+| Multiple apps | Separate instances | Can share | Separate containers |
+| Production hardening | Basic | Your configuration | Image-based |
+| Upgrade path | Replace download | Upgrade independently | Change image tag |
 
 ## Migration Between Runtimes
 
@@ -303,3 +396,17 @@ Check the version compatibility table above. Update either your Lucee version or
 ### Port conflicts
 
 The external Tomcat's ports are controlled by LuCLI, not your Tomcat's default server.xml. Check your `lucee.json` port settings.
+
+### Docker: Container starts but pages don't load
+
+1. Check the container is running: `docker ps --filter name=lucli-<name>`
+2. Check container logs: `docker logs lucli-<name>`
+3. Verify your project directory is mounted: `docker exec lucli-<name> ls /var/www/`
+
+### Docker: "container name already in use"
+
+LuCLI automatically cleans up stale containers before starting. If you see this error, the container may have been created outside of LuCLI. Remove it manually:
+
+```bash
+docker rm -f lucli-<name>
+```

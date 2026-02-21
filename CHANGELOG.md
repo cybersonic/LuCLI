@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Runtime Providers:** LuCLI now supports pluggable server runtimes via the new `runtime` key in `lucee.json`. Choose how your Lucee server runs:
+  - **Lucee Express** (default) — same as before, no config change needed.
+  - **Vendor Tomcat** — point LuCLI at your own Tomcat installation with `"runtime": {"type": "tomcat", "catalinaHome": "/path/to/tomcat"}`. LuCLI validates the installation, checks Lucee/Tomcat version compatibility, and creates an isolated per-server instance. Also supports the `CATALINA_HOME` environment variable as a fallback.
+  - **Docker** *(experimental)* — run Lucee in a Docker container with `"runtime": "docker"`. Automatically pulls the `lucee/lucee` image, maps ports and volumes, and manages the container lifecycle. `server stop`, `server status`, and `server list` all work with Docker containers.
+- **Runtime Configuration in lucee.json:** Supports both string shorthand (`"runtime": "docker"`) and object form (`"runtime": {"type": "tomcat", "catalinaHome": "..."}`) with optional fields for Docker image, tag, and container name. Updated `lucee.schema.json` with the new schema.
+- **Fix: Server Status with Tomcat:** Fixed a bug where `server status` would report a running server as "NOT RUNNING" because the PID file was being overwritten during Tomcat startup.
+- **Documentation:** Added runtime providers guide covering all three providers with configuration examples and a manual QA test guide.
 - **New Aliases** Added plural aliases for better discoverability: `lucli server` → `lucli servers`, `lucli module` → `lucli modules`, `lucli secret` → `lucli secrets`.
 - **Reusable Table UI Component:** Added `org.lucee.lucli.ui.Table` class for consistent CLI table rendering across commands. Features include multiple title rows, auto-sizing columns, full-width separators, optional footer, and configurable border styles (BOX, ASCII, NONE). Uses builder pattern for fluent API.
 - **ModuleConfig Loader:** Added `org.lucee.lucli.modules.ModuleConfig` class that loads `module.json` once with sensible defaults. Eliminates redundant JSON parsing (was reading file 3x per module) and provides status detection (DEV/INSTALLED/AVAILABLE).

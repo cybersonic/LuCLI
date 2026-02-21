@@ -319,10 +319,10 @@ public class LuceeServerManager {
         }
 
         try {
-            // Generate Tomcat configuration and supporting files in the sandbox directory
-            TomcatConfigGenerator configGenerator = new TomcatConfigGenerator();
-            boolean overwriteProjectConfig = forceReplace;
-            configGenerator.generateConfiguration(serverInstanceDir, config, projectDir, luceeExpressDir, overwriteProjectConfig);
+            // Generate CATALINA_BASE configuration from the Express CATALINA_HOME
+            org.lucee.lucli.server.runtime.CatalinaBaseConfigGenerator configGenerator =
+                    new org.lucee.lucli.server.runtime.CatalinaBaseConfigGenerator();
+            configGenerator.generateConfiguration(serverInstanceDir, config, projectDir, luceeExpressDir, 0, forceReplace);
 
             // Write CFConfig (.CFConfig.json) if present in the in-memory configuration
             LuceeServerConfig.writeCfConfigIfPresent(config, projectDir, serverInstanceDir);
@@ -336,8 +336,8 @@ public class LuceeServerManager {
             }
 
             // Launch foreground process; this blocks until shutdown
-            launchServerProcess(serverInstanceDir, config, projectDir, luceeExpressDir,
-                                agentOverrides, environment, true);
+            launchTomcatProcess(luceeExpressDir, serverInstanceDir, config, projectDir,
+                                agentOverrides, environment, true, "lucee-express");
         } finally {
             // After the foreground process exits, clean up the sandbox server directory
             try {
@@ -420,10 +420,10 @@ public class LuceeServerManager {
             System.err.println("Warning: Failed to write sandbox marker: " + e.getMessage());
         }
 
-        // Generate Tomcat configuration and supporting files in the sandbox directory
-        TomcatConfigGenerator configGenerator = new TomcatConfigGenerator();
-        boolean overwriteProjectConfig = forceReplace;
-        configGenerator.generateConfiguration(serverInstanceDir, config, projectDir, luceeExpressDir, overwriteProjectConfig);
+        // Generate CATALINA_BASE configuration from the Express CATALINA_HOME
+        org.lucee.lucli.server.runtime.CatalinaBaseConfigGenerator sandboxConfigGen =
+                new org.lucee.lucli.server.runtime.CatalinaBaseConfigGenerator();
+        sandboxConfigGen.generateConfiguration(serverInstanceDir, config, projectDir, luceeExpressDir, 0, forceReplace);
 
         // Write CFConfig (.CFConfig.json) if present in the in-memory configuration
         LuceeServerConfig.writeCfConfigIfPresent(config, projectDir, serverInstanceDir);
@@ -437,8 +437,8 @@ public class LuceeServerManager {
         }
 
         // Launch background process; this returns immediately
-        ServerInstance instance = launchServerProcess(serverInstanceDir, config, projectDir, luceeExpressDir,
-                                                     agentOverrides, environment, false);
+        ServerInstance instance = launchTomcatProcess(luceeExpressDir, serverInstanceDir, config, projectDir,
+                                                     agentOverrides, environment, false, "lucee-express");
 
         // Optionally wait for startup before returning (same timeout as normal start)
         waitForServerStartup(instance, 30);
@@ -589,14 +589,28 @@ public class LuceeServerManager {
      * Stop a specific server instance
      */
     public boolean stopServer(ServerInstance instance) throws IOException {
-        if (instance.getPid() <= 0) {
-            return false;
-        }
-
         Path serverDir = instance.getServerDir();
         Path pidFile = serverDir.resolve("server.pid");
         Path sandboxMarker = serverDir.resolve(".sandbox");
         boolean isSandbox = Files.exists(sandboxMarker);
+
+        // Docker-managed servers: stop via docker stop + docker rm.
+        Path dockerMarker = serverDir.resolve(".docker-container");
+        if (Files.exists(dockerMarker)) {
+            String containerName = Files.readString(dockerMarker).trim();
+            boolean stopped = org.lucee.lucli.server.runtime.DockerRuntimeProvider
+                    .stopDockerContainer(containerName);
+            Files.deleteIfExists(pidFile);
+            Files.deleteIfExists(dockerMarker);
+            if (isSandbox) {
+                deleteServerDirectory(serverDir);
+            }
+            return stopped;
+        }
+
+        if (instance.getPid() <= 0) {
+            return false;
+        }
         
         try {
             // Try graceful shutdown first
@@ -643,7 +657,7 @@ public class LuceeServerManager {
             return new ServerStatus(false, null, -1, -1, null);
         }
         
-        boolean isRunning = isProcessRunning(instance.getPid());
+        boolean isRunning = isProcessRunning(instance.getPid(), instance.getServerDir());
         return new ServerStatus(isRunning, instance.getServerName(), instance.getPid(), 
                               instance.getPort(), instance.getServerDir());
     }
@@ -675,10 +689,29 @@ public class LuceeServerManager {
                         if (parts.length >= 2) {
                             pid = Long.parseLong(parts[0]);
                             port = Integer.parseInt(parts[1]);
-                            isRunning = isProcessRunning(pid);
+                            isRunning = isProcessRunning(pid, serverDir);
                         }
                     } catch (Exception e) {
                         // Invalid PID file, server is not running
+                    }
+                }
+                
+                // Docker fallback: container may be running without a valid server.pid
+                if (!isRunning) {
+                    Path dockerMarker = serverDir.resolve(".docker-container");
+                    if (Files.exists(dockerMarker)) {
+                        try {
+                            String containerName = Files.readString(dockerMarker).trim();
+                            if (org.lucee.lucli.server.runtime.DockerRuntimeProvider
+                                    .isDockerContainerRunning(containerName)) {
+                                isRunning = true;
+                                pid = -1;
+                                if (port <= 0) {
+                                    port = recoverDockerPort(serverDir);
+                                }
+                            }
+                        } catch (Exception ignored) {
+                        }
                     }
                 }
                 
@@ -713,29 +746,75 @@ public class LuceeServerManager {
             Path serverDir = serversDir.resolve(config.name);
             Path pidFile = serverDir.resolve("server.pid");
             
-            if (!Files.exists(pidFile)) {
-                return null;
+            if (Files.exists(pidFile)) {
+                String pidContent = Files.readString(pidFile).trim();
+                String[] parts = pidContent.split(":");
+                if (parts.length >= 2) {
+                    long pid = Long.parseLong(parts[0]);
+                    int port = Integer.parseInt(parts[1]);
+                    
+                    if (isProcessRunning(pid, serverDir)) {
+                        return new ServerInstance(config.name, pid, port, serverDir, projectDir);
+                    }
+                    // Stale PID file
+                    Files.deleteIfExists(pidFile);
+                }
             }
             
-            String pidContent = Files.readString(pidFile).trim();
-            String[] parts = pidContent.split(":");
-            if (parts.length < 2) {
-                return null;
+            // Fallback: Docker container may still be running even if server.pid
+            // was deleted (e.g. by an older LuCLI build).
+            ServerInstance dockerInstance = getDockerFallbackInstance(config.name, serverDir, projectDir);
+            if (dockerInstance != null) {
+                return dockerInstance;
             }
             
-            long pid = Long.parseLong(parts[0]);
-            int port = Integer.parseInt(parts[1]);
-            
-            if (!isProcessRunning(pid)) {
-                // Remove stale PID file
-                Files.deleteIfExists(pidFile);
-                return null;
-            }
-            
-            return new ServerInstance(config.name, pid, port, serverDir, projectDir);
+            return null;
         } catch (Exception e) {
             return null;
         }
+    }
+    
+    /**
+     * Check for a running Docker container when server.pid is missing.
+     * If the .docker-container marker exists and the container is running,
+     * reconstruct a ServerInstance from the config port.
+     */
+    private ServerInstance getDockerFallbackInstance(String serverName, Path serverDir, Path projectDir) {
+        try {
+            Path dockerMarker = serverDir.resolve(".docker-container");
+            if (!Files.exists(dockerMarker)) {
+                return null;
+            }
+            String containerName = Files.readString(dockerMarker).trim();
+            if (!org.lucee.lucli.server.runtime.DockerRuntimeProvider.isDockerContainerRunning(containerName)) {
+                return null;
+            }
+            // Recover port from lucee.json via project path marker
+            int port = recoverDockerPort(serverDir);
+            // Re-create server.pid so future operations work normally
+            if (port > 0) {
+                Files.writeString(serverDir.resolve("server.pid"), "-1:" + port);
+            }
+            return new ServerInstance(serverName, -1L, port, serverDir, projectDir);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+    
+    /**
+     * Try to recover the HTTP port for a Docker server from its project config.
+     */
+    private int recoverDockerPort(Path serverDir) {
+        try {
+            Path projectPathFile = serverDir.resolve(".project-path");
+            if (Files.exists(projectPathFile)) {
+                Path projectDir = Paths.get(Files.readString(projectPathFile).trim());
+                LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(projectDir);
+                return config.port;
+            }
+        } catch (Exception ignored) {
+        }
+        return -1;
     }
     
     /**
@@ -846,10 +925,24 @@ public class LuceeServerManager {
 
 
     /**
-     * Check if a process is running
+     * Check if a process is running.
+     * For Docker servers (PID <= 0) this checks the container status.
      */
-    private boolean isProcessRunning(long pid) {
+    private boolean isProcessRunning(long pid, Path serverDir) {
         if (pid <= 0) {
+            // Docker-managed server: check container status
+            if (serverDir != null) {
+                Path dockerMarker = serverDir.resolve(".docker-container");
+                if (Files.exists(dockerMarker)) {
+                    try {
+                        String containerName = Files.readString(dockerMarker).trim();
+                        return org.lucee.lucli.server.runtime.DockerRuntimeProvider
+                                .isDockerContainerRunning(containerName);
+                    } catch (Exception e) {
+                        return false;
+                    }
+                }
+            }
             return false;
         }
         
@@ -859,6 +952,11 @@ public class LuceeServerManager {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    /** Convenience overload for callers without a server dir reference. */
+    private boolean isProcessRunning(long pid) {
+        return isProcessRunning(pid, null);
     }
     
     /**
@@ -877,7 +975,7 @@ public class LuceeServerManager {
             String[] parts = pidContent.split(":");
             if (parts.length >= 1) {
                 long pid = Long.parseLong(parts[0]);
-                return isProcessRunning(pid);
+                return isProcessRunning(pid, serverDir);
             }
         } catch (Exception e) {
             // Invalid PID file
@@ -1689,160 +1787,184 @@ public class LuceeServerManager {
     }
     
     /**
-     * Launch the server process using either startup script (background) or catalina run (foreground).
-     * 
-     * @param serverInstanceDir The server instance directory
-     * @param config Server configuration
-     * @param projectDir Project directory
-     * @param luceeExpressDir Lucee Express directory
-     * @param agentOverrides Agent overrides
-     * @param environment Environment name
-     * @param foreground If true, uses 'catalina run' and blocks; if false, uses 'startup' script and returns immediately
-     * @return ServerInstance (only when foreground=false; foreground=true blocks until shutdown)
+     * Launch a Tomcat server process using separate CATALINA_HOME and CATALINA_BASE.
+     * This is the unified launch method used by all runtime providers (Express and vendor Tomcat).
+     *
+     * @param catalinaHome    Read-only Tomcat installation (Express dir or vendor Tomcat)
+     * @param catalinaBase    Per-server instance directory (~/.lucli/servers/&lt;name&gt;)
+     * @param config          Server configuration
+     * @param projectDir      Project directory
+     * @param agentOverrides  Agent overrides (may be null)
+     * @param environment     Environment name (may be null)
+     * @param foreground      If true, uses 'catalina run' and blocks; if false, uses startup script
+     * @param runtimeType     Runtime type marker written to .runtime-type (e.g. "lucee-express", "tomcat")
+     * @return ServerInstance (only when foreground=false; foreground=true returns null)
      */
-    public ServerInstance launchServerProcess(Path serverInstanceDir, LuceeServerConfig.ServerConfig config, 
-                                             Path projectDir, Path luceeExpressDir,
-                                             AgentOverrides agentOverrides, String environment, boolean foreground) throws Exception {
-        
+    public ServerInstance launchTomcatProcess(Path catalinaHome, Path catalinaBase,
+                                              LuceeServerConfig.ServerConfig config,
+                                              Path projectDir,
+                                              AgentOverrides agentOverrides,
+                                              String environment,
+                                              boolean foreground,
+                                              String runtimeType) throws Exception {
+
         boolean isWindows = System.getProperty("os.name", "").toLowerCase().contains("win");
-        
-        // Build command based on foreground mode
+
+        // Build command — look for scripts in bin/ first, then root (Express compat)
         List<String> command = new ArrayList<>();
         Path scriptPath;
-        
+
         if (foreground) {
-            // Use catalina.sh run for foreground mode
             String scriptName = isWindows ? "catalina.bat" : "catalina.sh";
-            scriptPath = luceeExpressDir.resolve("bin").resolve(scriptName);
-            if (!Files.exists(scriptPath) || (!isWindows && !Files.isExecutable(scriptPath))) {
-                throw new Exception("Lucee Express catalina script not found or not executable: " + scriptPath);
-            }
+            scriptPath = catalinaHome.resolve("bin").resolve(scriptName);
             command.add(scriptPath.toString());
             command.add("run");
         } else {
-            // Use startup.sh for background mode
             String scriptName = isWindows ? "startup.bat" : "startup.sh";
-            scriptPath = luceeExpressDir.resolve(scriptName);
-            if (!Files.exists(scriptPath) || (!isWindows && !Files.isExecutable(scriptPath))) {
-                throw new Exception("Lucee Express startup script not found or not executable: " + scriptPath);
+            scriptPath = catalinaHome.resolve("bin").resolve(scriptName);
+            // Lucee Express puts startup.sh in root; fall back
+            if (!Files.exists(scriptPath)) {
+                scriptPath = catalinaHome.resolve(scriptName);
             }
             command.add(scriptPath.toString());
         }
-        
-        // Create process
+
+        if (!Files.exists(scriptPath)) {
+            throw new Exception("Tomcat script not found: " + scriptPath);
+        }
+
+        // Create logs dir before redirecting output
+        Path logsDir = catalinaBase.resolve("logs");
+        Files.createDirectories(logsDir);
+
         ProcessBuilder pb = new ProcessBuilder(command);
-        pb.directory(luceeExpressDir.toFile());
-        
+        pb.directory(catalinaHome.toFile());
+
         if (foreground) {
-            // Inherit I/O streams for foreground mode
             pb.inheritIO();
         } else {
-            // Redirect to log files for background mode
-            pb.redirectOutput(serverInstanceDir.resolve("logs/server.out").toFile());
-            pb.redirectError(serverInstanceDir.resolve("logs/server.err").toFile());
+            pb.redirectOutput(logsDir.resolve("server.out").toFile());
+            pb.redirectError(logsDir.resolve("server.err").toFile());
         }
-        
-        // Set environment variables for Tomcat configuration
+
+        // Environment variables
         Map<String, String> env = pb.environment();
-        // Ensure any .env / envFile values loaded during configuration are also
-        // visible to the child process, without clobbering explicit OS vars.
         LuceeServerConfig.applyLoadedEnvToProcessEnvironment(env);
-        env.put("CATALINA_BASE", serverInstanceDir.toString());
-        env.put("CATALINA_HOME", serverInstanceDir.toString());
-        
-        // Set JVM options through CATALINA_OPTS
+
+        // Key: CATALINA_HOME != CATALINA_BASE
+        env.put("CATALINA_HOME", catalinaHome.toString());
+        env.put("CATALINA_BASE", catalinaBase.toString());
+
         List<String> catalinaOpts = buildCatalinaOpts(config, agentOverrides, projectDir);
         env.put("CATALINA_OPTS", String.join(" ", catalinaOpts));
-        
-        // Set other Tomcat environment variables
-        Path pidFile = serverInstanceDir.resolve("server.pid");
-        env.put("CATALINA_PID", pidFile.toString());
-        env.put("CATALINA_OUT", serverInstanceDir.resolve("logs/catalina.out").toString());
 
-        if(config.admin.password != null && config.admin.password.length() > 0){
+        Path pidFile = catalinaBase.resolve("server.pid");
+        // Use a separate file for CATALINA_PID so Tomcat's startup script
+        // doesn't overwrite our PID:PORT format in server.pid
+        Path catalinaPidFile = catalinaBase.resolve("catalina.pid");
+        env.put("CATALINA_PID", catalinaPidFile.toString());
+        env.put("CATALINA_OUT", logsDir.resolve("catalina.out").toString());
+
+        if (config.admin != null && config.admin.password != null && !config.admin.password.isEmpty()) {
             env.put("LUCEE_ADMIN_PASSWORD", config.admin.password);
         }
-        
-        // Set LUCEE_EXTENSIONS environment variable if extensions are configured
+
         String luceeExtensions = LuceeServerManager.buildLuceeExtensions(projectDir);
         if (luceeExtensions != null && !luceeExtensions.isEmpty()) {
             env.put("LUCEE_EXTENSIONS", luceeExtensions);
         }
 
-        // Apply additional environment variables defined in lucee.json (envVars)
-        if (config.envVars != null && !config.envVars.isEmpty()) {
+        if (config.envVars != null) {
             for (Map.Entry<String, String> entry : config.envVars.entrySet()) {
-                String key = entry.getKey();
-                if (key == null || key.trim().isEmpty()) {
-                    continue;
-                }
-                String value = entry.getValue();
-                if (value != null) {
-                    env.put(key, value);
+                if (entry.getKey() != null && !entry.getKey().trim().isEmpty() && entry.getValue() != null) {
+                    env.put(entry.getKey(), entry.getValue());
                 }
             }
         }
-        
-        // Write project path marker file to track which project this server belongs to
-        Files.writeString(serverInstanceDir.resolve(".project-path"), projectDir.toAbsolutePath().toString());
-        
-        // Write environment marker file if environment was specified
+
+        // Marker files
+        Files.writeString(catalinaBase.resolve(".project-path"), projectDir.toAbsolutePath().toString());
         if (environment != null && !environment.trim().isEmpty()) {
-            Files.writeString(serverInstanceDir.resolve(".environment"), environment.trim());
+            Files.writeString(catalinaBase.resolve(".environment"), environment.trim());
         }
-        
+        if (runtimeType != null && !runtimeType.isEmpty()) {
+            Files.writeString(catalinaBase.resolve(".runtime-type"), runtimeType);
+        }
+
         if (foreground) {
-            // Add shutdown hook to cleanup PID file on exit
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 try {
                     Files.deleteIfExists(pidFile);
+                    Files.deleteIfExists(catalinaPidFile);
                 } catch (IOException e) {
-                    // Ignore cleanup errors
+                    // Ignore
                 }
             }));
         }
-        
-        // Start the process
+
         Process process = pb.start();
-        
-        // Write PID file
-        String pidContent = process.pid() + ":" + config.port;
-        Files.writeString(pidFile, pidContent);
-        
+
+        // Write LuCLI's PID:PORT format. The initial PID is the startup
+        // script; Tomcat writes the actual Java PID to catalina.pid
+        // asynchronously. We update server.pid once that file appears.
+        long launcherPid = process.pid();
+        Files.writeString(pidFile, launcherPid + ":" + config.port);
+
+        // Wait briefly for Tomcat to write the real Java PID via CATALINA_PID
+        long javaPid = launcherPid;
+        for (int i = 0; i < 20; i++) {
+            try { Thread.sleep(250); } catch (InterruptedException ignored) { break; }
+            if (Files.exists(catalinaPidFile)) {
+                try {
+                    String raw = Files.readString(catalinaPidFile).trim();
+                    if (!raw.isEmpty()) {
+                        javaPid = Long.parseLong(raw);
+                        break;
+                    }
+                } catch (NumberFormatException ignored) { }
+            }
+        }
+        // Rewrite with the real Java PID so status/stop work correctly
+        Files.writeString(pidFile, javaPid + ":" + config.port);
+
         if (foreground) {
-            // Foreground mode: wait for process to complete
             try {
-                // Wait for the process to exit (blocks until Ctrl+C or server stops)
                 int exitCode = process.waitFor();
-                
                 if (exitCode != 0) {
                     System.err.println("\nServer exited with code: " + exitCode);
                 } else {
                     System.out.println("\nServer stopped successfully.");
                 }
             } catch (InterruptedException e) {
-                // Handle interruption (Ctrl+C)
                 System.out.println("\nShutting down server...");
                 process.destroy();
-                
-                // Wait a bit for graceful shutdown
                 try {
                     if (!process.waitFor(10, TimeUnit.SECONDS)) {
-                        // Force kill if not shut down within 10 seconds
                         process.destroyForcibly();
                     }
                 } catch (InterruptedException ex) {
                     process.destroyForcibly();
                 }
             } finally {
-                // Cleanup PID file
                 Files.deleteIfExists(pidFile);
+                Files.deleteIfExists(catalinaPidFile);
             }
-            return null; // Foreground mode doesn't return an instance since it blocks
+            return null;
         } else {
-            // Background mode: return immediately with instance
-            return new ServerInstance(config.name, process.pid(), config.port, serverInstanceDir, projectDir);
+            return new ServerInstance(config.name, javaPid, config.port, catalinaBase, projectDir);
         }
+    }
+
+    /**
+     * @deprecated Use {@link #launchTomcatProcess} instead. This wrapper preserves the old
+     * CATALINA_HOME==CATALINA_BASE behaviour for callers that haven't migrated yet.
+     */
+    @Deprecated
+    public ServerInstance launchServerProcess(Path serverInstanceDir, LuceeServerConfig.ServerConfig config,
+                                             Path projectDir, Path luceeExpressDir,
+                                             AgentOverrides agentOverrides, String environment, boolean foreground) throws Exception {
+        return launchTomcatProcess(luceeExpressDir, serverInstanceDir, config, projectDir,
+                agentOverrides, environment, foreground, "lucee-express");
     }
     
     /**

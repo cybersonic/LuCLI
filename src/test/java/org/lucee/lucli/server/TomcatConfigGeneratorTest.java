@@ -3,7 +3,6 @@ package org.lucee.lucli.server;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
@@ -13,21 +12,19 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Unit tests for TomcatConfigGenerator
- * Tests placeholder map creation and template processing logic
+ * Unit tests for TomcatConfigSupport placeholder map creation
+ * and template processing logic.
  */
 public class TomcatConfigGeneratorTest {
 
     @TempDir
     Path tempDir;
-    
-    private TomcatConfigGenerator generator;
+
     private Path projectDir;
     private Path serverInstanceDir;
 
     @BeforeEach
     void setUp() throws IOException {
-        generator = new TomcatConfigGenerator();
         projectDir = tempDir.resolve("project");
         serverInstanceDir = tempDir.resolve("server");
         Files.createDirectories(projectDir);
@@ -227,18 +224,7 @@ public class TomcatConfigGeneratorTest {
         return config;
     }
 
-    /**
-     * Use reflection to access private createPlaceholderMap method
-     */
-    @SuppressWarnings("unchecked")
     private Map<String, String> invokeCreatePlaceholderMap(LuceeServerConfig.ServerConfig config) throws Exception {
-        Method method = TomcatConfigGenerator.class.getDeclaredMethod(
-            "createPlaceholderMap", 
-            Path.class, 
-            LuceeServerConfig.ServerConfig.class, 
-            Path.class
-        );
-        method.setAccessible(true);
-        return (Map<String, String>) method.invoke(generator, serverInstanceDir, config, projectDir);
+        return TomcatConfigSupport.createPlaceholderMap(serverInstanceDir, config, projectDir);
     }
 }

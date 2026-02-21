@@ -7,6 +7,7 @@ import java.nio.file.Paths;
 
 import org.lucee.lucli.server.LuceeServerConfig;
 import org.lucee.lucli.server.LuceeServerManager;
+import org.lucee.lucli.server.TomcatConfigSupport;
 
 /**
  * Runtime provider for the "tomcat" runtime type.
@@ -67,7 +68,7 @@ public final class TomcatRuntimeProvider implements RuntimeProvider {
         config = portResult.updatedConfig;
 
         // Display port details
-        displayPortDetails(config, foreground);
+        TomcatConfigSupport.displayPortDetails(config, foreground, "external Tomcat");
 
         // Ensure Lucee JAR is available (cached in ~/.lucli/jars/)
         String variant = (rt.variant != null && !rt.variant.isEmpty()) ? rt.variant : "standard";
@@ -76,7 +77,7 @@ public final class TomcatRuntimeProvider implements RuntimeProvider {
         // Create CATALINA_BASE (server instance directory)
         Path serverInstanceDir = manager.getServersDir().resolve(config.name);
         if (Files.exists(serverInstanceDir) && forceReplace) {
-            deleteDirectoryRecursively(serverInstanceDir);
+            TomcatConfigSupport.deleteDirectoryRecursively(serverInstanceDir);
         }
         Files.createDirectories(serverInstanceDir);
 
@@ -84,7 +85,7 @@ public final class TomcatRuntimeProvider implements RuntimeProvider {
         deployLuceeJarToServerInstance(luceeJar, serverInstanceDir, config.version, variant);
 
         // Generate Tomcat configuration for CATALINA_BASE
-        ExternalTomcatConfigGenerator configGenerator = new ExternalTomcatConfigGenerator();
+        CatalinaBaseConfigGenerator configGenerator = new CatalinaBaseConfigGenerator();
         boolean overwriteProjectConfig = forceReplace;
         configGenerator.generateConfiguration(serverInstanceDir, config, projectDir, catalinaHome, tomcatMajorVersion, overwriteProjectConfig);
 
@@ -94,17 +95,10 @@ public final class TomcatRuntimeProvider implements RuntimeProvider {
         // Deploy extension dependencies
         manager.deployExtensionsForServer(projectDir, serverInstanceDir);
 
-        // Launch the server process using external Tomcat
-        LuceeServerManager.ServerInstance instance = launchExternalTomcat(
-                manager,
-                serverInstanceDir,
-                config,
-                projectDir,
-                catalinaHome,
-                agentOverrides,
-                environment,
-                foreground
-        );
+        // Launch the server process using unified launch method
+        LuceeServerManager.ServerInstance instance = manager.launchTomcatProcess(
+                catalinaHome, serverInstanceDir, config, projectDir,
+                agentOverrides, environment, foreground, "tomcat");
 
         // For background mode: wait for startup and open browser
         if (!foreground && instance != null) {
@@ -303,183 +297,5 @@ public final class TomcatRuntimeProvider implements RuntimeProvider {
         System.out.println("Deploying Lucee JAR to server instance: " + targetJar);
         Files.copy(luceeJar, targetJar);
     }
-
-    /**
-     * Launch the server using external Tomcat's startup scripts.
-     */
-    private LuceeServerManager.ServerInstance launchExternalTomcat(
-            LuceeServerManager manager,
-            Path serverInstanceDir,
-            LuceeServerConfig.ServerConfig config,
-            Path projectDir,
-            Path catalinaHome,
-            LuceeServerManager.AgentOverrides agentOverrides,
-            String environment,
-            boolean foreground
-    ) throws Exception {
-        boolean isWindows = System.getProperty("os.name", "").toLowerCase().contains("win");
-
-        // Build command
-        java.util.List<String> command = new java.util.ArrayList<>();
-        Path scriptPath;
-
-        if (foreground) {
-            String scriptName = isWindows ? "catalina.bat" : "catalina.sh";
-            scriptPath = catalinaHome.resolve("bin").resolve(scriptName);
-            command.add(scriptPath.toString());
-            command.add("run");
-        } else {
-            String scriptName = isWindows ? "startup.bat" : "startup.sh";
-            scriptPath = catalinaHome.resolve("bin").resolve(scriptName);
-            command.add(scriptPath.toString());
-        }
-
-        if (!Files.exists(scriptPath)) {
-            throw new Exception("Tomcat script not found: " + scriptPath);
-        }
-
-        // Create process
-        ProcessBuilder pb = new ProcessBuilder(command);
-        pb.directory(catalinaHome.toFile());
-
-        // Create logs directory
-        Path logsDir = serverInstanceDir.resolve("logs");
-        Files.createDirectories(logsDir);
-
-        if (foreground) {
-            pb.inheritIO();
-        } else {
-            pb.redirectOutput(logsDir.resolve("server.out").toFile());
-            pb.redirectError(logsDir.resolve("server.err").toFile());
-        }
-
-        // Set environment variables
-        java.util.Map<String, String> env = pb.environment();
-        LuceeServerConfig.applyLoadedEnvToProcessEnvironment(env);
-
-        // Key difference: CATALINA_HOME != CATALINA_BASE
-        env.put("CATALINA_HOME", catalinaHome.toString());
-        env.put("CATALINA_BASE", serverInstanceDir.toString());
-
-        // Set JVM options
-        java.util.List<String> catalinaOpts = manager.buildCatalinaOpts(config, agentOverrides, projectDir);
-        env.put("CATALINA_OPTS", String.join(" ", catalinaOpts));
-
-        // Set other environment variables
-        Path pidFile = serverInstanceDir.resolve("server.pid");
-        env.put("CATALINA_PID", pidFile.toString());
-        env.put("CATALINA_OUT", logsDir.resolve("catalina.out").toString());
-
-        if (config.admin != null && config.admin.password != null && !config.admin.password.isEmpty()) {
-            env.put("LUCEE_ADMIN_PASSWORD", config.admin.password);
-        }
-
-        // Set LUCEE_EXTENSIONS
-        String luceeExtensions = LuceeServerManager.buildLuceeExtensions(projectDir);
-        if (luceeExtensions != null && !luceeExtensions.isEmpty()) {
-            env.put("LUCEE_EXTENSIONS", luceeExtensions);
-        }
-
-        // Apply envVars from config
-        if (config.envVars != null) {
-            for (java.util.Map.Entry<String, String> entry : config.envVars.entrySet()) {
-                if (entry.getKey() != null && !entry.getKey().trim().isEmpty() && entry.getValue() != null) {
-                    env.put(entry.getKey(), entry.getValue());
-                }
-            }
-        }
-
-        // Write marker files
-        Files.writeString(serverInstanceDir.resolve(".project-path"), projectDir.toAbsolutePath().toString());
-        if (environment != null && !environment.trim().isEmpty()) {
-            Files.writeString(serverInstanceDir.resolve(".environment"), environment.trim());
-        }
-        // Mark this as a tomcat runtime server
-        Files.writeString(serverInstanceDir.resolve(".runtime-type"), "tomcat");
-
-        if (foreground) {
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                try {
-                    Files.deleteIfExists(pidFile);
-                } catch (IOException e) {
-                    // Ignore
-                }
-            }));
-        }
-
-        // Start the process
-        Process process = pb.start();
-
-        // Write PID file
-        String pidContent = process.pid() + ":" + config.port;
-        Files.writeString(pidFile, pidContent);
-
-        if (foreground) {
-            try {
-                int exitCode = process.waitFor();
-                if (exitCode != 0) {
-                    System.err.println("\nServer exited with code: " + exitCode);
-                } else {
-                    System.out.println("\nServer stopped successfully.");
-                }
-            } catch (InterruptedException e) {
-                System.out.println("\nShutting down server...");
-                process.destroy();
-                try {
-                    if (!process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)) {
-                        process.destroyForcibly();
-                    }
-                } catch (InterruptedException ex) {
-                    process.destroyForcibly();
-                }
-            } finally {
-                Files.deleteIfExists(pidFile);
-            }
-            return null;
-        } else {
-            return new LuceeServerManager.ServerInstance(
-                    config.name, process.pid(), config.port, serverInstanceDir, projectDir);
-        }
-    }
-
-    /**
-     * Display port details.
-     */
-    private void displayPortDetails(LuceeServerConfig.ServerConfig config, boolean foreground) {
-        StringBuilder portInfo = new StringBuilder();
-        if (foreground) {
-            portInfo.append("Running server '").append(config.name).append("' in foreground mode (external Tomcat):");
-        } else {
-            portInfo.append("Starting server '").append(config.name).append("' (external Tomcat) on:");
-        }
-        portInfo.append("\n  HTTP port:     ").append(config.port);
-        portInfo.append("\n  Shutdown port: ").append(LuceeServerConfig.getEffectiveShutdownPort(config));
-        if (config.monitoring != null && config.monitoring.enabled && config.monitoring.jmx != null) {
-            portInfo.append("\n  JMX port:      ").append(config.monitoring.jmx.port);
-        }
-        if (LuceeServerConfig.isHttpsEnabled(config)) {
-            portInfo.append("\n  HTTPS port:    ").append(LuceeServerConfig.getEffectiveHttpsPort(config));
-            portInfo.append("\n  HTTPS redirect:")
-                    .append(LuceeServerConfig.isHttpsRedirectEnabled(config) ? " enabled" : " disabled");
-        }
-        if (foreground) {
-            portInfo.append("\n\nPress Ctrl+C to stop the server\n");
-        }
-        System.out.println(portInfo.toString());
-    }
-
-    private static void deleteDirectoryRecursively(Path dir) throws IOException {
-        if (!Files.exists(dir)) {
-            return;
-        }
-        Files.walk(dir)
-                .sorted(java.util.Comparator.reverseOrder())
-                .forEach(path -> {
-                    try {
-                        Files.deleteIfExists(path);
-                    } catch (IOException e) {
-                        System.err.println("Warning: Failed to delete " + path + ": " + e.getMessage());
-                    }
-                });
-    }
 }
+
