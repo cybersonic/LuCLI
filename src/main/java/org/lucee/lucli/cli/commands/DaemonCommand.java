@@ -12,6 +12,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 
 import org.lucee.lucli.LuCLI;
@@ -47,11 +48,20 @@ public class DaemonCommand implements Callable<Integer> {
     @Option(names = "--lsp", description = "Run daemon in Language Server Protocol (LSP) mode")
     private boolean lspMode;
 
+    @Option(names = "--client", description = "Connect to a running daemon as an interactive client")
+    private boolean clientMode;
+
+    @Option(names = "--raw", description = "In client mode, print the raw JSON response packet instead of just the output")
+    private boolean rawMode;
+
     @Option(names = "--module", description = "CFML module to use as LSP endpoint (e.g. LuceeLSP)")
     private String lspModuleName = "LuceeLSP";
 
     @Override
     public Integer call() throws Exception {
+        if (clientMode) {
+            return runClient();
+        }
         if (lspMode) {
             return runLspDaemon();
         }
@@ -309,6 +319,98 @@ public class DaemonCommand implements Callable<Integer> {
                 writer.flush();
             }
         }
+    }
+
+    /** Interactive client mode: connect to a running daemon and send commands. */
+    private Integer runClient() {
+        LuCLI.info("Connecting to LuCLI daemon on 127.0.0.1:" + port + " ...");
+
+        // Quick connectivity check
+        try (Socket probe = new Socket(InetAddress.getByName("127.0.0.1"), port)) {
+            // connected OK
+        } catch (IOException e) {
+            LuCLI.error("Could not connect to daemon on port " + port + ": " + e.getMessage());
+            LuCLI.error("Is the daemon running?  Start it with: lucli daemon --port " + port);
+            return 1;
+        }
+
+        LuCLI.info("Connected. Type commands as you would with lucli (e.g. 'modules list').");
+        LuCLI.info("Type 'exit' or 'quit' to disconnect.\n");
+
+        ObjectMapper mapper = new ObjectMapper();
+
+        try (BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8))) {
+            String line;
+            while (true) {
+                System.out.print("lucli> ");
+                System.out.flush();
+                line = stdin.readLine();
+                if (line == null) {
+                    // EOF (e.g. piped input ended)
+                    break;
+                }
+                String trimmed = line.trim();
+                if (trimmed.isEmpty()) {
+                    continue;
+                }
+                if ("exit".equalsIgnoreCase(trimmed) || "quit".equalsIgnoreCase(trimmed)) {
+                    LuCLI.info("Disconnected.");
+                    break;
+                }
+
+                // Split the input into argv tokens (simple whitespace split)
+                String[] argv = trimmed.split("\\s+");
+
+                // Build request
+                DaemonRequest request = new DaemonRequest();
+                request.id = UUID.randomUUID().toString();
+                request.argv = argv;
+
+                try (Socket sock = new Socket(InetAddress.getByName("127.0.0.1"), port)) {
+                    BufferedWriter writer = new BufferedWriter(
+                        new OutputStreamWriter(sock.getOutputStream(), StandardCharsets.UTF_8));
+                    BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(sock.getInputStream(), StandardCharsets.UTF_8));
+
+                    // Send request
+                    String json = mapper.writeValueAsString(request);
+                    writer.write(json);
+                    writer.write("\n");
+                    writer.flush();
+
+                    // Read response
+                    String responseLine = reader.readLine();
+                    if (responseLine != null && !responseLine.isEmpty()) {
+                        if (rawMode) {
+                            // Print the exact JSON packet from the daemon
+                            System.out.println(responseLine);
+                        } else {
+                            DaemonResponse response = mapper.readValue(responseLine, DaemonResponse.class);
+                            if (response.output != null && !response.output.isEmpty()) {
+                                System.out.print(response.output);
+                                if (!response.output.endsWith("\n")) {
+                                    System.out.println();
+                                }
+                            }
+                            if (response.exitCode != 0) {
+                                System.out.println("[exit code: " + response.exitCode + "]");
+                            }
+                        }
+                    } else {
+                        System.out.println("(no response from daemon)");
+                    }
+                } catch (IOException e) {
+                    LuCLI.error("Communication error: " + e.getMessage());
+                    LuCLI.error("Daemon may have stopped. Exiting client.");
+                    return 1;
+                }
+            }
+        } catch (IOException e) {
+            LuCLI.error("Client error: " + e.getMessage());
+            return 1;
+        }
+
+        return 0;
     }
 
     // Simple DTOs for JSON mapping
