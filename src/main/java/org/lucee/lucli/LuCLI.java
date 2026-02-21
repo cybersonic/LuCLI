@@ -308,6 +308,18 @@ public class LuCLI implements Callable<Integer> {
      * Execute a module via the modules run command
      */
     private Integer executeViaModulesCommand(String moduleName, String[] args) throws Exception {
+        // Intercept --help / -h before picocli can swallow it;
+        // delegate to the module's own showHelp() instead.
+        if (args != null) {
+            for (String arg : args) {
+                if ("--help".equals(arg) || "-h".equals(arg)) {
+                    LuceeScriptEngine engine = LuceeScriptEngine.getInstance();
+                    engine.executeModule(moduleName, new String[]{"showHelp"});
+                    return 0;
+                }
+            }
+        }
+
         verbose("Executing module shortcut: " + moduleName + 
             " (equivalent to 'lucli modules run " + moduleName + " " + String.join(" ", args) + "')");
         
@@ -387,6 +399,12 @@ public class LuCLI implements Callable<Integer> {
     public static void main(String[] args) throws Exception {
         // Suppress JLine "Unable to create a system terminal" warning
         java.util.logging.Logger.getLogger("org.jline").setLevel(java.util.logging.Level.SEVERE);
+
+        // Pre-process: if first arg is a module name and --help/-h is present,
+        // rewrite to "modules run <module> --help" so picocli routes to
+        // ModulesRunCommandImpl (which delegates to the module's showHelp())
+        // instead of showing root-level help.
+        args = preprocessModuleHelp(args);
         
         // Create Picocli CommandLine with our main command
         CommandLine cmd = new CommandLine(new LuCLI());
@@ -416,6 +434,40 @@ public class LuCLI implements Callable<Integer> {
         System.exit(exitCode);
     }
     
+    /**
+     * If the CLI args look like {@code <module-name> [subcommand...] --help},
+     * rewrite them to {@code modules run <module-name> [subcommand...] --help}
+     * so picocli routes to ModulesRunCommandImpl instead of showing root help.
+     */
+    private static String[] preprocessModuleHelp(String[] args) {
+        if (args.length < 2) return args;
+
+        String first = args[0];
+        if (first.startsWith("-")) return args;
+
+        // Check whether --help / -h appears anywhere after the first arg
+        boolean hasHelp = false;
+        for (int i = 1; i < args.length; i++) {
+            if ("--help".equals(args[i]) || "-h".equals(args[i])) {
+                hasHelp = true;
+                break;
+            }
+        }
+        if (!hasHelp) return args;
+
+        // Only rewrite when the first arg is an installed module
+        if (!ModuleCommand.moduleExists(first)) return args;
+
+        // Prepend "modules run" so picocli delegates to ModulesRunCommandImpl
+        List<String> rewritten = new ArrayList<>();
+        rewritten.add("modules");
+        rewritten.add("run");
+        for (String arg : args) {
+            rewritten.add(arg);
+        }
+        return rewritten.toArray(new String[0]);
+    }
+
     // ====================
     // Output Methods
     // ====================

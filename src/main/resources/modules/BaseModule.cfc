@@ -199,4 +199,121 @@ component {
     function version(){
         return  variables.moduleConfig.version ?: "Version not specified";
     }
+
+    /**
+     * Show help for this module by introspecting component metadata.
+     * Lists all public functions as subcommands with their arguments and hints.
+     */
+    public string function showHelp() {
+        var md = getComponentMetadata(this);
+        var cfg = variables.moduleConfig ?: {};
+
+        // Prefer module.json "name", fall back to component path
+        var moduleName = "";
+        if (structKeyExists(cfg, "name") && len(trim(cfg.name))) {
+            moduleName = cfg.name;
+        } else {
+            var segments = listToArray(md.name, ".");
+            moduleName = arrayLen(segments) >= 2 ? segments[arrayLen(segments) - 1] : listLast(md.name, ".");
+        }
+
+        var moduleVersion = structKeyExists(cfg, "version") && len(trim(cfg.version)) ? cfg.version : "";
+        var moduleDesc = structKeyExists(cfg, "description") && len(trim(cfg.description)) ? cfg.description : "";
+        var nl = chr(10);
+        var buf = "";
+
+        // Header
+        buf &= static.bold & moduleName & static.reset;
+        if (len(moduleVersion)) {
+            buf &= " " & static.dim & "v" & moduleVersion & static.reset;
+        }
+        buf &= nl;
+        if (len(moduleDesc)) {
+            buf &= moduleDesc & nl;
+        } else if (structKeyExists(md, "hint") && len(trim(md.hint))) {
+            buf &= listFirst(md.hint, chr(10) & chr(13)) & nl;
+        }
+        buf &= nl;
+        buf &= static.bold & "Usage:" & static.reset & nl;
+        buf &= "  lucli " & lcase(moduleName) & " <subcommand> [options]" & nl;
+        buf &= nl;
+
+        // Functions from BaseModule to exclude from command listing
+        var internalFunctions = [
+            "init", "showhelp", "out", "err", "getenv", "verbose",
+            "getabsolutepath", "executecommand", "version"
+        ];
+
+        // Collect public command functions
+        var commands = md.functions.filter(function(fn) {
+            return fn.access == "public" && !arrayFindNoCase(internalFunctions, fn.name);
+        });
+
+        if (!arrayLen(commands)) {
+            buf &= "  No commands available." & nl;
+            return buf;
+        }
+
+        // Find max command name length for alignment
+        var maxLen = 0;
+        for (var fn in commands) {
+            if (len(fn.name) > maxLen) maxLen = len(fn.name);
+        }
+
+        buf &= static.bold & "Available Commands:" & static.reset & nl;
+
+        for (var fn in commands) {
+            var name = lcase(fn.name);
+            // Use only the first line of the hint for the command listing
+            var rawHint = structKeyExists(fn, "hint") ? trim(fn.hint) : "";
+            var hint = len(rawHint) ? listFirst(rawHint, chr(10) & chr(13)) : "";
+            var pad = repeatString(" ", max(maxLen - len(name) + 2, 2));
+
+            if (len(hint)) {
+                buf &= "  " & static.cyan & name & static.reset & pad & hint & nl;
+            } else {
+                buf &= "  " & static.cyan & name & static.reset & nl;
+            }
+
+            // Parameters
+            if (arrayLen(fn.parameters)) {
+                for (var p in fn.parameters) {
+                    var line = "      --" & lcase(p.name);
+
+                    // Type
+                    if (structKeyExists(p, "type") && len(p.type) && p.type != "any") {
+                        line &= " <" & p.type & ">";
+                    }
+
+                    // Required / default
+                    var meta = [];
+                    if (structKeyExists(p, "required") && p.required) {
+                        arrayAppend(meta, "required");
+                    }
+                    if (structKeyExists(p, "default")) {
+                        try {
+                            var defVal = toString(p.default);
+                            if (len(defVal)) {
+                                arrayAppend(meta, "default: " & defVal);
+                            }
+                        } catch (any e) {
+                            // ignore non-stringable defaults
+                        }
+                    }
+                    if (arrayLen(meta)) {
+                        line &= " (" & arrayToList(meta, ", ") & ")";
+                    }
+
+                    // Hint
+                    if (structKeyExists(p, "hint") && len(trim(p.hint))) {
+                        line &= "  " & static.dim & p.hint & static.reset;
+                    }
+
+                    buf &= line & nl;
+                }
+            }
+        }
+
+        return buf;
+    }
 }

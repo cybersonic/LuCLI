@@ -323,6 +323,13 @@ public class LuceeScriptEngine {
             subCommand = parsedArgs.subCommand;
             Map<String, String> argsMap = parsedArgs.argsMap;
 
+            // If --help or -h was passed, route to showHelp()
+            if (argsMap.containsKey("help") || argsMap.containsKey("h")) {
+                subCommand = "showHelp";
+                argsMap.remove("help");
+                argsMap.remove("h");
+            }
+
             Timer.start("Module Execution: " + moduleName);
             if (isVerboseMode() || isDebugMode()) {
                 System.out.println("=== Direct Module Execution Script ===");

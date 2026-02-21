@@ -9,6 +9,7 @@ import java.util.concurrent.Callable;
 import org.lucee.lucli.LuceeScriptEngine;
 
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
 /**
@@ -17,9 +18,12 @@ import picocli.CommandLine.Parameters;
 @Command(
     name = "run",
     description = "Run a module",
-    mixinStandardHelpOptions = true
+    mixinStandardHelpOptions = false
 )
 public class ModulesRunCommandImpl implements Callable<Integer> {
+
+    @Option(names = {"-h", "--help"}, description = "Show module help")
+    private boolean helpRequested;
 
     @Parameters(
         index = "0",
@@ -33,6 +37,11 @@ public class ModulesRunCommandImpl implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
+        if (helpRequested) {
+            LuceeScriptEngine engine = LuceeScriptEngine.getInstance();
+            engine.executeModule(moduleName, new String[]{"showHelp"});
+            return 0;
+        }
         runModule();
         return 0;
     }
