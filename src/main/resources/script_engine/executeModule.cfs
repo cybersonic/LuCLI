@@ -30,7 +30,8 @@ modules = createObject("component", "modules.#moduleName#.Module").init(
         verboseEnabled=verbose,
         timingEnabled=timing,
         cwd=__cwd,
-        timer=Timer
+        timer=Timer,
+        moduleConfig=moduleConfigStruct
     );
 
 results = modules[subcommand](argumentCollection=argCollection);

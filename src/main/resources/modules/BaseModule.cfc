@@ -59,11 +59,13 @@ component {
         boolean verboseEnabled=false,
         boolean timingEnabled=false,
         string cwd="",
-        any timer
+        any timer,
+        Struct moduleConfig
         ) {
             variables.verboseEnabled = arguments.verboseEnabled;
             variables.timingEnabled = arguments.timingEnabled;
             variables.cwd = arguments.cwd;
+            variables.moduleConfig = arguments.moduleConfig;
             variables.timer = arguments.timer ?: {
                 "start": function(){},
                 "stop": function(){}
@@ -180,8 +182,10 @@ component {
         var cwdPath = Paths.get(URI);
 
 
+        var actualCommand = [command];
+            actualCommand.append(arguments.args, true);
         var LuCLI = createObject("java", "org.lucee.lucli.LuCLI");
-        LuCLI.main(["--version"]);
+        LuCLI.main(actualCommand);
         // Terminal mode = true so ServerCommandHandler returns strings
         // var executor = createObject("java", "org.lucee.lucli.server.ServerCommandHandler")
         //     .init(true, cwdPath);
@@ -190,5 +194,9 @@ component {
 
         // Always return a string (never null)
         return result ?: "";
+    }
+
+    function version(){
+        return  variables.moduleConfig.version ?: "Version not specified";
     }
 }

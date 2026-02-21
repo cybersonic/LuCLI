@@ -352,6 +352,9 @@ public class LuceeScriptEngine {
             }
             engine.eval(script);
             Object results = engine.get("results");
+            if(results !=null){
+                StringOutput.getInstance().println(results.toString());
+            }
             Timer.stop("Module Execution: " + moduleName);
     }
 

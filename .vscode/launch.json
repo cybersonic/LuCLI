@@ -105,6 +105,16 @@
     },
     {
       "type": "java",
+      "name": "📦 LucCLI Markspresso Version",
+      "request": "launch",
+      "mainClass": "org.lucee.lucli.LuCLI",
+      "args": ["markspresso", "version"],
+      "projectName": "lucli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "java",
       "name": "📦 LucCLI Lint Module Direct",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",
