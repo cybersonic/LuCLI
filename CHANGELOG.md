@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Module Help:** Modules now support `--help` (e.g. `lucli markspresso --help`) to display available subcommands with their arguments, types, and defaults. Module name, version, and description are pulled from `module.json`. Module authors can override `showHelp()` for custom help output.
 - **New Aliases** Added plural aliases for better discoverability: `lucli server` → `lucli servers`, `lucli module` → `lucli modules`, `lucli secret` → `lucli secrets`.
 - **Reusable Table UI Component:** Added `org.lucee.lucli.ui.Table` class for consistent CLI table rendering across commands. Features include multiple title rows, auto-sizing columns, full-width separators, optional footer, and configurable border styles (BOX, ASCII, NONE). Uses builder pattern for fluent API.
 - **ModuleConfig Loader:** Added `org.lucee.lucli.modules.ModuleConfig` class that loads `module.json` once with sensible defaults. Eliminates redundant JSON parsing (was reading file 3x per module) and provides status detection (DEV/INSTALLED/AVAILABLE).
