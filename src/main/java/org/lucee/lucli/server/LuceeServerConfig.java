@@ -186,7 +186,7 @@ public class LuceeServerConfig {
      */
     public static class RuntimeConfig {
         // Common fields
-        public String type;         // "lucee-express" | "tomcat" | "docker" (others later)
+        public String type;         // "lucee-express" | "tomcat" | "docker" | "jetty"
         public String installPath;  // Host path for lucee-express/tomcat; in-container path for docker
 
         // Lucee Express–specific
@@ -200,6 +200,9 @@ public class LuceeServerConfig {
         public String webappsDir; 
         @Deprecated
         public String contextPath;
+
+        // Jetty-specific
+        public String jettyHome;    // Path to Jetty distribution; falls back to JETTY_HOME env var
 
         // Docker-specific (configuration only for now)
         public String image;

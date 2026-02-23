@@ -28,6 +28,7 @@ import org.lucee.lucli.server.runtime.LuceeExpressRuntimeProvider;
 import org.lucee.lucli.server.runtime.RuntimeProvider;
 import org.lucee.lucli.server.runtime.TomcatRuntimeProvider;
 import org.lucee.lucli.server.runtime.DockerRuntimeProvider;
+import org.lucee.lucli.server.runtime.JettyRuntimeProvider;
 
 /**
  * Manages Lucee server instances - downloading, configuring, starting, and stopping servers
@@ -88,6 +89,7 @@ public class LuceeServerManager {
         registerRuntimeProvider(express);
         registerRuntimeProvider(new TomcatRuntimeProvider());
         registerRuntimeProvider(new DockerRuntimeProvider());
+        registerRuntimeProvider(new JettyRuntimeProvider());
     }
     
     /**
@@ -606,6 +608,41 @@ public class LuceeServerManager {
                 deleteServerDirectory(serverDir);
             }
             return stopped;
+        }
+
+        // Jetty-managed servers: graceful shutdown via STOP.PORT / STOP.KEY.
+        Path jettyStopPortFile = serverDir.resolve(".jetty-stop-port");
+        Path jettyStopKeyFile = serverDir.resolve(".jetty-stop-key");
+        Path jettyHomeFile = serverDir.resolve(".jetty-home");
+        if (Files.exists(jettyStopPortFile) && Files.exists(jettyStopKeyFile) && Files.exists(jettyHomeFile)) {
+            try {
+                int stopPort = Integer.parseInt(Files.readString(jettyStopPortFile).trim());
+                String stopKey = Files.readString(jettyStopKeyFile).trim();
+                Path jettyHome = Paths.get(Files.readString(jettyHomeFile).trim());
+
+                boolean stopped = JettyRuntimeProvider.stopJettyServer(jettyHome, stopPort, stopKey);
+                if (stopped) {
+                    // Wait briefly for process to exit
+                    if (instance.getPid() > 0) {
+                        ProcessHandle ph = ProcessHandle.of(instance.getPid()).orElse(null);
+                        if (ph != null && ph.isAlive()) {
+                            try {
+                                ph.onExit().orTimeout(10, TimeUnit.SECONDS).join();
+                            } catch (Exception ignored) {
+                                ph.destroyForcibly();
+                            }
+                        }
+                    }
+                    Files.deleteIfExists(pidFile);
+                    if (isSandbox) {
+                        deleteServerDirectory(serverDir);
+                    }
+                    return true;
+                }
+                // If Jetty stop command failed, fall through to generic PID-based stop
+            } catch (Exception e) {
+                // Fall through to generic stop
+            }
         }
 
         if (instance.getPid() <= 0) {
@@ -1967,6 +2004,136 @@ public class LuceeServerManager {
                 agentOverrides, environment, foreground, "lucee-express");
     }
     
+    /**
+     * Launch a Jetty server process using separate JETTY_HOME and JETTY_BASE.
+     *
+     * Unlike Tomcat, Jetty launches via {@code java -jar $JETTY_HOME/start.jar}
+     * with the working directory set to JETTY_BASE. JVM options are configured
+     * via start.d/jvm.ini rather than environment variables.
+     *
+     * @param jettyHome       Read-only Jetty distribution
+     * @param jettyBase       Per-server instance directory (~/.lucli/servers/&lt;name&gt;)
+     * @param config          Server configuration
+     * @param projectDir      Project directory
+     * @param agentOverrides  Agent overrides (may be null)
+     * @param environment     Environment name (may be null)
+     * @param foreground      If true, blocks until server exits; if false, returns immediately
+     * @param stopPort        STOP.PORT for graceful shutdown
+     * @param stopKey         STOP.KEY for graceful shutdown
+     * @return ServerInstance (only when foreground=false; foreground=true returns null)
+     */
+    public ServerInstance launchJettyProcess(Path jettyHome, Path jettyBase,
+                                             LuceeServerConfig.ServerConfig config,
+                                             Path projectDir,
+                                             AgentOverrides agentOverrides,
+                                             String environment,
+                                             boolean foreground,
+                                             int stopPort, String stopKey) throws Exception {
+
+        String javaExe = findJavaExecutable();
+        Path startJar = jettyHome.resolve("start.jar");
+
+        // Build command: java -jar $JETTY_HOME/start.jar
+        // Jetty resolves jetty.base from the working directory
+        List<String> command = new ArrayList<>();
+        command.add(javaExe);
+        command.add("-jar");
+        command.add(startJar.toString());
+
+        // Create logs dir before redirecting output
+        Path logsDir = jettyBase.resolve("logs");
+        Files.createDirectories(logsDir);
+
+        ProcessBuilder pb = new ProcessBuilder(command);
+        // Jetty resolves JETTY_BASE from the working directory
+        pb.directory(jettyBase.toFile());
+
+        if (foreground) {
+            pb.inheritIO();
+        } else {
+            pb.redirectOutput(logsDir.resolve("jetty.out").toFile());
+            pb.redirectError(logsDir.resolve("jetty.err").toFile());
+        }
+
+        // Environment variables
+        Map<String, String> env = pb.environment();
+        LuceeServerConfig.applyLoadedEnvToProcessEnvironment(env);
+
+        env.put("JETTY_HOME", jettyHome.toString());
+        env.put("JETTY_BASE", jettyBase.toString());
+
+        if (config.admin != null && config.admin.password != null && !config.admin.password.isEmpty()) {
+            env.put("LUCEE_ADMIN_PASSWORD", config.admin.password);
+        }
+
+        String luceeExtensions = LuceeServerManager.buildLuceeExtensions(projectDir);
+        if (luceeExtensions != null && !luceeExtensions.isEmpty()) {
+            env.put("LUCEE_EXTENSIONS", luceeExtensions);
+        }
+
+        if (config.envVars != null) {
+            for (Map.Entry<String, String> entry : config.envVars.entrySet()) {
+                if (entry.getKey() != null && !entry.getKey().trim().isEmpty() && entry.getValue() != null) {
+                    env.put(entry.getKey(), entry.getValue());
+                }
+            }
+        }
+
+        // Marker files
+        Path pidFile = jettyBase.resolve("server.pid");
+        Files.writeString(jettyBase.resolve(".project-path"), projectDir.toAbsolutePath().toString());
+        if (environment != null && !environment.trim().isEmpty()) {
+            Files.writeString(jettyBase.resolve(".environment"), environment.trim());
+        }
+        Files.writeString(jettyBase.resolve(".runtime-type"), "jetty");
+
+        // Write Jetty stop markers so stopServer() can perform graceful shutdown
+        Files.writeString(jettyBase.resolve(".jetty-stop-port"), String.valueOf(stopPort));
+        Files.writeString(jettyBase.resolve(".jetty-stop-key"), stopKey);
+        Files.writeString(jettyBase.resolve(".jetty-home"), jettyHome.toAbsolutePath().toString());
+
+        if (foreground) {
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                try {
+                    Files.deleteIfExists(pidFile);
+                } catch (IOException e) {
+                    // Ignore
+                }
+            }));
+        }
+
+        Process process = pb.start();
+        long pid = process.pid();
+        Files.writeString(pidFile, pid + ":" + config.port);
+
+        if (foreground) {
+            try {
+                int exitCode = process.waitFor();
+                if (exitCode != 0) {
+                    System.err.println("\nServer exited with code: " + exitCode);
+                } else {
+                    System.out.println("\nServer stopped successfully.");
+                }
+            } catch (InterruptedException e) {
+                System.out.println("\nShutting down Jetty server...");
+                // Try graceful shutdown via STOP.PORT/STOP.KEY
+                JettyRuntimeProvider.stopJettyServer(jettyHome, stopPort, stopKey);
+                try {
+                    if (!process.waitFor(10, TimeUnit.SECONDS)) {
+                        process.destroyForcibly();
+                    }
+                } catch (InterruptedException ex) {
+                    process.destroyForcibly();
+                }
+            } finally {
+                Files.deleteIfExists(pidFile);
+            }
+            return null;
+        } else {
+            return new ServerInstance(config.name, pid, config.port, jettyBase, projectDir);
+        }
+    }
+
     /**
      * Find Java executable
      */
