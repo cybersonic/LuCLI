@@ -336,8 +336,8 @@ public class ServerCommandHandler {
                 : serverManager.getServersDir().resolve(finalConfig.name);
 
             try {
-                TomcatConfigGenerator generator = new TomcatConfigGenerator();
-                generator.generateConfiguration(serverInstanceDir, finalConfig, projectDir, sourceDir, false);
+                org.lucee.lucli.server.runtime.CatalinaBaseConfigGenerator generator = new org.lucee.lucli.server.runtime.CatalinaBaseConfigGenerator();
+                generator.generateConfiguration(serverInstanceDir, finalConfig, projectDir, sourceDir, 0, false);
             } catch (IOException e) {
                 return formatOutput("❌ Failed to generate server configuration: " + e.getMessage(), true);
             }
@@ -394,14 +394,20 @@ public class ServerCommandHandler {
                 try {
                     // Get the Lucee Express directory
                     Path luceeExpressDir = serverManager.ensureLuceeExpress(finalConfig.version);
-                    TomcatConfigGenerator tomcatGen = new TomcatConfigGenerator();
+                    org.lucee.lucli.server.runtime.CatalinaBaseConfigGenerator tomcatGen = new org.lucee.lucli.server.runtime.CatalinaBaseConfigGenerator();
                     Path serverInstanceDir = serverManager.getServersDir().resolve(finalConfig.name);
 
                     if(includeLuceeConfig) {
-                        result.append("\n📄 .CFConfig.json (patched, from lucee.json):\n");
+                        result.append("\n📄 .CFConfig.json (effective, including existing file if present):\n");
                         result.append("────────────────────────────────────────────\n");
                         try {
-                            com.fasterxml.jackson.databind.JsonNode cfConfig = LuceeServerConfig.resolveConfigurationNode(finalConfig, projectDir);
+                            java.util.List<String> arrayPaths = new java.util.ArrayList<>();
+                            com.fasterxml.jackson.databind.JsonNode cfConfig = LuceeServerConfig.resolveEffectiveCfConfigForContext(
+                                finalConfig,
+                                projectDir,
+                                serverInstanceDir,
+                                arrayPaths
+                            );
                             if (cfConfig == null || cfConfig.isNull()) {
                                 result.append("No Lucee configuration defined (no configuration or configurationFile in lucee.json)\n");
                             } else {
@@ -409,6 +415,13 @@ public class ServerCommandHandler {
                                 mapper.enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT);
                                 String cfConfigJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(cfConfig);
                                 result.append(cfConfigJson).append("\n");
+
+                                if (!arrayPaths.isEmpty()) {
+                                    result.append("\n⚠️  NOTE: The following CFConfig array paths will replace existing arrays in .CFConfig.json (not be merged):\n");
+                                    for (String path : arrayPaths) {
+                                        result.append("  - ").append(path).append("\n");
+                                    }
+                                }
                             }
                         } catch (Exception e) {
                             result.append("❌ Error generating .CFConfig.json preview: ").append(e.getMessage()).append("\n");
@@ -1716,10 +1729,10 @@ public class ServerCommandHandler {
     
     private String handleConfigGet(ServerConfigHelper configHelper, String[] args) throws Exception {
         if (args.length < 3) {
-            return formatOutput("❌ config get: missing key\n💡 Usage: server config get <key>\\n" +
-                "💡 Example: server config get port\\n" +
-                "💡 Example: server config get admin.enabled\\n" +
-                "💡 Example: server config get serverDir (virtual key - shows Tomcat instance location)\\n" +
+            return formatOutput("❌ config get: missing key\n💡 Usage: server config get <key>\n" +
+                "💡 Example: server config get port\n" +
+                "💡 Example: server config get admin.enabled\n" +
+                "💡 Example: server config get serverDir (virtual key - shows Tomcat instance location)\n" +
                 "💡 Example: server config get configuration --env=prod (export Lucee CFConfig for an environment)", true);
         }
         

@@ -33,6 +33,7 @@ This page describes all settings currently supported in `lucee.json` for LuCLI-m
     "enabled": true
   },
   "enableLucee": true,
+  "runtime": "lucee-express",
   "agents": {
     "luceedebug": {
       "enabled": false,
@@ -260,6 +261,7 @@ This section expands on the basic configuration reference and documents every av
 || `https`             | object  | disabled                                 | Optional HTTPS configuration. When enabled, LuCLI adds an HTTPS connector and generates a per-server PKCS12 keystore under the server instance directory.                        |
 || `agents`            | object  | `{}`                                      | Named Java agents (debuggers, JMX exporters, etc.), keyed by agent ID.                                                                                                          |
 || `environments`      | object  | `{}`                                      | Named environment configurations that can override base settings. See [Environment-Based Configuration](#environment-based-configuration) section above for details.            |
+|| `runtime`           | string or object | `"lucee-express"`               | Server runtime provider. Use `"docker"` or `"tomcat"` as shorthand, or an object like `{"type": "tomcat", "catalinaHome": "/opt/tomcat"}`. See [Runtime Providers](040_runtime-providers.md) for details. |
 
 ### `monitoring` settings
 

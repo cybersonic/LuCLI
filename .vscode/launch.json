@@ -247,12 +247,12 @@
     },
     {
       "type": "java",
-      "name": "🌍 Lucli Server Start No Index",
+      "name": "🌍 Lucli Server Start Runtime (Tomcat)",
       "request": "launch",
       "mainClass": "org.lucee.lucli.LuCLI",
       "projectName": "lucli",
       "console": "integratedTerminal",
-      "cwd": "${workspaceFolder}/examples/server-no-index",
+      "cwd": "${workspaceFolder}/examples/server-runtimes/",
       "args": [ "server", "start"]
     },
     {

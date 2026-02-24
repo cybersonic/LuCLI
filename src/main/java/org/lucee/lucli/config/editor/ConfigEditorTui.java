@@ -151,6 +151,18 @@ public class ConfigEditorTui {
         fields.add(new Field("webroot", "Webroot", FieldType.STRING,
                 () -> nullToEmpty(config.webroot),
                 v -> config.webroot = v));
+
+        // Runtime summary fields (type + installPath) so users can see/edit
+        // the active runtime quickly even though the TUI currently focuses on
+        // the General tab only.
+        LuceeServerConfig.RuntimeConfig runtime = LuceeServerConfig.getEffectiveRuntime(config);
+        fields.add(new Field("runtime.type", "Runtime Type", FieldType.STRING,
+                () -> nullToEmpty(runtime.type),
+                v -> runtime.type = v));
+        fields.add(new Field("runtime.installPath", "Runtime InstallPath", FieldType.STRING,
+                () -> nullToEmpty(runtime.installPath),
+                v -> runtime.installPath = v));
+
         fields.add(new Field("enableLucee", "Enable Lucee", FieldType.BOOL,
                 () -> String.valueOf(config.enableLucee),
                 v -> {

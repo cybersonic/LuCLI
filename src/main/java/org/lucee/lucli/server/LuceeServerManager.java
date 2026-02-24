@@ -24,6 +24,11 @@ import java.awt.GraphicsEnvironment;
 
 import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.deps.ExtensionDependencyInstaller;
+import org.lucee.lucli.server.runtime.LuceeExpressRuntimeProvider;
+import org.lucee.lucli.server.runtime.RuntimeProvider;
+import org.lucee.lucli.server.runtime.TomcatRuntimeProvider;
+import org.lucee.lucli.server.runtime.DockerRuntimeProvider;
+import org.lucee.lucli.server.runtime.JettyRuntimeProvider;
 
 /**
  * Manages Lucee server instances - downloading, configuring, starting, and stopping servers
@@ -53,6 +58,19 @@ public class LuceeServerManager {
     private final Path expressDir;
     private final Path serversDir;
     private final Path jarsDir;
+
+    /**
+     * Registered runtime providers keyed by their runtime type strings
+     * (e.g. "lucee-express", "tomcat"). Providers are per-manager so they
+     * can reuse this manager's helper methods and directories.
+     */
+    private final java.util.Map<String, RuntimeProvider> runtimeProviders = new java.util.HashMap<>();
+
+    /**
+     * Default provider used when runtime.type is omitted or unknown.
+     * Currently this is always the Lucee Express provider.
+     */
+    private final RuntimeProvider defaultRuntimeProvider;
     
     public LuceeServerManager() throws IOException {
         this.lucliHome = getLucliHome();
@@ -64,6 +82,14 @@ public class LuceeServerManager {
         Files.createDirectories(expressDir);
         Files.createDirectories(serversDir);
         Files.createDirectories(jarsDir);
+
+        // Register built-in runtime providers.
+        RuntimeProvider express = new LuceeExpressRuntimeProvider();
+        this.defaultRuntimeProvider = express;
+        registerRuntimeProvider(express);
+        registerRuntimeProvider(new TomcatRuntimeProvider());
+        registerRuntimeProvider(new DockerRuntimeProvider());
+        registerRuntimeProvider(new JettyRuntimeProvider());
     }
     
     /**
@@ -178,7 +204,23 @@ public class LuceeServerManager {
         startServerInternal(projectDir, versionOverride, forceReplace, customName, agentOverrides, environment, configFileName, true);
     }
 
-/**
+
+    private void registerRuntimeProvider(RuntimeProvider provider) {
+        if (provider == null || provider.getType() == null) {
+            return;
+        }
+        runtimeProviders.put(provider.getType(), provider);
+    }
+
+    private RuntimeProvider getRuntimeProvider(String type) {
+        if (type == null || type.trim().isEmpty()) {
+            return defaultRuntimeProvider;
+        }
+        RuntimeProvider provider = runtimeProviders.get(type);
+        return provider != null ? provider : defaultRuntimeProvider;
+    }
+
+    /**
      * Run a transient "sandbox" server in foreground mode without writing lucee.json
      * in the project directory or persisting the server instance after shutdown.
      *
@@ -279,10 +321,10 @@ public class LuceeServerManager {
         }
 
         try {
-            // Generate Tomcat configuration and supporting files in the sandbox directory
-            TomcatConfigGenerator configGenerator = new TomcatConfigGenerator();
-            boolean overwriteProjectConfig = forceReplace;
-            configGenerator.generateConfiguration(serverInstanceDir, config, projectDir, luceeExpressDir, overwriteProjectConfig);
+            // Generate CATALINA_BASE configuration from the Express CATALINA_HOME
+            org.lucee.lucli.server.runtime.CatalinaBaseConfigGenerator configGenerator =
+                    new org.lucee.lucli.server.runtime.CatalinaBaseConfigGenerator();
+            configGenerator.generateConfiguration(serverInstanceDir, config, projectDir, luceeExpressDir, 0, forceReplace);
 
             // Write CFConfig (.CFConfig.json) if present in the in-memory configuration
             LuceeServerConfig.writeCfConfigIfPresent(config, projectDir, serverInstanceDir);
@@ -296,8 +338,8 @@ public class LuceeServerManager {
             }
 
             // Launch foreground process; this blocks until shutdown
-            launchServerProcess(serverInstanceDir, config, projectDir, luceeExpressDir,
-                                agentOverrides, environment, true);
+            launchTomcatProcess(luceeExpressDir, serverInstanceDir, config, projectDir,
+                                agentOverrides, environment, true, "lucee-express");
         } finally {
             // After the foreground process exits, clean up the sandbox server directory
             try {
@@ -380,10 +422,10 @@ public class LuceeServerManager {
             System.err.println("Warning: Failed to write sandbox marker: " + e.getMessage());
         }
 
-        // Generate Tomcat configuration and supporting files in the sandbox directory
-        TomcatConfigGenerator configGenerator = new TomcatConfigGenerator();
-        boolean overwriteProjectConfig = forceReplace;
-        configGenerator.generateConfiguration(serverInstanceDir, config, projectDir, luceeExpressDir, overwriteProjectConfig);
+        // Generate CATALINA_BASE configuration from the Express CATALINA_HOME
+        org.lucee.lucli.server.runtime.CatalinaBaseConfigGenerator sandboxConfigGen =
+                new org.lucee.lucli.server.runtime.CatalinaBaseConfigGenerator();
+        sandboxConfigGen.generateConfiguration(serverInstanceDir, config, projectDir, luceeExpressDir, 0, forceReplace);
 
         // Write CFConfig (.CFConfig.json) if present in the in-memory configuration
         LuceeServerConfig.writeCfConfigIfPresent(config, projectDir, serverInstanceDir);
@@ -397,8 +439,8 @@ public class LuceeServerManager {
         }
 
         // Launch background process; this returns immediately
-        ServerInstance instance = launchServerProcess(serverInstanceDir, config, projectDir, luceeExpressDir,
-                                                     agentOverrides, environment, false);
+        ServerInstance instance = launchTomcatProcess(luceeExpressDir, serverInstanceDir, config, projectDir,
+                                                     agentOverrides, environment, false, "lucee-express");
 
         // Optionally wait for startup before returning (same timeout as normal start)
         waitForServerStartup(instance, 30);
@@ -524,136 +566,13 @@ public class LuceeServerManager {
                                           " (PID: " + existingInstance.getPid() + ", Port: " + existingInstance.getPort() + ")");
         }
         
-        // Ensure Lucee Express is available
-        Path luceeExpressDir = ensureLuceeExpress(config.version);
-        
-        // Resolve port conflicts right before starting server to avoid race conditions
-        LuceeServerConfig.PortConflictResult portResult = LuceeServerConfig.resolvePortConflicts(config, false, this);
-        
-        if (portResult.hasConflicts) {
-            // Check for specific server conflicts and provide helpful messages
-            String httpPortServer = getServerUsingPort(config.port);
-            String shutdownPortServer = getServerUsingPort(LuceeServerConfig.getShutdownPort(config.port));
-            String jmxPortServer = null;
-            if (config.monitoring != null && config.monitoring.jmx != null) {
-                jmxPortServer = getServerUsingPort(config.monitoring.jmx.port);
-            }
-            
-            StringBuilder errorMessage = new StringBuilder("Cannot start server - port conflicts detected:\n\n");
-            
-            if (!LuceeServerConfig.isPortAvailable(config.port)) {
-                if (httpPortServer != null) {
-                    errorMessage.append("• HTTP port ").append(config.port)
-                            .append(" is being used by Lucee server '").append(httpPortServer).append("'\n")
-                            .append("  Use: lucli server stop ").append(httpPortServer).append(" (to stop the server)\n")
-                            .append("  Or change the port in your lucee.json file\n\n");
-                } else {
-                    errorMessage.append("• HTTP port ").append(config.port)
-                            .append(" is already in use by another process\n")
-                            .append("  Use: lsof -i :").append(config.port).append(" (to see what's using the port)\n")
-                            .append("  Or change the port in your lucee.json file\n\n");
-                }
-            }
-            
-            int shutdownPort = LuceeServerConfig.getShutdownPort(config.port);
-            if (!LuceeServerConfig.isPortAvailable(shutdownPort)) {
-                if (shutdownPortServer != null) {
-                    errorMessage.append("• Shutdown port ").append(shutdownPort)
-                            .append(" (HTTP port + 1000) is being used by Lucee server '").append(shutdownPortServer).append("'\n")
-                            .append("  Use: lucli server stop ").append(shutdownPortServer).append(" (to stop the server)\n")
-                            .append("  Or change the HTTP port in your lucee.json file\n\n");
-                } else {
-                    errorMessage.append("• Shutdown port ").append(shutdownPort)
-                            .append(" (HTTP port + 1000) is already in use by another process\n")
-                            .append("  Use: lsof -i :").append(shutdownPort).append(" (to see what's using the port)\n")
-                            .append("  Or change the HTTP port in your lucee.json file\n\n");
-                }
-            }
-            
-            if (config.monitoring != null && config.monitoring.jmx != null && config.monitoring.enabled && !LuceeServerConfig.isPortAvailable(config.monitoring.jmx.port)) {
-                if (jmxPortServer != null) {
-                    errorMessage.append("• JMX port ").append(config.monitoring.jmx.port)
-                            .append(" is being used by Lucee server '").append(jmxPortServer).append("'\n")
-                            .append("  Use: lucli server stop ").append(jmxPortServer).append(" (to stop the server)\n")
-                            .append("  Or change the JMX port in your lucee.json file\n\n");
-                } else {
-                    errorMessage.append("• JMX port ").append(config.monitoring.jmx.port)
-                            .append(" is already in use by another process\n")
-                            .append("  Use: lsof -i :").append(config.monitoring.jmx.port).append(" (to see what's using the port)\n")
-                            .append("  Or change the JMX port in your lucee.json file\n\n");
-                }
-            }
+        // At this point the logical server name and environment are resolved
+        // and any existing LuCLI-managed server directories have been checked.
+        // Delegate the actual runtime-specific startup to a RuntimeProvider.
 
-            if (LuceeServerConfig.isHttpsEnabled(config) && !LuceeServerConfig.isPortAvailable(LuceeServerConfig.getEffectiveHttpsPort(config))) {
-                int httpsPort = LuceeServerConfig.getEffectiveHttpsPort(config);
-                errorMessage.append("• HTTPS port ").append(httpsPort)
-                        .append(" is already in use by another process\n")
-                        .append("  Use: lsof -i :").append(httpsPort).append(" (to see what's using the port)\n")
-                        .append("  Or change https.port in your lucee.json file (or disable https)\n\n");
-            }
-            
-            throw new IllegalStateException(errorMessage.toString().trim());
-        }
-        
-        // Build port information message
-        StringBuilder portInfo = new StringBuilder();
-        if (foreground) {
-            portInfo.append("Running server '\"").append(config.name).append("\' in foreground mode:");
-        } else {
-            portInfo.append("Starting server '\"").append(config.name).append("\' on:");
-        }
-        portInfo.append("\n  HTTP port:     ").append(config.port);
-        portInfo.append("\n  Shutdown port: ").append(LuceeServerConfig.getEffectiveShutdownPort(config));
-        if (config.monitoring != null && config.monitoring.enabled && config.monitoring.jmx != null) {
-            portInfo.append("\n  JMX port:      ").append(config.monitoring.jmx.port);
-        }
-        if (LuceeServerConfig.isHttpsEnabled(config)) {
-            portInfo.append("\n  HTTPS port:    ").append(LuceeServerConfig.getEffectiveHttpsPort(config));
-            portInfo.append("\n  HTTPS redirect:").append(LuceeServerConfig.isHttpsRedirectEnabled(config) ? " enabled" : " disabled");
-        }
-        if (foreground) {
-            portInfo.append("\n\nPress Ctrl+C to stop the server\n");
-        }
-        
-        System.out.println(portInfo.toString());
-        
-        // Create server instance directory
-        Path serverInstanceDir = serversDir.resolve(config.name);
-        Files.createDirectories(serverInstanceDir);
-        
-        // Generate Tomcat configuration
-        TomcatConfigGenerator configGenerator = new TomcatConfigGenerator();
-        // When forceReplace is true (e.g. --force), also allow overwriting project-level
-        // WEB-INF config files (web.xml, urlrewrite.xml, UrlRewriteFilter JAR). Without
-        // --force, we preserve any existing project configuration files.
-        boolean overwriteProjectConfig = forceReplace;
-        configGenerator.generateConfiguration(serverInstanceDir, config, projectDir, luceeExpressDir, overwriteProjectConfig);
-
-        // Write CFConfig (.CFConfig.json) into the Lucee context if configured in lucee.json.
-        // This treats lucee.json as the source of truth and .CFConfig.json as a derived file.
-        LuceeServerConfig.writeCfConfigIfPresent(config, projectDir, serverInstanceDir);
-        
-        // Deploy extension dependencies to lucee-server/deploy folder (always deploy)
-        deployExtensionsForServer(projectDir, serverInstanceDir);
-        
-        // Copy welcome index.cfm if Lucee is enabled and no index.cfm exists in webroot
-        if (config.enableLucee) {
-            copyWelcomeIndexIfMissing(config, projectDir);
-        }
-        
-        // Launch the server process
-        ServerInstance instance = launchServerProcess(serverInstanceDir, config, projectDir, luceeExpressDir, agentOverrides, environment, foreground);
-        
-        // For background mode only: wait for startup and open browser
-        if (!foreground) {
-            // Wait for server to start
-            waitForServerStartup(instance, 30); // 30 second timeout
-            
-            // Open the browser if enabled
-            openBrowserForServer(instance, config);
-        }
-        
-        return instance;
+        LuceeServerConfig.RuntimeConfig runtimeConfig = LuceeServerConfig.getEffectiveRuntime(config);
+        RuntimeProvider provider = getRuntimeProvider(runtimeConfig.type);
+        return provider.start(this, config, projectDir, environment, agentOverrides, foreground, forceReplace);
     }
     
     /**
@@ -672,14 +591,63 @@ public class LuceeServerManager {
      * Stop a specific server instance
      */
     public boolean stopServer(ServerInstance instance) throws IOException {
-        if (instance.getPid() <= 0) {
-            return false;
-        }
-
         Path serverDir = instance.getServerDir();
         Path pidFile = serverDir.resolve("server.pid");
         Path sandboxMarker = serverDir.resolve(".sandbox");
         boolean isSandbox = Files.exists(sandboxMarker);
+
+        // Docker-managed servers: stop via docker stop + docker rm.
+        Path dockerMarker = serverDir.resolve(".docker-container");
+        if (Files.exists(dockerMarker)) {
+            String containerName = Files.readString(dockerMarker).trim();
+            boolean stopped = org.lucee.lucli.server.runtime.DockerRuntimeProvider
+                    .stopDockerContainer(containerName);
+            Files.deleteIfExists(pidFile);
+            Files.deleteIfExists(dockerMarker);
+            if (isSandbox) {
+                deleteServerDirectory(serverDir);
+            }
+            return stopped;
+        }
+
+        // Jetty-managed servers: graceful shutdown via STOP.PORT / STOP.KEY.
+        Path jettyStopPortFile = serverDir.resolve(".jetty-stop-port");
+        Path jettyStopKeyFile = serverDir.resolve(".jetty-stop-key");
+        Path jettyHomeFile = serverDir.resolve(".jetty-home");
+        if (Files.exists(jettyStopPortFile) && Files.exists(jettyStopKeyFile) && Files.exists(jettyHomeFile)) {
+            try {
+                int stopPort = Integer.parseInt(Files.readString(jettyStopPortFile).trim());
+                String stopKey = Files.readString(jettyStopKeyFile).trim();
+                Path jettyHome = Paths.get(Files.readString(jettyHomeFile).trim());
+
+                boolean stopped = JettyRuntimeProvider.stopJettyServer(jettyHome, stopPort, stopKey);
+                if (stopped) {
+                    // Wait briefly for process to exit
+                    if (instance.getPid() > 0) {
+                        ProcessHandle ph = ProcessHandle.of(instance.getPid()).orElse(null);
+                        if (ph != null && ph.isAlive()) {
+                            try {
+                                ph.onExit().orTimeout(10, TimeUnit.SECONDS).join();
+                            } catch (Exception ignored) {
+                                ph.destroyForcibly();
+                            }
+                        }
+                    }
+                    Files.deleteIfExists(pidFile);
+                    if (isSandbox) {
+                        deleteServerDirectory(serverDir);
+                    }
+                    return true;
+                }
+                // If Jetty stop command failed, fall through to generic PID-based stop
+            } catch (Exception e) {
+                // Fall through to generic stop
+            }
+        }
+
+        if (instance.getPid() <= 0) {
+            return false;
+        }
         
         try {
             // Try graceful shutdown first
@@ -726,7 +694,7 @@ public class LuceeServerManager {
             return new ServerStatus(false, null, -1, -1, null);
         }
         
-        boolean isRunning = isProcessRunning(instance.getPid());
+        boolean isRunning = isProcessRunning(instance.getPid(), instance.getServerDir());
         return new ServerStatus(isRunning, instance.getServerName(), instance.getPid(), 
                               instance.getPort(), instance.getServerDir());
     }
@@ -758,10 +726,29 @@ public class LuceeServerManager {
                         if (parts.length >= 2) {
                             pid = Long.parseLong(parts[0]);
                             port = Integer.parseInt(parts[1]);
-                            isRunning = isProcessRunning(pid);
+                            isRunning = isProcessRunning(pid, serverDir);
                         }
                     } catch (Exception e) {
                         // Invalid PID file, server is not running
+                    }
+                }
+                
+                // Docker fallback: container may be running without a valid server.pid
+                if (!isRunning) {
+                    Path dockerMarker = serverDir.resolve(".docker-container");
+                    if (Files.exists(dockerMarker)) {
+                        try {
+                            String containerName = Files.readString(dockerMarker).trim();
+                            if (org.lucee.lucli.server.runtime.DockerRuntimeProvider
+                                    .isDockerContainerRunning(containerName)) {
+                                isRunning = true;
+                                pid = -1;
+                                if (port <= 0) {
+                                    port = recoverDockerPort(serverDir);
+                                }
+                            }
+                        } catch (Exception ignored) {
+                        }
                     }
                 }
                 
@@ -796,29 +783,75 @@ public class LuceeServerManager {
             Path serverDir = serversDir.resolve(config.name);
             Path pidFile = serverDir.resolve("server.pid");
             
-            if (!Files.exists(pidFile)) {
-                return null;
+            if (Files.exists(pidFile)) {
+                String pidContent = Files.readString(pidFile).trim();
+                String[] parts = pidContent.split(":");
+                if (parts.length >= 2) {
+                    long pid = Long.parseLong(parts[0]);
+                    int port = Integer.parseInt(parts[1]);
+                    
+                    if (isProcessRunning(pid, serverDir)) {
+                        return new ServerInstance(config.name, pid, port, serverDir, projectDir);
+                    }
+                    // Stale PID file
+                    Files.deleteIfExists(pidFile);
+                }
             }
             
-            String pidContent = Files.readString(pidFile).trim();
-            String[] parts = pidContent.split(":");
-            if (parts.length < 2) {
-                return null;
+            // Fallback: Docker container may still be running even if server.pid
+            // was deleted (e.g. by an older LuCLI build).
+            ServerInstance dockerInstance = getDockerFallbackInstance(config.name, serverDir, projectDir);
+            if (dockerInstance != null) {
+                return dockerInstance;
             }
             
-            long pid = Long.parseLong(parts[0]);
-            int port = Integer.parseInt(parts[1]);
-            
-            if (!isProcessRunning(pid)) {
-                // Remove stale PID file
-                Files.deleteIfExists(pidFile);
-                return null;
-            }
-            
-            return new ServerInstance(config.name, pid, port, serverDir, projectDir);
+            return null;
         } catch (Exception e) {
             return null;
         }
+    }
+    
+    /**
+     * Check for a running Docker container when server.pid is missing.
+     * If the .docker-container marker exists and the container is running,
+     * reconstruct a ServerInstance from the config port.
+     */
+    private ServerInstance getDockerFallbackInstance(String serverName, Path serverDir, Path projectDir) {
+        try {
+            Path dockerMarker = serverDir.resolve(".docker-container");
+            if (!Files.exists(dockerMarker)) {
+                return null;
+            }
+            String containerName = Files.readString(dockerMarker).trim();
+            if (!org.lucee.lucli.server.runtime.DockerRuntimeProvider.isDockerContainerRunning(containerName)) {
+                return null;
+            }
+            // Recover port from lucee.json via project path marker
+            int port = recoverDockerPort(serverDir);
+            // Re-create server.pid so future operations work normally
+            if (port > 0) {
+                Files.writeString(serverDir.resolve("server.pid"), "-1:" + port);
+            }
+            return new ServerInstance(serverName, -1L, port, serverDir, projectDir);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+    
+    /**
+     * Try to recover the HTTP port for a Docker server from its project config.
+     */
+    private int recoverDockerPort(Path serverDir) {
+        try {
+            Path projectPathFile = serverDir.resolve(".project-path");
+            if (Files.exists(projectPathFile)) {
+                Path projectDir = Paths.get(Files.readString(projectPathFile).trim());
+                LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(projectDir);
+                return config.port;
+            }
+        } catch (Exception ignored) {
+        }
+        return -1;
     }
     
     /**
@@ -836,11 +869,117 @@ public class LuceeServerManager {
         return null;
     }
     
+    public void checkAndReportPortConflicts(LuceeServerConfig.ServerConfig config, LuceeServerConfig.PortConflictResult portResult)
+                throws IOException {
+            if (portResult.hasConflicts) {
+                // Check for specific server conflicts and provide helpful messages
+                String httpPortServer = getServerUsingPort(config.port);
+                String shutdownPortServer = getServerUsingPort(LuceeServerConfig.getShutdownPort(config.port));
+                String jmxPortServer = null;
+                if (config.monitoring != null && config.monitoring.jmx != null) {
+                    jmxPortServer = getServerUsingPort(config.monitoring.jmx.port);
+                }
+
+                StringBuilder errorMessage = new StringBuilder("Cannot start server - port conflicts detected:\n\n");
+
+                if (!LuceeServerConfig.isPortAvailable(config.port)) {
+                    if (httpPortServer != null) {
+                        errorMessage.append("• HTTP port ").append(config.port)
+                                .append(" is being used by Lucee server '").append(httpPortServer).append("'\n")
+                                .append("  Use: lucli server stop ").append(httpPortServer).append(" (to stop the server)\n")
+                                .append("  Or change the port in your lucee.json file\n\n");
+                    } else {
+                        errorMessage.append("• HTTP port ").append(config.port)
+                                .append(" is already in use by another process\n")
+                                .append("  Use: lsof -i :").append(config.port).append(" (to see what's using the port)\n")
+                                .append("  Or change the port in your lucee.json file\n\n");
+                    }
+                }
+
+                int shutdownPort = LuceeServerConfig.getShutdownPort(config.port);
+                if (!LuceeServerConfig.isPortAvailable(shutdownPort)) {
+                    if (shutdownPortServer != null) {
+                        errorMessage.append("• Shutdown port ").append(shutdownPort)
+                                .append(" (HTTP port + 1000) is being used by Lucee server '").append(shutdownPortServer).append("'\n")
+                                .append("  Use: lucli server stop ").append(shutdownPortServer).append(" (to stop the server)\n")
+                                .append("  Or change the HTTP port in your lucee.json file\n\n");
+                    } else {
+                        errorMessage.append("• Shutdown port ").append(shutdownPort)
+                                .append(" (HTTP port + 1000) is already in use by another process\n")
+                                .append("  Use: lsof -i :").append(shutdownPort).append(" (to see what's using the port)\n")
+                                .append("  Or change the HTTP port in your lucee.json file\n\n");
+                    }
+                }
+
+                if (config.monitoring != null && config.monitoring.jmx != null && config.monitoring.enabled && !LuceeServerConfig.isPortAvailable(config.monitoring.jmx.port)) {
+                    if (jmxPortServer != null) {
+                        errorMessage.append("• JMX port ").append(config.monitoring.jmx.port)
+                                .append(" is being used by Lucee server '").append(jmxPortServer).append("'\n")
+                                .append("  Use: lucli server stop ").append(jmxPortServer).append(" (to stop the server)\n")
+                                .append("  Or change the JMX port in your lucee.json file\n\n");
+                    } else {
+                        errorMessage.append("• JMX port ").append(config.monitoring.jmx.port)
+                                .append(" is already in use by another process\n")
+                                .append("  Use: lsof -i :").append(config.monitoring.jmx.port).append(" (to see what's using the port)\n")
+                                .append("  Or change the JMX port in your lucee.json file\n\n");
+                    }
+                }
+
+                if (LuceeServerConfig.isHttpsEnabled(config) && !LuceeServerConfig.isPortAvailable(LuceeServerConfig.getEffectiveHttpsPort(config))) {
+                    int httpsPort = LuceeServerConfig.getEffectiveHttpsPort(config);
+                    errorMessage.append("• HTTPS port ").append(httpsPort)
+                            .append(" is already in use by another process\n")
+                            .append("  Use: lsof -i :").append(httpsPort).append(" (to see what's using the port)\n")
+                            .append("  Or change https.port in your lucee.json file (or disable https)\n\n");
+                }
+
+                throw new IllegalStateException(errorMessage.toString().trim());
+            }
+        }
+
+     private void displayPortDetails(LuceeServerConfig.ServerConfig config, boolean foreground) {
+            StringBuilder portInfo = new StringBuilder();
+            if (foreground) {
+                portInfo.append("Running server '\"").append(config.name).append("\' in foreground mode:");
+            } else {
+                portInfo.append("Starting server '\"").append(config.name).append("\' on:");
+            }
+            portInfo.append("\n  HTTP port:     ").append(config.port);
+            portInfo.append("\n  Shutdown port: ").append(LuceeServerConfig.getEffectiveShutdownPort(config));
+            if (config.monitoring != null && config.monitoring.enabled && config.monitoring.jmx != null) {
+                portInfo.append("\n  JMX port:      ").append(config.monitoring.jmx.port);
+            }
+            if (LuceeServerConfig.isHttpsEnabled(config)) {
+                portInfo.append("\n  HTTPS port:    ").append(LuceeServerConfig.getEffectiveHttpsPort(config));
+                portInfo.append("\n  HTTPS redirect:").append(LuceeServerConfig.isHttpsRedirectEnabled(config) ? " enabled" : " disabled");
+            }
+            if (foreground) {
+                portInfo.append("\n\nPress Ctrl+C to stop the server\n");
+            }
+
+            System.out.println(portInfo.toString());
+        }
+
+
     /**
-     * Check if a process is running
+     * Check if a process is running.
+     * For Docker servers (PID <= 0) this checks the container status.
      */
-    private boolean isProcessRunning(long pid) {
+    private boolean isProcessRunning(long pid, Path serverDir) {
         if (pid <= 0) {
+            // Docker-managed server: check container status
+            if (serverDir != null) {
+                Path dockerMarker = serverDir.resolve(".docker-container");
+                if (Files.exists(dockerMarker)) {
+                    try {
+                        String containerName = Files.readString(dockerMarker).trim();
+                        return org.lucee.lucli.server.runtime.DockerRuntimeProvider
+                                .isDockerContainerRunning(containerName);
+                    } catch (Exception e) {
+                        return false;
+                    }
+                }
+            }
             return false;
         }
         
@@ -850,6 +989,11 @@ public class LuceeServerManager {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    /** Convenience overload for callers without a server dir reference. */
+    private boolean isProcessRunning(long pid) {
+        return isProcessRunning(pid, null);
     }
     
     /**
@@ -868,7 +1012,7 @@ public class LuceeServerManager {
             String[] parts = pidContent.split(":");
             if (parts.length >= 1) {
                 long pid = Long.parseLong(parts[0]);
-                return isProcessRunning(pid);
+                return isProcessRunning(pid, serverDir);
             }
         } catch (Exception e) {
             // Invalid PID file
@@ -1193,7 +1337,7 @@ public class LuceeServerManager {
      * Open the configured browser URL (or default) for a started server.
      * This is best-effort and should not cause server startup to fail.
      */
-    private void openBrowserForServer(ServerInstance instance, LuceeServerConfig.ServerConfig config) {
+    public void openBrowserForServer(ServerInstance instance, LuceeServerConfig.ServerConfig config) {
         if (config == null || !config.openBrowser) {
             return;
         }
@@ -1384,7 +1528,7 @@ public class LuceeServerManager {
     
     /**
      * Format bytes as MB with 1 decimal place
-     */
+     */ 
     private String formatMB(long bytes) {
         return String.format("%.1f", bytes / 1024.0 / 1024.0);
     }
@@ -1555,7 +1699,7 @@ public class LuceeServerManager {
      * Deploy extension dependencies (.lex files) to server's lucee-server/deploy folder.
      * Called before server startup.
      */
-    private void deployExtensionsForServer(Path projectDir, Path serverInstanceDir) {
+    public void deployExtensionsForServer(Path projectDir, Path serverInstanceDir) {
         try {
             // Load lock file to get installed extension dependencies
             org.lucee.lucli.config.LuceeLockFile lockFile = org.lucee.lucli.config.LuceeLockFile.read(projectDir);
@@ -1680,162 +1824,316 @@ public class LuceeServerManager {
     }
     
     /**
-     * Launch the server process using either startup script (background) or catalina run (foreground).
-     * 
-     * @param serverInstanceDir The server instance directory
-     * @param config Server configuration
-     * @param projectDir Project directory
-     * @param luceeExpressDir Lucee Express directory
-     * @param agentOverrides Agent overrides
-     * @param environment Environment name
-     * @param foreground If true, uses 'catalina run' and blocks; if false, uses 'startup' script and returns immediately
-     * @return ServerInstance (only when foreground=false; foreground=true blocks until shutdown)
+     * Launch a Tomcat server process using separate CATALINA_HOME and CATALINA_BASE.
+     * This is the unified launch method used by all runtime providers (Express and vendor Tomcat).
+     *
+     * @param catalinaHome    Read-only Tomcat installation (Express dir or vendor Tomcat)
+     * @param catalinaBase    Per-server instance directory (~/.lucli/servers/&lt;name&gt;)
+     * @param config          Server configuration
+     * @param projectDir      Project directory
+     * @param agentOverrides  Agent overrides (may be null)
+     * @param environment     Environment name (may be null)
+     * @param foreground      If true, uses 'catalina run' and blocks; if false, uses startup script
+     * @param runtimeType     Runtime type marker written to .runtime-type (e.g. "lucee-express", "tomcat")
+     * @return ServerInstance (only when foreground=false; foreground=true returns null)
      */
-    private ServerInstance launchServerProcess(Path serverInstanceDir, LuceeServerConfig.ServerConfig config, 
-                                             Path projectDir, Path luceeExpressDir,
-                                             AgentOverrides agentOverrides, String environment, boolean foreground) throws Exception {
-        
+    public ServerInstance launchTomcatProcess(Path catalinaHome, Path catalinaBase,
+                                              LuceeServerConfig.ServerConfig config,
+                                              Path projectDir,
+                                              AgentOverrides agentOverrides,
+                                              String environment,
+                                              boolean foreground,
+                                              String runtimeType) throws Exception {
+
         boolean isWindows = System.getProperty("os.name", "").toLowerCase().contains("win");
-        
-        // Build command based on foreground mode
+
+        // Build command — look for scripts in bin/ first, then root (Express compat)
         List<String> command = new ArrayList<>();
         Path scriptPath;
-        
+
         if (foreground) {
-            // Use catalina.sh run for foreground mode
             String scriptName = isWindows ? "catalina.bat" : "catalina.sh";
-            scriptPath = luceeExpressDir.resolve("bin").resolve(scriptName);
-            if (!Files.exists(scriptPath) || (!isWindows && !Files.isExecutable(scriptPath))) {
-                throw new Exception("Lucee Express catalina script not found or not executable: " + scriptPath);
-            }
+            scriptPath = catalinaHome.resolve("bin").resolve(scriptName);
             command.add(scriptPath.toString());
             command.add("run");
         } else {
-            // Use startup.sh for background mode
             String scriptName = isWindows ? "startup.bat" : "startup.sh";
-            scriptPath = luceeExpressDir.resolve(scriptName);
-            if (!Files.exists(scriptPath) || (!isWindows && !Files.isExecutable(scriptPath))) {
-                throw new Exception("Lucee Express startup script not found or not executable: " + scriptPath);
+            scriptPath = catalinaHome.resolve("bin").resolve(scriptName);
+            // Lucee Express puts startup.sh in root; fall back
+            if (!Files.exists(scriptPath)) {
+                scriptPath = catalinaHome.resolve(scriptName);
             }
             command.add(scriptPath.toString());
         }
-        
-        // Create process
+
+        if (!Files.exists(scriptPath)) {
+            throw new Exception("Tomcat script not found: " + scriptPath);
+        }
+
+        // Create logs dir before redirecting output
+        Path logsDir = catalinaBase.resolve("logs");
+        Files.createDirectories(logsDir);
+
         ProcessBuilder pb = new ProcessBuilder(command);
-        pb.directory(luceeExpressDir.toFile());
-        
+        pb.directory(catalinaHome.toFile());
+
         if (foreground) {
-            // Inherit I/O streams for foreground mode
             pb.inheritIO();
         } else {
-            // Redirect to log files for background mode
-            pb.redirectOutput(serverInstanceDir.resolve("logs/server.out").toFile());
-            pb.redirectError(serverInstanceDir.resolve("logs/server.err").toFile());
+            pb.redirectOutput(logsDir.resolve("server.out").toFile());
+            pb.redirectError(logsDir.resolve("server.err").toFile());
         }
-        
-        // Set environment variables for Tomcat configuration
+
+        // Environment variables
         Map<String, String> env = pb.environment();
-        // Ensure any .env / envFile values loaded during configuration are also
-        // visible to the child process, without clobbering explicit OS vars.
         LuceeServerConfig.applyLoadedEnvToProcessEnvironment(env);
-        env.put("CATALINA_BASE", serverInstanceDir.toString());
-        env.put("CATALINA_HOME", serverInstanceDir.toString());
-        
-        // Set JVM options through CATALINA_OPTS
+
+        // Key: CATALINA_HOME != CATALINA_BASE
+        env.put("CATALINA_HOME", catalinaHome.toString());
+        env.put("CATALINA_BASE", catalinaBase.toString());
+
         List<String> catalinaOpts = buildCatalinaOpts(config, agentOverrides, projectDir);
         env.put("CATALINA_OPTS", String.join(" ", catalinaOpts));
-        
-        // Set other Tomcat environment variables
-        Path pidFile = serverInstanceDir.resolve("server.pid");
-        env.put("CATALINA_PID", pidFile.toString());
-        env.put("CATALINA_OUT", serverInstanceDir.resolve("logs/catalina.out").toString());
 
-        if(config.admin.password != null && config.admin.password.length() > 0){
+        Path pidFile = catalinaBase.resolve("server.pid");
+        // Use a separate file for CATALINA_PID so Tomcat's startup script
+        // doesn't overwrite our PID:PORT format in server.pid
+        Path catalinaPidFile = catalinaBase.resolve("catalina.pid");
+        env.put("CATALINA_PID", catalinaPidFile.toString());
+        env.put("CATALINA_OUT", logsDir.resolve("catalina.out").toString());
+
+        if (config.admin != null && config.admin.password != null && !config.admin.password.isEmpty()) {
             env.put("LUCEE_ADMIN_PASSWORD", config.admin.password);
         }
-        
-        // Set LUCEE_EXTENSIONS environment variable if extensions are configured
+
         String luceeExtensions = LuceeServerManager.buildLuceeExtensions(projectDir);
         if (luceeExtensions != null && !luceeExtensions.isEmpty()) {
             env.put("LUCEE_EXTENSIONS", luceeExtensions);
         }
 
-        // Apply additional environment variables defined in lucee.json (envVars)
-        if (config.envVars != null && !config.envVars.isEmpty()) {
+        if (config.envVars != null) {
             for (Map.Entry<String, String> entry : config.envVars.entrySet()) {
-                String key = entry.getKey();
-                if (key == null || key.trim().isEmpty()) {
-                    continue;
-                }
-                String value = entry.getValue();
-                if (value != null) {
-                    env.put(key, value);
+                if (entry.getKey() != null && !entry.getKey().trim().isEmpty() && entry.getValue() != null) {
+                    env.put(entry.getKey(), entry.getValue());
                 }
             }
         }
-        
-        // Write project path marker file to track which project this server belongs to
-        Files.writeString(serverInstanceDir.resolve(".project-path"), projectDir.toAbsolutePath().toString());
-        
-        // Write environment marker file if environment was specified
+
+        // Marker files
+        Files.writeString(catalinaBase.resolve(".project-path"), projectDir.toAbsolutePath().toString());
         if (environment != null && !environment.trim().isEmpty()) {
-            Files.writeString(serverInstanceDir.resolve(".environment"), environment.trim());
+            Files.writeString(catalinaBase.resolve(".environment"), environment.trim());
         }
-        
+        if (runtimeType != null && !runtimeType.isEmpty()) {
+            Files.writeString(catalinaBase.resolve(".runtime-type"), runtimeType);
+        }
+
         if (foreground) {
-            // Add shutdown hook to cleanup PID file on exit
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 try {
                     Files.deleteIfExists(pidFile);
+                    Files.deleteIfExists(catalinaPidFile);
                 } catch (IOException e) {
-                    // Ignore cleanup errors
+                    // Ignore
                 }
             }));
         }
-        
-        // Start the process
+
         Process process = pb.start();
-        
-        // Write PID file
-        String pidContent = process.pid() + ":" + config.port;
-        Files.writeString(pidFile, pidContent);
-        
+
+        // Write LuCLI's PID:PORT format. The initial PID is the startup
+        // script; Tomcat writes the actual Java PID to catalina.pid
+        // asynchronously. We update server.pid once that file appears.
+        long launcherPid = process.pid();
+        Files.writeString(pidFile, launcherPid + ":" + config.port);
+
+        // Wait briefly for Tomcat to write the real Java PID via CATALINA_PID
+        long javaPid = launcherPid;
+        for (int i = 0; i < 20; i++) {
+            try { Thread.sleep(250); } catch (InterruptedException ignored) { break; }
+            if (Files.exists(catalinaPidFile)) {
+                try {
+                    String raw = Files.readString(catalinaPidFile).trim();
+                    if (!raw.isEmpty()) {
+                        javaPid = Long.parseLong(raw);
+                        break;
+                    }
+                } catch (NumberFormatException ignored) { }
+            }
+        }
+        // Rewrite with the real Java PID so status/stop work correctly
+        Files.writeString(pidFile, javaPid + ":" + config.port);
+
         if (foreground) {
-            // Foreground mode: wait for process to complete
             try {
-                // Wait for the process to exit (blocks until Ctrl+C or server stops)
                 int exitCode = process.waitFor();
-                
                 if (exitCode != 0) {
                     System.err.println("\nServer exited with code: " + exitCode);
                 } else {
                     System.out.println("\nServer stopped successfully.");
                 }
             } catch (InterruptedException e) {
-                // Handle interruption (Ctrl+C)
                 System.out.println("\nShutting down server...");
                 process.destroy();
-                
-                // Wait a bit for graceful shutdown
                 try {
                     if (!process.waitFor(10, TimeUnit.SECONDS)) {
-                        // Force kill if not shut down within 10 seconds
                         process.destroyForcibly();
                     }
                 } catch (InterruptedException ex) {
                     process.destroyForcibly();
                 }
             } finally {
-                // Cleanup PID file
                 Files.deleteIfExists(pidFile);
+                Files.deleteIfExists(catalinaPidFile);
             }
-            return null; // Foreground mode doesn't return an instance since it blocks
+            return null;
         } else {
-            // Background mode: return immediately with instance
-            return new ServerInstance(config.name, process.pid(), config.port, serverInstanceDir, projectDir);
+            return new ServerInstance(config.name, javaPid, config.port, catalinaBase, projectDir);
         }
     }
+
+    /**
+     * @deprecated Use {@link #launchTomcatProcess} instead. This wrapper preserves the old
+     * CATALINA_HOME==CATALINA_BASE behaviour for callers that haven't migrated yet.
+     */
+    @Deprecated
+    public ServerInstance launchServerProcess(Path serverInstanceDir, LuceeServerConfig.ServerConfig config,
+                                             Path projectDir, Path luceeExpressDir,
+                                             AgentOverrides agentOverrides, String environment, boolean foreground) throws Exception {
+        return launchTomcatProcess(luceeExpressDir, serverInstanceDir, config, projectDir,
+                agentOverrides, environment, foreground, "lucee-express");
+    }
     
+    /**
+     * Launch a Jetty server process using separate JETTY_HOME and JETTY_BASE.
+     *
+     * Unlike Tomcat, Jetty launches via {@code java -jar $JETTY_HOME/start.jar}
+     * with the working directory set to JETTY_BASE. JVM options are configured
+     * via start.d/jvm.ini rather than environment variables.
+     *
+     * @param jettyHome       Read-only Jetty distribution
+     * @param jettyBase       Per-server instance directory (~/.lucli/servers/&lt;name&gt;)
+     * @param config          Server configuration
+     * @param projectDir      Project directory
+     * @param agentOverrides  Agent overrides (may be null)
+     * @param environment     Environment name (may be null)
+     * @param foreground      If true, blocks until server exits; if false, returns immediately
+     * @param stopPort        STOP.PORT for graceful shutdown
+     * @param stopKey         STOP.KEY for graceful shutdown
+     * @return ServerInstance (only when foreground=false; foreground=true returns null)
+     */
+    public ServerInstance launchJettyProcess(Path jettyHome, Path jettyBase,
+                                             LuceeServerConfig.ServerConfig config,
+                                             Path projectDir,
+                                             AgentOverrides agentOverrides,
+                                             String environment,
+                                             boolean foreground,
+                                             int stopPort, String stopKey) throws Exception {
+
+        String javaExe = findJavaExecutable();
+        Path startJar = jettyHome.resolve("start.jar");
+
+        // Build command: java -jar $JETTY_HOME/start.jar
+        // Jetty resolves jetty.base from the working directory
+        List<String> command = new ArrayList<>();
+        command.add(javaExe);
+        command.add("-jar");
+        command.add(startJar.toString());
+
+        // Create logs dir before redirecting output
+        Path logsDir = jettyBase.resolve("logs");
+        Files.createDirectories(logsDir);
+
+        ProcessBuilder pb = new ProcessBuilder(command);
+        // Jetty resolves JETTY_BASE from the working directory
+        pb.directory(jettyBase.toFile());
+
+        if (foreground) {
+            pb.inheritIO();
+        } else {
+            pb.redirectOutput(logsDir.resolve("jetty.out").toFile());
+            pb.redirectError(logsDir.resolve("jetty.err").toFile());
+        }
+
+        // Environment variables
+        Map<String, String> env = pb.environment();
+        LuceeServerConfig.applyLoadedEnvToProcessEnvironment(env);
+
+        env.put("JETTY_HOME", jettyHome.toString());
+        env.put("JETTY_BASE", jettyBase.toString());
+
+        if (config.admin != null && config.admin.password != null && !config.admin.password.isEmpty()) {
+            env.put("LUCEE_ADMIN_PASSWORD", config.admin.password);
+        }
+
+        String luceeExtensions = LuceeServerManager.buildLuceeExtensions(projectDir);
+        if (luceeExtensions != null && !luceeExtensions.isEmpty()) {
+            env.put("LUCEE_EXTENSIONS", luceeExtensions);
+        }
+
+        if (config.envVars != null) {
+            for (Map.Entry<String, String> entry : config.envVars.entrySet()) {
+                if (entry.getKey() != null && !entry.getKey().trim().isEmpty() && entry.getValue() != null) {
+                    env.put(entry.getKey(), entry.getValue());
+                }
+            }
+        }
+
+        // Marker files
+        Path pidFile = jettyBase.resolve("server.pid");
+        Files.writeString(jettyBase.resolve(".project-path"), projectDir.toAbsolutePath().toString());
+        if (environment != null && !environment.trim().isEmpty()) {
+            Files.writeString(jettyBase.resolve(".environment"), environment.trim());
+        }
+        Files.writeString(jettyBase.resolve(".runtime-type"), "jetty");
+
+        // Write Jetty stop markers so stopServer() can perform graceful shutdown
+        Files.writeString(jettyBase.resolve(".jetty-stop-port"), String.valueOf(stopPort));
+        Files.writeString(jettyBase.resolve(".jetty-stop-key"), stopKey);
+        Files.writeString(jettyBase.resolve(".jetty-home"), jettyHome.toAbsolutePath().toString());
+
+        if (foreground) {
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                try {
+                    Files.deleteIfExists(pidFile);
+                } catch (IOException e) {
+                    // Ignore
+                }
+            }));
+        }
+
+        Process process = pb.start();
+        long pid = process.pid();
+        Files.writeString(pidFile, pid + ":" + config.port);
+
+        if (foreground) {
+            try {
+                int exitCode = process.waitFor();
+                if (exitCode != 0) {
+                    System.err.println("\nServer exited with code: " + exitCode);
+                } else {
+                    System.out.println("\nServer stopped successfully.");
+                }
+            } catch (InterruptedException e) {
+                System.out.println("\nShutting down Jetty server...");
+                // Try graceful shutdown via STOP.PORT/STOP.KEY
+                JettyRuntimeProvider.stopJettyServer(jettyHome, stopPort, stopKey);
+                try {
+                    if (!process.waitFor(10, TimeUnit.SECONDS)) {
+                        process.destroyForcibly();
+                    }
+                } catch (InterruptedException ex) {
+                    process.destroyForcibly();
+                }
+            } finally {
+                Files.deleteIfExists(pidFile);
+            }
+            return null;
+        } else {
+            return new ServerInstance(config.name, pid, config.port, jettyBase, projectDir);
+        }
+    }
+
     /**
      * Find Java executable
      */
@@ -1853,10 +2151,10 @@ public class LuceeServerManager {
     /**
      * Build JVM options (CATALINA_OPTS) including memory, JMX, Lucee extensions, and any configured agents.
      *
-     * Package-private so it can be reused by other server components and
-     * exercised directly from tests.
+     * Public so it can be reused by runtime providers and other server components,
+     * and exercised directly from tests.
      */
-    List<String> buildCatalinaOpts(LuceeServerConfig.ServerConfig config, AgentOverrides overrides, Path projectDir) {
+    public List<String> buildCatalinaOpts(LuceeServerConfig.ServerConfig config, AgentOverrides overrides, Path projectDir) {
         List<String> opts = new ArrayList<>();
         
         // Base memory settings
@@ -1976,7 +2274,7 @@ public class LuceeServerManager {
     /**
      * Wait for server to start up
      */
-    private void waitForServerStartup(ServerInstance instance, int timeoutSeconds) throws Exception {
+    public void waitForServerStartup(ServerInstance instance, int timeoutSeconds) throws Exception {
         long startTime = System.currentTimeMillis();
         long timeout = timeoutSeconds * 1000L;
         

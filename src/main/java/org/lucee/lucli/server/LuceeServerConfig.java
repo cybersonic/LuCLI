@@ -117,6 +117,13 @@ public class LuceeServerConfig {
          * Use `lucli server start --env prod` to apply the "prod" environment overrides.
          */
         public Map<String, ServerConfig> environments = new HashMap<>();
+
+        /**
+         * Optional runtime configuration describing how/where the server runs
+         * (lucee-express, tomcat, docker, etc.). When null or when type is
+         * omitted, LuCLI defaults to a Lucee Express runtime.
+         */
+        public RuntimeConfig runtime;
     }
     
     public static class HttpsConfig {
@@ -148,6 +155,12 @@ public class LuceeServerConfig {
     public static class UrlRewriteConfig {
         public boolean enabled = true;
         public String routerFile = "index.cfm";
+        /**
+         * Path to the urlrewrite.xml config file in the project.
+         * Relative paths are resolved against the project directory.
+         * Defaults to "urlrewrite.xml" in project root.
+         */
+        public String configFile = "urlrewrite.xml";
     }
     
     public static class MonitoringConfig {
@@ -163,6 +176,41 @@ public class LuceeServerConfig {
         public String maxMemory = "512m";
         public String minMemory = "128m";
         public String[] additionalArgs = new String[0];
+    }
+    
+    /**
+     * Runtime configuration describing how and where the server is run.
+     * This is a direct mapping of the "runtime" section documented in
+     * documentation/todo/RUNTIME.md and is intentionally permissive for
+     * future backends.
+     */
+    public static class RuntimeConfig {
+        // Common fields
+        public String type;         // "lucee-express" | "tomcat" | "docker" | "jetty"
+        public String installPath;  // Host path for lucee-express/tomcat; in-container path for docker
+
+        // Lucee Express–specific
+        public String variant;      // "standard" (default), "light", "zero"
+        public Boolean shared;      // false = per-project, true = shared install
+
+        // Tomcat-specific (first-pass wiring only)
+        public String catalinaHome;
+        public String catalinaBase;
+        @Deprecated
+        public String webappsDir; 
+        @Deprecated
+        public String contextPath;
+
+        // Jetty-specific
+        public String jettyHome;    // Path to Jetty distribution; falls back to JETTY_HOME env var
+
+        // Docker-specific (configuration only for now)
+        public String image;
+        public String dockerfile;
+        public String context;
+        public String tag;
+        public String containerName;
+        public String runMode;      // "mount" | "copy"
     }
     
     public static class AgentConfig {
@@ -275,6 +323,48 @@ public class LuceeServerConfig {
             return "localhost";
         }
         return config.host.trim();
+    }
+
+    /**
+     * Resolve the effective runtime configuration for a server.
+     *
+     * Behaviour:
+     * - When {@code config.runtime} is null, a new RuntimeConfig is created.
+     * - When {@code runtime.type} is null/blank, it defaults to "lucee-express".
+     * - Some fields have lightweight defaults applied (e.g. shared=false,
+     *   webappsDir="webapps", runMode="mount").
+     *
+     * The returned instance is also assigned back to {@code config.runtime}
+     * so that downstream callers can rely on non-null runtime configuration.
+     */
+    public static RuntimeConfig getEffectiveRuntime(ServerConfig config) {
+        if (config == null) {
+            throw new IllegalArgumentException("ServerConfig must not be null");
+        }
+
+        RuntimeConfig runtime = config.runtime != null ? config.runtime : new RuntimeConfig();
+
+        if (runtime.type == null || runtime.type.trim().isEmpty()) {
+            runtime.type = "lucee-express";
+        }
+
+        // Default shared flag for lucee-express runtime
+        if (runtime.shared == null) {
+            runtime.shared = Boolean.FALSE;
+        }
+
+        // Default Tomcat webappsDir
+        if (runtime.webappsDir == null || runtime.webappsDir.trim().isEmpty()) {
+            runtime.webappsDir = "webapps";
+        }
+
+        // Default Docker runMode for dev-like usage
+        if (runtime.runMode == null || runtime.runMode.trim().isEmpty()) {
+            runtime.runMode = "mount";
+        }
+
+        config.runtime = runtime;
+        return runtime;
     }
 
     /**
@@ -1561,13 +1651,70 @@ public class LuceeServerConfig {
     }
     
     /**
+     * Resolve the effective CFConfig JSON for a specific server instance directory,
+     * taking into account any existing .CFConfig.json file.
+     *
+     * This mirrors the behaviour of {@link #writeCfConfigIfPresent} but returns the
+     * merged JsonNode instead of writing it. The merge rules are:
+     *   - Objects (structs) are deep-merged, with override values winning.
+     *   - Scalars (strings, numbers, booleans, null) from the override replace existing values.
+     *   - Arrays from the override replace any existing arrays at the same path.
+     *
+     * If {@code arrayOverridePaths} is non-null and an existing .CFConfig.json file is
+     * present, any JSON paths where the override contains arrays that will replace
+     * existing arrays are recorded into that list.
+     */
+    public static JsonNode resolveEffectiveCfConfigForContext(
+            ServerConfig config,
+            Path projectDir,
+            Path serverInstanceDir,
+            java.util.List<String> arrayOverridePaths) throws IOException {
+        JsonNode cfConfig = resolveConfigurationNode(config, projectDir);
+        if (cfConfig == null || cfConfig.isNull()) {
+            return null;
+        }
+        
+        Path cfConfigPath = serverInstanceDir
+                .resolve("lucee-server")
+                .resolve("context")
+                .resolve(".CFConfig.json");
+        
+        if (!Files.exists(cfConfigPath)) {
+            // No existing file – nothing to merge.
+            return cfConfig;
+        }
+        
+        JsonNode existing = objectMapper.readTree(cfConfigPath.toFile());
+        if (existing == null || existing.isNull()) {
+            return cfConfig;
+        }
+        
+        if (arrayOverridePaths != null) {
+            trackArrayOverridePaths(cfConfig, "", arrayOverridePaths);
+        }
+        
+        // Deep merge existing with overrides from lucee.json, following mergeJsonNodes rules.
+        return mergeJsonNodes(existing.deepCopy(), cfConfig);
+    }
+    
+    /**
      * When a CFConfig definition is present in the server configuration, write it to
      * the Lucee context directory as .CFConfig.json. This is a pure side-effect method
      * used during server startup and does nothing when no configuration is defined.
+     *
+     * Behaviour when .CFConfig.json already exists:
+     *   - The existing file is loaded as the base configuration.
+     *   - The resolved CFConfig from lucee.json is deep-merged on top, with
+     *     structures and simple values overriding existing values while
+     *     preserving any keys not mentioned in lucee.json.
+     *   - Array values from lucee.json replace any existing arrays entirely
+     *     rather than being merged. Paths where array overrides occur are
+     *     printed to stdout so users can review them.
      */
     public static void writeCfConfigIfPresent(ServerConfig config, Path projectDir, Path serverInstanceDir) throws IOException {
-        JsonNode cfConfig = resolveConfigurationNode(config, projectDir);
-        if (cfConfig == null || cfConfig.isNull()) {
+        java.util.List<String> arrayPaths = new java.util.ArrayList<>();
+        JsonNode finalConfig = resolveEffectiveCfConfigForContext(config, projectDir, serverInstanceDir, arrayPaths);
+        if (finalConfig == null || finalConfig.isNull()) {
             return; // Nothing to write
         }
 
@@ -1576,6 +1723,51 @@ public class LuceeServerConfig {
         Files.createDirectories(contextDir);
 
         Path cfConfigPath = contextDir.resolve(".CFConfig.json");
-        objectMapper.writeValue(cfConfigPath.toFile(), cfConfig);
+
+        // Only log array overrides when we actually merged into an existing file.
+        if (!arrayPaths.isEmpty() && Files.exists(cfConfigPath)) {
+            System.out.println("⚠️  CFConfig merge applied array overrides at: " + String.join(", ", arrayPaths));
+            System.out.println("    Existing arrays at these paths were replaced rather than merged.");
+        }
+
+        objectMapper.writeValue(cfConfigPath.toFile(), finalConfig);
+    }
+
+    /**
+     * Recursively record JSON paths where the override configuration contains
+     * array values. These are the locations where merges will replace existing
+     * arrays entirely rather than merging element-by-element.
+     */
+    private static void trackArrayOverridePaths(JsonNode node, String currentPath, java.util.List<String> paths) {
+        if (node == null) {
+            return;
+        }
+
+        if (node.isArray()) {
+            // Record the path to this array; root arrays are recorded as "$".
+            String path = currentPath == null || currentPath.isEmpty() ? "$" : currentPath;
+            paths.add(path);
+            // Still walk children in case of nested arrays/objects
+            int index = 0;
+            for (JsonNode element : node) {
+                String childPath = path + "[" + index + "]";
+                trackArrayOverridePaths(element, childPath, paths);
+                index++;
+            }
+        } else if (node.isObject()) {
+            java.util.Iterator<java.util.Map.Entry<String, JsonNode>> it = node.fields();
+            while (it.hasNext()) {
+                java.util.Map.Entry<String, JsonNode> entry = it.next();
+                String key = entry.getKey();
+                JsonNode child = entry.getValue();
+                String childPath;
+                if (currentPath == null || currentPath.isEmpty()) {
+                    childPath = key;
+                } else {
+                    childPath = currentPath + "." + key;
+                }
+                trackArrayOverridePaths(child, childPath, paths);
+            }
+        }
     }
 }
