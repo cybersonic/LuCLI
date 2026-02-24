@@ -10,6 +10,7 @@ import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -18,7 +19,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class LuceeJsonConfig {
     
-    private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final ObjectMapper objectMapper = new ObjectMapper()
+            .enable(JsonParser.Feature.ALLOW_COMMENTS);
     
     @JsonProperty("name")
     private String name;

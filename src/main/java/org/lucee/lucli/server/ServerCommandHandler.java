@@ -120,6 +120,7 @@ public class ServerCommandHandler {
         String environment = null;
         String webrootOverride = null;
         boolean dryRun = false;
+        boolean includeEnv = false;
         boolean includeLuceeConfig = false;
         boolean includeTomcatWeb = false;
         boolean includeTomcatServer = false;
@@ -176,6 +177,8 @@ public class ServerCommandHandler {
                 }
             } else if (args[i].equals("--dry-run")) {
                 dryRun = true;
+            } else if (args[i].equals("--include-env")) {
+                includeEnv = true;
             } else if (args[i].equals("--include-tomcat-web")) {
                 includeTomcatWeb = true;
             } else if (args[i].equals("--include-lucee")) {
@@ -200,6 +203,7 @@ public class ServerCommandHandler {
                 destDirOverride = Paths.get(args[i].substring("--dest=".length()));
             } else if (args[i].equals("--include-all")) {
                 // Convenience flag for debugging: show all available dry-run previews.
+                includeEnv = true;
                 includeTomcatWeb = true;
                 includeTomcatServer = true;
                 includeHttpsKeystorePlan = true;
@@ -473,6 +477,10 @@ public class ServerCommandHandler {
                 }
             }
             
+            if (includeEnv) {
+                appendEnvPreview(result, finalConfig, projectDir, serverManager, agentOverrides);
+            }
+            
             result.append("\n✅ Use without --dry-run to start the server with this config.\n");
             return formatOutput(result.toString(), false);
         }
@@ -674,6 +682,8 @@ public class ServerCommandHandler {
         String environment = null;
         String webrootOverride = null;
         boolean sandbox = false;
+        boolean dryRun = false;
+        boolean includeEnv = false;
         Integer portOverride = null;
         Boolean enableLuceeOverride = null;
         Path projectDir = currentWorkingDirectory; // Default to current directory
@@ -714,6 +724,10 @@ public class ServerCommandHandler {
                 webrootOverride = args[++i];
             } else if (arg.startsWith("--webroot=")) {
                 webrootOverride = arg.substring("--webroot=".length());
+            } else if ("--dry-run".equals(arg)) {
+                dryRun = true;
+            } else if ("--include-env".equals(arg)) {
+                includeEnv = true;
             } else if ("--sandbox".equals(arg)) {
                 sandbox = true;
             } else if ("--disable-lucee".equals(arg)) {
@@ -753,6 +767,11 @@ public class ServerCommandHandler {
             }
         }
         
+        // Disallow --dry-run with --sandbox
+        if (sandbox && dryRun) {
+            return formatOutput("❌ --sandbox cannot be combined with --dry-run.", true);
+        }
+        
         // Apply any configuration overrides to the selected configuration file before starting the server,
         // but only in normal (non-sandbox) mode so sandbox does not create/write lucee.json.
         if (!sandbox && (!configOverrides.isEmpty() || portOverride != null || enableLuceeOverride != null)) {
@@ -781,6 +800,47 @@ public class ServerCommandHandler {
             (agentOverrides.enableAgents == null || agentOverrides.enableAgents.isEmpty()) &&
             (agentOverrides.disableAgents == null || agentOverrides.disableAgents.isEmpty())) {
             agentOverrides = null;
+        }
+        
+        // Dry-run: show realized config (and optionally env) without starting
+        if (dryRun) {
+            String cfgFile = configFileName != null ? configFileName : "lucee.json";
+            LuceeServerConfig.ServerConfig finalConfig = LuceeServerConfig.loadConfig(projectDir, cfgFile);
+            
+            if (environment != null && !environment.trim().isEmpty()) {
+                try {
+                    finalConfig = LuceeServerConfig.applyEnvironment(finalConfig, environment, projectDir);
+                } catch (IllegalArgumentException e) {
+                    return formatOutput("❌ " + e.getMessage(), true);
+                }
+            }
+            if (webrootOverride != null && !webrootOverride.trim().isEmpty()) {
+                finalConfig.webroot = webrootOverride.trim();
+            }
+            
+            StringBuilder result = new StringBuilder();
+            result.append("📋 DRY RUN: Server configuration that would be used:\n\n");
+            result.append("Realized lucee.json for: ").append(projectDir);
+            if (environment != null && !environment.trim().isEmpty()) {
+                result.append(" (with environment: ").append(environment).append(")");
+            }
+            result.append("\n═══════════════════════════════════════════\n");
+            try {
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                mapper.enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT);
+                String jsonString = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(finalConfig);
+                result.append(jsonString).append("\n");
+            } catch (Exception e) {
+                result.append("Error serializing config: ").append(e.getMessage());
+            }
+            result.append("═══════════════════════════════════════════\n");
+            
+            if (includeEnv) {
+                appendEnvPreview(result, finalConfig, projectDir, serverManager, agentOverrides);
+            }
+            
+            result.append("\n✅ Use without --dry-run to run the server with this config.\n");
+            return formatOutput(result.toString(), false);
         }
         
         try {
@@ -822,6 +882,67 @@ public class ServerCommandHandler {
             
             return formatOutput(result.toString(), true);
         }
+    }
+    
+    /**
+     * Append a preview of the environment variables that LuCLI would pass to the
+     * server runtime process. This mirrors the variables set in
+     * {@link LuceeServerManager#launchTomcatProcess} / launchJettyProcess.
+     */
+    private void appendEnvPreview(StringBuilder result,
+                                  LuceeServerConfig.ServerConfig config,
+                                  Path projectDir,
+                                  LuceeServerManager serverManager,
+                                  LuceeServerManager.AgentOverrides agentOverrides) {
+        result.append("\n🌐 Environment variables that would be passed to the runtime:\n");
+        result.append("─────────────────────────────────────────\n");
+
+        // Use a LinkedHashMap to preserve insertion order for readability
+        java.util.Map<String, String> envPreview = new java.util.LinkedHashMap<>();
+
+        // 1) Variables from .env / envFile (already loaded by loadConfig)
+        java.util.Map<String, String> envFileVars = new java.util.LinkedHashMap<>();
+        LuceeServerConfig.applyLoadedEnvToProcessEnvironment(envFileVars);
+        envPreview.putAll(envFileVars);
+
+        // 2) LuCLI-added runtime variables
+        Path serverInstanceDir = serverManager.getServersDir().resolve(config.name);
+        envPreview.put("CATALINA_HOME", "<lucee-express-dir>");
+        envPreview.put("CATALINA_BASE", serverInstanceDir.toString());
+
+        java.util.List<String> catalinaOpts = serverManager.buildCatalinaOpts(config, agentOverrides, projectDir);
+        envPreview.put("CATALINA_OPTS", String.join(" ", catalinaOpts));
+
+        envPreview.put("CATALINA_PID", serverInstanceDir.resolve("catalina.pid").toString());
+        envPreview.put("CATALINA_OUT", serverInstanceDir.resolve("logs").resolve("catalina.out").toString());
+
+        if (config.admin != null && config.admin.password != null && !config.admin.password.isEmpty()) {
+            envPreview.put("LUCEE_ADMIN_PASSWORD", "****");
+        }
+
+        try {
+            String luceeExtensions = LuceeServerManager.buildLuceeExtensions(projectDir);
+            if (luceeExtensions != null && !luceeExtensions.isEmpty()) {
+                envPreview.put("LUCEE_EXTENSIONS", luceeExtensions);
+            }
+        } catch (Exception e) {
+            // ignore — not critical for preview
+        }
+
+        // 3) User-defined envVars from lucee.json
+        if (config.envVars != null && !config.envVars.isEmpty()) {
+            envPreview.putAll(config.envVars);
+        }
+
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            mapper.enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT);
+            result.append(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(envPreview)).append("\n");
+        } catch (Exception e) {
+            result.append("Error serializing env preview: ").append(e.getMessage()).append("\n");
+        }
+
+        result.append("─────────────────────────────────────────\n");
     }
     
     private void appendHttpsKeystorePlan(StringBuilder result, LuceeServerConfig.ServerConfig config, Path serverInstanceDir) {

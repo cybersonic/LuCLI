@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **JSON Comments:** `lucee.json` now supports `//` line comments and `/* */` block comments, making it easier to annotate your configuration.
+- **Relative Path Resolution in envVars:** Relative paths (starting with `./` or `../`) in `envVars` are now automatically resolved to absolute paths against the project directory, so the server process receives correct paths regardless of its working directory.
+- **Dry-Run for `server run`:** `lucli server run --dry-run` now works the same as `server start --dry-run`, showing the realized configuration without starting the server.
+- **Environment Preview (`--include-env`):** Added `--include-env` flag for `--dry-run` on both `server start` and `server run` to display the environment variables that would be passed to the runtime (CATALINA_OPTS, LUCEE_EXTENSIONS, envVars, etc.). Also included in `--include-all`.
+- **Platform Updates:** Updated to Lucee 7.0.2.101-SNAPSHOT.
 - **Module Help:** Modules now support `--help` (e.g. `lucli markspresso --help`) to display available subcommands with their arguments, types, and defaults. Module name, version, and description are pulled from `module.json`. Module authors can override `showHelp()` for custom help output.
 - **Runtime Providers:** LuCLI now supports pluggable server runtimes via the new `runtime` key in `lucee.json`. Choose how your Lucee server runs:
   - **Lucee Express** (default) — same as before, no config change needed.

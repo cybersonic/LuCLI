@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.core.JsonParser;
 
 /**
  * Handles Lucee server configuration from lucee.json files
@@ -221,6 +222,7 @@ public class LuceeServerConfig {
     
     private static final ObjectMapper objectMapper = new ObjectMapper()
             .enable(SerializationFeature.INDENT_OUTPUT)
+            .enable(JsonParser.Feature.ALLOW_COMMENTS)
             // Keep lucee.json as small as possible by omitting null keys.
             .setSerializationInclusion(JsonInclude.Include.NON_NULL);
     
@@ -289,6 +291,10 @@ public class LuceeServerConfig {
         // Perform environment variable substitution on string fields
         // Supports ${VAR_NAME} and ${VAR_NAME:-default_value}
         substituteEnvironmentVariables(config);
+        
+        // Resolve relative paths in envVars (e.g. "./distrocore") against the project directory
+        // so that the server process receives absolute paths regardless of its working directory.
+        resolveRelativeEnvVarPaths(config, projectDir);
         
         // NOTE: Secret placeholders (${secret:NAME}) are NOT resolved automatically here
         // anymore. This prevents read-only commands (status, stop, list, config get, etc.)
@@ -581,6 +587,28 @@ public class LuceeServerConfig {
         if (config.configuration != null) {
             config.configuration = substituteInJsonNode(config.configuration);
         }
+    }
+    
+    /**
+     * Resolve relative paths (starting with "./" or "../") in envVars values
+     * to absolute paths against the project directory. This ensures the server
+     * process receives correct paths regardless of its working directory.
+     */
+    private static void resolveRelativeEnvVarPaths(ServerConfig config, Path projectDir) {
+        if (config.envVars == null || config.envVars.isEmpty() || projectDir == null) {
+            return;
+        }
+        Path absProjectDir = projectDir.toAbsolutePath().normalize();
+        Map<String, String> resolved = new HashMap<>();
+        for (Map.Entry<String, String> entry : config.envVars.entrySet()) {
+            String key = entry.getKey();
+            String value = entry.getValue();
+            if (value != null && (value.startsWith("./") || value.startsWith("../"))) {
+                value = absProjectDir.resolve(value).normalize().toString();
+            }
+            resolved.put(key, value);
+        }
+        config.envVars = resolved;
     }
     
     /**

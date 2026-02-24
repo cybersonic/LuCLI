@@ -308,7 +308,7 @@ public class TomcatWebXmlPatcher {
             return;
         }
 
-        Path luceeServerRoot = serverInstanceDir.resolve("lucee-server");
+        Path luceeServerRoot = serverInstanceDir.resolve(""); //Removing the extra "lucee-server" as that is where it's always created , it stop s the 'lucee-server/lucee-server/context' issue
         Path luceeWebRoot = serverInstanceDir.resolve("lucee-web");
 
         try (InputStream in = Files.newInputStream(webXmlPath)) {

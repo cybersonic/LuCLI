@@ -1,5 +1,6 @@
 package org.lucee.lucli.config;
 
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -16,7 +17,8 @@ public class LuceeJsonEditor {
 
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .enable(SerializationFeature.INDENT_OUTPUT)
-            .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
+            .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
+            .enable(JsonParser.Feature.ALLOW_COMMENTS);
 
     private final Path projectDir;
     private final Path configFile;

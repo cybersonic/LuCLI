@@ -18,11 +18,11 @@ if(fileExists( moduleConfigFilePath )){
             type="server",      
             flushExistingData=false
             );
-        }
+    }
 
-        if(verbose){
-            echo("Imported module configuration for module: #moduleName#");
-        }
+    if(verbose){
+        echo("Imported module configuration for module: #moduleName#");
+    }
 }
 
 
