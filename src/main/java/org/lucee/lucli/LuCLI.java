@@ -239,6 +239,16 @@ public class LuCLI implements Callable<Integer> {
 
             // No argument provided - start interactive terminal
             if (firstArg == null || firstArg.trim().isEmpty()) {
+                // Check for unrecognized options absorbed by @Unmatched
+                if (additionalArgs != null && additionalArgs.length > 0) {
+                    for (String arg : additionalArgs) {
+                        if (arg.startsWith("-")) {
+                            StringOutput.Quick.error("Unknown option: '" + arg + "'");
+                            spec.commandLine().usage(System.err);
+                            return 2;
+                        }
+                    }
+                }
                 debug("LuCLI", "No arguments provided, starting terminal mode");
                 Timer.start("Terminal Mode");
                 Terminal.main(new String[0]);

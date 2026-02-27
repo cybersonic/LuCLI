@@ -203,7 +203,7 @@ public class WindowsSupport {
         public static String FOLDER() { return EmojiSupport.emoji("📁", ""); }
         public static String COMPUTER() { return EmojiSupport.emoji("💻", ">"); }
         public static String TOOL() { return EmojiSupport.emoji("🔧", "[TOOL]"); }
-        public static String ART() { return EmojiSupport.emoji("🎨", ""); }
+        public static String ART() { return EmojiSupport.emoji("🎨", "[ART]"); }
         public static String WAVE() { return EmojiSupport.emoji("👋", "Bye!"); }
         public static String BULB() { return EmojiSupport.emoji("💡", "[TIP]"); }
         
