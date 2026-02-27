@@ -71,7 +71,8 @@ public final class JettyRuntimeProvider implements RuntimeProvider {
 
         // Detect Jetty version and validate Lucee compatibility
         int jettyMajorVersion = detectJettyMajorVersion(jettyHome);
-        validateLuceeJettyCompatibility(config.version, jettyMajorVersion);
+        String luceeVersion = LuceeServerConfig.getLuceeVersion(config);
+        validateLuceeJettyCompatibility(luceeVersion, jettyMajorVersion);
 
         // Resolve port conflicts
         LuceeServerConfig.PortConflictResult portResult =
@@ -83,8 +84,8 @@ public final class JettyRuntimeProvider implements RuntimeProvider {
         TomcatConfigSupport.displayPortDetails(config, foreground, "Jetty");
 
         // Ensure Lucee JAR is available (cached in ~/.lucli/jars/)
-        String variant = (rt.variant != null && !rt.variant.isEmpty()) ? rt.variant : "standard";
-        Path luceeJar = manager.ensureLuceeJar(config.version, variant);
+        String variant = LuceeServerConfig.getLuceeVariant(config);
+        Path luceeJar = manager.ensureLuceeJar(luceeVersion, variant);
 
         // Create JETTY_BASE (server instance directory)
         Path jettyBase = manager.getServersDir().resolve(config.name);
@@ -97,13 +98,20 @@ public final class JettyRuntimeProvider implements RuntimeProvider {
         int stopPort = LuceeServerConfig.getEffectiveShutdownPort(config);
         String stopKey = "lucli-" + UUID.randomUUID().toString().substring(0, 8);
 
+        // Warn if URL rewriting is enabled (not supported for Jetty runtime)
+        if (config.enableLucee && config.urlRewrite != null && config.urlRewrite.enabled) {
+            System.out.println("\n\u26a0\ufe0f  URL Rewriting via RewriteValve is not supported with the Jetty runtime.");
+            System.out.println("   Jetty uses its own RewriteHandler \u2014 manual configuration required.");
+            System.out.println("   Skipping URL rewrite configuration.\n");
+        }
+
         // Generate Jetty configuration for JETTY_BASE
         JettyBaseConfigGenerator configGenerator = new JettyBaseConfigGenerator();
         configGenerator.generateConfiguration(jettyBase, config, projectDir, jettyHome,
                 jettyMajorVersion, stopPort, stopKey);
 
         // Deploy Lucee JAR to JETTY_BASE/lib/ext/
-        configGenerator.deployLuceeJar(luceeJar, jettyBase, config.version, variant);
+        configGenerator.deployLuceeJar(luceeJar, jettyBase, luceeVersion, variant);
 
         // Write CFConfig if present
         LuceeServerConfig.writeCfConfigIfPresent(config, projectDir, jettyBase);
@@ -262,7 +270,7 @@ public final class JettyRuntimeProvider implements RuntimeProvider {
                     "Jetty 12+ uses jakarta.servlet (Jakarta EE), but Lucee " + luceeMajorVersion + ".x uses javax.servlet (Java EE).\n\n" +
                     "Solutions:\n" +
                     "  1. Use Lucee 7.x with Jetty " + jettyMajorVersion + " (recommended)\n" +
-                    "     Update lucee.json: \"version\": \"7.0.1.100-RC\"\n\n" +
+                    "     Update lucee.json: \"lucee\": { \"version\": \"7.0.1.100-RC\" }\n\n" +
                     "  2. Use Jetty 11.x with Lucee " + luceeVersion + "\n" +
                     "     Update lucee.json: \"runtime\": { \"jettyHome\": \"/path/to/jetty11\" }");
         }
@@ -276,7 +284,7 @@ public final class JettyRuntimeProvider implements RuntimeProvider {
                     "  1. Use Jetty 12+ with Lucee 7.x (recommended)\n" +
                     "     Update lucee.json: \"runtime\": { \"jettyHome\": \"/path/to/jetty12\" }\n\n" +
                     "  2. Use Lucee 6.x with Jetty " + jettyMajorVersion + "\n" +
-                    "     Update lucee.json: \"version\": \"6.2.2.91\"");
+                    "     Update lucee.json: \"lucee\": { \"version\": \"6.2.2.91\" }");
         }
 
         System.out.println("✓ Lucee " + luceeMajorVersion + ".x is compatible with Jetty " + jettyMajorVersion + ".x");

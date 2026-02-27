@@ -262,6 +262,34 @@ public class CatalinaBaseConfigGeneratorTest {
                         config, projectDir, catalinaBase, noWebXmlHome));
     }
 
+    // ── generateConfiguration: enableLucee=false ─────────────────────────
+
+    @Test
+    void generateConfiguration_removesLuceeServletsWhenEnableLuceeFalse() throws IOException {
+        // Use a CATALINA_HOME whose web.xml already contains Lucee servlets
+        // (simulates Lucee Express distribution)
+        Path expressHome = tempDir.resolve("express-home");
+        createFakeCatalinaHome(expressHome);
+        Files.writeString(expressHome.resolve("conf/web.xml"), WEB_XML_WITH_LUCEE_SERVLETS);
+
+        LuceeServerConfig.ServerConfig config = createTestConfig();
+        config.enableLucee = false;
+
+        Path base = tempDir.resolve("enablelucee-false-base");
+        Files.createDirectories(base);
+
+        generator.generateConfiguration(base, config, projectDir, expressHome, 0, false);
+
+        String webXml = Files.readString(base.resolve("conf/web.xml"), StandardCharsets.UTF_8);
+        assertFalse(webXml.contains("CFMLServlet"),
+                "web.xml should NOT contain CFMLServlet when enableLucee=false");
+        assertFalse(webXml.contains("lucee.loader.servlet"),
+                "web.xml should NOT contain Lucee servlet classes when enableLucee=false");
+        // The default servlet should still be present
+        assertTrue(webXml.contains("DefaultServlet"),
+                "web.xml should still contain the default servlet");
+    }
+
     // ── generateConfiguration: idempotency ──────────────────────────────
 
     @Test
@@ -301,7 +329,7 @@ public class CatalinaBaseConfigGeneratorTest {
         config.monitoring.jmx = new LuceeServerConfig.JmxConfig();
         config.monitoring.jmx.port = 8999;
         config.urlRewrite = new LuceeServerConfig.UrlRewriteConfig();
-        config.urlRewrite.enabled = false; // Disable to avoid network calls for filter JAR
+        config.urlRewrite.enabled = false;
         config.admin = new LuceeServerConfig.AdminConfig();
         config.ajp = new LuceeServerConfig.AjpConfig();
         return config;
@@ -351,6 +379,40 @@ public class CatalinaBaseConfigGeneratorTest {
                 <servlet-name>default</servlet-name>
                 <url-pattern>/</url-pattern>
               </servlet-mapping>
+            </web-app>
+            """;
+
+    /**
+     * Simulates a Lucee Express web.xml that already ships with Lucee servlets.
+     */
+    private static final String WEB_XML_WITH_LUCEE_SERVLETS = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <web-app xmlns="http://xmlns.jcp.org/xml/ns/javaee"
+                     version="4.0">
+              <servlet>
+                <servlet-name>default</servlet-name>
+                <servlet-class>org.apache.catalina.servlets.DefaultServlet</servlet-class>
+              </servlet>
+              <servlet>
+                <servlet-name>CFMLServlet</servlet-name>
+                <servlet-class>lucee.loader.servlet.CFMLServlet</servlet-class>
+              </servlet>
+              <servlet-mapping>
+                <servlet-name>default</servlet-name>
+                <url-pattern>/</url-pattern>
+              </servlet-mapping>
+              <servlet-mapping>
+                <servlet-name>CFMLServlet</servlet-name>
+                <url-pattern>*.cfm</url-pattern>
+              </servlet-mapping>
+              <servlet-mapping>
+                <servlet-name>CFMLServlet</servlet-name>
+                <url-pattern>*.cfc</url-pattern>
+              </servlet-mapping>
+              <welcome-file-list>
+                <welcome-file>index.cfm</welcome-file>
+                <welcome-file>index.html</welcome-file>
+              </welcome-file-list>
             </web-app>
             """;
 
