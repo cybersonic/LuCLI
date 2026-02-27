@@ -1,0 +1,18 @@
+# Test: source command for loading .env files
+# Run with: lucli tests/test-source.lucli
+# Or with --envfile: lucli --envfile=tests/test-source.env tests/test-source.lucli
+
+# Load the env file via source directive
+source tests/test-source.env
+
+# Verify values were loaded
+assert ${APP_NAME} LuCLI-SourceTest
+assert ${APP_VERSION} 2.0.0
+assert ${DB_HOST} localhost
+assert ${DB_PORT} 3306
+assert ${QUOTED_VAL} "hello world"
+assert ${SINGLE_QUOTED} "single quotes"
+
+# Verify we can use sourced values in SET expressions
+set CONN_STRING="${DB_HOST}:${DB_PORT}"
+assert ${CONN_STRING} "localhost:3306"
