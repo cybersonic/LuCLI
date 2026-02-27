@@ -26,12 +26,21 @@ java -jar lucli.jar
 java -jar lucli.jar myscript.cfs arg1 arg2
 ```
 
+Or with Docker
+
+```
+# Start using LuCLI interactively 
+docker run --interactive markdrew/lucli:latest repl 
+```
+
 ### Download Options
 Visit the [Releases Page](https://github.com/cybersonic/LuCLI/releases) to download:
 - **lucli.jar** - Universal JAR file (requires Java 17+)
 - **lucli** - Self-executing binary for Linux/macOS
 - **lucli.bat** - Windows batch file
 - **install.sh** - Automated installation script
+
+Also available as a [Docker image](https://hub.docker.com/r/markdrew/lucli)
 
 ### Binary Installation (Recommended)
 ```bash
