@@ -202,14 +202,14 @@ For now, `local` is the only implemented provider.
 
 ## Using Secrets in `lucee.json`
 
-You can reference secrets by name in your server configuration using the `${secret:...}` syntax.
+You can reference secrets by name in your server configuration using the `#secret:NAME#` syntax.
 
 ### Basic syntax
 
 ```json
 {
   "admin": {
-    "password": "${secret:admin.password}"
+    "password": "#secret:admin.password#"
   }
 }
 ```
@@ -217,17 +217,17 @@ You can reference secrets by name in your server configuration using the `${secr
 When LuCLI **starts or locks a server configuration** (for example `lucli server start` or `lucli server lock`), it:
 
 1. Loads your config
-2. Applies environment variable substitution (see `ENVIRONMENT_VARIABLES.md`)
-3. Scans for any `${secret:NAME}` placeholders
+2. Applies environment variable substitution (see [Environment Variables](../050_server-configuration/020_environment-variables/))
+3. Scans for any `#secret:NAME#` placeholders
 4. **Only if placeholders are present**, opens the local secret store and resolves them
 
-Read‑only commands that merely inspect configuration (e.g. `lucli server status`, `lucli server stop`, `lucli server list`, `lucli server config get`) do **not** resolve secrets and therefore will **not** prompt for the secrets passphrase just because `${secret:...}` is present in `lucee.json`.
+Read‑only commands that merely inspect configuration (e.g. `lucli server status`, `lucli server stop`, `lucli server list`, `lucli server config get`) do **not** resolve secrets and therefore will **not** prompt for the secrets passphrase just because `#secret:...#` is present in `lucee.json`.
 
 If a referenced secret cannot be found, or if the store/passphrase is unavailable when resolution is required, the command fails with a clear error instead of silently leaving the placeholder.
 
 ### Example: Database password in CFConfig
 
-You can also use `${secret:...}` inside the `configuration` (CFConfig) section of `lucee.json`:
+You can also use `#secret:...#` inside the `configuration` (CFConfig) section of `lucee.json`:
 
 ```json
 {
@@ -237,14 +237,16 @@ You can also use `${secret:...}` inside the `configuration` (CFConfig) section o
         "host": "db.internal",
         "database": "myapp",
         "username": "myapp_user",
-        "password": "${secret:db.password}"
+        "password": "#secret:db.password#"
       }
     }
   }
 }
 ```
 
-At runtime, LuCLI replaces `${secret:db.password}` with the decrypted value from the secret store **before** writing the final CFConfig JSON.
+At runtime, LuCLI replaces `#secret:db.password#` with the decrypted value from the secret store **before** writing the final CFConfig JSON.
+
+> **Note:** In the `configuration` block, only `#secret:NAME#` is resolved. The deprecated `${secret:NAME}` syntax is **not** processed in this protected zone, since `${...}` is left intact for Lucee runtime.
 
 Secrets are resolved **in memory only** – LuCLI does **not** write the resolved plaintext back into `lucee.json` or other files.
 
@@ -252,16 +254,16 @@ Secrets are resolved **in memory only** – LuCLI does **not** write the resolve
 
 Environment variables and secrets can be used together. The resolution order is:
 
-1. `.env` file and OS environment variables (`${VAR}` / `${VAR:-default}`)
-2. Secret placeholders (`${secret:NAME}`)
+1. `.env` file and OS environment variables (`#env:VAR#` / `#env:VAR:-default#`)
+2. Secret placeholders (`#secret:NAME#`)
 
 This lets you mix patterns, for example:
 
 ```json
 {
-  "name": "${APP_NAME:-my-app}",
+  "name": "#env:APP_NAME:-my-app#",
   "admin": {
-    "password": "${secret:admin.password}"
+    "password": "#secret:admin.password#"
   }
 }
 ```
@@ -304,7 +306,7 @@ Use environment variables for non-sensitive configuration that may change per en
 ## Best Practices
 
 1. **Use placeholders wherever possible**
-   - Prefer `${secret:...}` in `lucee.json` and CFConfig instead of hard‑coding passwords.
+   - Prefer `#secret:NAME#` in `lucee.json` and CFConfig instead of hard‑coding passwords.
 
 2. **Keep `.env` for non‑secret configuration**
    - Use environment variables for ports, hostnames, and feature flags.

@@ -131,9 +131,9 @@ public class ConfigEditorTui {
         fields.add(new Field("host", "Host", FieldType.STRING,
                 () -> nullToEmpty(config.host),
                 v -> config.host = v));
-        fields.add(new Field("version", "Lucee Version", FieldType.STRING,
-                () -> nullToEmpty(config.version),
-                v -> config.version = v));
+        fields.add(new Field("lucee.version", "Lucee Version", FieldType.STRING,
+                () -> nullToEmpty(LuceeServerConfig.getLuceeVersion(config)),
+                v -> LuceeServerConfig.setLuceeVersion(config, v)));
         fields.add(new Field("port", "HTTP Port", FieldType.INT,
                 () -> String.valueOf(config.port),
                 v -> {

@@ -53,7 +53,9 @@ public class ServerConfigHelper {
      */
     public List<String> getAvailableKeys() {
         List<String> keys = new ArrayList<>();
-        keys.add("version");
+        keys.add("lucee.version");
+        keys.add("lucee.variant");
+        keys.add("version"); // legacy / app version
         keys.add("port");
         keys.add("shutdownPort");
         keys.add("name");
@@ -168,7 +170,7 @@ public class ServerConfigHelper {
             String key = keyPath[0];
             switch (key) {
                 case "version":
-                    return config.version;
+                    return LuceeServerConfig.getLuceeVersion(config);
                 case "port":
                     return String.valueOf(config.port);
                 case "shutdownPort":
@@ -197,6 +199,8 @@ public class ServerConfigHelper {
             String key = keyPath[1];
             
             switch (category) {
+                case "lucee":
+                    return getLuceeEngineConfigValue(config, key);
                 case "jvm":
                     return getJVMConfigValue(config.jvm, key);
                 case "monitoring":
@@ -231,7 +235,7 @@ public class ServerConfigHelper {
             String key = keyPath[0];
             switch (key) {
                 case "version":
-                    config.version = value;
+                    LuceeServerConfig.setLuceeVersion(config, value);
                     break;
                 case "port":
                     try {
@@ -280,6 +284,9 @@ public class ServerConfigHelper {
             String key = keyPath[1];
             
             switch (category) {
+                case "lucee":
+                    setLuceeEngineConfigValue(config, key, value);
+                    break;
                 case "jvm":
                     if (config.jvm == null) config.jvm = new LuceeServerConfig.JvmConfig();
                     setJVMConfigValue(config.jvm, key, value);
@@ -318,6 +325,26 @@ public class ServerConfigHelper {
         }
     }
     
+    private String getLuceeEngineConfigValue(LuceeServerConfig.ServerConfig config, String key) {
+        switch (key) {
+            case "version": return LuceeServerConfig.getLuceeVersion(config);
+            case "variant": return LuceeServerConfig.getLuceeVariant(config);
+            default: return null;
+        }
+    }
+    
+    private void setLuceeEngineConfigValue(LuceeServerConfig.ServerConfig config, String key, String value) {
+        if (config.lucee == null) config.lucee = new LuceeServerConfig.LuceeEngineConfig();
+        switch (key) {
+            case "version":
+                LuceeServerConfig.setLuceeVersion(config, value);
+                break;
+            case "variant":
+                config.lucee.variant = value;
+                break;
+        }
+    }
+
     private String getJVMConfigValue(LuceeServerConfig.JvmConfig jvm, String key) {
         if (jvm == null) return null;
         switch (key) {

@@ -34,7 +34,7 @@ public final class LuceeExpressRuntimeProvider implements RuntimeProvider {
     ) throws Exception {
 
         // Ensure Lucee Express is available — this is our read-only CATALINA_HOME
-        Path catalinaHome = manager.ensureLuceeExpress(config.version);
+        Path catalinaHome = manager.ensureLuceeExpress(LuceeServerConfig.getLuceeVersion(config));
 
         // Resolve port conflicts right before starting server to avoid race conditions
         LuceeServerConfig.PortConflictResult portResult =

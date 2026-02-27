@@ -23,14 +23,14 @@ import org.lucee.lucli.config.DependencyConfig;
  *     "source": "file",
  *     "path": "../some/local/module",
  *     "installPath": "dependencies/my-module"
- *   }
- *
- *   "my-lib": {
- *     "type": "jar",
- *     "source": "file",
- *     "path": "./lib/my-lib.jar",
- *     "installPath": "lib/my-lib.jar"
- *   }
+    *   }
+    *
+    *   "my-lib": {
+    *     "type": "jar",
+    *     "source": "file",
+    *     "path": "./lib/my-lib.jar",
+    *     "installPath": "lib/my-lib.jar"
+    *   }
  */
 public class FileDependencyInstaller implements DependencyInstaller {
 

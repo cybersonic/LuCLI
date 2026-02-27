@@ -1,7 +1,9 @@
 {
   "name": "dependency-git-subpath-example",
   "webroot": "./webroot",
-  "version": "7.0.1.100",
+  "lucee": {
+    "version": "7.0.1.100"
+  },
   "admin": {
     "enabled": true,
     "password": "admin123"
@@ -15,5 +17,6 @@
       "installPath": "dependencies/fw1",
       "mapping": "/framework"
     }
+   
   }
 }

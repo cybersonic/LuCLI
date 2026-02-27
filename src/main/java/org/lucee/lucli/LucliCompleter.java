@@ -697,6 +697,11 @@ public class LucliCompleter implements Completer {
                 flags = new String[]{"--version", "--name", "--force", "--webroot", "-v", "-n", "-f"};
                 break;
             case "stop":
+                flags = new String[]{"--name", "--config", "--all", "-n", "-c"};
+                break;
+            case "restart":
+                flags = new String[]{"--name", "--config", "-n", "-c"};
+                break;
             case "status":
                 flags = new String[]{"--name", "-n"};
                 break;
@@ -751,6 +756,9 @@ public class LucliCompleter implements Completer {
             case "--name":
             case "-n":
                 return "Specify server name";
+            case "--config":
+            case "-c":
+                return "Specify configuration file";
             case "--force":
             case "-f":
                 return "Force replace existing server";
@@ -1047,8 +1055,7 @@ public class LucliCompleter implements Completer {
         } catch (Exception e) {
             // Fallback to static list if ServerConfigHelper fails
             String[] keys = {
-                "version", "port", "name", "jvm.maxMemory", "jvm.minMemory", "jvm.args",
-                "lucee.adminPassword", "lucee.preserveCase", "lucee.suppressWhitespace",
+                "lucee.version", "lucee.variant", "version", "port", "name", "jvm.maxMemory", "jvm.minMemory", "jvm.args",
                 "monitoring.enabled", "monitoring.jmx.enabled", "monitoring.jmx.port", "monitoring.jmx.host",
                 "ssl.enabled", "ssl.port", "ssl.keystore", "ssl.keystorePassword"
             };
@@ -1102,8 +1109,7 @@ public class LucliCompleter implements Completer {
             } catch (Exception e) {
                 // Fallback to static list
                 String[] keys = {
-                    "version", "port", "name", "jvm.maxMemory", "jvm.minMemory", "jvm.args",
-                    "lucee.adminPassword", "lucee.preserveCase", "lucee.suppressWhitespace",
+                    "lucee.version", "lucee.variant", "version", "port", "name", "jvm.maxMemory", "jvm.minMemory", "jvm.args",
                     "monitoring.enabled", "monitoring.jmx.enabled", "monitoring.jmx.port", "monitoring.jmx.host",
                     "ssl.enabled", "ssl.port", "ssl.keystore", "ssl.keystorePassword"
                 };
@@ -1130,6 +1136,7 @@ public class LucliCompleter implements Completer {
      */
     private void completeConfigValues(String key, String valuePartial, String fullPartial, List<Candidate> candidates) {
         switch (key.toLowerCase()) {
+            case "lucee.version":
             case "version":
                 // Complete Lucee versions
                 try {

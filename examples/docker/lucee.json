@@ -1,6 +1,8 @@
 {
   "name" : "docker",
-  "version" : "7.0.1.100",
+  "lucee" : {
+    "version" : "7.0.1.100"
+  },
   "port" : 8080,
   "webroot" : "./webroot",
   "monitoring" : {

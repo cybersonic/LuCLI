@@ -338,26 +338,17 @@ public class Terminal {
     }
     
     /**
-     * Execute a module in terminal mode
+     * Execute a module in terminal mode.
+     * Output flows directly to the terminal via System.out/err (same approach
+     * as executePicocliCommand) so that systemOutput() calls from CFML modules
+     * are visible immediately.
      */
     private static String executeModule(String moduleName, String[] moduleArgs) {
-        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
-        java.io.PrintStream originalOut = System.out;
-        java.io.PrintStream originalErr = System.err;
-        
         try {
-            System.setOut(new java.io.PrintStream(baos));
-            System.setErr(new java.io.PrintStream(baos));
-            
             ModuleCommand.executeModuleByName(moduleName, moduleArgs);
-            
-            return baos.toString().trim();
-            
+            return ""; // Output already written directly via systemOutput()
         } catch (Exception e) {
             return WindowsSupport.Symbols.ERROR() + " Error executing module '" + moduleName + "': " + e.getMessage();
-        } finally {
-            System.setOut(originalOut);
-            System.setErr(originalErr);
         }
     }
     

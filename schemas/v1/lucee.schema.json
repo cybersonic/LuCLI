@@ -14,10 +14,29 @@
     },
     "version": {
       "type": "string",
-      "description": "Lucee engine version to use for this server instance.",
-      "default": "6.2.2.91",
+      "description": "App/project version. (DEPRECATED for Lucee engine version — use the 'lucee' block instead.) Legacy lucee.json files that set this to a Lucee version string (e.g. '6.2.2.91') will be auto-migrated.",
       "x-ui-tab": "General",
       "x-ui-order": 20
+    },
+    "lucee": {
+      "type": "object",
+      "description": "Lucee engine configuration (version and JAR variant).",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "type": "string",
+          "description": "Lucee engine version to use for this server instance (e.g. '6.2.2.91', '7.0.0.346-RC').",
+          "default": "6.2.2.91"
+        },
+        "variant": {
+          "type": "string",
+          "description": "Lucee JAR variant: 'standard' (default), 'light', or 'zero'.",
+          "enum": ["standard", "light", "zero"],
+          "default": "standard"
+        }
+      },
+      "x-ui-tab": "General",
+      "x-ui-order": 21
     },
     "host": {
       "type": "string",

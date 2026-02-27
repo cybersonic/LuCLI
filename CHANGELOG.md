@@ -42,6 +42,7 @@ All notable changes to this project will be documented in this file.
 - **Welcome Page:** When starting a Lucee server with `enableLucee=true` (the default), LuCLI now automatically creates a welcome `index.cfm` in the webroot if one doesn't exist. The page displays server info, helpful commands, and links to documentation. Existing `index.cfm` files are never overwritten.
 - **Fix:** resolved an issue after refactoring where the values are not returned from the `executeLucliScriptCommand` method, causing CFML command outputs to not be displayed in the terminal. The method now returns the command output as a string, which is printed to the terminal if not empty.
 - **Fix:** Fixed silent failures when executing picocli subcommands (e.g. `server stop`) in `.lucli` scripts. Captured output was being discarded instead of returned, so commands would run but produce no visible output or error messages.
+- **SpotBugs Integration:** Added SpotBugs Maven plugin for static analysis. New documentation at `content/docs/150_testing-and-qa/020_spotbugs.md` covers setup, usage, and configuration.
 
 ## 0.1.293
 - **REPL Command:** Added `lucli repl` command for an interactive CFML read-eval-print loop. Provides a focused CFML-only environment for quick experimentation with history support, separate from the full terminal mode.

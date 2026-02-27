@@ -248,7 +248,7 @@ public class LuceeServerManager {
 
         // Apply CLI overrides
         if (versionOverride != null && !versionOverride.trim().isEmpty()) {
-            config.version = versionOverride.trim();
+            LuceeServerConfig.setLuceeVersion(config, versionOverride.trim());
         }
 
         if (customName != null && !customName.trim().isEmpty()) {
@@ -278,7 +278,7 @@ public class LuceeServerManager {
         config.openBrowser = false;
 
         // Ensure Lucee Express is available for the chosen version
-        Path luceeExpressDir = ensureLuceeExpress(config.version);
+        Path luceeExpressDir = ensureLuceeExpress(LuceeServerConfig.getLuceeVersion(config));
 
         // Resolve port conflicts just before startup using the same logic as normal servers
         LuceeServerConfig.PortConflictResult portResult = LuceeServerConfig.resolvePortConflicts(config, false, this);
@@ -370,7 +370,7 @@ public class LuceeServerManager {
 
         // Apply CLI overrides
         if (versionOverride != null && !versionOverride.trim().isEmpty()) {
-            config.version = versionOverride.trim();
+            LuceeServerConfig.setLuceeVersion(config, versionOverride.trim());
         }
 
         if (customName != null && !customName.trim().isEmpty()) {
@@ -399,7 +399,7 @@ public class LuceeServerManager {
         config.openBrowser = false;
 
         // Ensure Lucee Express is available for the chosen version
-        Path luceeExpressDir = ensureLuceeExpress(config.version);
+        Path luceeExpressDir = ensureLuceeExpress(LuceeServerConfig.getLuceeVersion(config));
 
         // Resolve port conflicts just before startup using the same logic as normal servers
         LuceeServerConfig.PortConflictResult portResult = LuceeServerConfig.resolvePortConflicts(config, false, this);
@@ -519,7 +519,7 @@ public class LuceeServerManager {
         
         // Override version if specified
         if (versionOverride != null && !versionOverride.trim().isEmpty()) {
-            config.version = versionOverride;
+            LuceeServerConfig.setLuceeVersion(config, versionOverride);
         }
         
         // Use custom name if provided

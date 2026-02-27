@@ -10,7 +10,9 @@ This page describes all settings currently supported in `lucee.json` for LuCLI-m
 ```json
 {
   "name": "my-project",
-  "version": "6.2.2.91",
+  "lucee": {
+    "version": "6.2.2.91"
+  },
   "port": 8080,
   "shutdownPort": 9080,
   "webroot": "./",
@@ -243,7 +245,7 @@ This section expands on the basic configuration reference and documents every av
 | Key                 | Type    | Default                                   | Description                                                                                                                                                                     |
 | ------------------- | ------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `name`              | string  | project folder name                       | Human-friendly server name. Used as the directory name under `~/.lucli/servers/` and in CLI output.                                                                             |
-| `version`           | string  | `6.2.2.91`                                | Lucee Express version to download and use for this server.                                                                                                                      |
+| `lucee.version`     | string  | `6.2.2.91`                                | Lucee engine version to download and use for this server. Specified under the `"lucee"` block (e.g. `"lucee": { "version": "6.2.2.91" }`).                                        |
 | `port`              | integer | `8080` (auto-adjusted to avoid conflicts) | Primary HTTP port for Tomcat.                                                                                                                                                   |
 | `shutdownPort`      | integer | `port + 1000`                             | Tomcat shutdown port. When omitted, LuCLI derives this from `port`.                                                                                                             |
 | `webroot`           | string  | `"./"`                                    | Webroot/docBase for the Tomcat context. May be relative to the project directory or absolute.                                                                                   |

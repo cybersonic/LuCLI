@@ -1478,6 +1478,7 @@ public class LuceeScriptEngine {
 
     public Integer executeCFMFile(String scriptPath, String[] scriptArgs) throws Exception {
         String scriptFileContent = new String(Files.readAllBytes(Paths.get(scriptPath)), java.nio.charset.StandardCharsets.UTF_8);
+        scriptFileContent = stripShebang(scriptFileContent);
         //Need to add usual variables. 
         setupScriptContext(engine, scriptPath, scriptArgs);
         return executeScriptByString("```" + scriptFileContent + "```", scriptPath, scriptArgs);
@@ -1485,9 +1486,24 @@ public class LuceeScriptEngine {
 
     public Integer executeCFSFile(String scriptPath, String[] scriptArgs) throws Exception {
        String scriptFileContent = new String(Files.readAllBytes(Paths.get(scriptPath)), java.nio.charset.StandardCharsets.UTF_8);
+        scriptFileContent = stripShebang(scriptFileContent);
         //Need to add usual variables. 
         setupScriptContext(engine, scriptPath, scriptArgs);
         return executeScriptByString( scriptFileContent , scriptPath, scriptArgs);
+    }
+
+    /**
+     * Strips shebang line (e.g., #!/usr/bin/env lucli) from script content.
+     * This allows scripts to be both directly executable and runnable via lucli.
+     */
+    private String stripShebang(String content) {
+        if (content != null && content.startsWith("#!")) {
+            int newlineIndex = content.indexOf('\n');
+            if (newlineIndex > 0) {
+                return content.substring(newlineIndex + 1);
+            }
+        }
+        return content;
     }
 
     public Integer executeCFCFile(String scriptPath, String[] scriptArgs) throws Exception {

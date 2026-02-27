@@ -1,6 +1,8 @@
 {
   "name": "server-environments-example",
-  "version": "6.2.2.91",
+  "lucee": {
+    "version": "6.2.2.91"
+  },
   "port": 8890,
   "webroot": "./",
   "monitoring": {

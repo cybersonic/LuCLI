@@ -9,38 +9,41 @@ LuCLI supports environment variable substitution throughout your `lucee.json` co
 
 This page focuses on how environment variables and `.env` files are resolved into your configuration. For how environment blocks (`environments.<name>`) are merged with the base config (including load order and deep‑merge rules), see [Environments and Configuration Overrides](../050_server-configuration/030_environments-and-overrides/).
 
-Environment variables can be used in any string field within `lucee.json` using standard substitution syntax. Variables are resolved when the configuration is loaded, enabling dynamic server configuration.
+Environment variables can be used in any string field within `lucee.json` using the `#env:VAR#` substitution syntax. Variables are resolved when the configuration is loaded, enabling dynamic server configuration.
 
 ## Syntax
 
 ### Basic Variable Substitution
 
-Use `${VARIABLE_NAME}` to substitute the value of an environment variable:
+Use `#env:VARIABLE_NAME#` to substitute the value of an environment variable:
 
 ```json
 {
-  "port": "${HTTP_PORT}",
-  "version": "${LUCEE_VERSION}",
+  "port": "#env:HTTP_PORT#",
+  "version": "#env:LUCEE_VERSION#",
   "jvm": {
-    "maxMemory": "${JVM_MAX_MEMORY}"
+    "maxMemory": "#env:JVM_MAX_MEMORY#"
   }
 }
 ```
 
 ### Default Values
 
-Use `${VARIABLE_NAME:-default_value}` to provide a fallback value when the variable is not set:
+Use `#env:VARIABLE_NAME:-default_value#` to provide a fallback value when the variable is not set:
 
 ```json
 {
-  "port": "${HTTP_PORT:-8080}",
-  "version": "${LUCEE_VERSION:-6.2.2.91}",
+  "port": "#env:HTTP_PORT:-8080#",
+  "version": "#env:LUCEE_VERSION:-6.2.2.91#",
   "jvm": {
-    "maxMemory": "${JVM_MAX_MEMORY:-512m}",
-    "minMemory": "${JVM_MIN_MEMORY:-128m}"
+    "maxMemory": "#env:JVM_MAX_MEMORY:-512m#",
+    "minMemory": "#env:JVM_MIN_MEMORY:-128m#"
   }
 }
 ```
+
+> **Why `#env:VAR#` instead of `${VAR}`?**  
+> Lucee and the JVM also use `${VAR}` for their own runtime variable resolution (e.g. in `.CFConfig.json` and JVM system properties). Using `#env:VAR#` for LuCLI substitution avoids ambiguity — you always know which tool will resolve a given placeholder. The `env:` prefix also makes it explicit that this is an environment variable lookup, distinguishing it from `#secret:NAME#` and potential future CFML expression support.
 
 ## Variable Sources
 
@@ -48,8 +51,8 @@ Variables are resolved in the following order of precedence:
 
 1. **`.env` file variables** (highest priority) - loaded from `.env` in the project directory
 2. **System environment variables** - from `echo $VAR_NAME`
-3. **Default values** - specified in the config using `${VAR:-default}`
-4. **Placeholder** - if none of the above, the placeholder remains unchanged (e.g., `${UNKNOWN}`)
+3. **Default values** - specified in the config using `#env:VAR:-default#`
+4. **Placeholder** - if none of the above, the placeholder remains unchanged (e.g., `#env:UNKNOWN#`)
 
 ## .env File
 
@@ -89,44 +92,70 @@ JVM_MIN_MEMORY=512m
 
 ## Supported Fields
 
-Environment variable substitution is supported in:
+The `#env:VAR#` substitution is supported in all string fields within `lucee.json`:
 
 - **Top-level string fields:** `version`, `name`, `webroot`, `openBrowserURL`, `configurationFile`
 - **JVM configuration:** `jvm.maxMemory`, `jvm.minMemory`, `jvm.additionalArgs`
 - **URL Rewrite:** `urlRewrite.routerFile`
-- **Entire `configuration` object:** All strings, arrays, and nested objects within the CFConfig can use variables
+- **Runtime configuration:** `runtime.type`, `runtime.installPath`, `runtime.variant`, `runtime.catalinaHome`, `runtime.catalinaBase`, `runtime.jettyHome`, `runtime.image`, `runtime.dockerfile`, `runtime.context`, `runtime.tag`, `runtime.containerName`, `runtime.runMode`
+- **`configuration` object:** `#env:VAR#` placeholders are resolved; `${VAR}` is preserved for Lucee runtime
+
+### Protected zones
+
+Some fields pass through to Lucee or the JVM, where `${...}` has its own meaning. In these zones, LuCLI only processes `#env:VAR#` and leaves `${VAR}` untouched:
+
+- **`configuration`** — written to `.CFConfig.json`, where Lucee may resolve `${...}` at runtime
+- **`environments.<env>.configuration`** — same as above, after environment merge
+- **`jvm.additionalArgs`** — the JVM resolves `${...}` system properties at runtime
+
+This means you can safely mix LuCLI variables and Lucee/JVM variables:
+
+```json
+{
+  "configuration": {
+    "inspectTemplate": "#env:LUCLI_INSPECT:-once#",
+    "password": "${LUCEE_RUNTIME_PASSWORD}"
+  },
+  "jvm": {
+    "additionalArgs": [
+      "-Dfile.encoding=#env:MY_ENCODING:-UTF-8#",
+      "-Djava.io.tmpdir=${java.io.tmpdir}/lucli"
+    ]
+  }
+}
+```
 
 ## Example Configuration
 
 ```json
 {
-  "name": "${APP_NAME:-my-app}",
-  "port": "${HTTP_PORT:-8080}",
-  "version": "${LUCEE_VERSION:-6.2.2.91}",
-  "webroot": "${PROJECT_WEBROOT:-.\/}",
+  "name": "#env:APP_NAME:-my-app#",
+  "port": "#env:HTTP_PORT:-8080#",
+  "version": "#env:LUCEE_VERSION:-6.2.2.91#",
+  "webroot": "#env:PROJECT_WEBROOT:-.\/# ",
   "jvm": {
-    "maxMemory": "${JVM_MAX_MEMORY:-512m}",
-    "minMemory": "${JVM_MIN_MEMORY:-128m}",
-    "additionalArgs": ["${JVM_ARG1:-}", "${JVM_ARG2:-}"]
+    "maxMemory": "#env:JVM_MAX_MEMORY:-512m#",
+    "minMemory": "#env:JVM_MIN_MEMORY:-128m#",
+    "additionalArgs": ["#env:JVM_ARG1:-#", "#env:JVM_ARG2:-#"]
   },
   "configuration": {
     "datasources": {
       "primary": {
-        "host": "${DB_HOST:-localhost}",
-        "port": "${DB_PORT:-3306}",
-        "database": "${DB_NAME:-myapp}",
-        "username": "${DB_USER:-admin}",
-        "password": "${DB_PASSWORD:-password}"
+        "host": "#env:DB_HOST:-localhost#",
+        "port": "#env:DB_PORT:-3306#",
+        "database": "#env:DB_NAME:-myapp#",
+        "username": "#env:DB_USER:-admin#",
+        "password": "#env:DB_PASSWORD:-password#"
       }
     },
     "mappings": {
-      "/api": "${API_MAPPING_PATH:-/var/api}",
-      "/static": "${STATIC_PATH:-.\/static}"
+      "/api": "#env:API_MAPPING_PATH:-/var/api#",
+      "/static": "#env:STATIC_PATH:-.\/static#"
     },
     "settings": {
-      "timeout": "${REQUEST_TIMEOUT:-30000}",
-      "enableCache": "${ENABLE_CACHE:-true}",
-      "logLevel": "${LOG_LEVEL:-info}"
+      "timeout": "#env:REQUEST_TIMEOUT:-30000#",
+      "enableCache": "#env:ENABLE_CACHE:-true#",
+      "logLevel": "#env:LOG_LEVEL:-info#"
     }
   }
 }
@@ -178,17 +207,17 @@ lucli server config set version=6.2.2.91
 lucli server config set port=8080 admin.enabled=false
 
 # Use variables when setting config
-lucli server config set port='${HTTP_PORT:-8080}' version='${LUCEE_VERSION:-6.2.2.91}'
+lucli server config set port='#env:HTTP_PORT:-8080#' version='#env:LUCEE_VERSION:-6.2.2.91#'
 
 # Preview changes without saving
-lucli server config set port='${HTTP_PORT:-8080}' --dry-run
+lucli server config set port='#env:HTTP_PORT:-8080#' --dry-run
 ```
 
 ## Best Practices
 
 1. **Use `.env` for development:** Keep sensitive data in `.env` which can be added to `.gitignore`
 2. **Use environment variables for CI/CD:** Set via deployment scripts or container orchestration
-3. **Provide sensible defaults:** Always use `${VAR:-default}` unless a value is required
+3. **Provide sensible defaults:** Always use `#env:VAR:-default#` unless a value is required
 4. **Document required variables:** List all expected variables in a README or `.env.example`
 5. **Don't commit `.env`:** Add `.env` to `.gitignore` to prevent accidental commits of sensitive data
 
@@ -219,11 +248,35 @@ ENABLE_CACHE=true
 LOG_LEVEL=info
 ```
 
+## Deprecated Syntax
+
+### `${VAR}` syntax (deprecated)
+
+The `${VAR}` and `${VAR:-default}` syntax for LuCLI variable substitution is **deprecated**. It still works outside protected zones but will emit a warning and will be removed in a future release.
+
+Note: `${VAR}` inside `configuration` and `jvm.additionalArgs` blocks is **not** deprecated there — it was never substituted by LuCLI in those zones and is left for Lucee/JVM runtime.
+
+### Bare `#VAR#` syntax (deprecated)
+
+The bare `#VAR#` syntax (without the `env:` prefix) is also **deprecated**. It still works for backward compatibility but will emit a one-time warning suggesting you use `#env:VAR#` instead.
+
+If you see a deprecation warning, update your `lucee.json`:
+
+```json
+// Before (deprecated)
+"password": "${ADMIN_PW}"
+"port": "#HTTP_PORT#"
+
+// After (preferred)
+"password": "#env:ADMIN_PW#"
+"port": "#env:HTTP_PORT#"
+```
+
 ## Troubleshooting
 
 ### Variable Not Substituted
 
-If you see `${VARIABLE_NAME}` in your output instead of the value:
+If you see `#env:VARIABLE_NAME#` in your output instead of the value:
 
 1. Check that the variable is defined in `.env` or system environment
 2. Verify the variable name matches exactly (case-sensitive)
