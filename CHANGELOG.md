@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+
 - **URL Rewriting: Migrated to Tomcat RewriteValve:** Replaced the Tuckey UrlRewriteFilter (`urlrewrite.xml`) with Tomcat's built-in RewriteValve (`rewrite.config`). This eliminates javax/jakarta servlet API compatibility issues across Tomcat versions and removes the need for an external JAR. Rewrite rules now use Apache `mod_rewrite` syntax and are placed at the Host level (`conf/Catalina/<host>/rewrite.config`) instead of inside `WEB-INF/`. When both HTTPS redirect and URL rewriting are enabled, rules are combined into a single `rewrite.config` file.
 - **⚠️ Deprecation: `urlrewrite.xml`:** Existing projects using `urlrewrite.xml` will see a warning at server startup. Migrate your rewrite rules to the new `rewrite.config` format (Apache `mod_rewrite` syntax). See the updated [URL Rewriting documentation](content/docs/080_https-and-routing/010_url-rewriting.md).
 - **Jetty Runtime: URL Rewriting Not Supported:** URL rewriting is not available when using the Jetty runtime. A warning is displayed if `urlRewrite.enabled` is set with a Jetty-based runtime.
@@ -45,6 +46,7 @@ All notable changes to this project will be documented in this file.
 - **SpotBugs Integration:** Added SpotBugs Maven plugin for static analysis. New documentation at `content/docs/150_testing-and-qa/020_spotbugs.md` covers setup, usage, and configuration.
 
 ## 0.1.293
+
 - **REPL Command:** Added `lucli repl` command for an interactive CFML read-eval-print loop. Provides a focused CFML-only environment for quick experimentation with history support, separate from the full terminal mode.
 - **Script Preprocessor:** New `LucliScriptPreprocessor` for `.lucli` script files with support for:
   - Line continuation using backslash (`\`) at end of line
@@ -62,9 +64,11 @@ All notable changes to this project will be documented in this file.
 - **Git Dependency Caching:** Added persistent git dependency cache under `~/.lucli/deps/git-cache` (configurable via `usePersistentGitCache`) and a new `lucli deps prune` command to clear cached git clones.
 
 ## 0.1.266
+
 - **Fixing build process:** Corrected the release workflow to add the expected "static" lucee.json
 
 ## v0.1.265
+
 - **Server Sandbox Mode:** Added a `--sandbox` option to `lucli server run` to start a transient foreground server without creating or modifying `lucee.json` and without persisting the server instance after shutdown.
 - **Run Commands from Modules:** Added `executeCommand` method to `BaseModule.cfc` to allow modules to programmatically execute LuCLI commands.
 - **Env File Configuration & Tomcat Environment:** Added `envFile` and `envVars` top-level keys to `lucee.json` so projects can control which env file is loaded for `${VAR}` substitution and explicitly pass selected variables through to the Tomcat process environment. You can see usage examples in the updated [Environment Variables documentation](documentation/ENVIRONMENT_VARIABLES.md).
@@ -72,6 +76,7 @@ All notable changes to this project will be documented in this file.
 
 
 ## 0.1.258
+
 - **Secrets Management:** Added first-class secrets management support with safeguards to prevent accidental leakage in logs, dry-run output, and documentation examples. Includes automatic checks for hard-coded secrets and improved validation of sensitive configuration values.
 - **Server Configuration Editor:** Introduced an interactive server configuration editor and new `server new`/`server edit` style commands for creating and modifying Lucee server configurations without manually editing `lucee.json`. Centralized configuration handling in a new `ServerConfigHelper` for more consistent behavior.
 - **Configuration Locking:** Added configuration lock behavior and tests to ensure locked server configurations cannot be modified unintentionally, improving safety for shared or production server configs.
