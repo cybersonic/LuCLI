@@ -31,7 +31,9 @@ No `runtime` section needed - Lucee Express is the default:
 ```json
 {
   "name": "my-app",
-  "version": "6.2.2.91",
+  "lucee": {
+    "version": "6.2.2.91"
+  },
   "port": 8080
 }
 ```
@@ -41,7 +43,9 @@ Or explicitly specify it:
 ```json
 {
   "name": "my-app",
-  "version": "6.2.2.91",
+  "lucee": {
+    "version": "6.2.2.91"
+  },
   "port": 8080,
   "runtime": {
     "type": "lucee-express",
@@ -107,7 +111,9 @@ Solutions:
 ```json
 {
   "name": "my-app",
-  "version": "7.0.1.100-RC",
+  "lucee": {
+    "version": "7.0.1.100-RC"
+  },
   "port": 8080,
   "runtime": {
     "type": "tomcat",
@@ -178,7 +184,9 @@ You can use different runtimes per environment:
 ```json
 {
   "name": "my-app",
-  "version": "7.0.1.100-RC",
+  "lucee": {
+    "version": "7.0.1.100-RC"
+  },
   "port": 8080,
   "environments": {
     "dev": {
@@ -296,32 +304,26 @@ Use `latest` for the most recent stable release, or pin to a specific version fo
 
 ## URL Rewriting
 
-URL rewriting configuration depends on your Tomcat version.
-
-### Tomcat 9 and Below
-
-LuCLI supports UrlRewriteFilter with Tomcat 9:
+LuCLI uses Tomcat's built-in **RewriteValve** for URL rewriting, which works across all Tomcat versions (8–11) with no javax/jakarta compatibility issues.
 
 ```json
 {
   "urlRewrite": {
     "enabled": true,
-    "routerFile": "index.cfm",
-    "configFile": "urlrewrite.xml"
+    "routerFile": "index.cfm"
   }
 }
 ```
 
-Create `urlrewrite.xml` in your project root - LuCLI copies it to the server automatically.
+Rewrite rules use Apache `mod_rewrite` syntax and are deployed to `conf/Catalina/<hostName>/rewrite.config` in the server's `CATALINA_BASE`. When both HTTPS redirect and URL rewriting are enabled, rules are combined into a single `rewrite.config` file.
 
-### Tomcat 10+
+For full details, see [URL Rewriting](/docs/080_https-and-routing/010_url-rewriting/).
 
-UrlRewriteFilter is not yet compatible with Tomcat 10+ (jakarta.servlet). Alternatives:
+> **⚠️ Migration Notice:** The previous Tuckey UrlRewriteFilter (`urlrewrite.xml`) has been replaced. If your project uses `urlrewrite.xml`, LuCLI will display a deprecation warning at startup. See the [migration guide](/docs/080_https-and-routing/010_url-rewriting/#migration-from-urlrewritexml-tuckey-urlrewritefilter) for details.
 
-1. **Tomcat's RewriteValve** - Built into Tomcat, uses Apache mod_rewrite syntax
-2. **OCPsoft Rewrite** - Jakarta-compatible (`org.ocpsoft.rewrite:rewrite-servlet:10.0.1.Final`)
+### Jetty Runtime
 
-LuCLI will display a warning if URL rewriting is enabled with Tomcat 10+.
+URL rewriting is **not supported** with the Jetty runtime. If `urlRewrite.enabled` is set to `true`, LuCLI will display a warning and skip URL rewrite configuration.
 
 ## Choosing the Right Runtime
 
@@ -364,7 +366,9 @@ Start
 
 ```json
 {
-  "version": "7.0.1.100-RC",
+  "lucee": {
+    "version": "7.0.1.100-RC"
+  },
   "runtime": {
     "type": "tomcat",
     "catalinaHome": "/opt/tomcat"

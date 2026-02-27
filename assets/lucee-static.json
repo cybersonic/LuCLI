@@ -1,6 +1,8 @@
 {
   "name" : "assets",
-  "version" : "6.2.2.91",
+  "lucee" : {
+    "version" : "6.2.2.91"
+  },
   "port" : 8080,
   "shutdownPort" : 9080,
   "webroot" : "./",

@@ -540,6 +540,10 @@ public class ServerCommand implements Callable<Integer> {
                 description = "Name of the server instance to stop")
         private String name;
 
+        @Option(names = {"-c", "--config"}, 
+                description = "Configuration file to resolve server name from (e.g., lucee-docker.json)")
+        private String configFile;
+
         @Option(names = {"--all"}, 
                 description = "Stop all running servers")
         private boolean all = false;
@@ -558,6 +562,9 @@ public class ServerCommand implements Callable<Integer> {
             } else if (name != null) {
                 args.add("--name");
                 args.add(name);
+            } else if (configFile != null) {
+                args.add("--config");
+                args.add(configFile);
             }
 
             // Execute the server stop command
@@ -586,6 +593,10 @@ public class ServerCommand implements Callable<Integer> {
                 description = "Name of the server instance to restart")
         private String name;
 
+        @Option(names = {"-c", "--config"}, 
+                description = "Configuration file to resolve server name from (e.g., lucee-docker.json)")
+        private String configFile;
+
         @Override
         public Integer call() throws Exception {
             // Create ServerCommandHandler for CLI mode
@@ -598,6 +609,10 @@ public class ServerCommand implements Callable<Integer> {
             if (name != null) {
                 args.add("--name");
                 args.add(name);
+            }
+            if (configFile != null) {
+                args.add("--config");
+                args.add(configFile);
             }
 
             // Execute the server restart command

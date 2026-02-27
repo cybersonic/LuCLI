@@ -34,7 +34,24 @@ public class LuceeServerConfig {
          * self-signed HTTPS certificates. Defaults to "localhost" when omitted.
          */
         public String host;
+
+        /**
+         * @deprecated Top-level "version" now refers to the app/project version.
+         * Lucee engine version should be specified under the "lucee" block:
+         * {@code "lucee": { "version": "6.2.2.91" }}.
+         * This field is kept for backward-compatible deserialization of legacy
+         * lucee.json files. Use {@link LuceeServerConfig#getLuceeVersion(ServerConfig)}
+         * to obtain the effective Lucee engine version.
+         */
+        @Deprecated
         public String version = "6.2.2.91";
+
+        /**
+         * Lucee engine configuration (version and variant).
+         * New-format lucee.json files should use this block:
+         * {@code "lucee": { "version": "6.2.2.91", "variant": "standard" }}
+         */
+        public LuceeEngineConfig lucee;
         /**
          * Primary HTTP port for Tomcat.
          */
@@ -97,17 +114,20 @@ public class LuceeServerConfig {
 
         /**
          * Optional path to a project-specific environment file. When set, this
-         * file is loaded before performing ${VAR} substitution in lucee.json.
+         * file is loaded before performing variable substitution in lucee.json.
          * Relative paths are resolved against the project directory. When not
          * specified, LuCLI defaults to `.env` in the project directory.
+         *
+         * Supports #env:VAR# syntax (preferred). Bare #VAR# and ${VAR} syntax are deprecated.
          */
         public String envFile;
 
         /**
          * Additional environment variables to expose to the Tomcat process when
-         * starting the server. Values support the same ${VAR} and
-         * ${VAR:-default} syntax as the rest of lucee.json and are resolved
-         * against the combined .env + system environment.
+         * starting the server. Values support #env:VAR# and #env:VAR:-default#
+         * syntax (preferred) and are resolved against the combined .env + system
+         * environment. Bare #VAR# and the deprecated ${VAR} syntax still work
+         * but will be removed in a future release.
          */
         public Map<String, String> envVars = new HashMap<>();
         
@@ -157,11 +177,12 @@ public class LuceeServerConfig {
         public boolean enabled = true;
         public String routerFile = "index.cfm";
         /**
-         * Path to the urlrewrite.xml config file in the project.
+         * Path to the rewrite.config file in the project.
          * Relative paths are resolved against the project directory.
-         * Defaults to "urlrewrite.xml" in project root.
+         * Defaults to "rewrite.config" in project root.
+         * Uses Tomcat RewriteValve mod_rewrite syntax.
          */
-        public String configFile = "urlrewrite.xml";
+        public String configFile = "rewrite.config";
     }
     
     public static class MonitoringConfig {
@@ -214,6 +235,24 @@ public class LuceeServerConfig {
         public String runMode;      // "mount" | "copy"
     }
     
+    /**
+     * Lucee engine configuration — version and JAR variant.
+     * This is the new canonical location for Lucee-specific settings
+     * that were previously at the top level of lucee.json.
+     */
+    public static class LuceeEngineConfig {
+        /**
+         * Lucee engine version (e.g. "6.2.2.91", "7.0.0.346-RC").
+         * Classifiers like -RC or -SNAPSHOT are part of this string.
+         */
+        public String version = "6.2.2.91";
+
+        /**
+         * Lucee JAR variant: "standard" (default), "light", or "zero".
+         */
+        public String variant = "standard";
+    }
+
     public static class AgentConfig {
         public boolean enabled = false;
         public String[] jvmArgs = new String[0];
@@ -253,6 +292,9 @@ public class LuceeServerConfig {
         
         ServerConfig config = objectMapper.readValue(configFile.toFile(), ServerConfig.class);
         
+        // Migrate legacy top-level "version" to the new "lucee" block
+        migrateLegacyLuceeVersion(config);
+        
         // Set default name if not specified - use only the last part of the path
         if (config.name == null || config.name.trim().isEmpty()) {
             config.name = projectDir.getFileName().toString();
@@ -288,19 +330,21 @@ public class LuceeServerConfig {
                 : config.envFile.trim();
         loadEnvFile(projectDir, envFileName);
 
-        // Perform environment variable substitution on string fields
-        // Supports ${VAR_NAME} and ${VAR_NAME:-default_value}
+        // Perform variable substitution on string fields
+        // Supports #env:VAR_NAME# and #env:VAR_NAME:-default# (preferred)
+        // Bare #VAR_NAME# and ${VAR_NAME} are deprecated but still work
         substituteEnvironmentVariables(config);
         
         // Resolve relative paths in envVars (e.g. "./distrocore") against the project directory
         // so that the server process receives absolute paths regardless of its working directory.
         resolveRelativeEnvVarPaths(config, projectDir);
         
-        // NOTE: Secret placeholders (${secret:NAME}) are NOT resolved automatically here
-        // anymore. This prevents read-only commands (status, stop, list, config get, etc.)
-        // from prompting for the secrets passphrase. Callers that actually need the
-        // resolved secrets (e.g. when starting a server or locking config) must
-        // explicitly call resolveSecretPlaceholders(config, projectDir).
+        // NOTE: Secret placeholders (#secret:NAME# or deprecated ${secret:NAME}) are
+        // NOT resolved automatically here. This prevents read-only commands (status,
+        // stop, list, config get, etc.) from prompting for the secrets passphrase.
+        // Callers that actually need the resolved secrets (e.g. when starting a
+        // server or locking config) must explicitly call
+        // resolveSecretPlaceholders(config, projectDir).
         
         // Ensure monitoring is initialized
         if (config.monitoring == null) {
@@ -319,6 +363,115 @@ public class LuceeServerConfig {
         // This prevents race conditions where ports become unavailable between config load and server start
         
         return config;
+    }
+
+    // Pattern matching a Lucee version string: N.N.N.N with optional classifier
+    private static final java.util.regex.Pattern LUCEE_VERSION_PATTERN =
+            java.util.regex.Pattern.compile("^\\d+\\.\\d+\\.\\d+\\.\\d+.*$");
+
+    // Track whether we've already shown the deprecation warning for this session
+    private static boolean hasShownDeprecationWarning = false;
+
+    // Track whether we've shown the ${VAR} -> #VAR# syntax deprecation warning
+    private static boolean hasShownVarSyntaxDeprecation = false;
+
+    // Track whether we've shown the bare #VAR# -> #env:VAR# prefix deprecation warning
+    private static boolean hasShownEnvPrefixDeprecation = false;
+
+    /**
+     * Migrate legacy top-level "version" (Lucee engine version) into the new
+     * {@code "lucee": { "version": ... }} block. This is called during
+     * {@link #loadConfig} so that all downstream code can rely on
+     * {@link #getLuceeVersion(ServerConfig)}.
+     *
+     * Rules:
+     * 1. If {@code config.lucee} already has a version → nothing to do (new format).
+     * 2. If top-level {@code version} looks like a Lucee version (N.N.N.N) and
+     *    no {@code lucee} block exists → migrate it and emit a deprecation warning.
+     * 3. If both exist, the {@code lucee.version} takes precedence.
+     */
+    private static void migrateLegacyLuceeVersion(ServerConfig config) {
+        if (config.lucee != null && config.lucee.version != null
+                && !config.lucee.version.trim().isEmpty()) {
+            // New format already present — nothing to migrate.
+            return;
+        }
+
+        @SuppressWarnings("deprecation")
+        String legacyVersion = config.version;
+        if (legacyVersion != null && LUCEE_VERSION_PATTERN.matcher(legacyVersion).matches()) {
+            // Legacy format detected — migrate
+            if (config.lucee == null) {
+                config.lucee = new LuceeEngineConfig();
+            }
+            config.lucee.version = legacyVersion;
+
+            // Migrate runtime.variant into lucee.variant if present
+            if (config.runtime != null && config.runtime.variant != null
+                    && !config.runtime.variant.trim().isEmpty()
+                    && (config.lucee.variant == null || "standard".equals(config.lucee.variant))) {
+                config.lucee.variant = config.runtime.variant;
+            }
+
+            // Only show deprecation warning once per session to avoid spam
+            if (!hasShownDeprecationWarning) {
+                System.err.println(
+                    "⚠️  Deprecation: top-level \"version\" in lucee.json is deprecated for specifying the Lucee engine version.\n" +
+                    "   Please move it to the \"lucee\" block:\n" +
+                    "     \"lucee\": { \"version\": \"" + legacyVersion + "\" }\n" +
+                    "   The top-level \"version\" key is now reserved for your app/project version.");
+                hasShownDeprecationWarning = true;
+            }
+        }
+    }
+
+    /**
+     * Get the effective Lucee engine version for a server configuration.
+     * Prefers {@code config.lucee.version}, falls back to the deprecated
+     * top-level {@code config.version}.
+     */
+    public static String getLuceeVersion(ServerConfig config) {
+        if (config == null) {
+            return "6.2.2.91";
+        }
+        if (config.lucee != null && config.lucee.version != null
+                && !config.lucee.version.trim().isEmpty()) {
+            return config.lucee.version;
+        }
+        @SuppressWarnings("deprecation")
+        String legacy = config.version;
+        return (legacy != null && !legacy.trim().isEmpty()) ? legacy : "6.2.2.91";
+    }
+
+    /**
+     * Get the effective Lucee JAR variant for a server configuration.
+     * Prefers {@code config.lucee.variant}, falls back to
+     * {@code config.runtime.variant}, then defaults to "standard".
+     */
+    public static String getLuceeVariant(ServerConfig config) {
+        if (config != null && config.lucee != null
+                && config.lucee.variant != null && !config.lucee.variant.trim().isEmpty()) {
+            return config.lucee.variant;
+        }
+        if (config != null && config.runtime != null
+                && config.runtime.variant != null && !config.runtime.variant.trim().isEmpty()) {
+            return config.runtime.variant;
+        }
+        return "standard";
+    }
+
+    /**
+     * Set the Lucee engine version on a configuration, writing to the new
+     * {@code lucee} block (and keeping the deprecated field in sync).
+     */
+    public static void setLuceeVersion(ServerConfig config, String version) {
+        if (config.lucee == null) {
+            config.lucee = new LuceeEngineConfig();
+        }
+        config.lucee.version = version;
+        // Keep deprecated field in sync for one release cycle
+        @SuppressWarnings("deprecation")
+        String ignored = config.version = version;
     }
 
     /**
@@ -507,49 +660,64 @@ public class LuceeServerConfig {
     }
     
     /**
-     * Substitute environment variables in all string fields.
+     * Substitute variables in all string fields of the configuration.
      * Supports:
-     *   ${VAR_NAME} - replaced with environment variable value
-     *   ${VAR_NAME:-default} - replaced with env var or default if not set
+     *   #env:VAR_NAME# - replaced with environment variable value (preferred)
+     *   #env:VAR_NAME:-default# - replaced with env var or default if not set (preferred)
+     *   #VAR_NAME# - deprecated, still works with a warning (use #env:VAR_NAME# instead)
+     *   ${VAR_NAME} - deprecated, still works outside protected zones with a warning
      * 
-     * This recursively processes the configuration object and nested JSON,
-     * allowing environment variables to be used in all config values.
+     * Protected zones where ${VAR} is NOT substituted (left for Lucee/JVM runtime):
+     *   - "configuration" block (passed to .CFConfig.json)
+     *   - "jvm.additionalArgs" (JVM resolves ${...} at runtime)
+     * In these zones, only #env:VAR# / #secret:NAME# syntax is processed.
      */
     private static void substituteEnvironmentVariables(ServerConfig config) {
-        // Top-level string fields
+        // Lucee engine config block
+        if (config.lucee != null) {
+            if (config.lucee.version != null) {
+                config.lucee.version = substituteField(config.lucee.version);
+            }
+            if (config.lucee.variant != null) {
+                config.lucee.variant = substituteField(config.lucee.variant);
+            }
+        }
+        // Legacy top-level version (kept in sync for backward compat)
         if (config.version != null) {
-            config.version = replaceEnvVars(config.version);
+            config.version = substituteField(config.version);
         }
         if (config.name != null) {
-            config.name = replaceEnvVars(config.name);
+            config.name = substituteField(config.name);
         }
         if (config.host != null) {
-            config.host = replaceEnvVars(config.host);
+            config.host = substituteField(config.host);
         }
         if (config.webroot != null) {
-            config.webroot = replaceEnvVars(config.webroot);
+            config.webroot = substituteField(config.webroot);
         }
         if (config.openBrowserURL != null) {
-            config.openBrowserURL = replaceEnvVars(config.openBrowserURL);
+            config.openBrowserURL = substituteField(config.openBrowserURL);
         }
         if (config.configurationFile != null) {
-            config.configurationFile = replaceEnvVars(config.configurationFile);
+            config.configurationFile = substituteField(config.configurationFile);
         }
         if (config.envFile != null) {
-            config.envFile = replaceEnvVars(config.envFile);
+            config.envFile = substituteField(config.envFile);
         }
         
         // Substitute in JVM config
         if (config.jvm != null) {
             if (config.jvm.maxMemory != null) {
-                config.jvm.maxMemory = replaceEnvVars(config.jvm.maxMemory);
+                config.jvm.maxMemory = substituteField(config.jvm.maxMemory);
             }
             if (config.jvm.minMemory != null) {
-                config.jvm.minMemory = replaceEnvVars(config.jvm.minMemory);
+                config.jvm.minMemory = substituteField(config.jvm.minMemory);
             }
+            // PROTECTED ZONE: jvm.additionalArgs — only #env:VAR# / #secret:NAME# syntax is processed.
+            // ${VAR} is left intact for JVM runtime resolution.
             if (config.jvm.additionalArgs != null) {
                 for (int i = 0; i < config.jvm.additionalArgs.length; i++) {
-                    config.jvm.additionalArgs[i] = replaceEnvVars(config.jvm.additionalArgs[i]);
+                    config.jvm.additionalArgs[i] = replaceLucliVars(config.jvm.additionalArgs[i]);
                 }
             }
         }
@@ -557,14 +725,14 @@ public class LuceeServerConfig {
         // Substitute in URL Rewrite config
         if (config.urlRewrite != null) {
             if (config.urlRewrite.routerFile != null) {
-                config.urlRewrite.routerFile = replaceEnvVars(config.urlRewrite.routerFile);
+                config.urlRewrite.routerFile = substituteField(config.urlRewrite.routerFile);
             }
         }
         
         // Substitute in Admin config
         if (config.admin != null) {
             if (config.admin.password != null) {
-                config.admin.password = replaceEnvVars(config.admin.password);
+                config.admin.password = substituteField(config.admin.password);
             }
         }
 
@@ -577,15 +745,55 @@ public class LuceeServerConfig {
                 if (key == null || key.trim().isEmpty()) {
                     continue;
                 }
-                resolved.put(key, value != null ? replaceEnvVars(value) : null);
+                resolved.put(key, value != null ? substituteField(value) : null);
             }
             config.envVars = resolved;
         }
         
-        // Recursively substitute in the configuration JSON object
-        // This supports environment variables throughout the entire CFConfig
+        // Substitute in Runtime config
+        if (config.runtime != null) {
+            if (config.runtime.type != null) {
+                config.runtime.type = substituteField(config.runtime.type);
+            }
+            if (config.runtime.installPath != null) {
+                config.runtime.installPath = substituteField(config.runtime.installPath);
+            }
+            if (config.runtime.variant != null) {
+                config.runtime.variant = substituteField(config.runtime.variant);
+            }
+            if (config.runtime.catalinaHome != null) {
+                config.runtime.catalinaHome = substituteField(config.runtime.catalinaHome);
+            }
+            if (config.runtime.catalinaBase != null) {
+                config.runtime.catalinaBase = substituteField(config.runtime.catalinaBase);
+            }
+            if (config.runtime.jettyHome != null) {
+                config.runtime.jettyHome = substituteField(config.runtime.jettyHome);
+            }
+            if (config.runtime.image != null) {
+                config.runtime.image = substituteField(config.runtime.image);
+            }
+            if (config.runtime.dockerfile != null) {
+                config.runtime.dockerfile = substituteField(config.runtime.dockerfile);
+            }
+            if (config.runtime.context != null) {
+                config.runtime.context = substituteField(config.runtime.context);
+            }
+            if (config.runtime.tag != null) {
+                config.runtime.tag = substituteField(config.runtime.tag);
+            }
+            if (config.runtime.containerName != null) {
+                config.runtime.containerName = substituteField(config.runtime.containerName);
+            }
+            if (config.runtime.runMode != null) {
+                config.runtime.runMode = substituteField(config.runtime.runMode);
+            }
+        }
+
+        // PROTECTED ZONE: configuration block — only #env:VAR# / #secret:NAME# syntax is processed.
+        // ${VAR} is left intact for Lucee runtime resolution in .CFConfig.json.
         if (config.configuration != null) {
-            config.configuration = substituteInJsonNode(config.configuration);
+            config.configuration = replaceLucliVarsInJsonNode(config.configuration);
         }
     }
     
@@ -646,15 +854,65 @@ public class LuceeServerConfig {
     }
     
     /**
-     * Replace secret placeholders in string using ${secret:NAME} syntax.
-     * This is evaluated after environment variables, and only for the local provider
-     * in this initial implementation.
+     * Replace secret placeholders in a string.
+     * Supports both new #secret:NAME# syntax (preferred) and deprecated ${secret:NAME} syntax.
+     * This is evaluated after environment variables, and only for the local provider.
      */
     private static String replaceSecretPlaceholders(String value, SecretStore store) throws SecretStoreException {
         if (value == null) {
             return null;
         }
-        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\\$\\{secret:([^}]+)\\}");
+        // Process new #secret:NAME# syntax first
+        java.util.regex.Pattern hashPattern = java.util.regex.Pattern.compile("#secret:([^#]+)#");
+        java.util.regex.Matcher hashMatcher = hashPattern.matcher(value);
+        StringBuffer sb1 = new StringBuffer();
+        while (hashMatcher.find()) {
+            String name = hashMatcher.group(1).trim();
+            java.util.Optional<char[]> secret = store.get(name);
+            if (secret.isEmpty()) {
+                throw new SecretStoreException("Secret '" + name + "' not found for placeholder in configuration");
+            }
+            String replacement = new String(secret.get());
+            hashMatcher.appendReplacement(sb1, java.util.regex.Matcher.quoteReplacement(replacement));
+        }
+        hashMatcher.appendTail(sb1);
+        value = sb1.toString();
+        
+        // Process deprecated ${secret:NAME} syntax
+        java.util.regex.Pattern dollarPattern = java.util.regex.Pattern.compile("\\$\\{secret:([^}]+)\\}");
+        java.util.regex.Matcher dollarMatcher = dollarPattern.matcher(value);
+        StringBuffer sb2 = new StringBuffer();
+        boolean foundDeprecated = false;
+        while (dollarMatcher.find()) {
+            foundDeprecated = true;
+            String name = dollarMatcher.group(1).trim();
+            java.util.Optional<char[]> secret = store.get(name);
+            if (secret.isEmpty()) {
+                throw new SecretStoreException("Secret '" + name + "' not found for placeholder in configuration");
+            }
+            String replacement = new String(secret.get());
+            dollarMatcher.appendReplacement(sb2, java.util.regex.Matcher.quoteReplacement(replacement));
+        }
+        dollarMatcher.appendTail(sb2);
+        if (foundDeprecated && !hasShownVarSyntaxDeprecation) {
+            System.err.println(
+                "\u26a0\ufe0f  Deprecation: ${secret:NAME} syntax is deprecated.\n" +
+                "   Please use #secret:NAME# instead. ${secret:NAME} will be removed in a future release.");
+            hasShownVarSyntaxDeprecation = true;
+        }
+        return sb2.toString();
+    }
+    
+    /**
+     * Replace secret placeholders in a string using only #secret:NAME# syntax.
+     * Used for protected zones (configuration blocks) where ${...} must be preserved.
+     * (In protected zones, #env:VAR# is the only env var syntax processed.)
+     */
+    private static String replaceLucliSecretPlaceholders(String value, SecretStore store) throws SecretStoreException {
+        if (value == null) {
+            return null;
+        }
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("#secret:([^#]+)#");
         java.util.regex.Matcher matcher = pattern.matcher(value);
         StringBuffer sb = new StringBuffer();
         while (matcher.find()) {
@@ -671,18 +929,22 @@ public class LuceeServerConfig {
     }
 
     /**
-     * Quick scan to see if any ${secret:...} placeholders are present in fields we support.
+     * Quick scan to see if any secret placeholders are present in fields we support.
+     * Checks for both new #secret:NAME# and deprecated ${secret:NAME} syntax.
      */
     private static boolean hasSecretPlaceholders(ServerConfig config) {
-        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\\$\\{secret:([^}]+)\\}");
+        java.util.regex.Pattern hashPattern = java.util.regex.Pattern.compile("#secret:([^#]+)#");
+        java.util.regex.Pattern dollarPattern = java.util.regex.Pattern.compile("\\$\\{secret:([^}]+)\\}");
 
         if (config.admin != null && config.admin.password != null) {
-            if (pattern.matcher(config.admin.password).find()) {
+            if (hashPattern.matcher(config.admin.password).find() ||
+                dollarPattern.matcher(config.admin.password).find()) {
                 return true;
             }
         }
         if (config.configuration != null) {
-            return jsonNodeHasSecretPlaceholders(config.configuration, pattern);
+            return jsonNodeHasSecretPlaceholders(config.configuration, hashPattern) ||
+                   jsonNodeHasSecretPlaceholders(config.configuration, dollarPattern);
         }
         return false;
     }
@@ -713,12 +975,16 @@ public class LuceeServerConfig {
     }
 
     /**
-     * Resolve ${secret:...} placeholders across relevant config fields.
+     * Resolve secret placeholders across relevant config fields.
+     * Supports both #secret:NAME# (preferred) and deprecated ${secret:NAME} syntax.
      *
      * Behaviour:
-     * - If there are no ${secret:...} placeholders, this is a no-op.
+     * - If there are no secret placeholders, this is a no-op.
      * - If placeholders exist but no passphrase can be obtained (env var or console),
      *   an IOException is thrown so the caller sees a clear failure.
+     *
+     * For the "configuration" block (protected zone), only #secret:NAME# is resolved;
+     * ${secret:NAME} is left intact so Lucee can handle ${...} at runtime.
      *
      * This method is intentionally public so that only commands that actually
      * need secrets (e.g. server start, server lock) pay the cost of prompting
@@ -731,7 +997,7 @@ public class LuceeServerConfig {
 
         Path storePath = getLucliHome().resolve("secrets").resolve("local.json");
         if (!Files.exists(storePath)) {
-            throw new IOException("Configuration references ${secret:...} but local secret store does not exist. Run 'lucli secrets init' and define the required secrets.");
+            throw new IOException("Configuration references secret placeholders but local secret store does not exist. Run 'lucli secrets init' and define the required secrets.");
         }
 
         // Prefer non-interactive passphrase from environment when available
@@ -755,17 +1021,25 @@ public class LuceeServerConfig {
         }
 
         try {
+            // admin.password: supports both syntaxes (not a protected zone)
             if (config.admin != null && config.admin.password != null) {
                 config.admin.password = replaceSecretPlaceholders(config.admin.password, store);
             }
+            // PROTECTED ZONE: configuration block — only #secret:NAME# is resolved.
+            // ${secret:NAME} is left intact for Lucee runtime.
             if (config.configuration != null) {
-                config.configuration = substituteSecretsInJsonNode(config.configuration, store);
+                config.configuration = substituteLucliSecretsInJsonNode(config.configuration, store);
             }
         } catch (SecretStoreException e) {
             throw new IOException(e.getMessage(), e);
         }
     }
 
+    /**
+     * Recursively substitute secret placeholders in a JSON node.
+     * Supports both #secret:NAME# and deprecated ${secret:NAME} syntax.
+     * Used for non-protected zones.
+     */
     private static com.fasterxml.jackson.databind.JsonNode substituteSecretsInJsonNode(com.fasterxml.jackson.databind.JsonNode node, SecretStore store) throws SecretStoreException {
         if (node == null) {
             return null;
@@ -793,11 +1067,170 @@ public class LuceeServerConfig {
             return node;
         }
     }
+    
+    /**
+     * Recursively substitute only #secret:NAME# placeholders in a JSON node.
+     * Used for protected zones (configuration blocks) where ${...} must be preserved.
+     */
+    private static com.fasterxml.jackson.databind.JsonNode substituteLucliSecretsInJsonNode(com.fasterxml.jackson.databind.JsonNode node, SecretStore store) throws SecretStoreException {
+        if (node == null) {
+            return null;
+        }
+        if (node.isTextual()) {
+            String replaced = replaceLucliSecretPlaceholders(node.asText(), store);
+            return objectMapper.getNodeFactory().textNode(replaced);
+        } else if (node.isArray()) {
+            com.fasterxml.jackson.databind.node.ArrayNode arrayNode = objectMapper.getNodeFactory().arrayNode();
+            for (com.fasterxml.jackson.databind.JsonNode element : node) {
+                arrayNode.add(substituteLucliSecretsInJsonNode(element, store));
+            }
+            return arrayNode;
+        } else if (node.isObject()) {
+            com.fasterxml.jackson.databind.node.ObjectNode objNode = objectMapper.getNodeFactory().objectNode();
+            node.fields().forEachRemaining(entry -> {
+                try {
+                    objNode.set(entry.getKey(), substituteLucliSecretsInJsonNode(entry.getValue(), store));
+                } catch (SecretStoreException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+            return objNode;
+        } else {
+            return node;
+        }
+    }
 
     /**
-     * Replace environment variables in a string using ${VAR} or ${VAR:-default} syntax
-     * Checks .env file variables first, then system environment variables
+     * Replace LuCLI variables in a string.
+     * Preferred syntax: #env:VAR# or #env:VAR:-default#
+     * Deprecated syntax: bare #VAR# or #VAR:-default# (still works with a warning)
+     * Checks .env file variables first, then system environment variables.
      */
+    private static String replaceLucliVars(String value) {
+        if (value == null) {
+            return null;
+        }
+        
+        // Pattern: #...# (matches all hash-delimited placeholders)
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("#([^#]+)#");
+        java.util.regex.Matcher matcher = pattern.matcher(value);
+        StringBuffer sb = new StringBuffer();
+        
+        while (matcher.find()) {
+            String placeholder = matcher.group(1);
+            String replacement = null;
+            
+            // Skip secret placeholders — handled separately
+            if (placeholder.startsWith("secret:")) {
+                matcher.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(matcher.group(0)));
+                continue;
+            }
+            
+            // Warn about CFML-like expressions — LuCLI currently only supports
+            // simple variable names. Full CFML expression evaluation is planned.
+            if (placeholder.contains("(") || placeholder.contains(")")) {
+                System.err.println(
+                    "\u26a0\ufe0f  '#" + placeholder + "#' looks like a CFML expression. " +
+                    "LuCLI currently only supports simple variable names in #env:VAR# placeholders " +
+                    "(e.g. #env:MY_VAR# or #env:MY_VAR:-default#). CFML expression evaluation is planned for a future release.");
+                matcher.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(matcher.group(0)));
+                continue;
+            }
+            
+            // Determine the effective variable expression:
+            // #env:VAR# or #env:VAR:-default# → strip "env:" prefix
+            // bare #VAR# → deprecated, emit warning
+            String varExpression;
+            if (placeholder.startsWith("env:")) {
+                varExpression = placeholder.substring(4); // strip "env:" prefix
+            } else {
+                // Bare #VAR# — deprecated
+                if (!hasShownEnvPrefixDeprecation) {
+                    System.err.println(
+                        "\u26a0\ufe0f  Deprecation: bare #VAR# syntax is deprecated for LuCLI variable substitution.\n" +
+                        "   Please use #env:VAR# instead (e.g. #env:" + placeholder + "#). Bare #VAR# will be removed in a future release.");
+                    hasShownEnvPrefixDeprecation = true;
+                }
+                varExpression = placeholder;
+            }
+            
+            // Check if it has a default value
+            if (varExpression.contains(":-")) {
+                String[] parts = varExpression.split(":-", 2);
+                String varName = parts[0].trim();
+                String defaultValue = parts[1].trim();
+                replacement = getEnvVar(varName);
+                if (replacement == null) {
+                    replacement = defaultValue;
+                }
+            } else {
+                // Just the variable name
+                replacement = getEnvVar(varExpression);
+                if (replacement == null) {
+                    // Keep the placeholder if env var doesn't exist
+                    replacement = matcher.group(0);
+                }
+            }
+            
+            matcher.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(replacement));
+        }
+        matcher.appendTail(sb);
+        
+        return sb.toString();
+    }
+    
+    /**
+     * Recursively substitute LuCLI #env:VAR# variables in a JSON node.
+     * Unlike substituteInJsonNode, this does NOT process ${VAR} syntax,
+     * leaving those intact for Lucee runtime resolution.
+     */
+    private static JsonNode replaceLucliVarsInJsonNode(JsonNode node) {
+        if (node == null) {
+            return null;
+        }
+        
+        if (node.isTextual()) {
+            return objectMapper.getNodeFactory().textNode(replaceLucliVars(node.asText()));
+        } else if (node.isArray()) {
+            com.fasterxml.jackson.databind.node.ArrayNode arrayNode = 
+                objectMapper.getNodeFactory().arrayNode();
+            for (JsonNode element : node) {
+                arrayNode.add(replaceLucliVarsInJsonNode(element));
+            }
+            return arrayNode;
+        } else if (node.isObject()) {
+            com.fasterxml.jackson.databind.node.ObjectNode objNode = 
+                objectMapper.getNodeFactory().objectNode();
+            node.fields().forEachRemaining(entry -> {
+                objNode.set(entry.getKey(), replaceLucliVarsInJsonNode(entry.getValue()));
+            });
+            return objNode;
+        } else {
+            return node;
+        }
+    }
+    
+    /**
+     * Substitute a single config field value: first applies new #env:VAR# syntax
+     * (and deprecated bare #VAR#), then falls back to deprecated ${VAR} syntax
+     * for backward compatibility.
+     */
+    private static String substituteField(String value) {
+        if (value == null) {
+            return null;
+        }
+        value = replaceLucliVars(value);
+        value = replaceEnvVars(value);
+        return value;
+    }
+    
+    /**
+     * @deprecated Use #VAR# or #VAR:-default# syntax instead.
+     * Replace environment variables in a string using ${VAR} or ${VAR:-default} syntax.
+     * This method is kept for backward compatibility and emits a deprecation warning.
+     * Checks .env file variables first, then system environment variables.
+     */
+    @Deprecated
     private static String replaceEnvVars(String value) {
         if (value == null) {
             return null;
@@ -806,6 +1239,22 @@ public class LuceeServerConfig {
         // Pattern: ${VAR_NAME} or ${VAR_NAME:-default_value}
         java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\\$\\{([^}]+)\\}");
         java.util.regex.Matcher matcher = pattern.matcher(value);
+        
+        // Check if there are any ${VAR} placeholders before proceeding
+        if (!matcher.find()) {
+            return value; // No ${VAR} placeholders, nothing to do
+        }
+        
+        // Emit deprecation warning once per session
+        if (!hasShownVarSyntaxDeprecation) {
+            System.err.println(
+                "⚠️  Deprecation: ${VAR} syntax for LuCLI variable substitution is deprecated.\n" +
+                "   Please use #VAR# instead. ${VAR} will be removed in a future release.");
+            hasShownVarSyntaxDeprecation = true;
+        }
+        
+        // Reset matcher to start from beginning
+        matcher.reset();
         StringBuffer sb = new StringBuffer();
         
         while (matcher.find()) {
@@ -844,6 +1293,9 @@ public class LuceeServerConfig {
     public static ServerConfig createDefaultConfig(Path projectDir) {
         ServerConfig config = new ServerConfig();
         config.name = projectDir.getFileName().toString();
+
+        // Populate the new lucee block with defaults
+        config.lucee = new LuceeEngineConfig();
         
         // Try to find the LuCLI home directory to check existing servers
         Path lucliHome = getLucliHome();

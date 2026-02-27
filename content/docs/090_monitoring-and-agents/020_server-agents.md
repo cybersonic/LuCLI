@@ -23,7 +23,9 @@ Agents are configured in the top-level `agents` object of your project `lucee.js
 ```json
 {
   "name": "my-project",
-  "version": "7.0.0.123",
+  "lucee": {
+    "version": "7.0.0.123"
+  },
   "port": 8080,
   "webroot": "./",
   "monitoring": {

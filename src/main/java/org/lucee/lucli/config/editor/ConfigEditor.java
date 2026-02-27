@@ -106,7 +106,7 @@ public class ConfigEditor {
         }
 
         String versionInput = readVersionLine(
-                "Lucee version (or # from list) [" + nullToEmpty(config.version) + "]: ", scanner).trim();
+                "Lucee version (or # from list) [" + nullToEmpty(LuceeServerConfig.getLuceeVersion(config)) + "]: ", scanner).trim();
         if (!versionInput.isEmpty()) {
             String chosenVersion = versionInput;
             // Allow "1".."5" to pick from the suggested list
@@ -122,7 +122,7 @@ public class ConfigEditor {
                 }
             }
             final String applyVersion = chosenVersion;
-            updaters.put("version", () -> config.version = applyVersion);
+            updaters.put("version", () -> LuceeServerConfig.setLuceeVersion(config, applyVersion));
         }
 
         // port
@@ -208,13 +208,17 @@ public class ConfigEditor {
 
         // Type-specific prompts
         if ("lucee-express".equals(runtime.type)) {
-            System.out.print("Lucee JAR variant (standard/light/zero) [" + nullToEmpty(runtime.variant) + "]: ");
+            String currentVariant = LuceeServerConfig.getLuceeVariant(config);
+            System.out.print("Lucee JAR variant (standard/light/zero) [" + nullToEmpty(currentVariant) + "]: ");
             String variantInput = scanner.nextLine().trim();
             if (!variantInput.isEmpty()) {
                 String v = variantInput.toLowerCase();
                 if (!v.equals("standard") && !v.equals("light") && !v.equals("zero")) {
                     System.out.println("⚠️ Expected standard, light, or zero. Ignoring change.");
                 } else {
+                    if (config.lucee == null) config.lucee = new LuceeServerConfig.LuceeEngineConfig();
+                    config.lucee.variant = v;
+                    // Keep runtime.variant in sync for backward compat
                     runtime.variant = v;
                 }
             }

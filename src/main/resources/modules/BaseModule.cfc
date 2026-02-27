@@ -184,16 +184,12 @@ component {
 
         var actualCommand = [command];
             actualCommand.append(arguments.args, true);
+        // Use executeInProcess() instead of main() to avoid System.exit()
+        // which would kill the JVM (and the interactive terminal with it).
         var LuCLI = createObject("java", "org.lucee.lucli.LuCLI");
-        LuCLI.main(actualCommand);
-        // Terminal mode = true so ServerCommandHandler returns strings
-        // var executor = createObject("java", "org.lucee.lucli.server.ServerCommandHandler")
-        //     .init(true, cwdPath);
+        var exitCode = LuCLI.executeInProcess(actualCommand);
 
-        // var result = executor.executeCommand(command, args);
-
-        // Always return a string (never null)
-        return result ?: "";
+        return "";
     }
 
     function version(){

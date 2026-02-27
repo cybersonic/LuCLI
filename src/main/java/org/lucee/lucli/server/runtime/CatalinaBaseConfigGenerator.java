@@ -1,16 +1,21 @@
 package org.lucee.lucli.server.runtime;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Map;
 
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+
 import org.lucee.lucli.server.LuceeServerConfig;
 import org.lucee.lucli.server.TomcatConfigSupport;
 import org.lucee.lucli.server.TomcatServerXmlPatcher;
 import org.lucee.lucli.server.TomcatWebXmlPatcher;
+import org.w3c.dom.Document;
 
 /**
  * Generates a minimal CATALINA_BASE directory structure suitable for use with
@@ -79,20 +84,17 @@ public class CatalinaBaseConfigGenerator {
         Path serverWebXml = serverInstanceDir.resolve("conf/web.xml");
         webXmlPatcher.ensureLuceeServlets(serverWebXml, config, serverInstanceDir);
 
-        // Configure URL rewrite at server level (copies urlrewrite.xml, deploys JAR)
-        // Note: UrlRewriteFilter uses javax.servlet and is not compatible with Tomcat 10+
+        // Apply configuration-driven patches (disable Lucee/REST servlets when
+        // enableLucee=false, protect lucee.json, etc.). This must run after
+        // ensureLuceeServlets so that vendor web.xml files that already ship
+        // with Lucee servlets (e.g. Lucee Express) have them removed when the
+        // user explicitly sets enableLucee=false.
+        webXmlPatcher.patch(serverWebXml, config, projectDir, serverInstanceDir);
+
+        // Configure URL rewrite via Tomcat's built-in RewriteValve.
+        // This works across all Tomcat versions (8-11) with no external dependencies.
         if (config.enableLucee && config.urlRewrite != null && config.urlRewrite.enabled) {
-            if (tomcatMajorVersion >= 10) {
-                System.out.println("\n\u26a0\ufe0f  URL Rewriting is not yet supported with Tomcat " + tomcatMajorVersion + ".x");
-                System.out.println("   UrlRewriteFilter uses javax.servlet which is incompatible with Tomcat 10+.");
-                System.out.println("   Alternatives:");
-                System.out.println("     - Use Tomcat's built-in RewriteValve (Apache mod_rewrite syntax)");
-                System.out.println("     - Use OCPsoft Rewrite (org.ocpsoft.rewrite:rewrite-servlet:10.0.1.Final)");
-                System.out.println("   Skipping URL rewrite configuration.\n");
-            } else {
-                configureUrlRewrite(serverInstanceDir, config, projectDir, placeholders);
-                webXmlPatcher.ensureUrlRewriteFilter(serverWebXml, serverInstanceDir);
-            }
+            configureRewriteValve(serverInstanceDir, config, projectDir, placeholders);
         }
 
         // Generate setenv scripts (setenv.sh / setenv.bat) for JVM options
@@ -203,57 +205,129 @@ public class CatalinaBaseConfigGenerator {
 
 
     /**
-     * Configure URL rewrite at the server level.
+     * Configure URL rewriting via Tomcat's built-in RewriteValve.
      *
-     * This deploys URL rewrite to CATALINA_BASE instead of the project's WEB-INF:
-     * - Copies urlrewrite.xml from project to CATALINA_BASE/conf/
-     * - Deploys UrlRewriteFilter JAR to CATALINA_BASE/lib/
-     * - Filter is configured in server's web.xml via TomcatWebXmlPatcher
+     * This uses the Host-level RewriteValve which reads rewrite.config from
+     * {@code conf/Catalina/<hostName>/rewrite.config} in CATALINA_BASE.
      *
-     * This keeps the project webroot completely clean.
+     * The project webroot stays completely clean — no WEB-INF modifications.
+     * Works across all Tomcat versions (8, 9, 10, 11) with no external dependencies.
      *
-     * Note: Only works with Tomcat 9 and below (javax.servlet).
+     * If HTTPS redirect is also enabled, the redirect rules are prepended
+     * to the same rewrite.config file.
      */
-    private void configureUrlRewrite(Path serverInstanceDir, LuceeServerConfig.ServerConfig config,
-                                     Path projectDir, Map<String, String> placeholders) throws IOException {
-        // Only needed if URL rewrite is enabled
+    private void configureRewriteValve(Path serverInstanceDir, LuceeServerConfig.ServerConfig config,
+                                       Path projectDir, Map<String, String> placeholders) throws IOException {
         if (!config.enableLucee || config.urlRewrite == null || !config.urlRewrite.enabled) {
             return;
         }
 
-        // Resolve source urlrewrite.xml from project
+        // Warn about legacy urlrewrite.xml if present
+        Path legacyUrlRewriteXml = projectDir.resolve("urlrewrite.xml");
+        if (Files.exists(legacyUrlRewriteXml)) {
+            System.out.println("\n\u26a0\ufe0f  Found urlrewrite.xml in project root.");
+            System.out.println("   LuCLI now uses Tomcat's built-in RewriteValve with rewrite.config (mod_rewrite syntax).");
+            System.out.println("   Your urlrewrite.xml (Tuckey format) is no longer used.");
+            System.out.println("   To migrate, create a rewrite.config with equivalent mod_rewrite rules.");
+            System.out.println("   See: https://tomcat.apache.org/tomcat-9.0-doc/rewrite.html\n");
+        }
+
+        // Parse the patched server.xml to determine the Host name and ensure RewriteValve
+        Path serverXmlPath = serverInstanceDir.resolve("conf/server.xml");
+        Document serverXmlDoc = parseServerXml(serverXmlPath);
+
+        // Ensure RewriteValve is declared in server.xml
+        if (serverXmlDoc != null) {
+            serverXmlPatcher.ensureRewriteValve(serverXmlDoc);
+            writeDocument(serverXmlDoc, serverXmlPath);
+        }
+
+        // Determine the rewrite.config target directory
+        Path rewriteDir = serverXmlPatcher.getRewriteConfigDir(serverXmlDoc, serverInstanceDir);
+        Files.createDirectories(rewriteDir);
+
+        // Build the rewrite rules
+        StringBuilder rules = new StringBuilder();
+
+        // If HTTPS redirect is enabled, prepend those rules
+        if (LuceeServerConfig.isHttpsEnabled(config) && LuceeServerConfig.isHttpsRedirectEnabled(config)) {
+            rules.append(serverXmlPatcher.buildHttpsRedirectRules(config));
+            rules.append("\n");
+        }
+
+        // Resolve user-provided rewrite.config from project
         String configFileName = (config.urlRewrite.configFile != null && !config.urlRewrite.configFile.isEmpty())
                 ? config.urlRewrite.configFile
-                : "urlrewrite.xml";
-        Path sourceUrlRewriteXml = projectDir.resolve(configFileName);
+                : "rewrite.config";
+        Path sourceRewriteConfig = projectDir.resolve(configFileName);
 
-        // Target is CATALINA_BASE/conf/urlrewrite.xml
-        Path targetUrlRewriteXml = serverInstanceDir.resolve("conf/urlrewrite.xml");
-
-        if (Files.exists(sourceUrlRewriteXml)) {
-            Files.copy(sourceUrlRewriteXml, targetUrlRewriteXml, StandardCopyOption.REPLACE_EXISTING);
-            System.out.println("Deployed urlrewrite.xml from: " + sourceUrlRewriteXml);
+        if (Files.exists(sourceRewriteConfig)) {
+            // User has their own rewrite.config — append it
+            rules.append(Files.readString(sourceRewriteConfig, StandardCharsets.UTF_8));
+            System.out.println("Deployed rewrite.config from: " + sourceRewriteConfig);
         } else {
-            TomcatConfigSupport.applyTemplate("tomcat_template/webapps/ROOT/WEB-INF/urlrewrite.xml",
-                    targetUrlRewriteXml, placeholders);
-            System.out.println("Generated default urlrewrite.xml: " + targetUrlRewriteXml);
+            // Generate default rules from template
+            rules.append(loadAndProcessTemplate("rewrite_template/rewrite.config", placeholders));
+            System.out.println("Generated default rewrite.config (RewriteValve)");
             System.out.println("  \uD83D\uDCA1 Create " + configFileName + " in your project to customize rewrite rules.");
         }
 
-        // Deploy UrlRewriteFilter JAR to CATALINA_BASE/lib/
-        String urlRewriteVersion = TomcatConfigSupport.getUrlRewriteVersion();
-        try {
-            Path serverLibDir = serverInstanceDir.resolve("lib");
-            Files.createDirectories(serverLibDir);
+        // Write combined rewrite.config
+        Files.writeString(rewriteDir.resolve("rewrite.config"), rules.toString(), StandardCharsets.UTF_8);
+    }
 
-            Path urlRewriteJar = TomcatConfigSupport.ensureUrlRewriteFilter();
-            Path targetJar = serverLibDir.resolve("urlrewritefilter-" + urlRewriteVersion + ".jar");
-            if (!Files.exists(targetJar)) {
-                Files.copy(urlRewriteJar, targetJar, StandardCopyOption.REPLACE_EXISTING);
-                System.out.println("Deployed UrlRewriteFilter " + urlRewriteVersion + " to: " + targetJar);
-            }
+    /**
+     * Parse a server.xml file into a DOM Document.
+     */
+    private Document parseServerXml(Path serverXmlPath) {
+        if (serverXmlPath == null || !Files.exists(serverXmlPath)) {
+            return null;
+        }
+        try (InputStream in = Files.newInputStream(serverXmlPath)) {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setNamespaceAware(true);
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            return builder.parse(in);
         } catch (Exception e) {
-            throw new IOException("Failed to deploy UrlRewriteFilter JAR: " + e.getMessage(), e);
+            System.err.println("Warning: Could not parse server.xml for RewriteValve configuration: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Write a DOM Document back to the given path.
+     */
+    private void writeDocument(Document document, Path path) throws IOException {
+        try {
+            javax.xml.transform.TransformerFactory tf = javax.xml.transform.TransformerFactory.newInstance();
+            javax.xml.transform.Transformer transformer = tf.newTransformer();
+            transformer.setOutputProperty(javax.xml.transform.OutputKeys.INDENT, "yes");
+            transformer.setOutputProperty(javax.xml.transform.OutputKeys.ENCODING, "UTF-8");
+
+            try (java.io.OutputStream out = Files.newOutputStream(path)) {
+                transformer.transform(
+                        new javax.xml.transform.dom.DOMSource(document),
+                        new javax.xml.transform.stream.StreamResult(out));
+            }
+        } catch (javax.xml.transform.TransformerException e) {
+            throw new IOException("Failed to write server.xml: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Load a template from the classpath, apply placeholders, and return the result.
+     */
+    private String loadAndProcessTemplate(String templateResourcePath,
+                                          Map<String, String> placeholders) throws IOException {
+        try (InputStream is = getClass().getClassLoader().getResourceAsStream(templateResourcePath)) {
+            if (is == null) {
+                throw new IOException("Template not found: " + templateResourcePath);
+            }
+            String content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            for (Map.Entry<String, String> entry : placeholders.entrySet()) {
+                content = content.replace(entry.getKey(), entry.getValue());
+            }
+            return content;
         }
     }
 }

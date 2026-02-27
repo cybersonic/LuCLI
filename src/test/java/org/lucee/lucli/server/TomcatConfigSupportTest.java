@@ -395,18 +395,6 @@ public class TomcatConfigSupportTest {
         assertTrue(output.contains("HTTPS"), "Should mention HTTPS");
     }
 
-    // ── getUrlRewriteVersion ────────────────────────────────────────────
-
-    @Test
-    void getUrlRewriteVersion_returnsNonEmptyString() {
-        String version = TomcatConfigSupport.getUrlRewriteVersion();
-        assertNotNull(version);
-        assertFalse(version.isEmpty());
-        // Should look like a version number
-        assertTrue(version.matches("\\d+\\.\\d+\\.\\d+"),
-                "Version should be in x.y.z format, got: " + version);
-    }
-
     // ── Helper methods ──────────────────────────────────────────────────
 
     private LuceeServerConfig.ServerConfig createTestConfig() {

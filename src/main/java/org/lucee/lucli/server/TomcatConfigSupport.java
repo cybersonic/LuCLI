@@ -23,11 +23,6 @@ import java.util.Map;
  */
 public final class TomcatConfigSupport {
 
-    private static final String URLREWRITE_VERSION = "5.1.3";
-    private static final String URLREWRITE_MAVEN_URL =
-            "https://repo1.maven.org/maven2/org/tuckey/urlrewritefilter/" + URLREWRITE_VERSION +
-                    "/urlrewritefilter-" + URLREWRITE_VERSION + ".jar";
-
     private TomcatConfigSupport() {
     }
 
@@ -219,35 +214,6 @@ public final class TomcatConfigSupport {
         Files.writeString(setenvBat, bat.toString(), StandardCharsets.UTF_8);
 
         System.out.println("Generated setenv scripts in: " + binDir);
-    }
-
-    // ── UrlRewriteFilter ────────────────────────────────────────────────
-
-    /**
-     * Return the UrlRewriteFilter version string managed by LuCLI.
-     */
-    public static String getUrlRewriteVersion() {
-        return URLREWRITE_VERSION;
-    }
-
-    /**
-     * Ensure the UrlRewriteFilter JAR is cached under ~/.lucli/dependencies
-     * and return the path to it.
-     */
-    public static Path ensureUrlRewriteFilter() throws IOException {
-        Path dependenciesDir = getLucliHome().resolve("dependencies");
-        Files.createDirectories(dependenciesDir);
-
-        Path jarFile = dependenciesDir.resolve("urlrewritefilter-" + URLREWRITE_VERSION + ".jar");
-        if (Files.exists(jarFile)) {
-            return jarFile;
-        }
-
-        System.out.println("Downloading UrlRewriteFilter " + URLREWRITE_VERSION + "...");
-        downloadFileSimple(URLREWRITE_MAVEN_URL, jarFile);
-        System.out.println("UrlRewriteFilter downloaded successfully.");
-
-        return jarFile;
     }
 
     // ── Simple file download (no progress bar) ──────────────────────────

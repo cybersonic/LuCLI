@@ -59,7 +59,8 @@ public final class TomcatRuntimeProvider implements RuntimeProvider {
 
         // Detect Tomcat version and validate Lucee compatibility
         int tomcatMajorVersion = detectTomcatMajorVersion(catalinaHome);
-        validateLuceeTomcatCompatibility(config.version, tomcatMajorVersion);
+        String luceeVersion = LuceeServerConfig.getLuceeVersion(config);
+        validateLuceeTomcatCompatibility(luceeVersion, tomcatMajorVersion);
 
         // Resolve port conflicts
         LuceeServerConfig.PortConflictResult portResult =
@@ -71,8 +72,8 @@ public final class TomcatRuntimeProvider implements RuntimeProvider {
         TomcatConfigSupport.displayPortDetails(config, foreground, "external Tomcat");
 
         // Ensure Lucee JAR is available (cached in ~/.lucli/jars/)
-        String variant = (rt.variant != null && !rt.variant.isEmpty()) ? rt.variant : "standard";
-        Path luceeJar = manager.ensureLuceeJar(config.version, variant);
+        String variant = LuceeServerConfig.getLuceeVariant(config);
+        Path luceeJar = manager.ensureLuceeJar(luceeVersion, variant);
 
         // Create CATALINA_BASE (server instance directory)
         Path serverInstanceDir = manager.getServersDir().resolve(config.name);
@@ -82,7 +83,7 @@ public final class TomcatRuntimeProvider implements RuntimeProvider {
         Files.createDirectories(serverInstanceDir);
 
         // Deploy Lucee JAR to CATALINA_BASE/lib (not CATALINA_HOME - we don't touch external Tomcat)
-        deployLuceeJarToServerInstance(luceeJar, serverInstanceDir, config.version, variant);
+        deployLuceeJarToServerInstance(luceeJar, serverInstanceDir, luceeVersion, variant);
 
         // Generate Tomcat configuration for CATALINA_BASE
         CatalinaBaseConfigGenerator configGenerator = new CatalinaBaseConfigGenerator();
@@ -241,7 +242,7 @@ public final class TomcatRuntimeProvider implements RuntimeProvider {
                     "Tomcat 10+ uses jakarta.servlet (Jakarta EE), but Lucee " + luceeMajorVersion + ".x uses javax.servlet (Java EE).\n\n" +
                     "Solutions:\n" +
                     "  1. Use Lucee 7.x with Tomcat " + tomcatMajorVersion + " (recommended)\n" +
-                    "     Update lucee.json: \"version\": \"7.0.1.100-RC\"\n\n" +
+                    "     Update lucee.json: \"lucee\": { \"version\": \"7.0.1.100-RC\" }\n\n" +
                     "  2. Use Tomcat 9.x with Lucee " + luceeVersion + "\n" +
                     "     Update lucee.json: \"runtime\": { \"catalinaHome\": \"/path/to/tomcat9\" }");
         }
@@ -255,7 +256,7 @@ public final class TomcatRuntimeProvider implements RuntimeProvider {
                     "  1. Use Tomcat 10+ with Lucee 7.x (recommended)\n" +
                     "     Update lucee.json: \"runtime\": { \"catalinaHome\": \"/path/to/tomcat10\" }\n\n" +
                     "  2. Use Lucee 6.x with Tomcat " + tomcatMajorVersion + "\n" +
-                    "     Update lucee.json: \"version\": \"6.2.2.91\"");
+                    "     Update lucee.json: \"lucee\": { \"version\": \"6.2.2.91\" }");
         }
 
         System.out.println("✓ Lucee " + luceeMajorVersion + ".x is compatible with Tomcat " + tomcatMajorVersion + ".x");

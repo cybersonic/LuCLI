@@ -359,7 +359,7 @@ public class ServerCommandHandler {
             result.append("     - ").append(effectiveWebroot.resolve("WEB-INF").resolve("web.xml")).append("\n");
 
             if (finalConfig.enableLucee && finalConfig.urlRewrite != null && finalConfig.urlRewrite.enabled) {
-                result.append("     - ").append(effectiveWebroot.resolve("WEB-INF").resolve("urlrewrite.xml")).append("\n");
+                result.append("     - ").append(serverInstanceDir.resolve("conf/Catalina/localhost/rewrite.config")).append("\n");
             }
             if (LuceeServerConfig.isHttpsEnabled(finalConfig)) {
                 Path certsDir = serverInstanceDir.resolve("certs");
@@ -577,7 +577,7 @@ public class ServerCommandHandler {
             if (!configFileExisted && versionOverride != null && !versionOverride.trim().isEmpty()) {
                 try {
                     LuceeServerConfig.ServerConfig persistedConfig = LuceeServerConfig.loadConfig(projectDir, cfgFile);
-                    persistedConfig.version = versionOverride.trim();
+                    LuceeServerConfig.setLuceeVersion(persistedConfig, versionOverride.trim());
                     LuceeServerConfig.saveConfig(persistedConfig, cfgPath);
                 } catch (IOException e) {
                     System.err.println("Warning: Failed to persist Lucee version override to " + cfgFile + ": " + e.getMessage());
@@ -590,23 +590,23 @@ public class ServerCommandHandler {
             if (configFileExisted && versionOverride != null && !versionOverride.trim().isEmpty()) {
                 try {
                     LuceeServerConfig.ServerConfig persistedConfig = LuceeServerConfig.loadConfig(projectDir, cfgFile);
-                    String existingVersion = persistedConfig.version;
+                    String existingVersion = LuceeServerConfig.getLuceeVersion(persistedConfig);
                     String requestedVersion = versionOverride.trim();
                     if (existingVersion != null && !existingVersion.equals(requestedVersion)) {
                         // Only prompt in CLI mode with an interactive console; in terminal
                         // mode we leave lucee.json unchanged to avoid blocking.
                         if (!isTerminalMode && System.console() != null) {
                             System.out.print(
-                                "⚠️  lucee.json version (" + existingVersion +
+                                "⚠️  lucee.json Lucee version (" + existingVersion +
                                 ") differs from requested --version (" + requestedVersion + ").\n" +
                                 "Update lucee.json to " + requestedVersion + "? (y/N): "
                             );
                             java.util.Scanner scanner = new java.util.Scanner(System.in);
                             String response = scanner.nextLine().trim().toLowerCase();
                             if ("y".equals(response) || "yes".equals(response)) {
-                                persistedConfig.version = requestedVersion;
+                                LuceeServerConfig.setLuceeVersion(persistedConfig, requestedVersion);
                                 LuceeServerConfig.saveConfig(persistedConfig, cfgPath);
-                                result.append("   Updated lucee.json version from ")
+                                result.append("   Updated lucee.json Lucee version from ")
                                       .append(existingVersion)
                                       .append(" to ")
                                       .append(requestedVersion)
@@ -1075,16 +1075,29 @@ public class ServerCommandHandler {
 
     private String handleServerStop(LuceeServerManager serverManager, String[] args) throws Exception {
         String serverName = null;
+        String configFileName = null;
         boolean stopAll = false;
         
-        // Parse --name and --all flags (skip "stop")
+        // Parse --name, --config, and --all flags (skip "stop")
         for (int i = 1; i < args.length; i++) {
             if ((args[i].equals("--name") || args[i].equals("-n")) && i + 1 < args.length) {
                 serverName = args[i + 1];
-                break;
+                i++;
+            } else if ((args[i].equals("--config") || args[i].equals("-c")) && i + 1 < args.length) {
+                configFileName = args[i + 1];
+                i++;
             } else if (args[i].equals("--all")) {
                 stopAll = true;
-                break;
+            }
+        }
+        
+        // If --config was provided (and no explicit --name), resolve the server name from the config file
+        if (serverName == null && configFileName != null && !stopAll) {
+            try {
+                LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(currentWorkingDirectory, configFileName);
+                serverName = config.name;
+            } catch (Exception e) {
+                return formatOutput("❌ Failed to load config file '" + configFileName + "': " + e.getMessage(), true);
             }
         }
         
@@ -1292,7 +1305,7 @@ public class ServerCommandHandler {
             result.append("   Environment:   ").append(environment.trim()).append("\n");
         }
         result.append("   Lucee Enabled: ").append(config.enableLucee ? "yes" : "no").append("\n");
-        result.append("   Lucee Version: ").append(config.version).append("\n");
+        result.append("   Lucee Version: ").append(LuceeServerConfig.getLuceeVersion(config)).append("\n");
 
         // Expected server directory for this configuration
         Path serverDir = serverManager.getServersDir().resolve(config.name);

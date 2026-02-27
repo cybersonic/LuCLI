@@ -554,18 +554,14 @@ private static ModuleOptions parseArguments(String[] args) {
      */
     private static void runModule(String moduleName, String[] moduleArgs) throws Exception {
         if (moduleName == null || moduleName.trim().isEmpty()) {
-            System.err.println("Module name is required for run command.");
-            System.exit(1);
+            throw new IllegalArgumentException("Module name is required for run command.");
         }
         
         Path modulesDir = getModulesDirectory();
         Path moduleDir = modulesDir.resolve(moduleName);
         
         if (!Files.exists(moduleDir)) {
-            System.err.println("Module '" + moduleName + "' not found.");
-            System.err.println("Available modules:");
-            listModules();
-            System.exit(1);
+            throw new IllegalArgumentException("Module '" + moduleName + "' not found. Run 'lucli modules list' to see available modules.");
         }
         
         // Look for Module.cfc first
@@ -575,8 +571,7 @@ private static ModuleOptions parseArguments(String[] args) {
             LuceeScriptEngine engine = LuceeScriptEngine.getInstance();
             engine.executeModule(moduleName, moduleArgs != null ? moduleArgs : new String[0]);
         } else {
-            System.err.println("Module '" + moduleName + "' does not have a Module.cfc file.");
-            System.exit(1);
+            throw new IllegalArgumentException("Module '" + moduleName + "' does not have a Module.cfc file.");
         }
     }
     
@@ -1001,13 +996,8 @@ public static void installModule(String moduleName, String gitUrl, boolean force
     /**
      * Execute a module by name with arguments (public method for LuCLI main)
      */
-    public static void executeModuleByName(String moduleName, String[] moduleArgs) {
-        try {
-            runModule(moduleName, moduleArgs);
-        } catch (Exception e) {
-            System.err.println("Error executing module '" + moduleName + "': " + e.getMessage());
-            System.exit(1);
-        }
+    public static void executeModuleByName(String moduleName, String[] moduleArgs) throws Exception {
+        runModule(moduleName, moduleArgs);
     }
     
 /**

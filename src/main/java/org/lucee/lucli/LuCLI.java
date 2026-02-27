@@ -140,6 +140,13 @@ public class LuCLI implements Callable<Integer> {
     )
     private String envOption;
 
+    @Option(
+        names = {"--envfile"},
+        paramLabel = "<path>",
+        description = "Load environment variables from a file (e.g., .env) before script execution"
+    )
+    private String envFileOption;
+
     @Parameters(
         index = "0",
         arity = "0..1",
@@ -148,12 +155,7 @@ public class LuCLI implements Callable<Integer> {
     )
     private String firstArg;
 
-    @Parameters(
-        index = "1..*",
-        arity = "0..*",
-        paramLabel = "ARGS",
-        description = "Additional arguments to pass to the file or module"
-    )
+    @picocli.CommandLine.Unmatched
     private String[] additionalArgs = new String[0];
 
     @Spec
@@ -168,6 +170,7 @@ public class LuCLI implements Callable<Integer> {
     public static boolean timing = false;
     public static boolean preserveWhitespace = false;
     public static String currentEnvironment = null;
+    public static String envFilePath = null;
     private static boolean lucliScript = false;
     
     public static Map<String, String> scriptEnvironment = new HashMap<>(System.getenv());
@@ -227,6 +230,11 @@ public class LuCLI implements Callable<Integer> {
             if (luceeVersionRequested) {
                 showLuceeVersionNonInteractive();
                 return 0;
+            }
+
+            // Pre-load environment file if --envfile was specified
+            if (envFileOption != null && !envFileOption.trim().isEmpty()) {
+                loadEnvFileIntoScript(Paths.get(envFileOption), null);
             }
 
             // No argument provided - start interactive terminal
@@ -371,6 +379,10 @@ public class LuCLI implements Callable<Integer> {
         return envOption;
     }
     
+    public String getEnvFileOption() {
+        return envFileOption;
+    }
+    
     /**
      * Get the current execution environment.
      * Resolution order: --env flag > LUCLI_ENV environment variable > null
@@ -397,6 +409,23 @@ public class LuCLI implements Callable<Integer> {
     // ====================
 
     public static void main(String[] args) throws Exception {
+        // Suppress JLine "Unable to create a system terminal" warning
+        java.util.logging.Logger.getLogger("org.jline").setLevel(java.util.logging.Level.SEVERE);
+
+        int exitCode = executeInProcess(args);
+        System.exit(exitCode);
+    }
+
+    /**
+     * Execute LuCLI commands in-process without calling System.exit().
+     * This is meant for use by modules or embedded callers that need to
+     * invoke LuCLI commands within an existing JVM session (e.g. from
+     * BaseModule.executeCommand() or the interactive terminal).
+     *
+     * @param args command line arguments
+     * @return exit code (0 for success)
+     */
+    public static int executeInProcess(String[] args) throws Exception {
         // Suppress JLine "Unable to create a system terminal" warning
         java.util.logging.Logger.getLogger("org.jline").setLevel(java.util.logging.Level.SEVERE);
 
@@ -431,7 +460,7 @@ public class LuCLI implements Callable<Integer> {
         // Print timing results if enabled
         Timer.printResults();
         
-        System.exit(exitCode);
+        return exitCode;
     }
     
     /**
@@ -676,6 +705,93 @@ public class LuCLI implements Callable<Integer> {
     public static boolean isLucliScript() {
         return lucliScript;
     }
+
+    // ====================
+    // Env File Loading
+    // ====================
+
+    /**
+     * Parse a .env-style file and return its contents as a Map.
+     * Supports KEY=VALUE format, comments (#), blank lines, and
+     * both single- and double-quoted values.
+     *
+     * @param envFilePath Absolute or relative path to the env file
+     * @return Map of key-value pairs parsed from the file
+     * @throws java.io.IOException if the file cannot be read
+     */
+    public static Map<String, String> loadEnvFileToMap(Path envFilePath) throws java.io.IOException {
+        Map<String, String> result = new HashMap<>();
+        if (envFilePath == null || !Files.exists(envFilePath)) {
+            return result;
+        }
+
+        java.util.List<String> lines = Files.readAllLines(envFilePath, java.nio.charset.StandardCharsets.UTF_8);
+        for (String rawLine : lines) {
+            String line = rawLine.trim();
+
+            // Skip empty lines and comments
+            if (line.isEmpty() || line.startsWith("#")) {
+                continue;
+            }
+
+            // Parse KEY=VALUE
+            int equalIndex = line.indexOf('=');
+            if (equalIndex <= 0) {
+                continue; // Invalid line, skip
+            }
+
+            String key = line.substring(0, equalIndex).trim();
+            String value = line.substring(equalIndex + 1).trim();
+
+            // Remove surrounding quotes if present
+            if (value.length() >= 2) {
+                char first = value.charAt(0);
+                char last = value.charAt(value.length() - 1);
+                if ((first == '"' && last == '"') || (first == '\'' && last == '\'')) {
+                    value = value.substring(1, value.length() - 1);
+                }
+            }
+
+            result.put(key, value);
+        }
+        return result;
+    }
+
+    /**
+     * Load a .env-style file and inject all variables into
+     * {@link #scriptEnvironment} and {@link StringOutput} placeholders.
+     *
+     * @param filePath  Path to the env file (absolute or relative)
+     * @param resolveDir If non-null and filePath is relative, resolve against this directory;
+     *                   if null, resolve against the current working directory
+     */
+    public static void loadEnvFileIntoScript(Path filePath, Path resolveDir) {
+        Path resolved = filePath;
+        if (!filePath.isAbsolute()) {
+            if (resolveDir != null) {
+                resolved = resolveDir.resolve(filePath);
+            } else {
+                resolved = Paths.get(System.getProperty("user.dir")).resolve(filePath);
+            }
+        }
+
+        if (!Files.exists(resolved)) {
+            StringOutput.Quick.error("source: file not found: " + resolved);
+            return;
+        }
+
+        try {
+            Map<String, String> vars = loadEnvFileToMap(resolved);
+            StringOutput stringOutput = StringOutput.getInstance();
+            for (Map.Entry<String, String> entry : vars.entrySet()) {
+                scriptEnvironment.put(entry.getKey(), entry.getValue());
+                stringOutput.addPlaceholder(entry.getKey(), entry.getValue());
+            }
+            verbose("Loaded " + vars.size() + " variable(s) from " + resolved);
+        } catch (java.io.IOException e) {
+            StringOutput.Quick.error("source: could not read file: " + resolved + " (" + e.getMessage() + ")");
+        }
+    }
     
     /**
      * Record a command result string into the .lucli result history.
@@ -833,6 +949,12 @@ public class LuCLI implements Callable<Integer> {
             verbose("Executing with environment: " + env);
         }
 
+        // Pre-load --envfile if specified (covers the RunCommand path)
+        if (envFilePath != null && !envFilePath.trim().isEmpty()) {
+            Path scriptDir = path.toAbsolutePath().getParent();
+            loadEnvFileIntoScript(Paths.get(envFilePath), scriptDir);
+        }
+
         // Read all lines from the script file
         java.util.List<String> lines = Files.readAllLines(path, java.nio.charset.StandardCharsets.UTF_8);
         if (lines.isEmpty()) {
@@ -905,6 +1027,24 @@ public class LuCLI implements Callable<Integer> {
                 return exitCode;
             }
             
+            // Handle "source <file>" directive — load env file into script environment
+            if (trimmed.toLowerCase().startsWith("source ")) {
+                String sourceArg = trimmed.substring(7).trim();
+                // Strip surrounding quotes
+                if (sourceArg.length() >= 2) {
+                    char fc = sourceArg.charAt(0);
+                    char lc = sourceArg.charAt(sourceArg.length() - 1);
+                    if ((fc == '"' && lc == '"') || (fc == '\'' && lc == '\'')) {
+                        sourceArg = sourceArg.substring(1, sourceArg.length() - 1);
+                    }
+                }
+                // Resolve placeholders in the path (e.g. source ${CONFIG_DIR}/.env)
+                sourceArg = stringOutput.process(sourceArg);
+                // Resolve relative to the script's directory
+                Path scriptDir = path.toAbsolutePath().getParent();
+                loadEnvFileIntoScript(Paths.get(sourceArg), scriptDir);
+                continue;
+            }
 
             // Check if this is a SET directive (case-insensitive)
             if (trimmed.toLowerCase().startsWith("set ")) {
@@ -1302,7 +1442,7 @@ public class LuCLI implements Callable<Integer> {
                     if (captured != null && !captured.isEmpty()) {
                         recordLucliResult(captured);
                     }
-                    return "";
+                    return captured;
                 } else {
                     picocli.execute(parts);
                     return "";

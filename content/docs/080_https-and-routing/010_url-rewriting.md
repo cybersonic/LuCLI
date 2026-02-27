@@ -30,7 +30,9 @@ Create or update your `lucee.json` file in your project root:
 ```json
 {
   "name": "my-awesome-app",
-  "version": "6.2.2.91",
+  "lucee": {
+    "version": "6.2.2.91"
+  },
   "port": 8080,
   "urlRewrite": {
     "enabled": true,
@@ -399,27 +401,36 @@ application.myFramework.handleRoute(route);
 
 ### Custom URL Patterns
 
-LuCLI uses the powerful **tuckey URLRewriteFilter** under the hood. While basic configuration is handled through `lucee.json`, you can customize the URL rewrite rules by understanding the generated configuration.
+LuCLI uses Tomcat's built-in **RewriteValve** for URL rewriting. The rules use Apache `mod_rewrite` syntax and are deployed to the Tomcat Host level at `conf/Catalina/<hostName>/rewrite.config`. While basic configuration is handled through `lucee.json`, you can understand the generated rules below.
 
 #### Generated Rules (Framework-Style)
 
-When you enable framework-style routing, LuCLI generates rules similar to:
+When you enable framework-style routing, LuCLI generates a `rewrite.config` file with rules similar to:
 
-```xml
-<rule>
-    <name>Framework Router</name>
-    <condition type="request-uri" operator="notequal">^/index.cfm/.*$</condition>
-    <condition type="request-uri" operator="notequal">^/index.cfm$</condition>
-    <condition type="request-uri" operator="notequal">^/(images|css|js|fonts|assets|static)/.*$</condition>
-    <condition type="request-uri" operator="notequal">\.(css|js|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot|pdf|zip|json|xml|txt|map)$</condition>
-    <condition type="request-uri" operator="notequal">^/lucee/.*$</condition>
-    <condition type="request-uri" operator="notequal">\.(cfm|cfc|cfml)$</condition>
-    <condition type="request-filename" operator="notfile"/>
-    <condition type="request-filename" operator="notdir"/>
-    <from>^/(.*)$</from>
-    <to type="forward">/index.cfm/$1</to>
-</rule>
+```apache
+# Don't rewrite if accessing the router file directly
+RewriteCond %{REQUEST_URI} !^/index.cfm
+
+# Don't rewrite static resource directories
+RewriteCond %{REQUEST_URI} !^/(images|css|js|fonts|assets|static)/
+
+# Don't rewrite static file extensions
+RewriteCond %{REQUEST_URI} !\.(css|js|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot|pdf|zip|json|xml|txt|map)$
+
+# Don't rewrite Lucee admin
+RewriteCond %{REQUEST_URI} !^/lucee
+
+# Don't rewrite REST paths
+RewriteCond %{REQUEST_URI} !^/rest/
+
+# Don't rewrite CFML files accessed directly
+RewriteCond %{REQUEST_URI} !\.(cfm|cfc|cfml)$
+
+# Route everything else through the router file
+RewriteRule ^/(.*)$ /index.cfm/$1 [L]
 ```
+
+These rules use standard Apache `mod_rewrite` syntax. For full syntax documentation, see the [Tomcat Rewrite documentation](https://tomcat.apache.org/tomcat-9.0-doc/rewrite.html).
 
 ### Static Resource Exclusions
 
@@ -558,20 +569,17 @@ Test with: `http://localhost:8080/tests/path?debug=1`
 
 #### 2. Check URL Rewrite Status
 
-Look for URL rewrite filter in server startup logs:
+Look for RewriteValve in server startup logs:
 ```bash
-lucli server log --name your-server | grep -i urlrewrite
+lucli server log --name your-server | grep -i rewrite
 ```
 
 #### 3. Verify Configuration Deployment
 
-Check that URL rewrite files were deployed:
+Check that the rewrite config was deployed to the Host level:
 ```bash
-# Check for URL rewrite filter JAR
-ls ~/.lucli/servers/your-server/webapps/ROOT/WEB-INF/lib/urlrewritefilter-*.jar
-
-# Check for configuration file  
-cat ~/.lucli/servers/your-server/webapps/ROOT/WEB-INF/urlrewrite.xml
+# Check for rewrite.config at the Tomcat Host level
+cat ~/.lucli/servers/your-server/conf/Catalina/localhost/rewrite.config
 ```
 
 ## Examples
@@ -885,6 +893,48 @@ page = arrayLen(segments) > 0 ? segments[1] : "home";
 - `/en/about` → English about page
 - `/es/acerca` → Spanish about page  
 - `/fr/a-propos` → French about page
+
+---
+
+## Migration from urlrewrite.xml (Tuckey UrlRewriteFilter)
+
+> **⚠️ Deprecation Notice:** The Tuckey UrlRewriteFilter (`urlrewrite.xml`) has been replaced by Tomcat's built-in RewriteValve. If your project has a `urlrewrite.xml` file, LuCLI will display a warning at server startup. You should migrate to the new `rewrite.config` format.
+
+### Why the Change?
+
+- **Cross-version compatibility:** RewriteValve works across all Tomcat versions (8–11) with no javax/jakarta servlet API issues.
+- **No external JAR:** The Tuckey filter required downloading a separate JAR file into `WEB-INF/lib/`. RewriteValve is built into Tomcat.
+- **Cleaner project structure:** Rules are no longer placed inside `WEB-INF/` in your webroot.
+
+### Migration Steps
+
+1. **Remove** `urlrewrite.xml` from your project's `WEB-INF/` directory.
+2. **Update** `lucee.json` — the `configFile` default is now `rewrite.config`. You can remove `configFile` from your config or set it explicitly:
+   ```json
+   {
+     "urlRewrite": {
+       "enabled": true,
+       "routerFile": "index.cfm"
+     }
+   }
+   ```
+3. **Restart** your server with `lucli server restart`. LuCLI will automatically generate the appropriate `rewrite.config` with `mod_rewrite` syntax rules.
+4. If you had **custom rewrite rules** in `urlrewrite.xml`, translate them to Apache `mod_rewrite` syntax. See the [Tomcat Rewrite documentation](https://tomcat.apache.org/tomcat-9.0-doc/rewrite.html) for syntax reference.
+
+### Syntax Comparison
+
+The old Tuckey XML format:
+```xml
+<rule>
+    <from>^/(.*)$</from>
+    <to type="forward">/index.cfm/$1</to>
+</rule>
+```
+
+The new `mod_rewrite` format:
+```apache
+RewriteRule ^/(.*)$ /index.cfm/$1 [L]
+```
 
 ---
 
