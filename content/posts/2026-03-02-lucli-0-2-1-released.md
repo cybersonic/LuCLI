@@ -2,7 +2,7 @@
 title: Lucli 0.2.1 Released
 layout: post
 date: 2026-03-02
-draft: true
+draft: false
 permalink: lucli-0-2-1-released
 categories: lucli
 ---
