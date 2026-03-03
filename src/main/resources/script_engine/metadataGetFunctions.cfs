@@ -1,16 +1,62 @@
-// Gets the functions metadata for a module
-    md =  getComponentMetadata(componentPackage);
-    metadata = md.functions.filter(function(item){
-        if(item.name == "init"){
-            return false;
+// Gets the functions metadata for a module/component.
+// This is used by Java (LuceeScriptEngine.getComponentMetadata) to provide a
+// lightweight, structured view of module commands.
+//
+// Important: keep `name` at the top-level so any existing callers that only
+// care about the function name (e.g. completion) keep working.
+
+md = getComponentMetadata(componentPackage);
+
+// Match BaseModule.showHelp() semantics: exclude internal helper methods.
+// (We keep this list here so that the structured metadata matches what a user
+// would see in help output.)
+internalFunctions = [
+    "init",
+    "showhelp",
+    "out",
+    "err",
+    "getenv",
+    "verbose",
+    "getabsolutepath",
+    "executecommand",
+    "version"
+];
+
+metadata = (md.functions ?: []).filter(function(fn) {
+    if (!structKeyExists(fn, "access") || fn.access != "public") {
+        return false;
+    }
+    if (!structKeyExists(fn, "name")) {
+        return false;
+    }
+    return !arrayFindNoCase(internalFunctions, fn.name);
+});
+
+metadata = metadata.map(function(fn) {
+    var params = fn.parameters ?: [];
+
+    // Normalize parameter metadata to a JSON-friendly struct.
+    var normParams = params.map(function(p) {
+        var out = {
+            "name": lcase(p.name ?: ""),
+            "type": (structKeyExists(p, "type") ? p.type : "any"),
+            "required": (structKeyExists(p, "required") ? p.required : false),
+            "hint": (structKeyExists(p, "hint") ? p.hint : "")
+        };
+
+        // Only include defaults when they exist; helps build MCP schemas.
+        if (structKeyExists(p, "default")) {
+            out["default"] = p.default;
         }
-        return item.access == "public";
+
+        return out;
     });
 
-    metadata = metadata.map(function(item){
-        return {
-            "name": item.name,
-            "arguments": item.parameters,
-            "access": item.access
-        };
-    });
+    return {
+        "name": lcase(fn.name),
+        "hint": (structKeyExists(fn, "hint") ? fn.hint : ""),
+        "returnType": (structKeyExists(fn, "returnType") ? fn.returnType : ""),
+        "access": fn.access,
+        "parameters": normParams
+    };
+});

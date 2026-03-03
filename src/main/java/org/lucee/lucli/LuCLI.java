@@ -19,6 +19,7 @@ import org.lucee.lucli.cli.LuCLIVersionProvider;
 import org.lucee.lucli.cli.commands.CfmlCommand;
 import org.lucee.lucli.cli.commands.CompletionCommand;
 import org.lucee.lucli.cli.commands.DaemonCommand;
+import org.lucee.lucli.cli.commands.McpCommand;
 import org.lucee.lucli.cli.commands.modules.ModulesCommand;
 import org.lucee.lucli.cli.commands.ParrotCommand;
 import org.lucee.lucli.cli.commands.ReplCommand;
@@ -67,6 +68,7 @@ import picocli.CommandLine.Spec;
         CommandLine.HelpCommand.class,
         RunCommand.class,
         DaemonCommand.class,
+        McpCommand.class,
         // Hidden/internal diagnostics
         XmlCommand.class,
         XSetCommand.class,
