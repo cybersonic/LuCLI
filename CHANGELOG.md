@@ -3,6 +3,9 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+ - **Windows Bat File fixes**
+
+## 0.2.1
 
 - **URL Rewriting: Migrated to Tomcat RewriteValve:** Replaced the Tuckey UrlRewriteFilter (`urlrewrite.xml`) with Tomcat's built-in RewriteValve (`rewrite.config`). This eliminates javax/jakarta servlet API compatibility issues across Tomcat versions and removes the need for an external JAR. Rewrite rules now use Apache `mod_rewrite` syntax and are placed at the Host level (`conf/Catalina/<host>/rewrite.config`) instead of inside `WEB-INF/`. When both HTTPS redirect and URL rewriting are enabled, rules are combined into a single `rewrite.config` file.
 - **⚠️ Deprecation: `urlrewrite.xml`:** Existing projects using `urlrewrite.xml` will see a warning at server startup. Migrate your rewrite rules to the new `rewrite.config` format (Apache `mod_rewrite` syntax). See the updated [URL Rewriting documentation](content/docs/080_https-and-routing/010_url-rewriting.md).

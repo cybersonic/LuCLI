@@ -8,7 +8,7 @@
   "collections": {
     "posts": {
       "permalink": "/posts/:slug/",
-      "path": "content/posts",
+      "path": "posts",
       "layout": "post",
       "feed": {
         "enabled": true,
