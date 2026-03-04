@@ -382,37 +382,78 @@ lucli cleaner /tmp/cache --force
 lucli cleaner report format=json
 ```
 
-## Accessing environment and filesystem
+## Declaring env and secret requirements
 
-`modules.BaseModule` also provides helpers you can use from any module:
+Modules should declare runtime inputs in `module.json` so users can review and approve access during install/update.
+
+```json
+{
+  "permissions": {
+    "env": [
+      { "alias": "BITBUCKET_WORKSPACE", "required": true, "description": "Bitbucket workspace" }
+    ],
+    "secrets": [
+      { "alias": "BITBUCKET_AUTH_TOKEN", "required": true, "description": "Bitbucket API token" }
+    ]
+  }
+}
+```
+
+Shortcut arrays are also supported:
+
+- `envVars: ["BITBUCKET_WORKSPACE"]`
+- `secrets: ["BITBUCKET_AUTH_TOKEN"]`
+
+These are treated as required aliases.
+
+## Accessing environment, secrets, and filesystem
+
+`modules.BaseModule` provides helpers:
 
 - `getEnv(envKeyName, defaultValue="")`
-  - Looks in `server.env` and `SERVER.system.environment` for environment variables.
-  - Use this instead of `getEnvironmentVariable()` directly for consistency.
-
+  - Reads resolved module env aliases first, then compatibility env.
+- `getSecret(secretName, defaultValue="")`
+  - Reads resolved module secret aliases injected at runtime.
 - `getAbsolutePath(cwd, path)`
-  - Normalizes a (possibly relative) `path` against the module `cwd`.
+  - Normalizes a (possibly relative) `path` against module `cwd`.
 
-Example:
+### `.env.lucli` support
+
+When running modules, LuCLI loads `.env.lucli` from the current project directory.
+
+- Use plain values for non-sensitive inputs.
+- Use `#secret:NAME#` values for secret bindings.
+
+Example `.env.lucli`:
+
+```bash
+BITBUCKET_WORKSPACE=my-workspace
+BITBUCKET_REPO_SLUG=my-repo
+BITBUCKET_AUTH_TOKEN=#secret:bitbucket.authToken#
+```
+
+Example module code:
 
 ```cfml
 function main() {
-    var apiKey = getEnv("MY_API_KEY", "");
-    if (!len(apiKey)) {
-        err("Missing MY_API_KEY in environment");
+    var workspace = getEnv("BITBUCKET_WORKSPACE", "");
+    var token = getSecret("BITBUCKET_AUTH_TOKEN", "");
+    if (!len(token)) {
+        err("Missing BITBUCKET_AUTH_TOKEN secret");
         return;
     }
 
     var target = getAbsolutePath(variables.cwd, "./data/output.json");
-    verbose("Writing to " & target);
+    verbose("Workspace: " & workspace & ", writing to " & target);
 }
 ```
 
 ## Summary
 
 - Use `lucli modules init <name>` to scaffold a module under `~/.lucli/modules`.
-- Extend `modules.BaseModule` to get `out`, `err`, `verbose`, `getEnv`, and path helpers.
+- Extend `modules.BaseModule` to get `out`, `err`, `verbose`, `getEnv`, `getSecret`, and path helpers.
 - Let LuCLI manage `init()` unless you have special needs; otherwise, preserve its signature.
 - Use `variables.verboseEnabled` and `verbose()` for extra logging controlled by `--verbose`.
 - Use `variables.timingEnabled` and `variables.timer` to integrate with `--timing`.
+- Declare required `permissions.env` and `permissions.secrets` in `module.json`.
 - Implement `main()` and optional subcommand functions to handle your module’s behavior.

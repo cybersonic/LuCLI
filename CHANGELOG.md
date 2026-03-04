@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
  - **Windows Bat File fixes**
  - **MCP Server for Modules:** Added `lucli mcp <module>` to run a per-module MCP server over stdio, exposing a module’s public functions as MCP tools (with JSON schema-derived input). 
+ - **Module Runtime Permissions + Env/Secrets Resolution:**
+   - Added module metadata keys `permissions.env` and `permissions.secrets` to declare runtime env/secret aliases.
+   - Added shorthand compatibility arrays `envVars` and `secrets` (treated as required aliases).
+   - Added module runtime resolver with `.env.lucli` support and optional `.env` fallback (controlled by settings).
+   - Added support for `#secret:NAME#` resolution in module runtime values via LuCLI local secret store.
+   - Added strict-mode controls for module env exposure (`moduleRuntime.strictEnv`) and `.env` fallback (`moduleRuntime.allowDotEnvFallback`).
+   - Added install/update permission approval prompts and persisted grants under `modulePermissions` in settings.
+   - Extended BaseModule helpers to support injected context (`getEnv` precedence updates and new `getSecret` helper).
 
 ## 0.2.1
 

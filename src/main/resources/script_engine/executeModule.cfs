@@ -1,38 +1,72 @@
 
 // results = createObject("component", "modules.#moduleName#.Module").main(argumentCollection=__arguments);
 
+moduleEnvVars = isDefined("moduleEnvVars") ? moduleEnvVars : {};
+moduleSecrets = isDefined("moduleSecrets") ? moduleSecrets : {};
+moduleRuntimeContext = isDefined("moduleRuntimeContext") ? moduleRuntimeContext : {};
+
 server.env = __env;
+server.moduleEnvVars = moduleEnvVars;
+server.moduleSecrets = moduleSecrets;
+server.moduleRuntimeContext = moduleRuntimeContext;
+
 Timer.start("Execute Module Script");
 // systemOutput("executeModule: [#fileExists(expandPath( "/modules/#moduleName#/module.json" ))#]", true, false );
 
-// Setup the envuronment settings if they exists. 
-moduleConfigFilePath = expandPath( "/modules/#moduleName#/module.json" );
-if(fileExists( moduleConfigFilePath )){
-    moduleConfig = FileRead( moduleConfigFilePath );
-    moduleConfigStruct = deserializeJSON( moduleConfig );
-    if( structKeyExists( moduleConfigStruct, "configuration" ) ){
+// Setup the environment settings if they exist.
+moduleConfigStruct = {};
+moduleConfigFilePath = expandPath("/modules/#moduleName#/module.json");
+if (fileExists(moduleConfigFilePath)) {
+    moduleConfig = FileRead(moduleConfigFilePath);
+    moduleConfigStruct = deserializeJSON(moduleConfig);
+    if (structKeyExists(moduleConfigStruct, "configuration")) {
         // systemOutput("Importing module configuration for module: #moduleName#", true, false );
         configImport(
             data=moduleConfigStruct.configuration,
             password=request.SERVERADMINPASSWORD,
-            type="server",      
+            type="server",
             flushExistingData=false
-            );
+        );
     }
 
-    if(verbose){
+    if (verbose) {
         echo("Imported module configuration for module: #moduleName#");
     }
 }
 
+moduleComponent = createObject("component", "modules.#moduleName#.Module");
+baseInitArgs = {
+    verboseEnabled=verbose,
+    timingEnabled=timing,
+    cwd=__cwd,
+    timer=Timer,
+    moduleConfig=moduleConfigStruct
+};
+fullInitArgs = duplicate(baseInitArgs);
+fullInitArgs.envVars = moduleEnvVars;
+fullInitArgs.secrets = moduleSecrets;
+fullInitArgs.runtimeContext = moduleRuntimeContext;
+selectedInitArgs = duplicate(baseInitArgs);
 
-modules = createObject("component", "modules.#moduleName#.Module").init(
-        verboseEnabled=verbose,
-        timingEnabled=timing,
-        cwd=__cwd,
-        timer=Timer,
-        moduleConfig=moduleConfigStruct
-    );
+componentMeta = getMetadata(moduleComponent);
+if (structKeyExists(componentMeta, "functions")) {
+    for (fn in componentMeta.functions) {
+        if (lcase(fn.name) == "init" && structKeyExists(fn, "parameters")) {
+            selectedInitArgs = {};
+            for (param in fn.parameters) {
+                if (structKeyExists(fullInitArgs, param.name)) {
+                    selectedInitArgs[param.name] = fullInitArgs[param.name];
+                }
+            }
+        }
+    }
+}
+
+if (structKeyExists(moduleComponent, "init")) {
+    modules = moduleComponent.init(argumentCollection=selectedInitArgs);
+} else {
+    modules = moduleComponent;
+}
 
 results = modules[subcommand](argumentCollection=argCollection);
 Timer.stop("Execute Module Script");

@@ -51,10 +51,22 @@
       },
       "default": []
     },
+    "modulePermissions": {
+      "type": "object",
+      "description": "Per-module permission grants recorded during module install/update prompts.",
+      "additionalProperties": {
+        "$ref": "#/definitions/modulePermissionGrant"
+      },
+      "default": {}
+    },
     "configuration": {
       "type": "object",
       "description": "Global Lucee CFConfig-style configuration that LuCLI may merge into the embedded Lucee engine configuration at startup. The structure is expected to follow Lucee's .CFConfig.json format, but is not strictly validated here.",
       "additionalProperties": true
+    },
+    "moduleRuntime": {
+      "$ref": "#/definitions/moduleRuntime",
+      "description": "Runtime behavior controls for LuCLI module env and secret resolution."
     }
   },
   "definitions": {
@@ -123,6 +135,46 @@
         }
       },
       "required": ["url"]
+    },
+    "moduleRuntime": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "strictEnv": {
+          "type": "boolean",
+          "description": "When true, modules only receive declared permissions/env aliases instead of full ambient environment.",
+          "default": false
+        },
+        "allowDotEnvFallback": {
+          "type": "boolean",
+          "description": "When true, module runtime can read .env as a fallback when .env.lucli values are not present.",
+          "default": false
+        }
+      }
+    },
+    "modulePermissionGrant": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "env": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "secrets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "grantedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
     }
   }
 }

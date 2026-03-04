@@ -4,7 +4,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Scanner;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import org.lucee.lucli.LuCLI;
@@ -13,6 +17,7 @@ import org.lucee.lucli.StringOutput;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /**
@@ -74,6 +79,146 @@ public static void executeModule(String[] args) {
         }
         System.exit(1);
     }
+}
+
+private static void ensureModulePermissionsGranted(String moduleName, ModuleConfig config) throws IOException {
+    if (config == null || !config.hasDeclaredPermissions()) {
+        return;
+    }
+
+    List<String> requestedEnv = getPermissionAliases(config.getEnvPermissions());
+    List<String> requestedSecrets = getPermissionAliases(config.getSecretPermissions());
+    if (requestedEnv.isEmpty() && requestedSecrets.isEmpty()) {
+        return;
+    }
+
+    Path settingsFile = getSettingsFile();
+    ObjectMapper mapper = new ObjectMapper();
+    ObjectNode root = loadSettingsRoot(mapper, settingsFile);
+
+    ObjectNode modulePermissionsNode;
+    JsonNode modulePermissionsExisting = root.get("modulePermissions");
+    if (modulePermissionsExisting != null && modulePermissionsExisting.isObject()) {
+        modulePermissionsNode = (ObjectNode) modulePermissionsExisting;
+    } else {
+        modulePermissionsNode = mapper.createObjectNode();
+        root.set("modulePermissions", modulePermissionsNode);
+    }
+
+    ObjectNode currentGrant = null;
+    JsonNode currentGrantNode = modulePermissionsNode.get(moduleName);
+    if (currentGrantNode != null && currentGrantNode.isObject()) {
+        currentGrant = (ObjectNode) currentGrantNode;
+    }
+
+    Set<String> grantedEnv = readGrantAliases(currentGrant, "env");
+    Set<String> grantedSecrets = readGrantAliases(currentGrant, "secrets");
+
+    List<String> newlyRequestedEnv = new ArrayList<>();
+    for (String alias : requestedEnv) {
+        if (!grantedEnv.contains(alias)) {
+            newlyRequestedEnv.add(alias);
+        }
+    }
+
+    List<String> newlyRequestedSecrets = new ArrayList<>();
+    for (String alias : requestedSecrets) {
+        if (!grantedSecrets.contains(alias)) {
+            newlyRequestedSecrets.add(alias);
+        }
+    }
+
+    if (newlyRequestedEnv.isEmpty() && newlyRequestedSecrets.isEmpty()) {
+        return;
+    }
+
+    System.out.println("Module '" + moduleName + "' requests runtime permissions:");
+    if (!requestedEnv.isEmpty()) {
+        System.out.println("  Environment aliases: " + String.join(", ", requestedEnv));
+    }
+    if (!requestedSecrets.isEmpty()) {
+        System.out.println("  Secret aliases: " + String.join(", ", requestedSecrets));
+    }
+    if (!newlyRequestedEnv.isEmpty()) {
+        System.out.println("  New env aliases requiring approval: " + String.join(", ", newlyRequestedEnv));
+    }
+    if (!newlyRequestedSecrets.isEmpty()) {
+        System.out.println("  New secret aliases requiring approval: " + String.join(", ", newlyRequestedSecrets));
+    }
+
+    java.io.Console console = System.console();
+    if (console == null) {
+        throw new IOException("Cannot prompt for module permission approval in non-interactive mode for module '"
+            + moduleName + "'.");
+    }
+
+    String answer = console.readLine("Allow these permissions? (y/N): ");
+    if (answer == null || (!answer.trim().equalsIgnoreCase("y") && !answer.trim().equalsIgnoreCase("yes"))) {
+        throw new IOException("Permission approval denied for module '" + moduleName + "'.");
+    }
+
+    ObjectNode updatedGrant = mapper.createObjectNode();
+    ArrayNode envArray = mapper.createArrayNode();
+    for (String alias : requestedEnv) {
+        envArray.add(alias);
+    }
+    ArrayNode secretsArray = mapper.createArrayNode();
+    for (String alias : requestedSecrets) {
+        secretsArray.add(alias);
+    }
+    updatedGrant.set("env", envArray);
+    updatedGrant.set("secrets", secretsArray);
+    updatedGrant.put("grantedAt", java.time.Instant.now().toString());
+    modulePermissionsNode.set(moduleName, updatedGrant);
+
+    mapper.writerWithDefaultPrettyPrinter().writeValue(settingsFile.toFile(), root);
+}
+
+private static List<String> getPermissionAliases(List<ModuleConfig.PermissionRequirement> requirements) {
+    List<String> aliases = new ArrayList<>();
+    Set<String> seen = new HashSet<>();
+    for (ModuleConfig.PermissionRequirement requirement : requirements) {
+        String alias = requirement.getAlias();
+        if (alias == null || alias.isBlank() || seen.contains(alias)) {
+            continue;
+        }
+        seen.add(alias);
+        aliases.add(alias);
+    }
+    return aliases;
+}
+
+private static Set<String> readGrantAliases(ObjectNode grantNode, String field) {
+    Set<String> aliases = new HashSet<>();
+    if (grantNode == null) {
+        return aliases;
+    }
+    JsonNode fieldNode = grantNode.get(field);
+    if (fieldNode == null || !fieldNode.isArray()) {
+        return aliases;
+    }
+    for (JsonNode aliasNode : fieldNode) {
+        if (aliasNode.isTextual()) {
+            String alias = aliasNode.asText().trim();
+            if (!alias.isEmpty()) {
+                aliases.add(alias);
+            }
+        }
+    }
+    return aliases;
+}
+
+private static ObjectNode loadSettingsRoot(ObjectMapper mapper, Path settingsFile) throws IOException {
+    if (Files.exists(settingsFile)) {
+        String content = Files.readString(settingsFile);
+        if (content != null && !content.trim().isEmpty()) {
+            JsonNode existing = mapper.readTree(content);
+            if (existing != null && existing.isObject()) {
+                return (ObjectNode) existing;
+            }
+        }
+    }
+    return mapper.createObjectNode();
 }
     
     /**
@@ -671,6 +816,9 @@ public static void installModule(String moduleName, String gitUrl, boolean force
                 System.exit(1);
             }
 
+            ModuleConfig sourceConfig = ModuleConfig.load(sourceDir);
+            ensureModulePermissionsGranted(moduleName, sourceConfig);
+
             Path modulesDir = getModulesDirectory();
             Path targetDir = modulesDir.resolve(moduleName);
 
@@ -1041,23 +1189,7 @@ private static class ModuleSource {
 private static void persistModuleSource(String moduleName, String repository, String ref) throws IOException {
     Path settingsFile = getSettingsFile();
     ObjectMapper mapper = new ObjectMapper();
-    ObjectNode root;
-
-    if (Files.exists(settingsFile)) {
-        String content = Files.readString(settingsFile);
-        if (content == null || content.trim().isEmpty()) {
-            root = mapper.createObjectNode();
-        } else {
-            JsonNode existing = mapper.readTree(content);
-            if (existing != null && existing.isObject()) {
-                root = (ObjectNode) existing;
-            } else {
-                root = mapper.createObjectNode();
-            }
-        }
-    } else {
-        root = mapper.createObjectNode();
-    }
+    ObjectNode root = loadSettingsRoot(mapper, settingsFile);
 
     ObjectNode modulesNode;
     JsonNode modulesExisting = root.get("modules");

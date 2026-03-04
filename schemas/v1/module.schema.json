@@ -42,6 +42,67 @@
       "type": "string",
       "description": "Creation timestamp for the module (ISO-8601).",
       "format": "date-time"
+    },
+    "envVars": {
+      "type": "array",
+      "description": "Shortcut list of environment aliases required by this module.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "secrets": {
+      "type": "array",
+      "description": "Shortcut list of secret aliases required by this module.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "permissions": {
+      "type": "object",
+      "description": "Declared runtime inputs required by the module.",
+      "additionalProperties": false,
+      "properties": {
+        "env": {
+          "type": "array",
+          "description": "Environment values requested by the module.",
+          "items": {
+            "$ref": "#/definitions/permissionEntry"
+          },
+          "default": []
+        },
+        "secrets": {
+          "type": "array",
+          "description": "Secret values requested by the module.",
+          "items": {
+            "$ref": "#/definitions/permissionEntry"
+          },
+          "default": []
+        }
+      }
+    }
+  },
+  "definitions": {
+    "permissionEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "alias": {
+          "type": "string",
+          "description": "Stable alias used by module code."
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether this input is required at runtime.",
+          "default": false
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description shown during permission prompts."
+        }
+      },
+      "required": [
+        "alias"
+      ]
     }
   },
   "required": [

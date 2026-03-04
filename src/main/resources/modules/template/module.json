@@ -5,6 +5,12 @@
   "author": "Your Name",
   "license": "MIT",
   "keywords": ["lucli", "module", "cfml"],
+  "envVars": [],
+  "secrets": [],
+  "permissions": {
+    "env": [],
+    "secrets": []
+  },
   "main": "Module.cfc",
   "created": "{{TIMESTAMP}}"
 }

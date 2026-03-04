@@ -12,6 +12,8 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptException;
 
 import org.lucee.lucli.modules.ModuleCommand;
+import org.lucee.lucli.modules.ModuleConfig;
+import org.lucee.lucli.modules.ModuleRuntimeConfigResolver;
 
 import lucee.runtime.script.LuceeScriptEngineFactory;
 import lucee.runtime.type.Array;
@@ -316,7 +318,11 @@ public class LuceeScriptEngine {
         
             // Ensure shared BaseModule.cfc in ~/.lucli/modules matches this LuCLI version
             ensureBaseModuleUpToDate();
-            // setupModuleEnvironment(moduleName);
+            Path moduleDir = ModuleCommand.getModulesDirectory().resolve(moduleName);
+            ModuleConfig moduleConfig = ModuleConfig.load(moduleDir);
+            ModuleRuntimeConfigResolver resolver = ModuleRuntimeConfigResolver.fromSettings();
+            ModuleRuntimeConfigResolver.ResolutionResult runtimeResolution =
+                resolver.resolve(moduleName, moduleConfig, Paths.get(System.getProperty("user.dir")));
             
             String subCommand = "main";
             ParsedArguments parsedArgs = parseArguments(scriptArgs);
@@ -342,8 +348,12 @@ public class LuceeScriptEngine {
 
             // The setup will clear everything as it binds to ENGINE_SCOPE
             setupScriptContext(engine, moduleName, scriptArgs);
+            engine.put("__env", runtimeResolution.getServerEnv());
             engine.put("subCommand", subCommand);
             engine.put("moduleName", moduleName);
+            engine.put("moduleEnvVars", runtimeResolution.getEnvVars());
+            engine.put("moduleSecrets", runtimeResolution.getSecrets());
+            engine.put("moduleRuntimeContext", runtimeResolution.getRuntimeContext());
 
             // engine.put("args", Arrays.asList(scriptArgs));
             engine.put("argCollection", argsMap);
@@ -351,6 +361,12 @@ public class LuceeScriptEngine {
             engine.put("verbose", LuCLI.verbose);
             engine.put("timing", LuCLI.timing);
             engine.put("timer", Timer.getInstance());
+
+            if (isVerboseMode() || isDebugMode()) {
+                for (String warning : runtimeResolution.getWarnings()) {
+                    System.out.println("Module runtime warning: " + warning);
+                }
+            }
             
 
             String script = readScriptTemplate("/script_engine/executeModule.cfs");

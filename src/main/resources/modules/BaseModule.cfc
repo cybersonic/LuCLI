@@ -60,12 +60,18 @@ component {
         boolean timingEnabled=false,
         string cwd="",
         any timer,
-        Struct moduleConfig
+        Struct moduleConfig={},
+        Struct envVars={},
+        Struct secrets={},
+        Struct runtimeContext={}
         ) {
             variables.verboseEnabled = arguments.verboseEnabled;
             variables.timingEnabled = arguments.timingEnabled;
             variables.cwd = arguments.cwd;
             variables.moduleConfig = arguments.moduleConfig;
+            variables.envVars = arguments.envVars;
+            variables.secrets = arguments.secrets;
+            variables.runtimeContext = arguments.runtimeContext;
             variables.timer = arguments.timer ?: {
                 "start": function(){},
                 "stop": function(){}
@@ -120,7 +126,12 @@ component {
      * @defaultValue The default value to return if the env var is not set
      */
     function getEnv(String envKeyName, String defaultValue=""){
-        
+        if (structKeyExists(variables, "envVars") && structKeyExists(variables.envVars, envKeyName)) {
+            return variables.envVars[envKeyName];
+        }
+        if (structKeyExists(server, "moduleEnvVars") && structKeyExists(server.moduleEnvVars, envKeyName)) {
+            return server.moduleEnvVars[envKeyName];
+        }
         if(structKeyExists(server.env, envKeyName)){
             return server.env[envKeyName];
         }
@@ -128,6 +139,22 @@ component {
             return SERVER.system.environment[envKeyName];
         }
         
+        return defaultValue;
+    }
+
+    /**
+     * Get a secret value exposed to the module runtime.
+     *
+     * @secretName The secret alias declared by the module
+     * @defaultValue The value to return when the secret is unavailable
+     */
+    function getSecret(String secretName, String defaultValue=""){
+        if (structKeyExists(variables, "secrets") && structKeyExists(variables.secrets, secretName)) {
+            return variables.secrets[secretName];
+        }
+        if (structKeyExists(server, "moduleSecrets") && structKeyExists(server.moduleSecrets, secretName)) {
+            return server.moduleSecrets[secretName];
+        }
         return defaultValue;
     }
 
@@ -237,7 +264,7 @@ component {
         // Functions from BaseModule to exclude from command listing
         var internalFunctions = [
             "init", "showhelp", "out", "err", "getenv", "verbose",
-            "getabsolutepath", "executecommand", "version"
+            "getsecret", "getabsolutepath", "executecommand", "version"
         ];
 
         // Collect public command functions

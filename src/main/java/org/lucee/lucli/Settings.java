@@ -106,6 +106,11 @@ public class Settings {
         promptSettings.put("useColors", true);
         
         defaultSettings.set("prompt", promptSettings);
+
+        ObjectNode moduleRuntime = objectMapper.createObjectNode();
+        moduleRuntime.put("strictEnv", false);
+        moduleRuntime.put("allowDotEnvFallback", false);
+        defaultSettings.set("moduleRuntime", moduleRuntime);
         
         return defaultSettings;
     }

@@ -134,6 +134,25 @@ function main(required string year, string format="json", boolean force=false) {
 
 will be populated by any of the CLI forms shown above (`year=2025`, `--year=2025`, `--force`, etc.).
 
+## Module env and secrets resolution
+
+Module runtime can resolve declared env and secret aliases from project files and environment:
+
+1. Current process / LuCLI script environment
+2. `.env.lucli` in the current project
+3. Optional `.env` fallback (when enabled via module runtime settings)
+4. Secret store placeholders like `#secret:bitbucket.authToken#`
+
+Use `.env.lucli` for module-specific values and secret bindings:
+
+```bash
+BITBUCKET_WORKSPACE=my-workspace
+BITBUCKET_REPO_SLUG=my-repo
+BITBUCKET_AUTH_TOKEN=#secret:bitbucket.authToken#
+```
+
+For secret placeholders, LuCLI resolves values from the local encrypted secret store (`lucli secrets ...`) at module run time.
+
 ## Module Management
 
 ```bash

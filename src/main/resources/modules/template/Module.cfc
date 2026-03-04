@@ -11,13 +11,22 @@ component extends="modules.BaseModule" {
         verboseEnabled=false,
         timingEnabled=false,
         cwd="",
-        timer=nullValue()
+        timer=nullValue(),
+        moduleConfig={},
+        envVars={},
+        secrets={},
+        runtimeContext={}
         ) {
-            // Map CLI verbosity flag into module-scoped verbose flag
-            variables.verbose = arguments.verboseEnabled;
-            variables.timingEnabled = arguments.timingEnabled;
-            variables.cwd = arguments.cwd;
-            variables.timer = arguments.timer ?: {};
+        super.init(
+            verboseEnabled=arguments.verboseEnabled,
+            timingEnabled=arguments.timingEnabled,
+            cwd=arguments.cwd,
+            timer=arguments.timer,
+            moduleConfig=arguments.moduleConfig,
+            envVars=arguments.envVars,
+            secrets=arguments.secrets,
+            runtimeContext=arguments.runtimeContext
+        );
         // Module initialization code goes here
         return this;
     }
