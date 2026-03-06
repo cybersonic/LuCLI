@@ -6,24 +6,27 @@ rem #                                                                        #
 rem ##########################################################################
 
 rem Set default Java arguments
-if not defined LUCLI_JAVA_ARGS set LUCLI_JAVA_ARGS=-client
+if not defined LUCLI_JAVA_ARGS set "LUCLI_JAVA_ARGS=-client"
 
 rem ##########################################################################
 rem # JAVA DETERMINATION                                                     #
 rem ##########################################################################
 
-rem Default Java command
-set JAVA_CMD=java
 
-rem Check if JAVA_HOME is set
-if defined JAVA_HOME (
-    set JAVA_CMD=%JAVA_HOME%\bin\java
-)
+rem Resolve script directory
+set "SCRIPT_DIR=%~dp0"
 
-rem Check for embedded JRE (same directory as this script)
-for %%I in ("%~dp0.") do set SCRIPT_DIR=%%~fI
+rem Prefer embedded JRE
 if exist "%SCRIPT_DIR%\jre\bin\java.exe" (
-    set JAVA_CMD=%SCRIPT_DIR%\jre\bin\java
+    set "JAVA_CMD=%SCRIPT_DIR%\jre\bin\java.exe"
+) else (
+    rem Then JAVA_HOME
+    if defined JAVA_HOME (
+        set "JAVA_CMD=%JAVA_HOME%\bin\java.exe"
+    ) else (
+        rem Fallback to PATH
+        set "JAVA_CMD=java.exe"
+    )
 )
 
 rem ##########################################################################
