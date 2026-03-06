@@ -1,13 +1,13 @@
 package org.lucee.lucli.cli.commands;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 
 import org.lucee.lucli.StringOutput;
 import org.lucee.lucli.LuCLI;
+import org.lucee.lucli.paths.LucliPaths;
 import org.lucee.lucli.secrets.LocalSecretStore;
 import org.lucee.lucli.secrets.SecretStore;
 import org.lucee.lucli.secrets.SecretStoreException;
@@ -47,10 +47,7 @@ public class SecretsCommand implements Callable<Integer> {
     }
 
     static Path getDefaultStorePath() {
-        String home = System.getProperty("lucli.home");
-        if (home == null) home = System.getenv("LUCLI_HOME");
-        if (home == null) home = System.getProperty("user.home") + "/.lucli";
-        return Paths.get(home).resolve("secrets").resolve("local.json");
+        return LucliPaths.resolve().secretsStoreFile();
     }
 
     static char[] readPassphrase(char[] provided) throws Exception {

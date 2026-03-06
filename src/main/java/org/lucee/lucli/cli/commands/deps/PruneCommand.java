@@ -4,11 +4,11 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Comparator;
 import java.util.stream.Stream;
 
 import org.lucee.lucli.StringOutput;
+import org.lucee.lucli.paths.LucliPaths;
 
 import picocli.CommandLine.Command;
 
@@ -24,15 +24,7 @@ public class PruneCommand implements Runnable {
     @Override
     public void run() {
         try {
-            String lucliHome = System.getProperty("lucli.home");
-            if (lucliHome == null) {
-                lucliHome = System.getenv("LUCLI_HOME");
-            }
-            if (lucliHome == null) {
-                lucliHome = System.getProperty("user.home") + "/.lucli";
-            }
-
-            Path gitCacheDir = Paths.get(lucliHome, "deps", "git-cache");
+            Path gitCacheDir = LucliPaths.resolve().depsGitCacheDir();
 
             if (!Files.exists(gitCacheDir)) {
                 StringOutput.Quick.info("No git dependency cache found at " + gitCacheDir);

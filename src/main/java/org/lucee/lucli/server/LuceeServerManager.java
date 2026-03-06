@@ -24,6 +24,7 @@ import java.awt.GraphicsEnvironment;
 
 import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.deps.ExtensionDependencyInstaller;
+import org.lucee.lucli.paths.LucliPaths;
 import org.lucee.lucli.server.runtime.LuceeExpressRuntimeProvider;
 import org.lucee.lucli.server.runtime.RuntimeProvider;
 import org.lucee.lucli.server.runtime.TomcatRuntimeProvider;
@@ -103,15 +104,7 @@ public class LuceeServerManager {
      * Get the LuCLI home directory
      */
     private static Path getLucliHome() {
-        String lucliHomeStr = System.getProperty("lucli.home");
-        if (lucliHomeStr == null) {
-            lucliHomeStr = System.getenv("LUCLI_HOME");
-        }
-        if (lucliHomeStr == null) {
-            String userHome = System.getProperty("user.home");
-            lucliHomeStr = Paths.get(userHome, ".lucli").toString();
-        }
-        return Paths.get(lucliHomeStr);
+        return LucliPaths.resolve().home();
     }
     
 /**

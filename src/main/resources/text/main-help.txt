@@ -11,6 +11,7 @@ ${EMOJI_GEAR} Options:
 ${EMOJI_COMPUTER} Commands:
   terminal       Start interactive terminal (default if no command given)
   server         Manage Lucee server instances (start, stop, status, list)
+  system         Manage LuCLI system state (paths, clean, backup)
   modules        Manage LuCLI modules (list, init, run)
   lint           CFML code linting and analysis (analyze, rules, config)
   --version      Show application version
@@ -30,4 +31,8 @@ Examples:
   java -jar lucli.jar script.cfs arg1 arg2 # Execute CFML script with arguments
   java -jar lucli.jar my-module arg1 arg2 # Execute module 'my-module' with arguments
   java -jar lucli.jar modules run my-module arg1 # Alternative module execution
+  java -jar lucli.jar system paths          # Show resolved LuCLI home paths
+  java -jar lucli.jar system clean --all    # Preview safe cleanup targets
+  java -jar lucli.jar system backup create  # Create a LuCLI home backup
+  java -jar lucli.jar system backup prune --older-than 30d --keep 10  # Preview backup pruning
   LUCLI_HOME=/tmp/lucli java -jar lucli.jar --lucee-version # Use custom home directory

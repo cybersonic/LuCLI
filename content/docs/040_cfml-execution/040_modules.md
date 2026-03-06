@@ -161,12 +161,25 @@ lucli modules list
 
 # Create a new module from the template
 lucli modules init my-awesome-module
+# Add/install a known module by name
+lucli modules add bitbucket
+
+# Add/install pinned to a specific ref (branch/tag/commit)
+lucli modules add bitbucket --ref=v1.2.0
 
 # Install from a git/HTTP URL or known repository entry
 lucli modules install my-awesome-module --url=https://github.com/example/my-awesome-module.git
 
+# Install pinned to a specific tag/branch/ref (append #ref to URL)
+lucli modules install my-awesome-module --url=https://github.com/example/my-awesome-module.git#v1.2.0
+
+# Equivalent explicit ref form (same behavior as URL#ref)
+lucli modules install my-awesome-module --url=https://github.com/example/my-awesome-module.git --ref=v1.2.0
+
 # Update or uninstall a module
 lucli modules update my-awesome-module
+lucli modules update my-awesome-module --ref=main
+lucli modules update my-awesome-module --url=https://github.com/example/my-awesome-module.git#main
 lucli modules uninstall my-awesome-module
 
 # Get detailed help

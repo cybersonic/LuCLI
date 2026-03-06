@@ -20,6 +20,96 @@ These options work with any command:
 
 ## Commands
 
+### `lucli system`
+
+Manage LuCLI system-level state and maintenance tasks.
+
+**Usage:**
+```bash
+lucli system [OPTIONS] [COMMAND]
+```
+
+**Subcommands:**
+
+- **`paths`** - Print resolved LuCLI paths (`LUCLI_HOME`, `servers`, `modules`, `secrets`, etc.)
+- **`clean`** - Safely prune cache/backup artifacts (dry-run by default)
+- **`backup`** - Create, list, verify, and restore LuCLI backups
+
+#### `lucli system paths`
+
+Show the resolved system paths used by LuCLI.
+
+**Usage:**
+```bash
+lucli system paths [--json]
+```
+
+#### `lucli system clean`
+
+Safely prune cache and backup artifacts.
+
+**Usage:**
+```bash
+lucli system clean [--caches] [--backups] [--all] [--older-than 30d] [--force]
+```
+
+**Notes:**
+- Defaults to a dry-run preview unless `--force` is provided.
+- Never removes critical state like `servers/`, `modules/`, `secrets/`, or `settings.json`.
+
+#### `lucli system backup`
+
+Manage backup archives under `~/.lucli_backups` by default.
+
+**Usage:**
+```bash
+lucli system backup [COMMAND]
+```
+
+**Subcommands:**
+- **`create`** - Create a backup archive
+- **`list`** - List available backup archives
+- **`verify`** - Verify checksum integrity for a backup
+- **`prune`** - Prune old backups by retention policy (dry-run by default)
+- **`restore`** - Restore a backup (dry-run by default)
+
+#### `lucli system backup create`
+
+Create a backup archive for the current LuCLI home.
+
+**Usage:**
+```bash
+lucli system backup create [--name my-backup] [--exclude-caches] [--include-backups]
+```
+
+#### `lucli system backup verify`
+
+Verify backup checksum integrity.
+
+**Usage:**
+```bash
+lucli system backup verify [BACKUP]
+lucli system backup verify --all
+```
+
+#### `lucli system backup prune`
+
+Preview or apply backup retention pruning.
+
+**Usage:**
+```bash
+lucli system backup prune [--older-than 30d] [--keep 10] [--force]
+```
+
+#### `lucli system backup restore`
+
+Preview or apply restore from a backup archive.
+
+**Usage:**
+```bash
+lucli system backup restore [BACKUP] [--to /path/to/dir] [--force]
+```
+
 ### `lucli server`
 
 Manage Lucee server instances
@@ -383,8 +473,13 @@ lucli install [OPTIONS]
 
 | Option | Description |
 |--------|-------------|
-| `-u, --url` | Git URL to install from (e.g. https://github.com/user/repo.git[#ref]] |
+| `-u, --url` | Git URL to install from (e.g. https://github.com/user/repo.git[#ref]) |
 | `-f, --force` | Overwrite existing module if it already exists |
+**Examples:**
+```bash
+lucli modules install my-module --url=https://github.com/user/repo.git#v1.2.0
+lucli modules install my-module --url=https://github.com/user/repo.git#main
+```
 
 ---
 
@@ -412,8 +507,13 @@ lucli update [OPTIONS]
 
 | Option | Description |
 |--------|-------------|
-| `-u, --url` | Git URL to update from (e.g. https://github.com/user/repo.git[#ref]] |
+| `-u, --url` | Git URL to update from (e.g. https://github.com/user/repo.git[#ref]) |
 | `-f, --force` | Overwrite existing module if it already exists |
+**Examples:**
+```bash
+lucli modules update my-module --url=https://github.com/user/repo.git#v1.2.0
+lucli modules update my-module --url=https://github.com/user/repo.git#main --force
+```
 
 ---
 
@@ -490,7 +590,7 @@ lucli install [OPTIONS]
 
 | Option | Description |
 |--------|-------------|
-| `-u, --url` | Git URL to install from (e.g. https://github.com/user/repo.git[#ref]] |
+| `-u, --url` | Git URL to install from (e.g. https://github.com/user/repo.git[#ref]) |
 | `-f, --force` | Overwrite existing module if it already exists |
 
 ---
@@ -519,7 +619,7 @@ lucli update [OPTIONS]
 
 | Option | Description |
 |--------|-------------|
-| `-u, --url` | Git URL to update from (e.g. https://github.com/user/repo.git[#ref]] |
+| `-u, --url` | Git URL to update from (e.g. https://github.com/user/repo.git[#ref]) |
 | `-f, --force` | Overwrite existing module if it already exists |
 
 ---

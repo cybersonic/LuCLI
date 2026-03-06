@@ -141,6 +141,38 @@ java -Dlucli.home=/tmp/lucli-test -jar target/lucli.jar server start
 
 This is useful for running multiple isolated environments on the same machine (for example, CI builds or test harnesses).
 
+## System commands for home management
+
+LuCLI includes system-level helpers for inspecting and maintaining the home directory:
+
+```bash
+# Show the resolved paths LuCLI is using right now
+lucli system paths
+
+# Same information in JSON format
+lucli system paths --json
+
+# Preview cleanup targets (safe dry-run by default)
+lucli system clean --all
+
+# Actually apply cleanup
+lucli system clean --all --force
+
+# Create a backup of LuCLI home
+lucli system backup create
+
+# Verify backup integrity
+lucli system backup verify
+# Preview pruning old backups with retention
+lucli system backup prune --older-than 30d --keep 10
+
+# Preview restore from latest backup
+lucli system backup restore
+```
+By default, backup archives are written to `~/.lucli_backups` (outside `~/.lucli`).
+
+`lucli system clean` is intentionally conservative: it focuses on cache/backup cleanup and does not remove critical state like `servers/`, `modules/`, `secrets/`, or `settings.json`.
+
 ## When to interact with the home directory
 
 Common reasons to look inside the LuCLI home directory:

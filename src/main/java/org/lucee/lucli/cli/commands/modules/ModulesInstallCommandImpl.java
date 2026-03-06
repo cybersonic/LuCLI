@@ -26,9 +26,14 @@ public class ModulesInstallCommandImpl implements Callable<Integer> {
 
     @Option(
         names = {"-u", "--url"},
-        description = "Git URL to install from (e.g. https://github.com/user/repo.git[#ref]]"
+        description = "Git URL to install from (e.g. https://github.com/user/repo.git[#ref])"
     )
     private String gitUrl;
+    @Option(
+        names = {"-r", "--ref", "--rev"},
+        description = "Git ref to install (branch, tag, or commit)"
+    )
+    private String ref;
 
     @Option(
         names = {"-f", "--force"},
@@ -39,7 +44,7 @@ public class ModulesInstallCommandImpl implements Callable<Integer> {
     @Override
     public Integer call() throws Exception {
         // Call installModule directly - no arg parsing needed
-        ModuleCommand.installModule(moduleName, gitUrl, force);
+        ModuleCommand.installModule(moduleName, gitUrl, ref, force);
         return 0;
     }
 }

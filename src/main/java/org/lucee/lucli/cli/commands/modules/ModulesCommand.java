@@ -19,6 +19,7 @@ import picocli.CommandLine.ParentCommand;
             ModulesListCommandImpl.class,
             ModulesInitCommandImpl.class,
             ModulesRunCommandImpl.class,
+            ModulesAddCommandImpl.class,
             ModulesInstallCommandImpl.class,
             ModulesUninstallCommandImpl.class,
             ModulesUpdateCommandImpl.class,
@@ -40,6 +41,7 @@ public class ModulesCommand implements Callable<Integer> {
 
     // Modules list subcommand now in ModulesListCommandImpl
     // Modules init subcommand now in ModulesInitCommandImpl
+    // Modules add subcommand now in ModulesAddCommandImpl
 
     // Modules install subcommand now in ModulesInstallCommandImpl
     // Modules uninstall subcommand now in ModulesUninstallCommandImpl

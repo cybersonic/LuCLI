@@ -9,28 +9,31 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
 /**
- * Direct implementation of modules update command
+ * Direct implementation of modules add command.
+ * Alias semantics for install, with explicit --ref support.
  */
 @Command(
-    name = "update",
-    description = "Update a module from git"
+    name = "add",
+    description = "Add (install) a module"
 )
-public class ModulesUpdateCommandImpl implements Callable<Integer> {
+public class ModulesAddCommandImpl implements Callable<Integer> {
 
     @Parameters(
         paramLabel = "MODULE_NAME",
-        description = "Name of module to update"
+        description = "Name of module to add",
+        arity = "0..1"
     )
     private String moduleName;
 
     @Option(
         names = {"-u", "--url"},
-        description = "Git URL to update from (e.g. https://github.com/user/repo.git[#ref])"
+        description = "Git URL to add from (e.g. https://github.com/user/repo.git)"
     )
     private String gitUrl;
+
     @Option(
         names = {"-r", "--ref", "--rev"},
-        description = "Git ref to update to (branch, tag, or commit)"
+        description = "Git ref to install (branch, tag, or commit)"
     )
     private String ref;
 
@@ -42,8 +45,7 @@ public class ModulesUpdateCommandImpl implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-        // Call updateModule directly - no arg parsing needed
-        ModuleCommand.updateModule(moduleName, gitUrl, ref, force);
+        ModuleCommand.installModule(moduleName, gitUrl, ref, force);
         return 0;
     }
 }

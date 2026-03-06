@@ -1,12 +1,19 @@
 {
   "name" : "LuCLI",
   "version" : "6.2.2.91",
-  "port" : 8010,
+  "lucee" : {
+    "version" : "6.2.2.91",
+    "variant" : "standard"
+  },
+  "port" : 3456,
   "https" : {
     "enabled" : true
   },
   "shutdownPort" : 9010,
   "webroot" : "./",
+  "ajp" : {
+    "enabled" : false
+  },
   "monitoring" : {
     "enabled" : false,
     "jmx" : {
@@ -20,10 +27,12 @@
   },
   "urlRewrite" : {
     "enabled" : false,
-    "routerFile" : "index.cfm"
+    "routerFile" : "index.cfm",
+    "configFile" : "urlrewrite.xml"
   },
   "admin" : {
-    "enabled" : false
+    "enabled" : false,
+    "password" : ""
   },
   "enableLucee" : true,
   "enableREST" : false,
@@ -32,5 +41,7 @@
   "configuration" : {
     "datasources" : { },
     "mappings" : { }
-  }
+  },
+  "envVars" : { },
+  "environments" : { }
 }

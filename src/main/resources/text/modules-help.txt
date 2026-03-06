@@ -6,6 +6,7 @@ Commands:
   list                       List installed modules and show additional modules from bundled and external repositories (default)
   init [module-name]         Initialize a new module
   run <module-name> [args]   Run a specific module with arguments
+  add [name] [options]       Add (install) a module from git
   install [name] [options]   Install a module from git
   uninstall <name>           Uninstall a module
   update <name> [options]    Update a module from git
@@ -20,10 +21,16 @@ Examples:
   lucli modules init                     # Initialize module (interactive)
   lucli modules init my-awesome-module   # Initialize named module
   lucli modules run my-module arg1 arg2  # Run a module with arguments
+  lucli modules add bitbucket -r v1.2.0                                      # Add known module pinned to ref (--rev also supported)
+  lucli modules add bitbucket -u https://github.com/user/lang-module.git -r main # Add from URL + explicit ref
   lucli modules install lang -u https://github.com/user/lang-module.git          # Install with explicit name
-  lucli modules install -u https://github.com/user/lang-module.git --force      # Install using name from module.json and overwrite if exists
+  lucli modules install bitbucket -r v1.2.0                                      # Install known module pinned to ref
+  lucli modules install lang -u https://github.com/user/lang-module.git#v1.2.0  # Install pinned to a specific tag/ref
+  lucli modules install -u https://github.com/user/lang-module.git --force       # Install using name from module.json and overwrite if exists
   lucli modules uninstall lang                                              # Uninstall a module
+  lucli modules update bitbucket -r main --force                            # Update known module to a specific ref
   lucli modules update lang -u https://github.com/user/lang-module.git --force # Update a module from git
+  lucli modules update lang -u https://github.com/user/lang-module.git#main --force # Update pinned to a branch/ref
 
 Module Directory:
   Modules are stored in ~/.lucli/modules/

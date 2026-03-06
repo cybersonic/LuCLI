@@ -26,6 +26,7 @@ import org.lucee.lucli.cli.commands.ReplCommand;
 import org.lucee.lucli.cli.commands.RunCommand;
 import org.lucee.lucli.cli.commands.SecretsCommand;
 import org.lucee.lucli.cli.commands.ServerCommand;
+import org.lucee.lucli.cli.commands.SystemCommand;
 import org.lucee.lucli.cli.commands.VersionsListCommand;
 import org.lucee.lucli.cli.commands.XmlCommand;
 import org.lucee.lucli.cli.commands.deps.DepsCommand;
@@ -65,6 +66,7 @@ import picocli.CommandLine.Spec;
         VersionsListCommand.class,
         ParrotCommand.class,
         SecretsCommand.class,
+        SystemCommand.class,
         CommandLine.HelpCommand.class,
         RunCommand.class,
         DaemonCommand.class,
@@ -88,7 +90,10 @@ import picocli.CommandLine.Spec;
         "  lucli myscript.lucli            # Execute a LuCLI command script",
         "  lucli cfml 'now()'              # Execute CFML expression",
         "  lucli server start --version 6.2.2.91  # Start server with specific Lucee version",
-        "  lucli modules list              # List available modules"
+        "  lucli modules list              # List available modules",
+        "  lucli system paths              # Show resolved LuCLI home paths",
+        "  lucli system backup create      # Create a LuCLI home backup",
+        "  lucli system backup prune --older-than 30d --keep 10  # Preview backup pruning"
     }
 )
 public class LuCLI implements Callable<Integer> {

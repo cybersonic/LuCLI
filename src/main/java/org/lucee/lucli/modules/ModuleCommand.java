@@ -14,6 +14,7 @@ import java.util.stream.Stream;
 import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.LuceeScriptEngine;
 import org.lucee.lucli.StringOutput;
+import org.lucee.lucli.paths.LucliPaths;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -58,13 +59,13 @@ public static void executeModule(String[] args) {
                 runModule(options.moduleName, options.moduleArgs);
                 break;
             case INSTALL:
-                installModule(options.moduleName, options.gitUrl, options.force);
+                installModule(options.moduleName, options.gitUrl, options.ref, options.force);
                 break;
             case UNINSTALL:
                 uninstallModule(options.moduleName);
                 break;
             case UPDATE:
-                updateModule(options.moduleName, options.gitUrl, options.force);
+                updateModule(options.moduleName, options.gitUrl, options.ref, options.force);
                 break;
             default:
                 System.err.println("Unknown module action. Use --help for available commands.");
@@ -405,17 +406,7 @@ private static ObjectNode loadSettingsRoot(ObjectMapper mapper, Path settingsFil
      * Get the modules directory (~/.lucli/modules)
      */
     public static Path getModulesDirectory() throws IOException {
-        String lucliHomeStr = System.getProperty("lucli.home");
-        if (lucliHomeStr == null) {
-            lucliHomeStr = System.getenv("LUCLI_HOME");
-        }
-        if (lucliHomeStr == null) {
-            String userHome = System.getProperty("user.home");
-            lucliHomeStr = Paths.get(userHome, ".lucli").toString();
-        }
-        
-        Path lucliHome = Paths.get(lucliHomeStr);
-        Path modulesDir = lucliHome.resolve("modules");
+        Path modulesDir = LucliPaths.resolve().modulesDir();
         
         // Ensure the directories exist
         Files.createDirectories(modulesDir);
@@ -427,15 +418,8 @@ private static ObjectNode loadSettingsRoot(ObjectMapper mapper, Path settingsFil
      * Get the LuCLI home directory (~/.lucli)
      */
     private static Path getLucliHomeDirectory() throws IOException {
-        Path modulesDir = getModulesDirectory();
-        Path lucliHome = modulesDir.getParent();
-        if (lucliHome == null) {
-            // Fallback to user.home if for some reason modulesDir has no parent
-            lucliHome = Paths.get(System.getProperty("user.home"), ".lucli");
-            if (!Files.exists(lucliHome)) {
-                Files.createDirectories(lucliHome);
-            }
-        }
+        Path lucliHome = LucliPaths.resolve().home();
+        Files.createDirectories(lucliHome);
         return lucliHome;
     }
 
@@ -631,6 +615,14 @@ private static ModuleOptions parseArguments(String[] args) {
                         i++;
                     }
                     break;
+                case "add":
+                    // Alias for install
+                    options.action = ModuleAction.INSTALL;
+                    if (i + 1 < args.length && !args[i + 1].startsWith("-")) {
+                        options.moduleName = args[i + 1];
+                        i++;
+                    }
+                    break;
 
                 case "uninstall":
                     options.action = ModuleAction.UNINSTALL;
@@ -654,6 +646,14 @@ private static ModuleOptions parseArguments(String[] args) {
                 case "-u":
                     if (i + 1 < args.length) {
                         options.gitUrl = args[i + 1];
+                        i++;
+                    }
+                    break;
+                case "--ref":
+                case "--rev":
+                case "-r":
+                    if (i + 1 < args.length) {
+                        options.ref = args[i + 1];
                         i++;
                     }
                     break;
@@ -729,10 +729,12 @@ private static ModuleOptions parseArguments(String[] args) {
      *  3) GitHub HTTPS URL fallback to archive download when git is not available
      */
 public static void installModule(String moduleName, String gitUrl, boolean force) throws Exception {
-
-
-
-
+        installModule(moduleName, gitUrl, null, force);
+    }
+    /**
+     * Install a module with optional explicit ref.
+     */
+public static void installModule(String moduleName, String gitUrl, String explicitRef, boolean force) throws Exception {
         // Phase 1: require explicit URL
         if (gitUrl == null || gitUrl.trim().isEmpty()) {
 
@@ -749,16 +751,23 @@ public static void installModule(String moduleName, String gitUrl, boolean force
             }
         }
 
+        String normalizedExplicitRef = normalizeRef(explicitRef);
         // Support #ref syntax in URL (e.g. https://github.com/user/repo.git#v1.2.0)
         String baseUrl = gitUrl;
-        String ref = null;
+        String refFromUrl = null;
         int hashIndex = gitUrl.indexOf('#');
         if (hashIndex >= 0) {
             baseUrl = gitUrl.substring(0, hashIndex);
             if (hashIndex + 1 < gitUrl.length()) {
-                ref = gitUrl.substring(hashIndex + 1);
+                refFromUrl = normalizeRef(gitUrl.substring(hashIndex + 1));
             }
         }
+        if (normalizedExplicitRef != null && refFromUrl != null && !normalizedExplicitRef.equals(refFromUrl)) {
+            System.err.println("Conflicting refs provided via --ref and --url#ref.");
+            System.err.println("Use only one ref value or make both values match.");
+            System.exit(1);
+        }
+        String ref = normalizedExplicitRef != null ? normalizedExplicitRef : refFromUrl;
 
         // Create temp working directory used by all strategies
         Path tempDir = Files.createTempDirectory("lucli-module-install-");
@@ -922,6 +931,16 @@ public static void installModule(String moduleName, String gitUrl, boolean force
         if (exitCode != 0) {
             throw new IOException("git command failed with exit code " + exitCode + ": " + String.join(" ", command));
         }
+    }
+    /**
+     * Normalize optional refs by trimming and converting blanks to null.
+     */
+    private static String normalizeRef(String ref) {
+        if (ref == null) {
+            return null;
+        }
+        String trimmed = ref.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
     
     /**
@@ -1093,6 +1112,12 @@ public static void installModule(String moduleName, String gitUrl, boolean force
      * If no URL is provided, attempts to use the last stored repository/ref from settings.json.
      */
     public static void updateModule(String moduleName, String gitUrl, boolean force) throws Exception {
+        updateModule(moduleName, gitUrl, null, force);
+    }
+    /**
+     * Update a module with optional explicit ref override.
+     */
+    public static void updateModule(String moduleName, String gitUrl, String explicitRef, boolean force) throws Exception {
         if (moduleName == null || moduleName.trim().isEmpty()) {
             System.err.println("Module name is required for update command.");
             System.exit(1);
@@ -1108,6 +1133,7 @@ public static void installModule(String moduleName, String gitUrl, boolean force
         }
 
         String effectiveUrl = gitUrl;
+        String effectiveRef = normalizeRef(explicitRef);
 
         if (effectiveUrl == null || effectiveUrl.trim().isEmpty()) {
             ModuleSource source = loadModuleSource(moduleName);
@@ -1118,13 +1144,13 @@ public static void installModule(String moduleName, String gitUrl, boolean force
             }
 
             effectiveUrl = source.repository;
-            if (source.ref != null && !source.ref.trim().isEmpty()) {
-                effectiveUrl = effectiveUrl + "#" + source.ref.trim();
+            if (effectiveRef == null && source.ref != null && !source.ref.trim().isEmpty()) {
+                effectiveRef = source.ref.trim();
             }
         }
 
         // Ensure force is enabled for updates regardless of user flag
-        installModule(moduleName, effectiveUrl, true);
+        installModule(moduleName, effectiveUrl, effectiveRef, true);
     }
 
     /**
@@ -1165,6 +1191,7 @@ private static class ModuleOptions {
     boolean showHelp = false;
     boolean verbose = false;
     String gitUrl = null;
+    String ref = null;
     boolean force = false;
     boolean gitInit = false;
     boolean noGitInit = false;
