@@ -474,11 +474,14 @@ lucli install [OPTIONS]
 | Option | Description |
 |--------|-------------|
 | `-u, --url` | Git URL to install from (e.g. https://github.com/user/repo.git[#ref]) |
+| `-r, --ref` | Git ref to install (branch, tag, or commit) |
+| `-n, --name` | Local module name/alias override |
 | `-f, --force` | Overwrite existing module if it already exists |
 **Examples:**
 ```bash
 lucli modules install my-module --url=https://github.com/user/repo.git#v1.2.0
 lucli modules install my-module --url=https://github.com/user/repo.git#main
+lucli modules install --url=https://github.com/cybersonic/lucli-bitbucket.git#dev --name=bitbucket-dev
 ```
 
 ---
@@ -508,6 +511,7 @@ lucli update [OPTIONS]
 | Option | Description |
 |--------|-------------|
 | `-u, --url` | Git URL to update from (e.g. https://github.com/user/repo.git[#ref]) |
+| `-r, --ref` | Git ref to update to (branch, tag, or commit) |
 | `-f, --force` | Overwrite existing module if it already exists |
 **Examples:**
 ```bash
@@ -591,6 +595,8 @@ lucli install [OPTIONS]
 | Option | Description |
 |--------|-------------|
 | `-u, --url` | Git URL to install from (e.g. https://github.com/user/repo.git[#ref]) |
+| `-r, --ref` | Git ref to install (branch, tag, or commit) |
+| `-n, --name` | Local module name/alias override |
 | `-f, --force` | Overwrite existing module if it already exists |
 
 ---
@@ -620,6 +626,7 @@ lucli update [OPTIONS]
 | Option | Description |
 |--------|-------------|
 | `-u, --url` | Git URL to update from (e.g. https://github.com/user/repo.git[#ref]) |
+| `-r, --ref` | Git ref to update to (branch, tag, or commit) |
 | `-f, --force` | Overwrite existing module if it already exists |
 
 ---

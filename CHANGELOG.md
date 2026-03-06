@@ -16,6 +16,8 @@ All notable changes to this project will be documented in this file.
  - **System Backup Commands:** Added `lucli system backup` command group with `create`, `list`, `verify`, `prune`, and `restore` subcommands.
  - **Safer Backup Storage Location:** Backup archives now default to `~/.lucli_backups` (outside `~/.lucli`) to reduce risk of losing backups when cleaning or replacing the LuCLI home directory. Optional overrides are supported via `LUCLI_BACKUPS_DIR` or `-Dlucli.backups.dir`.
  - **Backup Retention Pruning:** Added `lucli system backup prune --older-than <duration> --keep <count> [--force]` with dry-run by default and checksum sidecar cleanup when pruning.
+ - **Module Install Name/Alias Override (`--name`):** Added `-n` / `--name` option to `modules install` and `modules add` commands, allowing you to install a module under a different local name that overrides the `module.json` name (e.g., `lucli modules install --url=https://github.com/cybersonic/lucli-bitbucket.git#dev --name=bitbucket-dev`). Includes validation of the alias and improved error messages when module names mismatch.
+ - **Modules Help Improvements:** The `modules --help` output now includes an explicit "Install/Add Options" section listing `-u`, `-r`, `-n`, and `-f` flags with descriptions.
 
 ## 0.2.1
 

@@ -169,6 +169,8 @@ lucli modules add bitbucket --ref=v1.2.0
 
 # Install from a git/HTTP URL or known repository entry
 lucli modules install my-awesome-module --url=https://github.com/example/my-awesome-module.git
+# Install from URL and override local module name (alias install)
+lucli modules install --url=https://github.com/cybersonic/lucli-bitbucket.git#dev --name=bitbucket-dev
 
 # Install pinned to a specific tag/branch/ref (append #ref to URL)
 lucli modules install my-awesome-module --url=https://github.com/example/my-awesome-module.git#v1.2.0

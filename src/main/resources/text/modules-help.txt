@@ -15,6 +15,12 @@ Options:
   -v, --verbose              Enable verbose output
   -h, --help                 Show this help message
 
+Install/Add Options:
+  -u, --url <url>            Git URL to install from (supports #ref suffix)
+  -r, --ref <ref>            Git ref (branch/tag/commit) to install
+  -n, --name <slug>          Local module name/alias override (letters, numbers, - and _)
+  -f, --force                Overwrite existing module directory
+
 Examples:
   lucli modules                          # List all modules
   lucli modules list                     # List all modules
@@ -23,7 +29,9 @@ Examples:
   lucli modules run my-module arg1 arg2  # Run a module with arguments
   lucli modules add bitbucket -r v1.2.0                                      # Add known module pinned to ref (--rev also supported)
   lucli modules add bitbucket -u https://github.com/user/lang-module.git -r main # Add from URL + explicit ref
+  lucli modules add bitbucket -u https://github.com/cybersonic/lucli-bitbucket.git#dev --name bitbucket-dev # Install with local alias
   lucli modules install lang -u https://github.com/user/lang-module.git          # Install with explicit name
+  lucli modules install -u https://github.com/cybersonic/lucli-bitbucket.git#dev --name bitbucket-dev      # Install from URL with local alias
   lucli modules install bitbucket -r v1.2.0                                      # Install known module pinned to ref
   lucli modules install lang -u https://github.com/user/lang-module.git#v1.2.0  # Install pinned to a specific tag/ref
   lucli modules install -u https://github.com/user/lang-module.git --force       # Install using name from module.json and overwrite if exists

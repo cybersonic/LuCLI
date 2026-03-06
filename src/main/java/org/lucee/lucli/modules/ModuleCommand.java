@@ -59,7 +59,7 @@ public static void executeModule(String[] args) {
                 runModule(options.moduleName, options.moduleArgs);
                 break;
             case INSTALL:
-                installModule(options.moduleName, options.gitUrl, options.ref, options.force);
+                installModule(options.moduleName, options.installName, options.gitUrl, options.ref, options.force);
                 break;
             case UNINSTALL:
                 uninstallModule(options.moduleName);
@@ -657,6 +657,13 @@ private static ModuleOptions parseArguments(String[] args) {
                         i++;
                     }
                     break;
+                case "--name":
+                case "-n":
+                    if (i + 1 < args.length) {
+                        options.installName = args[i + 1];
+                        i++;
+                    }
+                    break;
 
             case "--force":
                     options.force = true;
@@ -729,24 +736,41 @@ private static ModuleOptions parseArguments(String[] args) {
      *  3) GitHub HTTPS URL fallback to archive download when git is not available
      */
 public static void installModule(String moduleName, String gitUrl, boolean force) throws Exception {
-        installModule(moduleName, gitUrl, null, force);
+        installModule(moduleName, null, gitUrl, null, force);
     }
     /**
      * Install a module with optional explicit ref.
      */
 public static void installModule(String moduleName, String gitUrl, String explicitRef, boolean force) throws Exception {
+        installModule(moduleName, null, gitUrl, explicitRef, force);
+    }
+    /**
+     * Install a module with optional install alias/local module name override.
+     */
+public static void installModule(String moduleName, String installName, String gitUrl, String explicitRef, boolean force) throws Exception {
+        String requestedModuleName = normalizeModuleName(moduleName);
+        String requestedInstallName = normalizeModuleName(installName);
+
+        if (requestedInstallName != null && !isValidModuleName(requestedInstallName)) {
+            System.err.println("Invalid module install name '" + requestedInstallName + "'. Module names should contain only letters, numbers, hyphens, and underscores.");
+            System.exit(1);
+        }
         // Phase 1: require explicit URL
         if (gitUrl == null || gitUrl.trim().isEmpty()) {
 
 
             ModuleRepositoryIndex repoIndex = ModuleRepositoryIndex.loadDefault();
             ModuleRepositoryIndex.RepoModule repoMod =
-                repoIndex.getModulesByName().get(moduleName);
+                repoIndex.getModulesByName().get(requestedModuleName);
 
             if (repoMod != null && repoMod.getUrl() != null && !repoMod.getUrl().isBlank()) {
                 gitUrl = repoMod.getUrl().trim();
             } else {
-                System.err.println("modules install currently requires --url=<url> or a known repository entry for '" + moduleName + "'.");
+                if (requestedModuleName == null || requestedModuleName.isBlank()) {
+                    System.err.println("modules install currently requires --url=<url> when no module name is provided.");
+                } else {
+                    System.err.println("modules install currently requires --url=<url> or a known repository entry for '" + requestedModuleName + "'.");
+                }
                 System.exit(1);
             }
         }
@@ -811,29 +835,34 @@ public static void installModule(String moduleName, String gitUrl, String explic
             }
 
             String metadataName = nameNode.asText().trim();
-
-            // If no module name was provided, derive it from module.json.name
-            if (moduleName == null || moduleName.trim().isEmpty()) {
-                moduleName = metadataName;
-            } else if (!metadataName.equals(moduleName)) {
-                System.err.println("Module name mismatch: requested '" + moduleName + "' but module.json.name is '" + metadataName + "'.");
+            String targetModuleName;
+            if (requestedInstallName != null) {
+                targetModuleName = requestedInstallName;
+            } else if (requestedModuleName == null || requestedModuleName.isBlank()) {
+                targetModuleName = metadataName;
+            } else if (!metadataName.equals(requestedModuleName)) {
+                System.err.println("Module name mismatch: requested '" + requestedModuleName + "' but module.json.name is '" + metadataName + "'.");
+                System.err.println("Use --name <local-module-name> to install under a different local module name.");
                 System.exit(1);
+                return;
+            } else {
+                targetModuleName = requestedModuleName;
             }
 
-            if (!isValidModuleName(moduleName)) {
-                System.err.println("Invalid module name '" + moduleName + "'. Module names should contain only letters, numbers, hyphens, and underscores.");
+            if (!isValidModuleName(targetModuleName)) {
+                System.err.println("Invalid module name '" + targetModuleName + "'. Module names should contain only letters, numbers, hyphens, and underscores.");
                 System.exit(1);
             }
 
             ModuleConfig sourceConfig = ModuleConfig.load(sourceDir);
-            ensureModulePermissionsGranted(moduleName, sourceConfig);
+            ensureModulePermissionsGranted(targetModuleName, sourceConfig);
 
             Path modulesDir = getModulesDirectory();
-            Path targetDir = modulesDir.resolve(moduleName);
+            Path targetDir = modulesDir.resolve(targetModuleName);
 
             // Protect development modules (those with a .git directory) from being overwritten
             if (Files.exists(targetDir) && Files.isDirectory(targetDir.resolve(".git"))) {
-                System.err.println("Module '" + moduleName + "' appears to be a local Git working copy at: " + targetDir);
+                System.err.println("Module '" + targetModuleName + "' appears to be a local Git working copy at: " + targetDir);
                 System.err.println("Refusing to overwrite a development module. Update it via git or remove the directory explicitly before reinstalling.");
                 System.exit(1);
             }
@@ -852,7 +881,7 @@ public static void installModule(String moduleName, String gitUrl, String explic
                             });
                     }
                 } else {
-                    System.err.println("Module '" + moduleName + "' already exists at: " + targetDir);
+                    System.err.println("Module '" + targetModuleName + "' already exists at: " + targetDir);
                     System.err.println("Use --force to overwrite the existing module.");
                     System.exit(1);
                 }
@@ -884,15 +913,15 @@ public static void installModule(String moduleName, String gitUrl, String explic
 
             // Record provenance in settings.json so we can support updates without explicit URLs
             try {
-                persistModuleSource(moduleName, baseUrl, ref);
+                persistModuleSource(targetModuleName, baseUrl, ref);
             } catch (IOException e) {
                 // Do not fail the install if we can't write settings; just warn in verbose mode
                 if (LuCLI.verbose || LuCLI.debug) {
-                    System.err.println("Warning: Failed to update settings.json for module '" + moduleName + "': " + e.getMessage());
+                    System.err.println("Warning: Failed to update settings.json for module '" + targetModuleName + "': " + e.getMessage());
                 }
             }
 
-            StringOutput.Quick.success("Successfully installed module: " + moduleName);
+            StringOutput.Quick.success("Successfully installed module: " + targetModuleName);
             StringOutput.getInstance().println("${EMOJI_FOLDER} Module directory: " + targetDir);
 
         } finally {
@@ -931,6 +960,16 @@ public static void installModule(String moduleName, String gitUrl, String explic
         if (exitCode != 0) {
             throw new IOException("git command failed with exit code " + exitCode + ": " + String.join(" ", command));
         }
+    }
+    /**
+     * Normalize optional module names by trimming and converting blanks to null.
+     */
+    private static String normalizeModuleName(String moduleName) {
+        if (moduleName == null) {
+            return null;
+        }
+        String trimmed = moduleName.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
     /**
      * Normalize optional refs by trimming and converting blanks to null.
@@ -1192,6 +1231,7 @@ private static class ModuleOptions {
     boolean verbose = false;
     String gitUrl = null;
     String ref = null;
+    String installName = null;
     boolean force = false;
     boolean gitInit = false;
     boolean noGitInit = false;

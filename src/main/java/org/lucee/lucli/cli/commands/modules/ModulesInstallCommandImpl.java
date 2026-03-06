@@ -34,6 +34,11 @@ public class ModulesInstallCommandImpl implements Callable<Integer> {
         description = "Git ref to install (branch, tag, or commit)"
     )
     private String ref;
+    @Option(
+        names = {"-n", "--name"},
+        description = "Install alias/name to use locally (overrides module.json name)"
+    )
+    private String installName;
 
     @Option(
         names = {"-f", "--force"},
@@ -44,7 +49,7 @@ public class ModulesInstallCommandImpl implements Callable<Integer> {
     @Override
     public Integer call() throws Exception {
         // Call installModule directly - no arg parsing needed
-        ModuleCommand.installModule(moduleName, gitUrl, ref, force);
+        ModuleCommand.installModule(moduleName, installName, gitUrl, ref, force);
         return 0;
     }
 }
