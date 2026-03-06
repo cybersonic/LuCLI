@@ -1,6 +1,8 @@
 # FROM eclipse-temurin:17-jre
 FROM eclipse-temurin:21-jre
 
+RUN apt-get update && apt-get install -y jq curl && rm -rf /var/lib/apt/lists/*
+
 # Create lucee user and group with specific UID/GID for consistency
 # Use GID 1001 to avoid conflict with existing GID 1000
 RUN groupadd --gid 1001 lucee && \
