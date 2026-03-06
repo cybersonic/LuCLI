@@ -1074,6 +1074,8 @@ public static void installModule(String moduleName, String installName, String g
     
     /**
      * Install from a GitHub HTTPS URL by downloading a zip archive instead of using git.
+     * When a ref is provided, tries tags first, then branches, since we cannot
+     * distinguish between the two without git.
      */
     private static Path installFromGithubArchive(Path tempDir, String baseUrl, String ref) throws IOException {
         String repo = baseUrl;
@@ -1081,16 +1083,24 @@ public static void installModule(String moduleName, String installName, String g
             repo = repo.substring(0, repo.length() - 4);
         }
 
-        String archiveUrl;
-        if (ref != null && !ref.isEmpty()) {
-            // Prefer tag archives; callers should pass branch/tag appropriately
-            archiveUrl = repo + "/archive/refs/tags/" + ref + ".zip";
-        } else {
+        if (ref == null || ref.isEmpty()) {
             // Default to main; in the future we could try main then master
-            archiveUrl = repo + "/archive/refs/heads/main.zip";
+            String archiveUrl = repo + "/archive/refs/heads/main.zip";
+            return installFromArchiveUrl(tempDir, archiveUrl);
         }
 
-        return installFromArchiveUrl(tempDir, archiveUrl);
+        // Try tag first, then branch
+        String tagUrl = repo + "/archive/refs/tags/" + ref + ".zip";
+        try {
+            return installFromArchiveUrl(tempDir, tagUrl);
+        } catch (java.io.FileNotFoundException e) {
+            if (LuCLI.verbose || LuCLI.debug) {
+                System.out.println("No tag '" + ref + "' found, trying branch...");
+            }
+        }
+
+        String branchUrl = repo + "/archive/refs/heads/" + ref + ".zip";
+        return installFromArchiveUrl(tempDir, branchUrl);
     }
     
     /**

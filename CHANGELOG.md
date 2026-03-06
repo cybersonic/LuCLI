@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+ - **Fix: Module Install with `--rev` on Branch Names:** Fixed `modules install --rev <branch>` failing when git is not available. You can now install modules from both tags and branches in non-git environments.
  - **Windows Bat File fixes**
  - **MCP Server for Modules:** Added `lucli mcp <module>` to run a per-module MCP server over stdio, exposing a module’s public functions as MCP tools (with JSON schema-derived input). 
  - **Module Runtime Permissions + Env/Secrets Resolution:**
