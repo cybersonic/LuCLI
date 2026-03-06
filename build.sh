@@ -29,19 +29,26 @@ if [[ "$1" == "clear" ]]; then
     mvn dependency:purge-local-repository -DreResolve=false -DactTransitively=false
 fi
 
+# Bump the patch version in pom.xml (e.g. 0.2.2-SNAPSHOT → 0.2.3-SNAPSHOT)
+# This replicates the version bump that the -Pbinary profile used to do.
+echo "Bumping patch version..."
+mvn -q build-helper:parse-version versions:set \
+    -DnewVersion='${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.nextIncrementalVersion}-SNAPSHOT' \
+    -DgenerateBackupPoms=false
+
 # Build the JAR and binary
 # Use -Dmaven.test.skip=true so Maven does not compile or run tests during this
 # quick-build path. The recommended way to run the full test suite remains
 # ./tests/test.sh when you want full verification.
 #
 # Note: we intentionally do NOT activate the "binary" Maven profile here.
-# That profile performs version-bumping and additional packaging steps which
-# currently interfere with the shaded JAR contents and result in
-# "ClassNotFoundException: org.lucee.lucli.LuCLI" when running the jar.
+# That profile's additional packaging steps interfere with the shaded JAR
+# contents and result in "ClassNotFoundException: org.lucee.lucli.LuCLI".
 # A plain `mvn clean package` produces a correct shaded jar, so we build that
 # first and then create the self-executing binary ourselves below.
 echo "Building LuCLI JAR and binary..."
-mvn clean package -q -Dmaven.test.skip=true -Djreleaser.dry.run=true
+rm -rf target
+mvn package -q -Dmaven.test.skip=true -Djreleaser.dry.run=true
 if [ $? -ne 0 ]; then
     echo "Maven build failed!"
     exit 1
