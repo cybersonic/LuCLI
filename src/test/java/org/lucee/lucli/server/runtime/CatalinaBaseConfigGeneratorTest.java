@@ -110,6 +110,48 @@ public class CatalinaBaseConfigGeneratorTest {
     }
 
     @Test
+    void generateConfiguration_usesSafeAdminEntrypointMappingWhenAddingCfmlServlets() throws IOException {
+        // Use a minimal CATALINA_HOME web.xml without pre-existing Lucee servlets
+        Path minimalHome = tempDir.resolve("minimal-home-admin-mapping");
+        Files.createDirectories(minimalHome.resolve("conf"));
+        Files.writeString(minimalHome.resolve("conf/server.xml"), MINIMAL_SERVER_XML);
+        Files.writeString(minimalHome.resolve("conf/web.xml"), MINIMAL_WEB_XML);
+
+        Path base = tempDir.resolve("minimal-base-admin-mapping");
+        Files.createDirectories(base);
+        LuceeServerConfig.ServerConfig config = createTestConfig();
+
+        generator.generateConfiguration(base, config, projectDir, minimalHome, 0, false);
+
+        String webXml = Files.readString(base.resolve("conf/web.xml"), StandardCharsets.UTF_8);
+        assertTrue(webXml.contains("/lucee/admin.cfm"),
+                "Generated web.xml should include explicit /lucee/admin.cfm mapping");
+        assertFalse(webXml.contains("/lucee/*"),
+                "Generated web.xml should not include broad /lucee/* mapping");
+        assertFalse(webXml.contains("/lucee/admin/*"),
+                "Generated web.xml should not include broad /lucee/admin/* mapping");
+    }
+
+    @Test
+    void generateConfiguration_migratesLegacyProjectWebXmlAdminMappings() throws IOException {
+        Path webInf = projectDir.resolve("WEB-INF");
+        Files.createDirectories(webInf);
+        Path projectWebXml = webInf.resolve("web.xml");
+        Files.writeString(projectWebXml, LEGACY_PROJECT_WEB_XML, StandardCharsets.UTF_8);
+
+        LuceeServerConfig.ServerConfig config = createTestConfig();
+        generator.generateConfiguration(catalinaBase, config, projectDir, catalinaHome, 0, false);
+
+        String migrated = Files.readString(projectWebXml, StandardCharsets.UTF_8);
+        assertFalse(migrated.contains("/lucee/*"),
+                "Legacy project web.xml should have /lucee/* mapping removed");
+        assertFalse(migrated.contains("/lucee/admin/*"),
+                "Legacy project web.xml should have /lucee/admin/* mapping removed");
+        assertTrue(migrated.contains("/lucee/admin.cfm"),
+                "Legacy project web.xml should include explicit /lucee/admin.cfm mapping");
+    }
+
+    @Test
     void generateConfiguration_copiesLoggingProperties() throws IOException {
         LuceeServerConfig.ServerConfig config = createTestConfig();
 
@@ -426,5 +468,35 @@ public class CatalinaBaseConfigGeneratorTest {
     private static final String MINIMAL_TOMCAT_USERS_XML = """
             <?xml version="1.0" encoding="UTF-8"?>
             <tomcat-users />
+            """;
+
+    private static final String LEGACY_PROJECT_WEB_XML = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
+                     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                     xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee
+                     https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd"
+                     version="6.0">
+              <servlet>
+                <servlet-name>CFMLServlet</servlet-name>
+                <servlet-class>lucee.loader.servlet.jakarta.CFMLServlet</servlet-class>
+                <init-param>
+                  <param-name>lucee-server-root</param-name>
+                  <param-value>/tmp/lucee-server</param-value>
+                </init-param>
+              </servlet>
+              <servlet-mapping>
+                <servlet-name>CFMLServlet</servlet-name>
+                <url-pattern>*.cfm</url-pattern>
+              </servlet-mapping>
+              <servlet-mapping>
+                <servlet-name>CFMLServlet</servlet-name>
+                <url-pattern>/lucee/*</url-pattern>
+              </servlet-mapping>
+              <servlet-mapping>
+                <servlet-name>CFMLServlet</servlet-name>
+                <url-pattern>/lucee/admin/*</url-pattern>
+              </servlet-mapping>
+            </web-app>
             """;
 }

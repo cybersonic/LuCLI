@@ -64,6 +64,8 @@ public class LuceeServerConfigTest {
         assertNotNull(config.lucee);
         assertEquals("6.2.2.91", config.lucee.version);
         assertEquals("standard", config.lucee.variant);
+        assertFalse(config.urlRewrite.enabled,
+            "URL rewrite should be disabled by default unless explicitly enabled");
     }
 
     // ===================
@@ -85,6 +87,9 @@ public class LuceeServerConfigTest {
         
         assertEquals("test-server", config.name);
         assertEquals(9000, config.port);
+        assertNotNull(config.urlRewrite);
+        assertFalse(config.urlRewrite.enabled,
+            "URL rewrite should be disabled when not specified in lucee.json");
     }
 
     @Test
@@ -259,6 +264,64 @@ public class LuceeServerConfigTest {
         assertNotNull(config.lucee);
         assertEquals("7.0.0.100-RC", config.lucee.version);
         assertEquals("7.0.0.100-RC", LuceeServerConfig.getLuceeVersion(config));
+    }
+
+    // ===================
+    // Lucee Version Cutoff Tests
+    // ===================
+
+    @Test
+    void isLuceeVersionAtLeast_handlesQualifiedVersions() {
+        assertTrue(LuceeServerConfig.isLuceeVersionAtLeast("6.1.0.0", 6, 1));
+        assertTrue(LuceeServerConfig.isLuceeVersionAtLeast("6.1.8.29", 6, 1));
+        assertTrue(LuceeServerConfig.isLuceeVersionAtLeast("7.0.1.100-RC", 6, 1));
+
+        assertFalse(LuceeServerConfig.isLuceeVersionAtLeast("6.0.4.10", 6, 1));
+        assertFalse(LuceeServerConfig.isLuceeVersionAtLeast("5.4.6.9", 6, 1));
+    }
+
+    @Test
+    void validateLuceeVersionSupportForRuntime_rejectsSub61() {
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () ->
+                LuceeServerConfig.validateLuceeVersionSupportForRuntime("6.0.4.10", "lucee-express"));
+
+        assertTrue(ex.getMessage().contains("6.0.4.10"));
+        assertTrue(ex.getMessage().contains(LuceeServerConfig.MIN_SUPPORTED_LUCEE_VERSION));
+    }
+
+    @Test
+    void validateLuceeVersionSupportForRuntime_accepts61AndAbove() {
+        assertDoesNotThrow(() ->
+                LuceeServerConfig.validateLuceeVersionSupportForRuntime("6.1.0.0", "lucee-express"));
+        assertDoesNotThrow(() ->
+                LuceeServerConfig.validateLuceeVersionSupportForRuntime("7.0.1.100-RC", "tomcat"));
+    }
+
+    @Test
+    void validateCfConfigSupport_rejectsSub61WhenCfConfigDefined() throws IOException {
+        LuceeServerConfig.ServerConfig config = new LuceeServerConfig.ServerConfig();
+        LuceeServerConfig.setLuceeVersion(config, "6.0.4.10");
+        config.configuration = new com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree("{\"inspectTemplate\":\"once\"}");
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () ->
+                LuceeServerConfig.validateCfConfigSupport(config));
+
+        assertTrue(ex.getMessage().contains(".CFConfig"));
+        assertTrue(ex.getMessage().contains(LuceeServerConfig.MIN_SUPPORTED_LUCEE_VERSION));
+    }
+
+    @Test
+    void resolveConfigurationNode_rejectsSub61WhenCfConfigDefined() throws IOException {
+        LuceeServerConfig.ServerConfig config = new LuceeServerConfig.ServerConfig();
+        LuceeServerConfig.setLuceeVersion(config, "6.0.4.10");
+        config.configuration = new com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree("{\"inspectTemplate\":\"once\"}");
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () ->
+                LuceeServerConfig.resolveConfigurationNode(config, tempDir));
+
+        assertTrue(ex.getMessage().contains(".CFConfig"));
     }
 
     // ===================
@@ -689,6 +752,153 @@ public class LuceeServerConfigTest {
 
         // Unresolvable #env:VAR# should be preserved as-is
         assertEquals("#env:NONEXISTENT_LUCLI_VAR#", config.name);
+    }
+    
+    // ===================
+    // Dependency Mapping Tests
+    // ===================
+    
+    @Test
+    void resolveConfigurationNode_generatesForgeboxMappingToProjectDependenciesDirectory() throws IOException {
+        String json = """
+            {
+              "name": "dep-map-test",
+              "dependencies": {
+                "testbox": {
+                  "version": "5.0.0",
+                  "source": "forgebox",
+                  "mapping": "/testbox"
+                }
+              }
+            }
+            """;
+        Files.writeString(tempDir.resolve("lucee.json"), json);
+        
+        LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(tempDir);
+        com.fasterxml.jackson.databind.JsonNode resolved =
+                LuceeServerConfig.resolveConfigurationNode(config, tempDir);
+        
+        assertNotNull(resolved);
+        com.fasterxml.jackson.databind.JsonNode mapping = resolved.path("mappings").path("/testbox/");
+        assertTrue(mapping.isObject(), "Expected /testbox/ mapping to be generated");
+        
+        String expectedPhysicalPath = tempDir.resolve("dependencies")
+                .resolve("testbox")
+                .toAbsolutePath()
+                .normalize()
+                .toString();
+        assertEquals(expectedPhysicalPath, mapping.path("physical").asText());
+    }
+    
+    @Test
+    void resolveConfigurationNode_prefersExistingForgeboxDependenciesDirectoryWhenLockPathIsStale() throws IOException {
+        String json = """
+            {
+              "name": "dep-map-lock-test",
+              "dependencies": {
+                "testbox": {
+                  "version": "5.0.0",
+                  "source": "forgebox",
+                  "mapping": "/testbox"
+                }
+              }
+            }
+            """;
+        Files.writeString(tempDir.resolve("lucee.json"), json);
+        
+        // Simulate actual installed ForgeBox package location
+        Files.createDirectories(tempDir.resolve("dependencies").resolve("testbox"));
+        
+        // Simulate stale lock metadata pointing at an incorrect old installPath
+        String staleLockJson = """
+            {
+              "dependencies": {
+                "testbox": {
+                  "version": "5.0.0",
+                  "resolved": "forgebox:testbox@5.0.0",
+                  "integrity": "sha512-dummy",
+                  "source": "forgebox",
+                  "type": "cfml",
+                  "installPath": "testbox",
+                  "mapping": "/testbox"
+                }
+              },
+              "devDependencies": {}
+            }
+            """;
+        Files.writeString(tempDir.resolve("lucee-lock.json"), staleLockJson);
+        
+        LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(tempDir);
+        com.fasterxml.jackson.databind.JsonNode resolved =
+                LuceeServerConfig.resolveConfigurationNode(config, tempDir);
+        
+        assertNotNull(resolved);
+        com.fasterxml.jackson.databind.JsonNode mapping = resolved.path("mappings").path("/testbox/");
+        assertTrue(mapping.isObject(), "Expected /testbox/ mapping to be generated");
+        
+        String expectedPhysicalPath = tempDir.resolve("dependencies")
+                .resolve("testbox")
+                .toAbsolutePath()
+                .normalize()
+                .toString();
+        assertEquals(expectedPhysicalPath, mapping.path("physical").asText(),
+                "Stale lock installPath should not override the real dependencies/testbox location");
+    }
+
+    // ===================
+    // CFConfig Path Tests
+    // ===================
+
+    @Test
+    void writeCfConfigIfPresent_writesToNestedLuceeServerContextForTomcatBasedRuntimes() throws IOException {
+        LuceeServerConfig.ServerConfig config = new LuceeServerConfig.ServerConfig();
+        config.configuration = new com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree("{\"inspectTemplate\":\"once\"}");
+
+        Path serverInstanceDir = tempDir.resolve("server-instance");
+        Files.createDirectories(serverInstanceDir);
+
+        LuceeServerConfig.writeCfConfigIfPresent(config, tempDir, serverInstanceDir);
+
+        Path expectedPath = serverInstanceDir
+                .resolve("lucee-server")
+                .resolve("lucee-server")
+                .resolve("context")
+                .resolve(".CFConfig.json");
+        Path legacyPath = serverInstanceDir
+                .resolve("lucee-server")
+                .resolve("context")
+                .resolve(".CFConfig.json");
+
+        assertTrue(Files.exists(expectedPath), "Expected .CFConfig.json at nested Lucee server context path");
+        assertFalse(Files.exists(legacyPath), "Legacy non-nested .CFConfig.json path should not be written");
+    }
+
+    @Test
+    void writeCfConfigIfPresent_writesToJettyContextForJettyRuntime() throws IOException {
+        LuceeServerConfig.ServerConfig config = new LuceeServerConfig.ServerConfig();
+        config.runtime = new LuceeServerConfig.RuntimeConfig();
+        config.runtime.type = "jetty";
+        config.configuration = new com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree("{\"inspectTemplate\":\"once\"}");
+
+        Path serverInstanceDir = tempDir.resolve("jetty-instance");
+        Files.createDirectories(serverInstanceDir);
+
+        LuceeServerConfig.writeCfConfigIfPresent(config, tempDir, serverInstanceDir);
+
+        Path expectedPath = serverInstanceDir
+                .resolve("lucee-server")
+                .resolve("context")
+                .resolve(".CFConfig.json");
+        Path tomcatNestedPath = serverInstanceDir
+                .resolve("lucee-server")
+                .resolve("lucee-server")
+                .resolve("context")
+                .resolve(".CFConfig.json");
+
+        assertTrue(Files.exists(expectedPath), "Expected .CFConfig.json at Jetty Lucee context path");
+        assertFalse(Files.exists(tomcatNestedPath), "Tomcat nested context path should not be used for Jetty");
     }
 
     // ===================

@@ -92,6 +92,57 @@ public class TomcatWebXmlPatcher {
         }
     }
 
+    /**
+     * Migrate legacy LuCLI-generated project WEB-INF/web.xml admin mappings that
+     * can cause /lucee/admin.cfm requests to resolve as a directory.
+     *
+     * <p>Older generated web.xml files used path-prefix mappings like
+     * {@code /lucee/*}. For {@code /lucee/admin.cfm}, Tomcat routes to servletPath
+     * {@code /lucee} with pathInfo {@code /admin.cfm}, which can cause Lucee to try
+     * reading a directory as a template.</p>
+     *
+     * <p>This migration is intentionally conservative and only applies to web.xml
+     * files that look LuCLI-generated (CFMLServlet + lucee-server-root init-param).</p>
+     */
+    public void migrateLegacyProjectWebXmlAdminMappings(Path webXmlPath) throws IOException {
+        if (webXmlPath == null || !Files.exists(webXmlPath)) {
+            return;
+        }
+
+        try (InputStream in = Files.newInputStream(webXmlPath)) {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setNamespaceAware(true);
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document document = builder.parse(in);
+            Element root = document.getDocumentElement();
+            if (root == null || !isLikelyLucliGeneratedProjectWebXml(root)) {
+                return;
+            }
+
+            boolean changed = false;
+            changed |= removeServletMapping(root, "CFMLServlet", "/lucee/*");
+            changed |= removeServletMapping(root, "CFMLServlet", "/lucee/admin/*");
+            changed |= ensureServletMapping(root, "CFMLServlet", "/lucee/admin.cfm");
+
+            if (!changed) {
+                return;
+            }
+
+            TransformerFactory tf = TransformerFactory.newInstance();
+            Transformer transformer = tf.newTransformer();
+            transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+            transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
+
+            try (OutputStream out = Files.newOutputStream(webXmlPath)) {
+                transformer.transform(new DOMSource(document), new StreamResult(out));
+            }
+
+            System.out.println("Updated legacy project WEB-INF/web.xml admin mappings for Lucee admin compatibility.");
+        } catch (ParserConfigurationException | SAXException | TransformerException e) {
+            throw new IOException("Failed to migrate legacy project web.xml admin mappings: " + e.getMessage(), e);
+        }
+    }
+
 /**
      * Ensure that the lucee.json configuration file is not accessible via HTTP.
      *
@@ -470,7 +521,7 @@ public class TomcatWebXmlPatcher {
      * Add CFML servlet mappings.
      */
     private void addCfmlServletMappings(Element root) {
-        String[] patterns = {"*.cfm", "*.cfml", "*.cfc", "*.cfs", "/index.cfm/*", "/lucee/*"};
+        String[] patterns = {"*.cfm", "*.cfml", "*.cfc", "*.cfs", "/index.cfm/*", "/lucee/admin.cfm"};
         for (String pattern : patterns) {
             Element mapping = append(root, "servlet-mapping", null);
             append(mapping, "servlet-name", "CFMLServlet");
@@ -561,6 +612,88 @@ public class TomcatWebXmlPatcher {
             }
         }
         return null;
+    }
+
+    /**
+     * Detect whether a project WEB-INF/web.xml looks like a LuCLI-generated
+     * legacy template.
+     */
+    private boolean isLikelyLucliGeneratedProjectWebXml(Element root) {
+        NodeList servletNodes = root.getElementsByTagName("servlet");
+        for (int i = 0; i < servletNodes.getLength(); i++) {
+            Node node = servletNodes.item(i);
+            if (!(node instanceof Element)) {
+                continue;
+            }
+            Element servlet = (Element) node;
+            String servletName = getChildText(servlet, "servlet-name");
+            String servletClass = getChildText(servlet, "servlet-class");
+            if (!"CFMLServlet".equals(servletName)
+                    || servletClass == null
+                    || !servletClass.contains("lucee.loader.servlet")) {
+                continue;
+            }
+
+            NodeList initParams = servlet.getElementsByTagName("init-param");
+            for (int j = 0; j < initParams.getLength(); j++) {
+                Node initNode = initParams.item(j);
+                if (!(initNode instanceof Element)) {
+                    continue;
+                }
+                String paramName = getChildText((Element) initNode, "param-name");
+                if ("lucee-server-root".equals(paramName)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Remove servlet-mapping entries matching servlet-name + url-pattern.
+     */
+    private boolean removeServletMapping(Element root, String servletName, String urlPattern) {
+        boolean removed = false;
+        NodeList mappingNodes = root.getElementsByTagName("servlet-mapping");
+        for (int i = 0; i < mappingNodes.getLength(); i++) {
+            Node node = mappingNodes.item(i);
+            if (!(node instanceof Element)) {
+                continue;
+            }
+            Element mapping = (Element) node;
+            String name = getChildText(mapping, "servlet-name");
+            String pattern = getChildText(mapping, "url-pattern");
+            if (servletName.equals(name) && urlPattern.equals(pattern)) {
+                root.removeChild(mapping);
+                removed = true;
+                i--; // NodeList is live
+            }
+        }
+        return removed;
+    }
+
+    /**
+     * Ensure a servlet-mapping exists for servlet-name + url-pattern.
+     */
+    private boolean ensureServletMapping(Element root, String servletName, String urlPattern) {
+        NodeList mappingNodes = root.getElementsByTagName("servlet-mapping");
+        for (int i = 0; i < mappingNodes.getLength(); i++) {
+            Node node = mappingNodes.item(i);
+            if (!(node instanceof Element)) {
+                continue;
+            }
+            Element mapping = (Element) node;
+            String name = getChildText(mapping, "servlet-name");
+            String pattern = getChildText(mapping, "url-pattern");
+            if (servletName.equals(name) && urlPattern.equals(pattern)) {
+                return false;
+            }
+        }
+
+        Element mapping = append(root, "servlet-mapping", null);
+        append(mapping, "servlet-name", servletName);
+        append(mapping, "url-pattern", urlPattern);
+        return true;
     }
 
 }

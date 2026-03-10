@@ -101,7 +101,8 @@ public class LuceeServerConfig {
         public String openBrowserURL;
 
         /**
-         * Optional Lucee server configuration to be written to lucee-server/context/.CFConfig.json.
+         * Optional Lucee server configuration to be written to the runtime's
+         * effective Lucee context .CFConfig.json location.
          * When present, this JSON is treated as the source of truth for CFConfig.
          */
         public JsonNode configuration;
@@ -174,7 +175,7 @@ public class LuceeServerConfig {
     }
     
     public static class UrlRewriteConfig {
-        public boolean enabled = true;
+        public boolean enabled = false;
         public String routerFile = "index.cfm";
         /**
          * Path to the rewrite.config file in the project.
@@ -368,6 +369,11 @@ public class LuceeServerConfig {
     // Pattern matching a Lucee version string: N.N.N.N with optional classifier
     private static final java.util.regex.Pattern LUCEE_VERSION_PATTERN =
             java.util.regex.Pattern.compile("^\\d+\\.\\d+\\.\\d+\\.\\d+.*$");
+    private static final java.util.regex.Pattern LEADING_NUMERIC_VERSION_PART =
+            java.util.regex.Pattern.compile("^(\\d+)");
+    public static final String MIN_SUPPORTED_LUCEE_VERSION = "6.1.0.0";
+    private static final int MIN_SUPPORTED_LUCEE_MAJOR = 6;
+    private static final int MIN_SUPPORTED_LUCEE_MINOR = 1;
 
     // Track whether we've already shown the deprecation warning for this session
     private static boolean hasShownDeprecationWarning = false;
@@ -472,6 +478,128 @@ public class LuceeServerConfig {
         // Keep deprecated field in sync for one release cycle
         @SuppressWarnings("deprecation")
         String ignored = config.version = version;
+    }
+
+    /**
+     * Parse a Lucee version string into numeric parts.
+     *
+     * Supports classifiers such as "-RC" or "-SNAPSHOT" on any segment by
+     * extracting the leading numeric portion of each dot-delimited part.
+     *
+     * Examples:
+     *   - "6.2.4.24"      -> [6,2,4,24]
+     *   - "7.0.1.100-RC"  -> [7,0,1,100]
+     *   - "6.1"           -> [6,1,0,0]
+     */
+    private static int[] parseLuceeVersionParts(String version) {
+        int[] parts = new int[] {0, 0, 0, 0};
+        if (version == null || version.trim().isEmpty()) {
+            return parts;
+        }
+
+        String[] tokens = version.trim().split("\\.");
+        int max = Math.min(tokens.length, 4);
+        for (int i = 0; i < max; i++) {
+            parts[i] = parseLeadingNumericPart(tokens[i]);
+        }
+        return parts;
+    }
+
+    private static int parseLeadingNumericPart(String token) {
+        if (token == null || token.trim().isEmpty()) {
+            return 0;
+        }
+        java.util.regex.Matcher matcher = LEADING_NUMERIC_VERSION_PART.matcher(token.trim());
+        if (!matcher.find()) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(matcher.group(1));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    /**
+     * Compare only major/minor version segments against a minimum required pair.
+     */
+    public static boolean isLuceeVersionAtLeast(String version, int requiredMajor, int requiredMinor) {
+        int[] parts = parseLuceeVersionParts(version);
+        int major = parts[0];
+        int minor = parts[1];
+
+        if (major > requiredMajor) {
+            return true;
+        }
+        if (major < requiredMajor) {
+            return false;
+        }
+        return minor >= requiredMinor;
+    }
+
+    /**
+     * Whether this Lucee version is within LuCLI's supported runtime floor.
+     */
+    public static boolean isLuceeVersionSupportedForLucli(String version) {
+        return isLuceeVersionAtLeast(version, MIN_SUPPORTED_LUCEE_MAJOR, MIN_SUPPORTED_LUCEE_MINOR);
+    }
+
+    /**
+     * Enforce LuCLI's runtime support floor for Lucee versions.
+     */
+    public static void validateLuceeVersionSupportForRuntime(String version, String runtimeType) {
+        String effectiveVersion = (version == null || version.trim().isEmpty()) ? "unknown" : version.trim();
+        String normalizedRuntime = (runtimeType == null || runtimeType.trim().isEmpty())
+                ? "lucee-express"
+                : runtimeType.trim();
+
+        if (isLuceeVersionSupportedForLucli(effectiveVersion)) {
+            return;
+        }
+
+        throw new IllegalStateException(
+            "❌ Lucee " + effectiveVersion + " is below LuCLI's supported cutoff.\n" +
+            "   Runtime: " + normalizedRuntime + "\n" +
+            "   Minimum supported Lucee version: " + MIN_SUPPORTED_LUCEE_VERSION + "\n\n" +
+            "Versions below 6.1 are not supported because Lucee Express availability\n" +
+            "and LuCLI feature/config parity are not guaranteed."
+        );
+    }
+
+    /**
+     * Enforce LuCLI's runtime support floor for the effective version in config.
+     */
+    public static void validateLuceeVersionSupportForRuntime(ServerConfig config, String runtimeType) {
+        validateLuceeVersionSupportForRuntime(getLuceeVersion(config), runtimeType);
+    }
+
+    private static boolean hasCfConfigDefinition(ServerConfig config) {
+        if (config == null) {
+            return false;
+        }
+        boolean hasInlineConfig = config.configuration != null && !config.configuration.isNull();
+        boolean hasConfigFile = config.configurationFile != null && !config.configurationFile.trim().isEmpty();
+        return hasInlineConfig || hasConfigFile;
+    }
+
+    /**
+     * Enforce .CFConfig support cutoff for older Lucee versions.
+     */
+    public static void validateCfConfigSupport(ServerConfig config) {
+        if (!hasCfConfigDefinition(config)) {
+            return;
+        }
+
+        String effectiveVersion = getLuceeVersion(config);
+        if (isLuceeVersionSupportedForLucli(effectiveVersion)) {
+            return;
+        }
+
+        throw new IllegalStateException(
+            "❌ .CFConfig integration is not supported for Lucee " + effectiveVersion + ".\n" +
+            "   Minimum supported Lucee version for .CFConfig features: " + MIN_SUPPORTED_LUCEE_VERSION + "\n" +
+            "   Remove 'configuration'/'configurationFile' or upgrade to Lucee 6.1+."
+        );
     }
 
     /**
@@ -1735,6 +1863,7 @@ public class LuceeServerConfig {
         if (config == null) {
             return null;
         }
+        validateCfConfigSupport(config);
 
         JsonNode result = null;
 
@@ -2062,19 +2191,47 @@ public class LuceeServerConfig {
         
         JsonNode mappingNode = dep.get("mapping");
         JsonNode installPathNode = dep.get("installPath");
+        JsonNode sourceNode = dep.get("source");
+        String source = sourceNode != null && !sourceNode.isNull() ? sourceNode.asText() : null;
+        boolean isForgeBox = source != null && "forgebox".equalsIgnoreCase(source);
         
-        if (mappingNode == null || mappingNode.isNull() || 
-            installPathNode == null || installPathNode.isNull()) {
+        if (mappingNode == null || mappingNode.isNull()) {
             return; // No mapping defined for this dependency
         }
         
         String virtualPath = mappingNode.asText();
-        String installPath = installPathNode.asText();
+        String installPath = (installPathNode != null && !installPathNode.isNull())
+                ? installPathNode.asText()
+                : null;
+        
+        // ForgeBox dependencies are expected to install under dependencies/<name>
+        // by default. When a stale lock entry points elsewhere, avoid overriding
+        // the computed declared mapping with a non-existent path.
+        if ((installPath == null || installPath.isBlank()) && isForgeBox) {
+            installPath = "dependencies/" + depName;
+        }
+        if (installPath == null || installPath.isBlank()) {
+            return;
+        }
         
         // Resolve to absolute path
         Path physicalPath = Paths.get(installPath);
         if (!physicalPath.isAbsolute()) {
             physicalPath = projectDir.resolve(installPath).toAbsolutePath().normalize();
+        }
+        
+        if (isForgeBox && !Files.exists(physicalPath)) {
+            Path defaultForgeboxPath = projectDir.resolve("dependencies")
+                                                 .resolve(depName)
+                                                 .toAbsolutePath()
+                                                 .normalize();
+            if (Files.exists(defaultForgeboxPath)) {
+                physicalPath = defaultForgeboxPath;
+            } else {
+                // Keep any existing declared mapping rather than overriding it
+                // with a stale/non-existent lock-file path.
+                return;
+            }
         }
         
         // Create CFConfig mapping object
@@ -2154,10 +2311,7 @@ public class LuceeServerConfig {
             return null;
         }
         
-        Path cfConfigPath = serverInstanceDir
-                .resolve("lucee-server")
-                .resolve("context")
-                .resolve(".CFConfig.json");
+        Path cfConfigPath = resolveCfConfigPath(config, serverInstanceDir);
         
         if (!Files.exists(cfConfigPath)) {
             // No existing file – nothing to merge.
@@ -2197,12 +2351,9 @@ public class LuceeServerConfig {
         if (finalConfig == null || finalConfig.isNull()) {
             return; // Nothing to write
         }
-
-        // Ensure lucee-server/context directory exists under this server instance
-        Path contextDir = serverInstanceDir.resolve("lucee-server").resolve("context");
+        Path cfConfigPath = resolveCfConfigPath(config, serverInstanceDir);
+        Path contextDir = cfConfigPath.getParent();
         Files.createDirectories(contextDir);
-
-        Path cfConfigPath = contextDir.resolve(".CFConfig.json");
 
         // Only log array overrides when we actually merged into an existing file.
         if (!arrayPaths.isEmpty() && Files.exists(cfConfigPath)) {
@@ -2211,6 +2362,36 @@ public class LuceeServerConfig {
         }
 
         objectMapper.writeValue(cfConfigPath.toFile(), finalConfig);
+    }
+
+    /**
+     * Resolve the effective .CFConfig.json path for the given runtime.
+     *
+     * <p>Tomcat-based runtimes (lucee-express/tomcat) expect the server
+     * context under lucee-server/lucee-server/context/.CFConfig.json.
+     * Jetty uses lucee-server/context/.CFConfig.json.</p>
+     */
+    private static Path resolveCfConfigPath(ServerConfig config, Path serverInstanceDir) {
+        String runtimeType = "lucee-express";
+        if (config != null
+                && config.runtime != null
+                && config.runtime.type != null
+                && !config.runtime.type.trim().isEmpty()) {
+            runtimeType = config.runtime.type.trim();
+        }
+
+        if ("jetty".equalsIgnoreCase(runtimeType)) {
+            return serverInstanceDir
+                    .resolve("lucee-server")
+                    .resolve("context")
+                    .resolve(".CFConfig.json");
+        }
+
+        return serverInstanceDir
+                .resolve("lucee-server")
+                .resolve("lucee-server")
+                .resolve("context")
+                .resolve(".CFConfig.json");
     }
 
     /**

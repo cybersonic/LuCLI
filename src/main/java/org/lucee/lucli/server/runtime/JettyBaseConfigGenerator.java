@@ -252,7 +252,7 @@ public class JettyBaseConfigGenerator {
             xml.append("  </servlet>\n\n");
 
             // CFML servlet mappings
-            String[] cfmlPatterns = {"*.cfm", "*.cfml", "*.cfc", "*.cfs", "/index.cfm/*", "/lucee/*"};
+            String[] cfmlPatterns = {"*.cfm", "*.cfml", "*.cfc", "*.cfs", "/index.cfm/*", "/lucee/admin.cfm"};
             for (String pattern : cfmlPatterns) {
                 xml.append("  <servlet-mapping>\n");
                 xml.append("    <servlet-name>CFMLServlet</servlet-name>\n");

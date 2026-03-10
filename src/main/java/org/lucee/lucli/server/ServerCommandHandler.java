@@ -329,9 +329,11 @@ public class ServerCommandHandler {
                 sourceDir = sourceDirOverride.toAbsolutePath();
             } else {
                 try {
-                    sourceDir = serverManager.ensureLuceeExpress(finalConfig.version);
-                } catch (IOException e) {
-                    return formatOutput("❌ Failed to obtain server distribution for version " + finalConfig.version + ": " + e.getMessage(), true);
+                    String luceeVersion = LuceeServerConfig.getLuceeVersion(finalConfig);
+                    sourceDir = serverManager.ensureLuceeExpress(luceeVersion);
+                } catch (Exception e) {
+                    return formatOutput("❌ Failed to obtain server distribution for version "
+                            + LuceeServerConfig.getLuceeVersion(finalConfig) + ": " + e.getMessage(), true);
                 }
             }
 
@@ -397,7 +399,7 @@ public class ServerCommandHandler {
 
                 try {
                     // Get the Lucee Express directory
-                    Path luceeExpressDir = serverManager.ensureLuceeExpress(finalConfig.version);
+                    Path luceeExpressDir = serverManager.ensureLuceeExpress(LuceeServerConfig.getLuceeVersion(finalConfig));
                     org.lucee.lucli.server.runtime.CatalinaBaseConfigGenerator tomcatGen = new org.lucee.lucli.server.runtime.CatalinaBaseConfigGenerator();
                     Path serverInstanceDir = serverManager.getServersDir().resolve(finalConfig.name);
 

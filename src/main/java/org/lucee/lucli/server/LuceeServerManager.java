@@ -270,6 +270,10 @@ public class LuceeServerManager {
         // Do not auto-open browser for sandbox foreground runs
         config.openBrowser = false;
 
+        // Enforce LuCLI-supported version/runtime and .CFConfig cutoffs.
+        LuceeServerConfig.validateLuceeVersionSupportForRuntime(config, "lucee-express");
+        LuceeServerConfig.validateCfConfigSupport(config);
+
         // Ensure Lucee Express is available for the chosen version
         Path luceeExpressDir = ensureLuceeExpress(LuceeServerConfig.getLuceeVersion(config));
 
@@ -390,6 +394,10 @@ public class LuceeServerManager {
 
         // For sandbox background servers, do not auto-open browser by default
         config.openBrowser = false;
+
+        // Enforce LuCLI-supported version/runtime and .CFConfig cutoffs.
+        LuceeServerConfig.validateLuceeVersionSupportForRuntime(config, "lucee-express");
+        LuceeServerConfig.validateCfConfigSupport(config);
 
         // Ensure Lucee Express is available for the chosen version
         Path luceeExpressDir = ensureLuceeExpress(LuceeServerConfig.getLuceeVersion(config));
@@ -564,6 +572,8 @@ public class LuceeServerManager {
         // Delegate the actual runtime-specific startup to a RuntimeProvider.
 
         LuceeServerConfig.RuntimeConfig runtimeConfig = LuceeServerConfig.getEffectiveRuntime(config);
+        LuceeServerConfig.validateLuceeVersionSupportForRuntime(config, runtimeConfig.type);
+        LuceeServerConfig.validateCfConfigSupport(config);
         RuntimeProvider provider = getRuntimeProvider(runtimeConfig.type);
         return provider.start(this, config, projectDir, environment, agentOverrides, foreground, forceReplace);
     }
@@ -1375,6 +1385,7 @@ public class LuceeServerManager {
      * Ensure Lucee Express for the specified version is available
      */
     public Path ensureLuceeExpress(String version) throws Exception {
+        LuceeServerConfig.validateLuceeVersionSupportForRuntime(version, "lucee-express");
         Path versionDir = expressDir.resolve(version);
         
         if (Files.exists(versionDir)) {
@@ -1618,6 +1629,9 @@ public class LuceeServerManager {
             org.lucee.lucli.config.DependencySettingsConfig settings = depConfig.getDependencySettings();
             if (settings == null || !settings.isAutoInstallOnServerStart()) {
                 return; // Feature disabled
+            }
+            if (!settings.isUseLockFileEnabled()) {
+                return; // Lock file flow disabled by dependency settings
             }
 
             java.util.List<org.lucee.lucli.config.DependencyConfig> prodDeps = depConfig.parseDependencies();

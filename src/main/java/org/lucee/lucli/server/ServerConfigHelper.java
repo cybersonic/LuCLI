@@ -110,12 +110,13 @@ public class ServerConfigHelper {
                 // Check if cache is recent (less than 24 hours old)
                 long cacheAge = System.currentTimeMillis() - Files.getLastModifiedTime(cacheFile).toMillis();
                 if (cacheAge < 24 * 60 * 60 * 1000) { // 24 hours in milliseconds
-                    return loadVersionsFromCache(cacheFile);
+                    return filterSupportedVersions(loadVersionsFromCache(cacheFile));
                 }
             }
             
             // Fetch versions from remote API
             List<String> versions = fetchVersionsFromAPI();
+            versions = filterSupportedVersions(versions);
             
             // Cache the results
             saveVersionsToCache(versions, cacheFile);
@@ -129,19 +130,46 @@ public class ServerConfigHelper {
             try {
                 Path cacheFile = getCacheFilePath();
                 if (Files.exists(cacheFile)) {
-                    return loadVersionsFromCache(cacheFile);
+                    return filterSupportedVersions(loadVersionsFromCache(cacheFile));
                 }
             } catch (Exception ex) {
                 // Ignore cache load errors
             }
             
             // Final fallback to hardcoded versions
-            return Arrays.asList(
+            return filterSupportedVersions(Arrays.asList(
                 "7.0.0.346", "7.0.0.145", "7.0.0.090",
                 "6.2.2.91", "6.2.1.75", "6.2.0.66", "6.1.8.29", 
                 "6.1.7.25", "6.1.6.16", "6.0.4.10", "5.4.5.17"
-            );
+            ));
         }
+    }
+
+    /**
+     * Keep only LuCLI-supported Lucee versions (>= 6.1), preserving source order.
+     */
+    private List<String> filterSupportedVersions(List<String> versions) {
+        if (versions == null || versions.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<String> filtered = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
+
+        for (String version : versions) {
+            if (version == null || version.trim().isEmpty()) {
+                continue;
+            }
+            String normalized = version.trim();
+            if (!seen.add(normalized)) {
+                continue;
+            }
+            if (LuceeServerConfig.isLuceeVersionSupportedForLucli(normalized)) {
+                filtered.add(normalized);
+            }
+        }
+
+        return filtered;
     }
     
     /**

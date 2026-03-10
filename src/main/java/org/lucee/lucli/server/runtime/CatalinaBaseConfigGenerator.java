@@ -84,6 +84,19 @@ public class CatalinaBaseConfigGenerator {
         Path serverWebXml = serverInstanceDir.resolve("conf/web.xml");
         webXmlPatcher.ensureLuceeServlets(serverWebXml, config, serverInstanceDir);
 
+        // Migrate legacy LuCLI-generated project WEB-INF/web.xml admin mappings
+        // that can break /lucee/admin.cfm by routing it via /lucee/* path-prefix
+        // servlet mappings.
+        Path projectWebXml = LuceeServerConfig.resolveWebroot(config, projectDir)
+                .resolve("WEB-INF")
+                .resolve("web.xml");
+        try {
+            webXmlPatcher.migrateLegacyProjectWebXmlAdminMappings(projectWebXml);
+        } catch (IOException e) {
+            // Never fail startup for migration warnings; this is best-effort.
+            System.err.println("Warning: Could not migrate legacy project WEB-INF/web.xml admin mappings: " + e.getMessage());
+        }
+
         // Apply configuration-driven patches (disable Lucee/REST servlets when
         // enableLucee=false, protect lucee.json, etc.). This must run after
         // ensureLuceeServlets so that vendor web.xml files that already ship

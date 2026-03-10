@@ -99,15 +99,10 @@
         <url-pattern>/index.cfm/*</url-pattern>
     </servlet-mapping>
 
-    <!-- Lucee Admin Servlet Mappings -->
+    <!-- Lucee Admin entrypoint mapping -->
     <servlet-mapping>
         <servlet-name>CFMLServlet</servlet-name>
-        <url-pattern>/lucee/*</url-pattern>
-    </servlet-mapping>
-    
-    <servlet-mapping>
-        <servlet-name>CFMLServlet</servlet-name>
-        <url-pattern>/lucee/admin/*</url-pattern>
+        <url-pattern>/lucee/admin.cfm</url-pattern>
     </servlet-mapping>
 
     <!-- REST Servlet Mappings -->

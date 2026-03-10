@@ -732,7 +732,7 @@ public class LucliCompleter implements Completer {
      */
     private void completeServerVersions(String partial, List<Candidate> candidates) {
         // Common Lucee versions
-        String[] versions = {"6.2.2.91", "6.1.0.243", "6.0.3.1", "5.4.6.9"};
+        String[] versions = {"7.0.0.346", "7.0.0.145", "6.2.2.91", "6.2.1.75", "6.1.8.29"};
         
         for (String version : versions) {
             if (version.startsWith(partial)) {
@@ -1157,7 +1157,7 @@ public class LucliCompleter implements Completer {
                     }
                 } catch (Exception e) {
                     // Fallback to common versions (including 7.x versions)
-                    String[] versions = {"7.0.0.346", "7.0.0.145", "7.0.0.090", "6.2.2.91", "6.2.1.75", "6.2.0.66", "6.1.8.29", "6.1.7.25", "6.0.4.10"};
+                    String[] versions = {"7.0.0.346", "7.0.0.145", "7.0.0.090", "6.2.2.91", "6.2.1.75", "6.2.0.66", "6.1.8.29", "6.1.7.25", "6.1.6.16"};
                     for (String version : versions) {
                         if (version.startsWith(valuePartial)) {
                             String completion = version;  // Just complete the version part
