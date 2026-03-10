@@ -39,3 +39,13 @@ Examples: `lucli server start --version 6.2.2.91`, `lucli server log --type serv
 ## Configuration (lucee.json)
 
 Supports `name`, `version`, `host`, `port`, `https` (e.g. `enabled`, `port`, `redirect`), `monitoring`, `jvm`, `urlRewrite`, `admin`, `agents`, `configurationFile`, `configuration`, `dependencies`, `environments`, etc. See WARP.md for full schema and examples.
+
+## Cursor Cloud specific instructions
+
+- **Java 21** (OpenJDK) and **Maven 3.8+** must be installed. JAVA_HOME should point to the JDK (e.g. `/usr/lib/jvm/java-21-openjdk-amd64`).
+- The pom.xml configures JAR signing (`maven-jarsigner-plugin`). In dev/CI without a keystore, pass `-Djarsigner.skip=true` to Maven commands (build, test, spotbugs).
+- **Build:** `mvn clean package -DskipTests -Djarsigner.skip=true` produces `target/lucli.jar`. To create the self-executing binary: `cat src/bin/lucli.sh target/lucli.jar > target/lucli && chmod 755 target/lucli`.
+- **Unit tests:** `mvn test -Djarsigner.skip=true` (509 JUnit 5 tests). Shell integration tests: `bash tests/test-simple.sh` (requires both JAR and binary in `target/`).
+- **Quick dev iteration:** `./dev-lucli.sh [args]` uses `mvn exec:java`; SDKMAN is optional and scripts gracefully fall back.
+- **SpotBugs** is configured at Low threshold/Max effort; the codebase has pre-existing findings so `mvn spotbugs:check` will fail. Use `mvn spotbugs:spotbugs` to generate the report without failing the build.
+- This is a self-contained CLI tool. No databases, Docker, or external services are required for building and testing.
