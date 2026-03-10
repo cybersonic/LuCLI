@@ -3,13 +3,13 @@ title: Dependency Management
 layout: docs
 ---
 
-LuCLI can manage CFML libraries and Lucee extensions as dependencies for your project, using the `dependencies`, `devDependencies`, and `dependencySettings` sections in `lucee.json`. Installed dependencies are recorded in `lucee-lock.json`, which is also used during server startup.
+LuCLI can manage CFML libraries and Lucee extensions as dependencies for your project, using the `dependencies`, `devDependencies`, and `dependencySettings` sections in `lucee.json`. Installed dependencies are recorded in `lucee-lock.json` only when lock files are enabled (`dependencySettings.useLockFile: true`).
 
 This page focuses on how dependencies and extensions work, independent of the rest of the `lucee.json` configuration.
 
 ## Git dependency caching
 
-LuCLI can manage CFML dependencies and Lucee extensions via the `dependencies`, `devDependencies`, and `dependencySettings` sections in `lucee.json`. Installed dependencies are recorded in `lucee-lock.json`, which is also used by server locking.
+LuCLI can manage CFML dependencies and Lucee extensions via the `dependencies`, `devDependencies`, and `dependencySettings` sections in `lucee.json`. Installed dependencies are recorded in `lucee-lock.json` when lock files are enabled.
 
 ### Git dependency caching
 
@@ -43,7 +43,8 @@ At a high level:
 - `dependencies` – production dependencies (CFML libraries, Lucee extensions, etc.).
 - `devDependencies` – development-only dependencies.
 - `dependencySettings` – controls how and where dependencies are installed.
-- `lucee-lock.json` – records the resolved versions, install paths, and mappings.
+- `dependencySettings.useLockFile` – enables/disables `lucee-lock.json` usage for dependency installs (default: `false`).
+- `lucee-lock.json` – optional lock file (`dependencySettings.useLockFile: true`) recording resolved versions, install paths, and mappings.
 - `LUCEE_EXTENSIONS` – built automatically from locked extension dependencies when the server starts.
 
 ### Declaring Lucee extensions as dependencies
@@ -108,7 +109,7 @@ Behaviour:
 - Installs supported dependency types:
   - `source: "git"` – CFML libraries installed from Git repositories.
   - `type: "extension"` – Lucee extensions installed via providers, URLs, or local `.lex` files.
-- Writes a normalized record for each dependency into `lucee-lock.json` (including version, source, install path, and, for extensions, their Lucee ID).
+- When `dependencySettings.useLockFile` is `true`, writes a normalized record for each dependency into `lucee-lock.json` (including version, source, install path, and, for extensions, their Lucee ID).
 - Prints the `LUCEE_EXTENSIONS` value that will be set when the server starts, built from all locked extension dependencies.
 
 ### Nested dependency projects
@@ -141,7 +142,7 @@ Environment handling for nested projects:
 
 ### How extensions are activated at server startup
 
-When you start a server, LuCLI:
+When you start a server (with lock files enabled), LuCLI:
 
 1. Reads `lucee-lock.json` for the project.
 2. Collects all locked dependencies with `type: "extension"`.
@@ -151,8 +152,8 @@ When you start a server, LuCLI:
 
 This means:
 
-- The **set of active extensions is driven by `lucee-lock.json`**, not by `lucee.json` alone.
-- Running `lucli deps install` is the canonical way to update which extensions are installed and locked for a project.
+- The **set of active extensions is driven by `lucee-lock.json`** when lock files are enabled, not by `lucee.json` alone.
+- Running `lucli deps install` is the canonical way to update which extensions are installed and locked for a project when `dependencySettings.useLockFile` is enabled.
 - Server lock (`lucee-lock.json` → `serverLocks`) coexists with dependency locking; updating dependencies and updating server locks are separate, explicit steps.
 
 For more about dependency structure, see `LuceeJsonConfig` and `DependencySettingsConfig` in the codebase, and for lock format see `LuceeLockFile`.
@@ -223,14 +224,14 @@ This section expands on the basic configuration reference and documents every av
 
 ```json
 "urlRewrite": {
-  "enabled": true,
+  "enabled": false,
   "routerFile": "index.cfm"
 }
 ```
 
 | Key                    | Type    | Default       | Description |
 |------------------------|---------|---------------|-------------|
-| `urlRewrite.enabled`   | boolean | `true`        | Enables framework-style URL rewriting using `urlrewrite.xml`. When `false`, no UrlRewrite filter or configuration is installed. |
+| `urlRewrite.enabled`   | boolean | `false`       | Enables framework-style URL rewriting using Tomcat RewriteValve (`rewrite.config`). When `false`, no rewrite rules are configured. |
 | `urlRewrite.routerFile`| string  | `"index.cfm"`| Central router script used by the URL rewrite rules for extensionless URLs. In static-only sites you may want to set this to `"index.html"`. |
 
 ### `admin` settings

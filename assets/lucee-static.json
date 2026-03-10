@@ -21,7 +21,7 @@
     "additionalArgs" : [ ]
   },
   "urlRewrite" : {
-    "enabled" : true,
+    "enabled" : false,
     "routerFile" : "index.cfm"
   },
   "admin" : {

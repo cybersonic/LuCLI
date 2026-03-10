@@ -301,14 +301,14 @@ This section expands on the basic configuration reference and documents every av
 
 ```json
 "urlRewrite": {
-  "enabled": true,
+  "enabled": false,
   "routerFile": "index.cfm"
 }
 ```
 
 | Key                    | Type    | Default       | Description |
 |------------------------|---------|---------------|-------------|
-| `urlRewrite.enabled`   | boolean | `true`        | Enables framework-style URL rewriting using `urlrewrite.xml`. When `false`, no UrlRewrite filter or configuration is installed. |
+| `urlRewrite.enabled`   | boolean | `false`       | Enables framework-style URL rewriting using Tomcat RewriteValve (`rewrite.config`). When `false`, no rewrite rules are configured. |
 | `urlRewrite.routerFile`| string  | `"index.cfm"`| Central router script used by the URL rewrite rules for extensionless URLs. In static-only sites you may want to set this to `"index.html"`. |
 
 ### `admin` settings
