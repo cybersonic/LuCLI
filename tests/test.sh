@@ -385,6 +385,7 @@ echo -e "${BLUE}=== Module System Tests ===${NC}"
 MODULES_DIR="${LUCLI_HOME}/modules"
 TEST_MODULE_NAME="test_module_$(date +%s)"
 TEST_ZIP_MODULE_NAME="test_zip_module_$(date +%s)"
+TEST_ZIP_ALIAS_NAME="${TEST_ZIP_MODULE_NAME}_alias"
 LOCAL_MODULE_SRC="local_module_src"
 
 # Ensure modules directory exists
@@ -432,10 +433,15 @@ if command -v zip &> /dev/null; then
     run_test "Install module from local zip URL" "java -jar ../$LUCLI_JAR modules install $TEST_ZIP_MODULE_NAME --url $MODULE_URL"
     run_test "Installed module directory exists" "test -d \"$MODULES_DIR/$TEST_ZIP_MODULE_NAME\""
     run_test "Installed module contains module.json" "test -f \"$MODULES_DIR/$TEST_ZIP_MODULE_NAME/module.json\""
+    run_test "Install module with --name alias" "java -jar ../$LUCLI_JAR modules install --url $MODULE_URL --name $TEST_ZIP_ALIAS_NAME"
+    run_test "Alias module directory exists" "test -d \"$MODULES_DIR/$TEST_ZIP_ALIAS_NAME\""
     run_test "settings.json contains module repository URL" "grep -q \"$MODULE_URL\" \"$LUCLI_HOME/settings.json\""
     run_test "Update module using stored URL" "java -jar ../$LUCLI_JAR modules update $TEST_ZIP_MODULE_NAME"
+    run_test "Update alias module using stored URL" "java -jar ../$LUCLI_JAR modules update $TEST_ZIP_ALIAS_NAME"
     run_test "Uninstall module removes directory" "java -jar ../$LUCLI_JAR modules uninstall $TEST_ZIP_MODULE_NAME"
     run_test "Module directory removed after uninstall" "test ! -d \"$MODULES_DIR/$TEST_ZIP_MODULE_NAME\""
+    run_test "Uninstall alias module removes directory" "java -jar ../$LUCLI_JAR modules uninstall $TEST_ZIP_ALIAS_NAME"
+    run_test "Alias module directory removed after uninstall" "test ! -d \"$MODULES_DIR/$TEST_ZIP_ALIAS_NAME\""
 else
     echo -e "${YELLOW}⚠️ zip not available, skipping module install/update tests${NC}"
 fi

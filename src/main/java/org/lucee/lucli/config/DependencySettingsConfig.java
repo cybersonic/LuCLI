@@ -24,6 +24,13 @@ public class DependencySettingsConfig {
     
     @JsonProperty("installMethod")
     private String installMethod = "symlink";
+
+    /**
+     * Whether lucee-lock.json should be used for dependency install flows.
+     * Defaults to disabled unless explicitly set to true.
+     */
+    @JsonProperty("useLockFile")
+    private Boolean useLockFile;
     
     @JsonProperty("installDevDependencies")
     private Boolean installDevDependencies;
@@ -72,6 +79,18 @@ public class DependencySettingsConfig {
     
     public void setInstallMethod(String installMethod) {
         this.installMethod = installMethod;
+    }
+
+    public Boolean getUseLockFile() {
+        return useLockFile;
+    }
+
+    public void setUseLockFile(Boolean useLockFile) {
+        this.useLockFile = useLockFile;
+    }
+
+    public boolean isUseLockFileEnabled() {
+        return Boolean.TRUE.equals(useLockFile);
     }
     
     public Boolean getInstallDevDependencies() {

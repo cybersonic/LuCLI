@@ -6,6 +6,9 @@ import org.lucee.lucli.config.DependencyConfig;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.Comparator;
+import java.util.stream.Stream;
 
 /**
  * Installer for ForgeBox-based CFML dependencies.
@@ -75,19 +78,22 @@ public class ForgeBoxDependencyInstaller implements DependencyInstaller {
 
         Path installDir = projectDir.resolve(dep.getInstallPath()).normalize();
         Path parent = installDir.getParent();
-        if (parent != null) {
-            Files.createDirectories(parent);
-        }
+        Path installRoot = parent != null ? parent : projectDir;
+        Files.createDirectories(installRoot);
+        Path installRootBoxJson = installRoot.resolve("box.json");
+        boolean hadInstallRootBoxJson = Files.exists(installRootBoxJson);
+
+        // Ensure reinstall behavior is deterministic.
+        deleteExisting(installDir);
 
         StringOutput.Quick.info("  Installing " + name + " from ForgeBox into " + dep.getInstallPath() + "...");
 
         ProcessBuilder pb = new ProcessBuilder(
             "box",
             "install",
-            pkgArg,
-            "--directory=" + installDir.toString()
+            pkgArg
         );
-        pb.directory(projectDir.toFile());
+        pb.directory(installRoot.toFile());
         pb.redirectErrorStream(true);
 
         Process p = pb.start();
@@ -101,6 +107,32 @@ public class ForgeBoxDependencyInstaller implements DependencyInstaller {
             );
         }
 
+        // CommandBox installs package endpoints as <working-dir>/<package-name>.
+        // Normalize into the configured installPath so lock entries are consistent
+        // even if the desired path basename differs from dependency name.
+        Path installedByBox = installRoot.resolve(name).normalize();
+        if (!Files.exists(installDir)) {
+            if (Files.exists(installedByBox)) {
+                if (!installedByBox.equals(installDir)) {
+                    Path configuredParent = installDir.getParent();
+                    if (configuredParent != null) {
+                        Files.createDirectories(configuredParent);
+                    }
+                    Files.move(installedByBox, installDir, StandardCopyOption.REPLACE_EXISTING);
+                }
+            } else {
+                throw new RuntimeException(
+                    "CommandBox install completed, but expected install directory was not found: " +
+                    installDir + "\nCommand output:\n" + output
+                );
+            }
+        }
+
+        // CommandBox creates a box.json in the working directory as a side-effect.
+        // If one did not exist before install, remove the generated file.
+        if (!hadInstallRootBoxJson && Files.exists(installRootBoxJson)) {
+            Files.deleteIfExists(installRootBoxJson);
+        }
         // Compute checksum of installed directory so we can detect changes on
         // subsequent runs similar to git/file installers.
         String checksum = ChecksumCalculator.calculate(installDir);
@@ -114,8 +146,28 @@ public class ForgeBoxDependencyInstaller implements DependencyInstaller {
         locked.setVersion(version != null && !version.isBlank() ? version.trim() : "latest");
         locked.setResolved("forgebox:" + pkgArg);
 
-        StringOutput.Quick.success("     Installed " + name + " from ForgeBox");
+        StringOutput.Quick.success("    ✓ Installed " + name + " from ForgeBox");
         return locked;
+    }
+
+    private void deleteExisting(Path path) throws Exception {
+        if (path == null || !Files.exists(path)) {
+            return;
+        }
+        if (Files.isDirectory(path)) {
+            try (Stream<Path> stream = Files.walk(path)) {
+                stream.sorted(Comparator.reverseOrder())
+                      .forEach(p -> {
+                          try {
+                              Files.deleteIfExists(p);
+                          } catch (Exception ignored) {
+                              // Best-effort cleanup
+                          }
+                      });
+            }
+        } else {
+            Files.deleteIfExists(path);
+        }
     }
 
     private boolean isCommandBoxAvailable() {

@@ -186,6 +186,9 @@ public class LuceeJsonConfig {
         if (envSettings.getInstallDevDependencies() != null) {
             base.setInstallDevDependencies(envSettings.getInstallDevDependencies());
         }
+        if (envSettings.getUseLockFile() != null) {
+            base.setUseLockFile(envSettings.getUseLockFile());
+        }
         // Add other settings as needed
     }
     

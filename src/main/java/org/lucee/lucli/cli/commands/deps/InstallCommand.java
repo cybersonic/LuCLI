@@ -125,6 +125,7 @@ public class InstallCommand implements Callable<Integer> {
         if (environment != null && config.getPackages().getInstallDevDependencies() != null) {
             installDev = config.getPackages().getInstallDevDependencies();
         }
+        boolean useLockFile = config.getDependencySettings().isUseLockFileEnabled();
         
         List<DependencyConfig> devDeps = installDev ? config.parseDevDependencies() : List.of();
         
@@ -209,11 +210,16 @@ public class InstallCommand implements Callable<Integer> {
             
             // If --include-nested-deps is specified, scan for nested projects and recurse dry-run
             if (includeNestedDeps) {
-                performDryRunNestedIntrospection(projectDir, allDeps, environment, production, force, depth, visited);
+                performDryRunNestedIntrospection(projectDir, allDeps, environment, production, force, depth, visited, useLockFile);
             }
             
             if (depth == 0) {
-                StringOutput.Quick.success("Run without --dry-run to install these dependencies and update lucee-lock.json.");
+                if (useLockFile) {
+                    StringOutput.Quick.success("Run without --dry-run to install these dependencies and update lucee-lock.json.");
+                } else {
+                    StringOutput.Quick.success("Run without --dry-run to install these dependencies.");
+                    StringOutput.Quick.info("Lock file is disabled (dependencySettings.useLockFile=false).");
+                }
                 if (!includeNestedDeps) {
                     StringOutput.Quick.info("\nTip: Use --include-nested-deps to see dependencies of nested projects in dry-run.");
                 }
@@ -229,7 +235,9 @@ public class InstallCommand implements Callable<Integer> {
         }
         
         // 7. Read existing lock file for verification
-        LuceeLockFile existingLockFile = LuceeLockFile.read(projectDir);
+        LuceeLockFile existingLockFile = useLockFile
+            ? LuceeLockFile.read(projectDir)
+            : new LuceeLockFile();
         
         StringOutput.Quick.info(" Installing dependencies...");
         GitDependencyInstaller gitInstaller = new GitDependencyInstaller(projectDir);
@@ -306,7 +314,7 @@ public class InstallCommand implements Callable<Integer> {
             }
         }
         // 8. Write lock file
-        if (successCount > 0 || unchangedCount > 0) {
+        if (useLockFile && (successCount > 0 || unchangedCount > 0)) {
             LuceeLockFile lockFile = new LuceeLockFile();
             lockFile.setDependencies(installedProd);
             lockFile.setDevDependencies(installedDev);
@@ -334,19 +342,23 @@ public class InstallCommand implements Callable<Integer> {
             StringOutput.Quick.info(skipCount + " dependencies skipped (unsupported sources)");
         }
         if (successCount > 0 || unchangedCount > 0) {
-            StringOutput.Quick.info(" Updated lucee-lock.json");
+            if (useLockFile) {
+                StringOutput.Quick.info(" Updated lucee-lock.json");
 
-            // Only the root project (depth == 0) influences LUCEE_EXTENSIONS
-            if (depth == 0) {
-                // Show the LUCEE_EXTENSIONS value that will be used when the
-                // server starts based on the newly written lock file.
-                String luceeExt = LuceeServerManager.buildLuceeExtensions(projectDir);
-                if (luceeExt != null && !luceeExt.isBlank()) {
-                    StringOutput.Quick.print("\nLUCEE_EXTENSIONS that will be set when the server starts:");
-                    StringOutput.Quick.print("  " + luceeExt);
-                } else {
-                    StringOutput.Quick.print("\nNo LUCEE_EXTENSIONS will be set from dependencies.");
+                // Only the root project (depth == 0) influences LUCEE_EXTENSIONS
+                if (depth == 0) {
+                    // Show the LUCEE_EXTENSIONS value that will be used when the
+                    // server starts based on the newly written lock file.
+                    String luceeExt = LuceeServerManager.buildLuceeExtensions(projectDir);
+                    if (luceeExt != null && !luceeExt.isBlank()) {
+                        StringOutput.Quick.print("\nLUCEE_EXTENSIONS that will be set when the server starts:");
+                        StringOutput.Quick.print("  " + luceeExt);
+                    } else {
+                        StringOutput.Quick.print("\nNo LUCEE_EXTENSIONS will be set from dependencies.");
+                    }
                 }
+            } else {
+                StringOutput.Quick.info(" Skipped lucee-lock.json update (dependencySettings.useLockFile=false)");
             }
         }
         
@@ -500,9 +512,28 @@ public class InstallCommand implements Callable<Integer> {
             String lockedVersion = locked.getVersion();
             if (requestedVersion == null || requestedVersion.isBlank()) {
                 // No explicit version requested: any forgebox-locked version is acceptable
-                return lockedVersion != null && !lockedVersion.isBlank();
+                if (lockedVersion == null || lockedVersion.isBlank()) {
+                    return false;
+                }
+            } else if (!requestedVersion.equals(lockedVersion)) {
+                return false;
             }
-            return requestedVersion.equals(lockedVersion);
+
+            // Keep lock file aligned with config changes that affect runtime behavior
+            // even when the package version itself has not changed.
+            String requestedInstallPath = requested.getInstallPath();
+            String lockedInstallPath = locked.getInstallPath();
+            if (requestedInstallPath != null && !requestedInstallPath.equals(lockedInstallPath)) {
+                return false;
+            }
+
+            String requestedMapping = requested.getMapping();
+            String lockedMapping = locked.getMapping();
+            if (requestedMapping != null && !requestedMapping.equals(lockedMapping)) {
+                return false;
+            }
+
+            return true;
         }
         
         // For non-extension file-based dependencies, compare configured path and installPath
@@ -616,9 +647,12 @@ public class InstallCommand implements Callable<Integer> {
                                                    boolean production,
                                                    boolean force,
                                                    int depth,
-                                                   Set<Path> visited) {
+                                                   Set<Path> visited,
+                                                   boolean useLockFile) {
         // Read existing lock file to find installed paths
-        LuceeLockFile existingLockFile = LuceeLockFile.read(projectDir);
+        LuceeLockFile existingLockFile = useLockFile
+            ? LuceeLockFile.read(projectDir)
+            : new LuceeLockFile();
         
         for (DependencyConfig dep : allDeps) {
             boolean isGit = "git".equals(dep.getSource());
