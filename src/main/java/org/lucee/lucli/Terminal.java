@@ -468,6 +468,15 @@ public class Terminal {
         help.append("  modules list        List available modules\n");
         help.append("  modules run <name>  Run a module\n");
         help.append("  <module-name>       Module shortcut (e.g., lint)\n\n");
+
+        help.append("AI:\\n");
+        help.append("  ai config           Manage AI config commands (alias: ai configure)\\n");
+        help.append("  ai config defaults  View/update LuCLI AI defaults\\n");
+        help.append("  ai config add       Add/update Lucee AI endpoint config\\n");
+        help.append("  ai config list      List Lucee AI endpoint config\\n");
+        help.append("  ai prompt           Run one-shot AI prompt\\n");
+        help.append("  ai list             List configured endpoints\\n");
+        help.append("  ai skill            Manage skills and skill paths\\n\\n");
         
         help.append("File System:\n");
         help.append("  ls, cd, pwd         Navigate directories\n");

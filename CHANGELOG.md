@@ -6,8 +6,16 @@ All notable changes to this project will be documented in this file.
  - **Bootstrap Installers + Download UX:** Added cross-platform bootstrap installers (`install.sh` and `install.ps1`) for one-line install flows (`curl ... | sh` and `irm ... | iex`), published as release assets, and documented in README/install docs. Updated the download page with copyable install commands, pinned-version examples, and automatic pinned-version updates from the latest release (with release workflow stamping).
  - **Adding JQ and Curl to docker image**  - this allows us to use common tools alongside with lucli in pipelines
  - **Fix: Module Install with `--rev` on Branch Names:** Fixed `modules install --rev <branch>` failing when git is not available. You can now install modules from both tags and branches in non-git environments.
+ - **Fix: Module Command Prompt Input Handling:** Stopped closing `System.in` in interactive module name prompts (`module` and `modules init`) to prevent follow-up terminal input from breaking after prompt use.
  - **Windows Bat File fixes**
  - **MCP Server for Modules:** Added `lucli mcp <module>` to run a per-module MCP server over stdio, exposing a module’s public functions as MCP tools (with JSON schema-derived input). 
+ - **AI Command (`lucli ai`) Enhancements:**
+   - Added `lucli ai` command group with provider config, prompting, testing, and skill-path management workflows.
+   - Added guided provider setup via `lucli ai config add --guided` with optional `--test-after-save`.
+   - Added `lucli ai config defaults` for default endpoint/model management, and made `lucli ai config` show subcommand help.
+   - Added provider listing from Lucee CFConfig (`lucli ai list` / `lucli ai config list`) and compatibility handling for `--refresh`.
+   - Added secret key masking by default in list/config output, with explicit `--show` to reveal full values when needed.
+   - Updated prompt UX to support repeatable `--image`, rules via `--rules-file` / `--rules-folder`, and clearer instruction composition behavior.
  - **Module Runtime Permissions + Env/Secrets Resolution:**
    - Added module metadata keys `permissions.env` and `permissions.secrets` to declare runtime env/secret aliases.
    - Added shorthand compatibility arrays `envVars` and `secrets` (treated as required aliases).

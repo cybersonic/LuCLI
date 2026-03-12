@@ -146,6 +146,25 @@ public final class LucliPaths {
         public Path secretsStoreFile() {
             return secretsDir().resolve("local.json");
         }
+        public Path aiDir() {
+            return home.resolve("ai");
+        }
+        public Path aiSettingsFile() {
+            return aiDir().resolve("settings.json");
+        }
+
+        public Path aiEndpointsFile() {
+            // Backward-compatible alias for earlier first-pass naming.
+            return aiSettingsFile();
+        }
+
+        public Path aiSkillsFile() {
+            return aiDir().resolve("skills.json");
+        }
+
+        public Path aiSkillPathsFile() {
+            return aiDir().resolve("skill-paths.json");
+        }
 
         public Path settingsFile() {
             return home.resolve("settings.json");
@@ -163,6 +182,11 @@ public final class LucliPaths {
             values.put("backupsDir", backupsDir().toString());
             values.put("secretsDir", secretsDir().toString());
             values.put("secretsStoreFile", secretsStoreFile().toString());
+            values.put("aiDir", aiDir().toString());
+            values.put("aiSettingsFile", aiSettingsFile().toString());
+            values.put("aiEndpointsFile", aiEndpointsFile().toString());
+            values.put("aiSkillsFile", aiSkillsFile().toString());
+            values.put("aiSkillPathsFile", aiSkillPathsFile().toString());
             values.put("settingsFile", settingsFile().toString());
             return values;
         }

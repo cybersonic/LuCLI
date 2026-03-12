@@ -317,7 +317,6 @@ private static ObjectNode loadSettingsRoot(ObjectMapper mapper, Path settingsFil
             Scanner scanner = new Scanner(System.in);
             System.out.print("Enter module name: ");
             moduleName = scanner.nextLine().trim();
-            scanner.close();
             if (moduleName.isEmpty()) {
                 System.err.println("Module name cannot be empty.");
                 System.exit(1);

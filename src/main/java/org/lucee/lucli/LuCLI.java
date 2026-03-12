@@ -20,6 +20,7 @@ import org.lucee.lucli.cli.commands.CfmlCommand;
 import org.lucee.lucli.cli.commands.CompletionCommand;
 import org.lucee.lucli.cli.commands.DaemonCommand;
 import org.lucee.lucli.cli.commands.McpCommand;
+import org.lucee.lucli.cli.commands.AiCommand;
 import org.lucee.lucli.cli.commands.modules.ModulesCommand;
 import org.lucee.lucli.cli.commands.ParrotCommand;
 import org.lucee.lucli.cli.commands.ReplCommand;
@@ -71,6 +72,7 @@ import picocli.CommandLine.Spec;
         RunCommand.class,
         DaemonCommand.class,
         McpCommand.class,
+        AiCommand.class,
         // Hidden/internal diagnostics
         XmlCommand.class,
         XSetCommand.class,
@@ -91,6 +93,8 @@ import picocli.CommandLine.Spec;
         "  lucli cfml 'now()'              # Execute CFML expression",
         "  lucli server start --version 6.2.2.91  # Start server with specific Lucee version",
         "  lucli modules list              # List available modules",
+        "  lucli system                    # Show system command help",
+        "  lucli system inspect --lucee    # Print Lucee CFConfig as formatted JSON",
         "  lucli system paths              # Show resolved LuCLI home paths",
         "  lucli system backup create      # Create a LuCLI home backup",
         "  lucli system backup prune --older-than 30d --keep 10  # Preview backup pruning"

@@ -60,6 +60,18 @@ Manage libraries and extensions:
 
 - [Dependency Management](dependencies-and-extensions/dependency-management/)
 
+## AI Features
+
+LuCLI has two major AI-related areas:
+
+- **AI prompting and configuration** via `lucli ai`
+- **MCP tool serving** via `lucli mcp`
+
+Start here:
+
+- [AI Prompting, Rules, and Skills](ai-features/ai-prompting-rules-and-skills/)
+- [MCP Module Servers](ai-features/mcp-module-servers/)
+
 ## Reference and contributing
 
 If you already know what you’re looking for:

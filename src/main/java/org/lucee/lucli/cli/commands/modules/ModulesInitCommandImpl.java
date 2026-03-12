@@ -57,7 +57,6 @@ public class ModulesInitCommandImpl implements Callable<Integer> {
             Scanner scanner = new Scanner(System.in);
             System.out.print("Enter module name: ");
             moduleName = scanner.nextLine().trim();
-            scanner.close();
             if (moduleName.isEmpty()) {
                 System.err.println("Module name cannot be empty.");
                 System.exit(1);
