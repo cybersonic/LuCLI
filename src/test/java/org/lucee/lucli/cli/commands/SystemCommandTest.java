@@ -15,6 +15,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import com.fasterxml.jackson.databind.JsonNode;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -59,6 +60,77 @@ class SystemCommandTest {
         Map<String, Object> parsed = mapper.readValue(out.toString(StandardCharsets.UTF_8), Map.class);
         assertEquals(tempDir.resolve("lucli-home").toAbsolutePath().normalize().toString(), parsed.get("home"));
         assertEquals("system-property", parsed.get("homeSource"));
+    }
+
+    @Test
+    void systemDefaultCommandShowsHelp() throws Exception {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        PrintStream originalOut = System.out;
+        try {
+            System.setOut(new PrintStream(out, true, StandardCharsets.UTF_8));
+            int exitCode = new CommandLine(new SystemCommand()).execute();
+            assertEquals(0, exitCode);
+        } finally {
+            System.setOut(originalOut);
+        }
+
+        String output = out.toString(StandardCharsets.UTF_8);
+        assertTrue(output.contains("Usage:"));
+        assertTrue(output.contains("inspect"));
+    }
+
+    @Test
+    void systemInspectLuceePrettyPrintsCfConfig() throws Exception {
+        Path cfConfigPath = tempDir.resolve("lucli-home/lucee-server/lucee-server/context/.CFConfig.json");
+        Files.createDirectories(cfConfigPath.getParent());
+        Files.writeString(
+            cfConfigPath,
+            "{\"admin\":{\"password\":\"secret\"},\"datasources\":[{\"name\":\"primary\"}]}"
+        );
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        PrintStream originalOut = System.out;
+        try {
+            System.setOut(new PrintStream(out, true, StandardCharsets.UTF_8));
+            int exitCode = new CommandLine(new SystemCommand()).execute("inspect", "--lucee");
+            assertEquals(0, exitCode);
+        } finally {
+            System.setOut(originalOut);
+        }
+
+        String output = out.toString(StandardCharsets.UTF_8).trim();
+        assertTrue(output.contains("\n"));
+
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode json = mapper.readTree(output);
+        assertEquals("secret", json.path("admin").path("password").asText());
+        assertEquals("primary", json.path("datasources").get(0).path("name").asText());
+    }
+
+    @Test
+    void systemInspectLuceeSupportsCustomPath() throws Exception {
+        Path customCfConfig = tempDir.resolve("custom/.CFConfig.json");
+        Files.createDirectories(customCfConfig.getParent());
+        Files.writeString(customCfConfig, "{\"mode\":\"custom\"}");
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        PrintStream originalOut = System.out;
+        try {
+            System.setOut(new PrintStream(out, true, StandardCharsets.UTF_8));
+            int exitCode = new CommandLine(new SystemCommand()).execute(
+                "inspect",
+                "--lucee",
+                "--path",
+                customCfConfig.toString()
+            );
+            assertEquals(0, exitCode);
+        } finally {
+            System.setOut(originalOut);
+        }
+
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode json = mapper.readTree(out.toString(StandardCharsets.UTF_8));
+        assertEquals("custom", json.path("mode").asText());
     }
 
     @Test

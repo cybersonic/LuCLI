@@ -30,6 +30,7 @@ import picocli.CommandLine.Parameters;
     description = "Manage LuCLI system-level state",
     mixinStandardHelpOptions = true,
     subcommands = {
+        SystemCommand.InspectCommand.class,
         SystemCommand.PathsCommand.class,
         SystemCommand.CleanCommand.class,
         SystemCommand.BackupCommand.class,
@@ -37,11 +38,73 @@ import picocli.CommandLine.Parameters;
     }
 )
 public class SystemCommand implements Callable<Integer> {
+    private static final Path DEFAULT_CFCONFIG_RELATIVE_PATH = Paths.get(
+        "lucee-server",
+        "lucee-server",
+        "context",
+        ".CFConfig.json"
+    );
 
     @Override
     public Integer call() throws Exception {
         new CommandLine(this).usage(System.out);
         return 0;
+    }
+
+    private static Path resolveCfConfigPath(String explicitPath) {
+        if (explicitPath != null && !explicitPath.isBlank()) {
+            return Paths.get(explicitPath);
+        }
+        return LucliPaths.resolve().home().resolve(DEFAULT_CFCONFIG_RELATIVE_PATH);
+    }
+
+    static int printCfConfig(Path cfConfigPath) {
+        Path normalizedPath = cfConfigPath.toAbsolutePath().normalize();
+        if (!Files.exists(normalizedPath)) {
+            StringOutput.Quick.error("CFConfig file not found: " + normalizedPath);
+            return 1;
+        }
+        if (!Files.isRegularFile(normalizedPath)) {
+            StringOutput.Quick.error("CFConfig path is not a file: " + normalizedPath);
+            return 1;
+        }
+
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            Object parsed = mapper.readValue(normalizedPath.toFile(), Object.class);
+            System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(parsed));
+            return 0;
+        } catch (Exception e) {
+            StringOutput.Quick.error("Failed to parse CFConfig JSON at " + normalizedPath + ": " + e.getMessage());
+            return 1;
+        }
+    }
+
+    @Command(
+        name = "inspect",
+        description = "Inspect LuCLI-managed state artifacts"
+    )
+    static class InspectCommand implements Callable<Integer> {
+        @Option(
+            names = "--lucee",
+            description = "Print Lucee CFConfig JSON in a readable format"
+        )
+        private boolean lucee;
+        @Option(
+            names = "--path",
+            paramLabel = "<path>",
+            description = "Optional path to .CFConfig.json (defaults to LuCLI home location)"
+        )
+        private String path;
+
+        @Override
+        public Integer call() throws Exception {
+            if (!lucee) {
+                new CommandLine(this).usage(System.out);
+                return 0;
+            }
+            return printCfConfig(resolveCfConfigPath(path));
+        }
     }
 
     @Command(

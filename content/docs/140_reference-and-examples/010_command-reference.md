@@ -29,11 +29,29 @@ Manage LuCLI system-level state and maintenance tasks.
 lucli system [OPTIONS] [COMMAND]
 ```
 
+**Notes:**
+- Running `lucli system` with no subcommand shows help.
+
 **Subcommands:**
+- **`inspect`** - Inspect LuCLI-managed state artifacts (including Lucee CFConfig JSON)
 
 - **`paths`** - Print resolved LuCLI paths (`LUCLI_HOME`, `servers`, `modules`, `secrets`, etc.)
 - **`clean`** - Safely prune cache/backup artifacts (dry-run by default)
 - **`backup`** - Create, list, verify, and restore LuCLI backups
+
+#### `lucli system inspect`
+
+Inspect LuCLI-managed artifacts.
+
+**Usage:**
+```bash
+lucli system inspect [--lucee] [--path /path/to/.CFConfig.json]
+```
+
+**Notes:**
+- `--lucee` pretty-prints the Lucee CFConfig JSON.
+- Default CFConfig path is `~/.lucli/lucee-server/lucee-server/context/.CFConfig.json`.
+- Use `--path` to inspect a different `.CFConfig.json` file.
 
 #### `lucli system paths`
 
