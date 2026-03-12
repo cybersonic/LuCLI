@@ -177,7 +177,7 @@
                         <div class="install-command-block">
                             <p class="install-command-label">Pinned version example</p>
                             <div class="install-command-row">
-                                <code id="install-command-unix-pinned">LUCLI_VERSION=0.2.1 curl -LsSf https://lucli.dev/install.sh | sh</code>
+                                <code id="install-command-unix-pinned">LUCLI_VERSION=0.2.23 curl -LsSf https://lucli.dev/install.sh | sh</code>
                                 <button class="install-copy-button" data-copy-target="install-command-unix-pinned" type="button">Copy</button>
                             </div>
                         </div>
@@ -203,7 +203,7 @@
                         <div class="install-command-block">
                             <p class="install-command-label">Pinned version example</p>
                             <div class="install-command-row">
-                                <code id="install-command-win-pinned">powershell -ExecutionPolicy Bypass -NoProfile -Command "&amp; { $env:LUCLI_VERSION='0.2.1'; irm https://lucli.dev/install.ps1 | iex }"</code>
+                                <code id="install-command-win-pinned">powershell -ExecutionPolicy Bypass -NoProfile -Command "&amp; { $env:LUCLI_VERSION='0.2.23'; irm https://lucli.dev/install.ps1 | iex }"</code>
                                 <button class="install-copy-button" data-copy-target="install-command-win-pinned" type="button">Copy</button>
                             </div>
                         </div>
