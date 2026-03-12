@@ -6,7 +6,7 @@
 
   <groupId>org.lucee</groupId>
   <artifactId>lucli</artifactId>
-  <version>0.2.11-SNAPSHOT</version>
+  <version>0.2.23</version>
 
   <name>LuCLI</name>
   <description>A CLI for Lucee</description>

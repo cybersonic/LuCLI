@@ -11,6 +11,8 @@ All notable changes to this project will be documented in this file.
  - **MCP Server for Modules:** Added `lucli mcp <module>` to run a per-module MCP server over stdio, exposing a module’s public functions as MCP tools (with JSON schema-derived input). 
  - **AI Command (`lucli ai`) Enhancements:**
    - Added `lucli ai` command group with provider config, prompting, testing, and skill-path management workflows.
+   - Registered `AiCommand` at the root CLI command level so `lucli ai ...` works consistently in one-shot command mode.
+   - Added AI command coverage in terminal help output (`ai config`, `ai config defaults`, `ai config add`, `ai config list`, `ai prompt`, `ai list`, `ai skill`).
    - Added guided provider setup via `lucli ai config add --guided` with optional `--test-after-save`.
    - Added `lucli ai config defaults` for default endpoint/model management, and made `lucli ai config` show subcommand help.
    - Added provider listing from Lucee CFConfig (`lucli ai list` / `lucli ai config list`) and compatibility handling for `--refresh`.
