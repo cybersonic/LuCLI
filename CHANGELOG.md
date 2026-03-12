@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
    - Added install/update permission approval prompts and persisted grants under `modulePermissions` in settings.
    - Extended BaseModule helpers to support injected context (`getEnv` precedence updates and new `getSecret` helper).
  - **System Backup Commands:** Added `lucli system backup` command group with `create`, `list`, `verify`, `prune`, and `restore` subcommands.
+ - **System Backup Create Progress:** `lucli system backup create` now shows a shared progress bar with source size totals, supports `--progress` for per-file archive output, and excludes legacy `~/.lucli/backups` content by default unless backups are explicitly included.
  - **System Inspect Command:** Added `lucli system inspect --lucee` to pretty-print Lucee CFConfig JSON from `~/.lucli/lucee-server/lucee-server/context/.CFConfig.json` (or `--path`), and made `lucli system` show help when run without a subcommand.
  - **Safer Backup Storage Location:** Backup archives now default to `~/.lucli_backups` (outside `~/.lucli`) to reduce risk of losing backups when cleaning or replacing the LuCLI home directory. Optional overrides are supported via `LUCLI_BACKUPS_DIR` or `-Dlucli.backups.dir`.
  - **Backup Retention Pruning:** Added `lucli system backup prune --older-than <duration> --keep <count> [--force]` with dry-run by default and checksum sidecar cleanup when pruning.

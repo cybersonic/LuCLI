@@ -21,6 +21,7 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.LongConsumer;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -35,6 +36,8 @@ public class SystemBackupManager {
 
     private static final DateTimeFormatter BACKUP_TIMESTAMP =
         DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss", Locale.ROOT).withZone(ZoneOffset.UTC);
+    private static final long BACKUP_PROGRESS_MIN_BYTES = 16L * 1024L * 1024L;
+    private static final long BACKUP_PROGRESS_MIN_NANOS = Duration.ofMillis(750).toNanos();
 
     public record BackupCreateOptions(
         String name,
@@ -49,6 +52,24 @@ public class SystemBackupManager {
         int fileCount,
         long archivedBytes
     ) {
+    }
+
+    public record BackupCreateProgress(
+        int totalFiles,
+        long totalBytes,
+        int filesCompleted,
+        long bytesCompleted,
+        String currentEntry,
+        boolean complete
+    ) {
+    }
+
+    @FunctionalInterface
+    public interface BackupCreateProgressListener {
+        void onProgress(BackupCreateProgress progress);
+    }
+
+    private record BackupArchiveEntry(Path sourcePath, String zipEntryPath) {
     }
 
     public record BackupInfo(
@@ -120,6 +141,10 @@ public class SystemBackupManager {
     }
 
     public BackupCreateResult createBackup(BackupCreateOptions options) throws IOException {
+        return createBackup(options, null);
+    }
+
+    public BackupCreateResult createBackup(BackupCreateOptions options, BackupCreateProgressListener progressListener) throws IOException {
         Files.createDirectories(paths.home());
         Files.createDirectories(paths.backupsDir());
 
@@ -155,34 +180,75 @@ public class SystemBackupManager {
             }
         }
 
+        Path backupsRoot = paths.backupsDir().toAbsolutePath().normalize();
+        List<BackupArchiveEntry> archiveEntries = new ArrayList<>(filesToArchive.size());
+        long totalSourceBytes = 0L;
+        for (Path file : filesToArchive) {
+            String relativePath = toBackupRelativePath(file, home, backupsRoot);
+            if (relativePath == null) {
+                continue;
+            }
+            long sizeBytes = Files.size(file);
+            totalSourceBytes += sizeBytes;
+            archiveEntries.add(new BackupArchiveEntry(file, relativePath));
+        }
+        final long plannedSourceBytes = totalSourceBytes;
+
+        emitProgress(progressListener, archiveEntries.size(), plannedSourceBytes, 0, 0L, null, false);
+
         int fileCount = 0;
         long byteCount = 0L;
+        final long[] lastProgressBytes = new long[] { 0L };
+        final long[] lastProgressNanos = new long[] { System.nanoTime() };
         try (OutputStream out = Files.newOutputStream(
                 archivePath,
                 StandardOpenOption.CREATE_NEW,
                 StandardOpenOption.WRITE
             );
             ZipOutputStream zipOut = new ZipOutputStream(out)) {
-
-            for (Path file : filesToArchive) {
-                String relativePath;
-                if (file.startsWith(home)) {
-                    relativePath = toZipEntryPath(home.relativize(file));
-                } else if (file.startsWith(paths.backupsDir().toAbsolutePath().normalize())) {
-                    Path backupsRoot = paths.backupsDir().toAbsolutePath().normalize();
-                    relativePath = toZipEntryPath(Paths.get("backups").resolve(backupsRoot.relativize(file)));
-                } else {
-                    // Defensive fallback: keep unknown paths out of archives.
-                    continue;
-                }
-                ZipEntry entry = new ZipEntry(relativePath);
-                entry.setTime(Files.getLastModifiedTime(file).toMillis());
+            for (BackupArchiveEntry archiveEntry : archiveEntries) {
+                ZipEntry entry = new ZipEntry(archiveEntry.zipEntryPath());
+                entry.setTime(Files.getLastModifiedTime(archiveEntry.sourcePath()).toMillis());
                 zipOut.putNextEntry(entry);
-                try (InputStream in = Files.newInputStream(file)) {
-                    byteCount += transfer(in, zipOut);
+                try (InputStream in = Files.newInputStream(archiveEntry.sourcePath())) {
+                    final int completedFilesBeforeCurrent = fileCount;
+                    final long completedBytesBeforeCurrent = byteCount;
+                    byteCount += transfer(in, zipOut, bytesWritten -> {
+                        if (progressListener == null) {
+                            return;
+                        }
+                        long now = System.nanoTime();
+                        long currentBytes = completedBytesBeforeCurrent + bytesWritten;
+                        long bytesDelta = currentBytes - lastProgressBytes[0];
+                        long nanosDelta = now - lastProgressNanos[0];
+                        if (bytesDelta >= BACKUP_PROGRESS_MIN_BYTES || nanosDelta >= BACKUP_PROGRESS_MIN_NANOS) {
+                            emitProgress(
+                                progressListener,
+                                archiveEntries.size(),
+                                plannedSourceBytes,
+                                completedFilesBeforeCurrent,
+                                currentBytes,
+                                archiveEntry.zipEntryPath(),
+                                false
+                            );
+                            lastProgressBytes[0] = currentBytes;
+                            lastProgressNanos[0] = now;
+                        }
+                    });
                 }
                 zipOut.closeEntry();
                 fileCount++;
+                emitProgress(
+                    progressListener,
+                    archiveEntries.size(),
+                    plannedSourceBytes,
+                    fileCount,
+                    byteCount,
+                    archiveEntry.zipEntryPath(),
+                    false
+                );
+                lastProgressBytes[0] = byteCount;
+                lastProgressNanos[0] = System.nanoTime();
             }
         }
 
@@ -196,6 +262,8 @@ public class SystemBackupManager {
             StandardOpenOption.WRITE
         );
 
+
+        emitProgress(progressListener, archiveEntries.size(), plannedSourceBytes, fileCount, byteCount, null, true);
         return new BackupCreateResult(archivePath, checksumPath, fileCount, byteCount);
     }
 
@@ -453,7 +521,11 @@ public class SystemBackupManager {
 
         if (!options.includeExistingBackups()) {
             Path backups = paths.backupsDir().toAbsolutePath().normalize();
+            Path legacyHomeBackups = home.resolve("backups").toAbsolutePath().normalize();
             if (file.startsWith(backups)) {
+                return false;
+            }
+            if (file.startsWith(legacyHomeBackups)) {
                 return false;
             }
         }
@@ -507,6 +579,16 @@ public class SystemBackupManager {
         return archivePath.resolveSibling(archivePath.getFileName().toString() + ".sha256");
     }
 
+    private String toBackupRelativePath(Path file, Path home, Path backupsRoot) {
+        if (file.startsWith(home)) {
+            return toZipEntryPath(home.relativize(file));
+        }
+        if (file.startsWith(backupsRoot)) {
+            return toZipEntryPath(Paths.get("backups").resolve(backupsRoot.relativize(file)));
+        }
+        return null;
+    }
+
     private String readExpectedSha256(Path checksumPath) throws IOException {
         List<String> lines = Files.readAllLines(checksumPath, StandardCharsets.UTF_8);
         for (String line : lines) {
@@ -551,12 +633,19 @@ public class SystemBackupManager {
     }
 
     private long transfer(InputStream in, OutputStream out) throws IOException {
+        return transfer(in, out, null);
+    }
+
+    private long transfer(InputStream in, OutputStream out, LongConsumer progressConsumer) throws IOException {
         byte[] buffer = new byte[8192];
         long total = 0L;
         int read;
         while ((read = in.read(buffer)) != -1) {
             out.write(buffer, 0, read);
             total += read;
+            if (progressConsumer != null) {
+                progressConsumer.accept(total);
+            }
         }
         return total;
     }
@@ -569,5 +658,27 @@ public class SystemBackupManager {
             total += read;
         }
         return total;
+    }
+
+    private void emitProgress(
+        BackupCreateProgressListener listener,
+        int totalFiles,
+        long totalBytes,
+        int filesCompleted,
+        long bytesCompleted,
+        String currentEntry,
+        boolean complete
+    ) {
+        if (listener == null) {
+            return;
+        }
+        listener.onProgress(new BackupCreateProgress(
+            totalFiles,
+            totalBytes,
+            filesCompleted,
+            bytesCompleted,
+            currentEntry,
+            complete
+        ));
     }
 }

@@ -97,7 +97,7 @@ Create a backup archive for the current LuCLI home.
 
 **Usage:**
 ```bash
-lucli system backup create [--name my-backup] [--exclude-caches] [--include-backups]
+lucli system backup create [--name my-backup] [--exclude-caches] [--include-backups] [--progress]
 ```
 
 #### `lucli system backup verify`

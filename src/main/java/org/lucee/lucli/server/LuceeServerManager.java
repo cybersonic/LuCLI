@@ -30,6 +30,7 @@ import org.lucee.lucli.server.runtime.RuntimeProvider;
 import org.lucee.lucli.server.runtime.TomcatRuntimeProvider;
 import org.lucee.lucli.server.runtime.DockerRuntimeProvider;
 import org.lucee.lucli.server.runtime.JettyRuntimeProvider;
+import org.lucee.lucli.ui.ProgressBar;
 
 /**
  * Manages Lucee server instances - downloading, configuring, starting, and stopping servers
@@ -1478,42 +1479,14 @@ public class LuceeServerManager {
                 byte[] buffer = new byte[8192];
                 long totalBytesRead = 0;
                 int bytesRead;
-                long lastProgressUpdate = 0;
-                
-                // Show initial progress
-                if (contentLength > 0) {
-                    System.out.print("\r[" + " ".repeat(50) + "] 0% (0 MB / " + formatMB(contentLength) + " MB)");
-                    System.out.flush();
-                }
+                ProgressBar progressBar = new ProgressBar("Downloading", contentLength > 0 ? contentLength : -1L);
                 
                 while ((bytesRead = in.read(buffer)) != -1) {
                     out.write(buffer, 0, bytesRead);
                     totalBytesRead += bytesRead;
-                    
-                    // Update progress every 100ms or when download completes
-                    long currentTime = System.currentTimeMillis();
-                    if (contentLength > 0 && (currentTime - lastProgressUpdate > 100 || bytesRead < buffer.length)) {
-                        double progress = (double) totalBytesRead / contentLength;
-                        int progressChars = (int) (progress * 50);
-                        
-                        String progressBar = "█".repeat(progressChars) + " ".repeat(50 - progressChars);
-                        String percentage = String.format("%.1f", progress * 100);
-                        
-                        System.out.print("\r[" + progressBar + "] " + percentage + "% (" + 
-                                       formatMB(totalBytesRead) + " MB / " + formatMB(contentLength) + " MB)");
-                        System.out.flush();
-                        lastProgressUpdate = currentTime;
-                    }
+                    progressBar.update(totalBytesRead);
                 }
-                
-                // Show completion
-                if (contentLength > 0) {
-                    System.out.println("\r[" + "█".repeat(50) + "] 100.0% (" + 
-                                     formatMB(totalBytesRead) + " MB / " + formatMB(contentLength) + " MB) - Download complete!");
-                } else {
-                    // If content length was unknown, just show total downloaded
-                    System.out.println("Download complete! (" + formatMB(totalBytesRead) + " MB)");
-                }
+                progressBar.complete("Download complete!");
             }
         } catch (IOException e) {
             // Fallback to simple download if progress fails
@@ -1528,13 +1501,6 @@ public class LuceeServerManager {
                 }
             }
         }
-    }
-    
-    /**
-     * Format bytes as MB with 1 decimal place
-     */ 
-    private String formatMB(long bytes) {
-        return String.format("%.1f", bytes / 1024.0 / 1024.0);
     }
     
     /**

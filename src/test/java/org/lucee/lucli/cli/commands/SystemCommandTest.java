@@ -151,7 +151,7 @@ class SystemCommandTest {
         Files.createDirectories(home);
         Files.writeString(home.resolve("settings.json"), "true");
 
-        int createExit = new CommandLine(new SystemCommand.BackupCommand.CreateCommand()).execute("--name", "test-backup");
+        int createExit = new CommandLine(new SystemCommand.BackupCommand.CreateCommand()).execute("--name", "test-backup", "--progress");
         assertEquals(0, createExit);
 
         Path archive = tempDir.resolve(".lucli_backups/test-backup.zip");

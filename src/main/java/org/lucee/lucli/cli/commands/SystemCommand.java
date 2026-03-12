@@ -14,6 +14,7 @@ import org.lucee.lucli.StringOutput;
 import org.lucee.lucli.paths.LucliPaths;
 import org.lucee.lucli.system.SystemBackupManager;
 import org.lucee.lucli.system.SystemCleaner;
+import org.lucee.lucli.ui.ProgressBar;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -279,15 +280,66 @@ public class SystemCommand implements Callable<Integer> {
             @Option(names = "--include-backups", description = "Include existing backups directory contents in the archive")
             private boolean includeBackups;
 
+            @Option(
+                names = "--progress",
+                description = "Show each file as it is added to the archive (verbose)"
+            )
+            private boolean progress;
+
             @Override
             public Integer call() throws Exception {
                 try {
-                    SystemBackupManager.BackupCreateResult result = manager().createBackup(
-                        new SystemBackupManager.BackupCreateOptions(
-                            name,
-                            !excludeCaches,
-                            includeBackups
-                        )
+                    SystemBackupManager backupManager = manager();
+                    SystemBackupManager.BackupCreateOptions createOptions = new SystemBackupManager.BackupCreateOptions(
+                        name,
+                        !excludeCaches,
+                        includeBackups
+                    );
+                    final boolean[] sourcePrinted = new boolean[] { false };
+                    final int[] lastPrintedFileCount = new int[] { 0 };
+                    final ProgressBar[] progressBar = new ProgressBar[1];
+
+                    SystemBackupManager.BackupCreateResult result = backupManager.createBackup(
+                        createOptions,
+                        backupProgress -> {
+                            if (!sourcePrinted[0]) {
+                                sourcePrinted[0] = true;
+                                StringOutput.Quick.info(
+                                    "Backup source: "
+                                        + backupProgress.totalFiles()
+                                        + " file(s), "
+                                        + ProgressBar.formatBytes(backupProgress.totalBytes())
+                                        + " ("
+                                        + backupProgress.totalBytes()
+                                        + " bytes)."
+                                );
+                                if (!progress) {
+                                    progressBar[0] = new ProgressBar("Backing up", backupProgress.totalBytes() > 0 ? backupProgress.totalBytes() : -1L);
+                                }
+                            }
+
+                            if (progress) {
+                                if (backupProgress.filesCompleted() > lastPrintedFileCount[0] && backupProgress.currentEntry() != null) {
+                                    lastPrintedFileCount[0] = backupProgress.filesCompleted();
+                                    System.out.println(
+                                        "  ["
+                                            + backupProgress.filesCompleted()
+                                            + "/"
+                                            + backupProgress.totalFiles()
+                                            + "] "
+                                            + backupProgress.currentEntry()
+                                    );
+                                }
+                                if (backupProgress.complete() && backupProgress.totalFiles() == 0) {
+                                    System.out.println("  [0/0] no files to archive");
+                                }
+                            } else if (progressBar[0] != null) {
+                                progressBar[0].update(backupProgress.bytesCompleted());
+                                if (backupProgress.complete()) {
+                                    progressBar[0].complete("Backup archive complete");
+                                }
+                            }
+                        }
                     );
 
                     StringOutput.Quick.success("Backup created.");

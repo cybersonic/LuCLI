@@ -12,7 +12,9 @@ import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.FileTime;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -46,6 +48,33 @@ class SystemBackupManagerTest {
     }
 
     @Test
+    void createBackupReportsProgressWithSourceTotals() throws Exception {
+        LucliPaths.ResolvedPaths paths = LucliPaths.forHome(tempDir.resolve("lucli-home"), "test");
+        seedHome(paths);
+
+        SystemBackupManager manager = new SystemBackupManager(paths);
+        List<SystemBackupManager.BackupCreateProgress> progressEvents = new ArrayList<>();
+        SystemBackupManager.BackupCreateResult created = manager.createBackup(
+            new SystemBackupManager.BackupCreateOptions("progress-test", true, false),
+            progressEvents::add
+        );
+
+        assertFalse(progressEvents.isEmpty());
+        SystemBackupManager.BackupCreateProgress first = progressEvents.get(0);
+        SystemBackupManager.BackupCreateProgress last = progressEvents.get(progressEvents.size() - 1);
+
+        assertEquals(0, first.filesCompleted());
+        assertEquals(0L, first.bytesCompleted());
+        assertEquals(created.fileCount(), first.totalFiles());
+        assertEquals(created.archivedBytes(), first.totalBytes());
+
+        assertTrue(last.complete());
+        assertEquals(created.fileCount(), last.filesCompleted());
+        assertEquals(created.archivedBytes(), last.bytesCompleted());
+        assertEquals(created.archivedBytes(), last.totalBytes());
+    }
+
+    @Test
     void createBackupCanExcludeCaches() throws Exception {
         LucliPaths.ResolvedPaths paths = LucliPaths.forHome(tempDir.resolve("lucli-home"), "test");
         seedHome(paths);
@@ -63,6 +92,23 @@ class SystemBackupManagerTest {
         assertTrue(entries.contains("settings.json"));
         assertFalse(entries.contains("express/cache.zip"));
         assertFalse(entries.contains("deps/git-cache/repo.txt"));
+    }
+
+    @Test
+    void createBackupExcludesLegacyHomeBackupsByDefault() throws Exception {
+        LucliPaths.ResolvedPaths paths = LucliPaths.forHome(tempDir.resolve("lucli-home"), "test");
+        seedHome(paths);
+        Path legacyBackupsDir = paths.home().resolve("backups");
+        Files.createDirectories(legacyBackupsDir);
+        Files.writeString(legacyBackupsDir.resolve("old-backup.zip"), "legacy");
+
+        SystemBackupManager manager = new SystemBackupManager(paths);
+        SystemBackupManager.BackupCreateResult created = manager.createBackup(
+            new SystemBackupManager.BackupCreateOptions("no-legacy-backups", true, false)
+        );
+
+        Set<String> entries = zipEntries(created.archivePath());
+        assertFalse(entries.contains("backups/old-backup.zip"));
     }
 
     @Test
