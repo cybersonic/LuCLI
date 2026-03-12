@@ -16,6 +16,18 @@ A modern, feature-rich command line interface for Lucee CFML that brings the pow
 
 ### Quick Start
 ```bash
+# Install latest (macOS/Linux)
+curl -LsSf https://lucli.dev/install.sh | sh
+
+# Install latest (Windows PowerShell)
+powershell -ExecutionPolicy Bypass -NoProfile -Command "irm https://lucli.dev/install.ps1 | iex"
+```
+
+Pin a specific version:
+```bash
+LUCLI_VERSION=0.2.1 curl -LsSf https://lucli.dev/install.sh | sh
+```
+```bash
 # Download the latest JAR release
 wget https://github.com/cybersonic/LuCLI/releases/latest/download/lucli.jar
 

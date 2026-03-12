@@ -147,6 +147,71 @@
             </div>
         </div>
     </section>
+
+    <section class="section">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">One-line install</h2>
+                <p class="section-description">
+                    Prefer a bootstrap installer? Use these commands to install LuCLI from the latest release.
+                </p>
+            </div>
+
+            <div class="downloads-grid">
+                <article class="download-card">
+                    <div class="download-card-header">
+                        <span class="download-os-label">macOS / Linux</span>
+                        <span class="download-os-name">Shell installer</span>
+                        <p class="download-description">
+                            Downloads and installs the latest LuCLI binary for your platform.
+                        </p>
+                    </div>
+                    <div class="download-card-footer">
+                        <div class="install-command-block">
+                            <p class="install-command-label">Latest</p>
+                            <div class="install-command-row">
+                                <code id="install-command-unix-latest">curl -LsSf https://lucli.dev/install.sh | sh</code>
+                                <button class="install-copy-button" data-copy-target="install-command-unix-latest" type="button">Copy</button>
+                            </div>
+                        </div>
+                        <div class="install-command-block">
+                            <p class="install-command-label">Pinned version example</p>
+                            <div class="install-command-row">
+                                <code id="install-command-unix-pinned">LUCLI_VERSION=0.2.1 curl -LsSf https://lucli.dev/install.sh | sh</code>
+                                <button class="install-copy-button" data-copy-target="install-command-unix-pinned" type="button">Copy</button>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="download-card">
+                    <div class="download-card-header">
+                        <span class="download-os-label">Windows</span>
+                        <span class="download-os-name">PowerShell installer</span>
+                        <p class="download-description">
+                            Uses PowerShell to download and run the LuCLI installer.
+                        </p>
+                    </div>
+                    <div class="download-card-footer">
+                        <div class="install-command-block">
+                            <p class="install-command-label">Latest</p>
+                            <div class="install-command-row">
+                                <code id="install-command-win-latest">powershell -ExecutionPolicy Bypass -NoProfile -Command "irm https://lucli.dev/install.ps1 | iex"</code>
+                                <button class="install-copy-button" data-copy-target="install-command-win-latest" type="button">Copy</button>
+                            </div>
+                        </div>
+                        <div class="install-command-block">
+                            <p class="install-command-label">Pinned version example</p>
+                            <div class="install-command-row">
+                                <code id="install-command-win-pinned">powershell -ExecutionPolicy Bypass -NoProfile -Command "&amp; { $env:LUCLI_VERSION='0.2.1'; irm https://lucli.dev/install.ps1 | iex }"</code>
+                                <button class="install-copy-button" data-copy-target="install-command-win-pinned" type="button">Copy</button>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            </div>
+        </div>
+    </section>
 </main>
  <cfinclude template="partials/footer.cfm">
 

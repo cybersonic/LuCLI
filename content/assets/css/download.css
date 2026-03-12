@@ -188,6 +188,59 @@
     text-align: center;
 }
 
+.install-command-block {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.install-command-label {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.install-command-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 0.5rem 0.6rem;
+}
+
+.install-command-row code {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+}
+
+.install-copy-button {
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.35rem 0.65rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.install-copy-button:hover {
+    border-color: var(--primary-color);
+    transform: translateY(-1px);
+}
+
 .download-secondary-button {
     display: inline-flex;
     align-items: center;

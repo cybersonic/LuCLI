@@ -78,6 +78,47 @@ jobs:
       - name: Download all artifacts
         if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
         uses: actions/download-artifact@v4
+      - name: Stamp website installer examples with release version
+        if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          version = os.environ["VERSION"]
+          path = Path("content/layouts/download.cfm")
+          text = path.read_text(encoding="utf-8")
+
+          text = re.sub(
+              r"LUCLI_VERSION=[0-9]+\.[0-9]+\.[0-9]+",
+              f"LUCLI_VERSION={version}",
+              text,
+          )
+          text = re.sub(
+              r"LUCLI_VERSION='[0-9]+\.[0-9]+\.[0-9]+'",
+              f"LUCLI_VERSION='{version}'",
+              text,
+          )
+
+          path.write_text(text, encoding="utf-8")
+          PY
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+
+      - name: Commit stamped installer examples
+        if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
+        run: |
+          if git diff --quiet -- content/layouts/download.cfm; then
+            echo "No website installer version changes to commit."
+            exit 0
+          fi
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add content/layouts/download.cfm
+          git commit -m "docs(download): stamp installer pinned examples for v${{ steps.version.outputs.VERSION }}"
+          git push
 
       - name: Setup JAR signing keystore
         if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
@@ -120,6 +161,15 @@ jobs:
               fi
             fi
           done
+
+          # Include bootstrap installers
+          if [ -f "scripts/install.sh" ]; then
+            cp "scripts/install.sh" "release-files/install.sh"
+            chmod +x "release-files/install.sh"
+          fi
+          if [ -f "scripts/install.ps1" ]; then
+            cp "scripts/install.ps1" "release-files/install.ps1"
+          fi
           
           echo "Release files prepared:"
           ls -lh release-files/
@@ -243,6 +293,8 @@ jobs:
             - **lucli-${{ steps.version.outputs.VERSION }}-linux** - Shell wrapper for Linux (Java 21+ required)
             - **lucli-${{ steps.version.outputs.VERSION }}-macos** - Shell wrapper for macOS (Java 21+ required)
             - **lucli-${{ steps.version.outputs.VERSION }}.bat** - Windows batch launcher (Java 21+ required)
+            - **install.sh** - POSIX installer bootstrap (`curl ... | sh`)
+            - **install.ps1** - PowerShell installer bootstrap (`irm ... | iex`)
             
             All downloads require Java 21+. JAR files are cryptographically signed for authenticity.
           files: release-files/*

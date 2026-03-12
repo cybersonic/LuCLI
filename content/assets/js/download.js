@@ -37,6 +37,71 @@
         }
     }
 
+    function decodeHtmlEntities(text) {
+        var parser = document.createElement('textarea');
+        parser.innerHTML = text;
+        return parser.value;
+    }
+
+    function copyTextToClipboard(text) {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            return navigator.clipboard.writeText(text);
+        }
+
+        return new Promise(function (resolve, reject) {
+            try {
+                var temp = document.createElement('textarea');
+                temp.value = text;
+                temp.setAttribute('readonly', '');
+                temp.style.position = 'absolute';
+                temp.style.left = '-9999px';
+                document.body.appendChild(temp);
+                temp.select();
+                var ok = document.execCommand('copy');
+                document.body.removeChild(temp);
+                if (!ok) {
+                    reject(new Error('Copy command returned false'));
+                    return;
+                }
+                resolve();
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
+
+    function setCopyButtonState(button, label) {
+        if (!button) return;
+        button.textContent = label;
+    }
+
+    function initCopyButtons() {
+        var buttons = document.querySelectorAll('.install-copy-button[data-copy-target]');
+        buttons.forEach(function (button) {
+            button.addEventListener('click', function () {
+                var targetId = button.getAttribute('data-copy-target');
+                if (!targetId) return;
+                var target = document.getElementById(targetId);
+                if (!target) return;
+
+                var text = decodeHtmlEntities(target.textContent || target.innerText || '');
+                copyTextToClipboard(text)
+                    .then(function () {
+                        setCopyButtonState(button, 'Copied');
+                        setTimeout(function () {
+                            setCopyButtonState(button, 'Copy');
+                        }, 1500);
+                    })
+                    .catch(function () {
+                        setCopyButtonState(button, 'Failed');
+                        setTimeout(function () {
+                            setCopyButtonState(button, 'Copy');
+                        }, 1500);
+                    });
+            });
+        });
+    }
+
     function configureDownloads(latestTag, latestVersion) {
         if (!latestTag || !latestVersion) {
             applyOsDetectionOnly();
@@ -55,6 +120,16 @@
         const latestReleaseLink = document.getElementById('latest-release-link');
         if (latestReleaseLink) {
             latestReleaseLink.href = 'https://github.com/cybersonic/LuCLI/releases/tag/' + latestTag;
+        }
+
+        var unixPinned = document.getElementById('install-command-unix-pinned');
+        if (unixPinned) {
+            unixPinned.textContent = 'LUCLI_VERSION=' + latestVersion + ' curl -LsSf https://lucli.dev/install.sh | sh';
+        }
+
+        var winPinned = document.getElementById('install-command-win-pinned');
+        if (winPinned) {
+            winPinned.textContent = 'powershell -ExecutionPolicy Bypass -NoProfile -Command "& { $env:LUCLI_VERSION=\'' + latestVersion + '\'; irm https://lucli.dev/install.ps1 | iex }"';
         }
 
         const osKey = detectOsKey();
@@ -92,6 +167,7 @@
     function initDownloadPage() {
         // Always apply OS detection, even if GitHub is blocked
         applyOsDetectionOnly();
+        initCopyButtons();
 
         if (!window.fetch) {
             // Older browsers: we can\'t safely call GitHub; just leave links as-is.

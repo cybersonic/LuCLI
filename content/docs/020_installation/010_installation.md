@@ -4,6 +4,29 @@ layout: docs
 
 ---
 LuCLI is distributed as a runnable JAR and as a self‑contained binary. You need a recent Java runtime (Java 17+) to run LuCLI or to build the binary.
+## Quick Install (recommended)
+
+Install the latest LuCLI using the bootstrap installers:
+
+```bash
+curl -LsSf https://lucli.dev/install.sh | sh
+```
+
+On Windows PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -NoProfile -Command "irm https://lucli.dev/install.ps1 | iex"
+```
+
+Install a specific version:
+
+```bash
+LUCLI_VERSION=0.2.1 curl -LsSf https://lucli.dev/install.sh | sh
+```
+
+```powershell
+powershell -ExecutionPolicy Bypass -NoProfile -Command "& { $env:LUCLI_VERSION='0.2.1'; irm https://lucli.dev/install.ps1 | iex }"
+```
 
 ## Requirements
 
