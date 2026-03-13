@@ -439,6 +439,13 @@ public class LuCLI implements Callable<Integer> {
         // Suppress JLine "Unable to create a system terminal" warning
         java.util.logging.Logger.getLogger("org.jline").setLevel(java.util.logging.Level.SEVERE);
 
+        // Binary name detection: when invoked via a symlink (e.g., "wheels" -> "lucli"),
+        // the shell stub passes the binary name as -Dlucli.binary.name. If the name
+        // is not "lucli", prepend it as the first argument so picocli routes to the
+        // module of that name. This lets "wheels generate model User" work identically
+        // to "lucli wheels generate model User".
+        args = prependBinaryNameIfAliased(args);
+
         // Pre-process: if first arg is a module name and --help/-h is present,
         // rewrite to "modules run <module> --help" so picocli routes to
         // ModulesRunCommandImpl (which delegates to the module's showHelp())
@@ -473,6 +480,40 @@ public class LuCLI implements Callable<Integer> {
         return exitCode;
     }
     
+    /**
+     * If the binary was invoked under an alias (e.g., via symlink "wheels" -> "lucli"),
+     * prepend the binary name as the first argument so it routes to the corresponding
+     * module. For example, "wheels generate model User" becomes
+     * ["wheels", "generate", "model", "User"] which routes to the "wheels" module.
+     *
+     * The binary name is passed from the shell stub via -Dlucli.binary.name.
+     * Only activates when the name is not "lucli" itself.
+     */
+    private static String[] prependBinaryNameIfAliased(String[] args) {
+        String binaryName = System.getProperty("lucli.binary.name", "lucli");
+
+        // Strip path separators in case the property contains a path fragment
+        if (binaryName.contains("/") || binaryName.contains("\\")) {
+            binaryName = Paths.get(binaryName).getFileName().toString();
+        }
+
+        // Only activate for non-lucli binary names
+        if ("lucli".equals(binaryName) || "lucli.sh".equals(binaryName) || binaryName.isEmpty()) {
+            return args;
+        }
+
+        // Note: verbose/debug flags are not yet parsed at this point (pre-picocli),
+        // so use LUCLI_DEBUG env var for early-boot diagnostics.
+        if (System.getenv("LUCLI_DEBUG") != null) {
+            System.err.println("[lucli] Binary name detection: invoked as '" + binaryName + "', prepending module name");
+        }
+
+        String[] newArgs = new String[args.length + 1];
+        newArgs[0] = binaryName;
+        System.arraycopy(args, 0, newArgs, 1, args.length);
+        return newArgs;
+    }
+
     /**
      * If the CLI args look like {@code <module-name> [subcommand...] --help},
      * rewrite them to {@code modules run <module-name> [subcommand...] --help}

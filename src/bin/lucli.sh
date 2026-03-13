@@ -66,11 +66,25 @@ then
 fi
 
 ##############################################################################
+##  BINARY NAME DETECTION                                                    ##
+##############################################################################
+
+# Detect the name used to invoke this binary (e.g., "lucli", "wheels").
+# When installed as a symlink (ln -s lucli wheels), the binary name tells
+# LuCLI to auto-route commands to the module of that name.
+binary_name=`basename "$0"`
+# Strip common extensions (.sh, .exe) for cleaner detection
+case "$binary_name" in
+    *.sh)  binary_name=`echo "$binary_name" | sed 's/\.sh$//'` ;;
+    *.exe) binary_name=`echo "$binary_name" | sed 's/\.exe$//'` ;;
+esac
+
+##############################################################################
 ##  EXECUTION                                                                ##
 ##############################################################################
 
 # This script is concatenated with a JAR file
 # The JAR starts after the __JAR_BOUNDARY__ marker
-exec "$java" $java_args -jar "$this_script" "$@"
+exec "$java" $java_args -Dlucli.binary.name="$binary_name" -jar "$this_script" "$@"
 exit
 __JAR_BOUNDARY__
