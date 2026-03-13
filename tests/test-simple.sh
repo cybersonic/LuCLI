@@ -13,6 +13,23 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
+# Provide a `timeout` command on platforms that lack GNU coreutils (e.g. macOS).
+# Falls back to a simple background-process implementation.
+if ! command -v timeout &> /dev/null; then
+    timeout() {
+        local secs="$1"; shift
+        "$@" &
+        local pid=$!
+        ( sleep "$secs"; kill "$pid" 2>/dev/null ) &
+        local watcher=$!
+        wait "$pid" 2>/dev/null
+        local rc=$?
+        kill "$watcher" 2>/dev/null
+        wait "$watcher" 2>/dev/null
+        return $rc
+    }
+fi
+
 # Test configuration
 LUCLI_JAR="target/lucli.jar"
 LUCLI_BINARY="target/lucli"
