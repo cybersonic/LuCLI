@@ -422,6 +422,13 @@ public class LuCLI implements Callable<Integer> {
         // Suppress JLine "Unable to create a system terminal" warning
         java.util.logging.Logger.getLogger("org.jline").setLevel(java.util.logging.Level.SEVERE);
 
+        // Binary name detection runs only on the initial CLI entry point — NOT in
+        // executeInProcess() — because modules call executeInProcess() recursively
+        // (e.g., BaseModule.executeCommand("server", ["start"])) and the system
+        // property persists for the JVM's lifetime. Prepending here ensures it
+        // happens exactly once.
+        args = prependBinaryNameIfAliased(args);
+
         int exitCode = executeInProcess(args);
         System.exit(exitCode);
     }
@@ -438,13 +445,6 @@ public class LuCLI implements Callable<Integer> {
     public static int executeInProcess(String[] args) throws Exception {
         // Suppress JLine "Unable to create a system terminal" warning
         java.util.logging.Logger.getLogger("org.jline").setLevel(java.util.logging.Level.SEVERE);
-
-        // Binary name detection: when invoked via a symlink (e.g., "wheels" -> "lucli"),
-        // the shell stub passes the binary name as -Dlucli.binary.name. If the name
-        // is not "lucli", prepend it as the first argument so picocli routes to the
-        // module of that name. This lets "wheels generate model User" work identically
-        // to "lucli wheels generate model User".
-        args = prependBinaryNameIfAliased(args);
 
         // Pre-process: if first arg is a module name and --help/-h is present,
         // rewrite to "modules run <module> --help" so picocli routes to
