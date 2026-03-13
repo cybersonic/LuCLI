@@ -217,11 +217,14 @@ run_test() {
     echo -e "${YELLOW}Command: ${command}${NC}"
     
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
-    local output
+    local output actual_exit_code
+    # Disable set -e so that commands expected to fail don't kill the script
+    set +e
     output=$(eval "$command" 2>&1)
-    local actual_exit_code=$?
+    actual_exit_code=$?
+    set -e
     local duration=$(($(date +%s) - start_time))
-    
+
     if [ $actual_exit_code -eq $expected_exit_code ]; then
         echo -e "${GREEN}✅ PASSED${NC}"
         record_test_result "$test_name" "passed" "$duration" ""
@@ -252,13 +255,16 @@ run_test_with_output() {
     
     echo -e "${CYAN}Testing: ${test_name}${NC}"
     echo -e "${YELLOW}Command: ${command}${NC}"
-    
+
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
-    
-    local output=$(eval "$command" 2>&1)
-    local exit_code=$?
+
+    local output exit_code
+    set +e
+    output=$(eval "$command" 2>&1)
+    exit_code=$?
+    set -e
     local duration=$(($(date +%s) - start_time))
-    
+
     if [ $exit_code -eq 0 ] && echo "$output" | grep -q "$expected_pattern"; then
         echo -e "${GREEN}✅ PASSED${NC}"
         echo -e "${PURPLE}Output sample: $(echo "$output" | head -n 1)${NC}"
@@ -291,11 +297,14 @@ run_help_test() {
     echo -e "${YELLOW}Command: ${command}${NC}"
     
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
-    
-    local output=$(eval "$command" 2>&1)
-    local exit_code=$?
+
+    local output exit_code
+    set +e
+    output=$(eval "$command" 2>&1)
+    exit_code=$?
+    set -e
     local duration=$(($(date +%s) - start_time))
-    
+
     # Help commands can exit with 0, 1, or 2, all are acceptable
     if ([ $exit_code -eq 0 ] || [ $exit_code -eq 1 ] || [ $exit_code -eq 2 ]) && echo "$output" | grep -q "$expected_pattern"; then
         echo -e "${GREEN}✅ PASSED${NC}"
