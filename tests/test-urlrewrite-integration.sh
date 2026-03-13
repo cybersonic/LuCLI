@@ -17,7 +17,7 @@ NC='\033[0m' # No Color
 TEST_SERVER_NAME="urlrewrite-integration-$(date +%s)"
 TEST_PORT=$((8800 + RANDOM % 100))  # Use random port between 8800-8899
 TIMEOUT_SECONDS=30
-MAX_WAIT_TIME=45
+MAX_WAIT_TIME=120  # Lucee needs time to download/extract runtime on first start in CI
 
 # Optional: filter tests by name (substring match, case-insensitive)
 TEST_FILTER="${TEST_FILTER:-}"
@@ -213,11 +213,18 @@ wait_count=0
 server_ready=false
 
 while [ $wait_count -lt $MAX_WAIT_TIME ]; do
-    if curl -s -o /dev/null -w "%{http_code}" "http://localhost:$TEST_PORT/" 2>/dev/null | grep -q "200"; then
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$TEST_PORT/" 2>/dev/null || echo "000")
+    if [ "$http_code" = "200" ]; then
         server_ready=true
         break
     fi
-    echo -n "."
+    # Show status code every 15 seconds for diagnostics
+    if [ $((wait_count % 15)) -eq 0 ] && [ $wait_count -gt 0 ]; then
+        echo ""
+        print_status "  Still waiting (${wait_count}s elapsed, last HTTP status: $http_code)..."
+    else
+        echo -n "."
+    fi
     sleep 1
     wait_count=$((wait_count + 1))
 done
@@ -225,7 +232,16 @@ done
 echo ""
 
 if [ "$server_ready" = false ]; then
-    print_error "Server did not become ready in time"
+    print_error "Server did not become ready in ${MAX_WAIT_TIME}s (last HTTP status: $http_code)"
+    # Show server status and logs for diagnostics
+    print_status "Server status:"
+    java -jar $LUCLI_JAR server status --name "$TEST_SERVER_NAME" 2>&1 || true
+    print_status "Checking if port $TEST_PORT is listening:"
+    if command -v ss &> /dev/null; then
+        ss -tlnp | grep "$TEST_PORT" || echo "  Port $TEST_PORT not found"
+    elif command -v lsof &> /dev/null; then
+        lsof -i ":$TEST_PORT" 2>/dev/null || echo "  Port $TEST_PORT not found"
+    fi
     exit 1
 fi
 
