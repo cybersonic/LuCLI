@@ -1,0 +1,63 @@
+package org.lucee.lucli;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+class LucliScriptLucliPrefixTest {
+
+    @TempDir
+    Path tempDir;
+
+    private Map<String, String> originalScriptEnvironment;
+
+    @BeforeEach
+    void setup() {
+        originalScriptEnvironment = new HashMap<>(LuCLI.scriptEnvironment);
+        LuCLI.scriptEnvironment = new HashMap<>(System.getenv());
+        LuCLI.currentEnvironment = null;
+        LuCLI.envFilePath = null;
+        LuCLI.clearRuntimeCwd();
+    }
+
+    @AfterEach
+    void cleanup() {
+        LuCLI.scriptEnvironment = new HashMap<>(originalScriptEnvironment);
+        LuCLI.currentEnvironment = null;
+        LuCLI.envFilePath = null;
+        LuCLI.clearRuntimeCwd();
+    }
+
+    @Test
+    void leadingLucliPrefixKeepsQuotedRunArgumentIntact() throws Exception {
+        Path cfsFile = tempDir.resolve("arg_count.cfs");
+        Path outputFile = tempDir.resolve("arg_count.txt");
+        Path lucliScript = tempDir.resolve("script.lucli");
+        String outputPath = outputFile.toAbsolutePath().toString().replace("\\", "\\\\").replace("'", "''");
+
+        Files.writeString(
+            cfsFile,
+            "fileWrite('" + outputPath + "', \"ARG_COUNT=\" & arrayLen(__arguments));",
+            StandardCharsets.UTF_8
+        );
+        Files.write(
+            lucliScript,
+            List.of(
+                "lucli run \"" + cfsFile.toAbsolutePath() + "\" \"Mark Drew\""
+            ),
+            StandardCharsets.UTF_8
+        );
+        int exitCode = LuCLI.executeLucliScript(lucliScript.toString());
+        assertEquals(0, exitCode);
+        assertEquals("ARG_COUNT=1", Files.readString(outputFile, StandardCharsets.UTF_8));
+    }
+}

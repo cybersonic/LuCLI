@@ -79,3 +79,7 @@ Append new entries at the bottom under the appropriate date/session.
 
 - In `.lucli` script execution, picocli subcommands return an integer exit code from `picocli.execute(...)`; if that value is ignored, script runs can print command errors but still exit with status `0`. Always propagate that exit code into the script-level result.
 - OpenAI-compatible provider entries in Lucee AI config should not include `custom.timeout`; recent OpenAI-compatible APIs can reject it as an unsupported request argument. In `lucli ai config add`, gate timeout serialization by provider/engine compatibility and keep explicit user feedback when `--timeout` is ignored.
+
+## 2026-05-07
+
+- In `.lucli` command normalization, stripping a leading `lucli` prefix must operate on the raw command string (substring after `lucli`) rather than reparsing/rejoining tokens; rebuilding from `parseCommand(...)` drops original quoting and can split values like `\"Mark Drew\"` into multiple arguments.
