@@ -42,22 +42,24 @@ class LucliScriptLucliPrefixTest {
         Path cfsFile = tempDir.resolve("arg_count.cfs");
         Path outputFile = tempDir.resolve("arg_count.txt");
         Path lucliScript = tempDir.resolve("script.lucli");
-        String outputPath = outputFile.toAbsolutePath().toString().replace("\\", "\\\\").replace("'", "''");
 
         Files.writeString(
             cfsFile,
-            "fileWrite('" + outputPath + "', \"ARG_COUNT=\" & arrayLen(__arguments));",
+            "if (arrayLen(__arguments) LT 1) {"
+                + " throw(type=\"LuCLI.TestFailure\", message=\"Missing output path argument\");"
+                + "} "
+                + "fileWrite(__arguments[1], \"ARG_COUNT=\" & arrayLen(__arguments));",
             StandardCharsets.UTF_8
         );
         Files.write(
             lucliScript,
             List.of(
-                "lucli run \"" + cfsFile.toAbsolutePath() + "\" \"Mark Drew\""
+                "lucli run \"" + cfsFile.toAbsolutePath() + "\" \"" + outputFile.toAbsolutePath() + "\" \"Mark Drew\""
             ),
             StandardCharsets.UTF_8
         );
         int exitCode = LuCLI.executeLucliScript(lucliScript.toString());
         assertEquals(0, exitCode);
-        assertEquals("ARG_COUNT=1", Files.readString(outputFile, StandardCharsets.UTF_8));
+        assertEquals("ARG_COUNT=2", Files.readString(outputFile, StandardCharsets.UTF_8));
     }
 }
