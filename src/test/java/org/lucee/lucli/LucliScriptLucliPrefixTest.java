@@ -40,26 +40,27 @@ class LucliScriptLucliPrefixTest {
     @Test
     void leadingLucliPrefixKeepsQuotedRunArgumentIntact() throws Exception {
         Path cfsFile = tempDir.resolve("arg_count.cfs");
-        Path outputFile = tempDir.resolve("arg_count.txt");
         Path lucliScript = tempDir.resolve("script.lucli");
 
         Files.writeString(
             cfsFile,
-            "if (arrayLen(__arguments) LT 1) {"
-                + " throw(type=\"LuCLI.TestFailure\", message=\"Missing output path argument\");"
+            "if (arrayLen(__arguments) NEQ 1) {"
+                + " throw(type=\"LuCLI.TestFailure\", message=\"Expected exactly one argument, got #arrayLen(__arguments)#\");"
                 + "} "
-                + "fileWrite(__arguments[1], \"ARG_COUNT=\" & arrayLen(__arguments));",
+                + "if (__arguments[1] NEQ \"Mark Drew\") {"
+                + " throw(type=\"LuCLI.TestFailure\", message=\"Expected quoted argument to stay intact, got '#__arguments[1]#'\");"
+                + "}",
             StandardCharsets.UTF_8
         );
         Files.write(
             lucliScript,
             List.of(
-                "lucli run \"" + cfsFile.toAbsolutePath() + "\" \"" + outputFile.toAbsolutePath() + "\" \"Mark Drew\""
+                "cd \"" + tempDir.toAbsolutePath() + "\"",
+                "lucli run \"arg_count.cfs\" \"Mark Drew\""
             ),
             StandardCharsets.UTF_8
         );
         int exitCode = LuCLI.executeLucliScript(lucliScript.toString());
         assertEquals(0, exitCode);
-        assertEquals("ARG_COUNT=2", Files.readString(outputFile, StandardCharsets.UTF_8));
     }
 }
