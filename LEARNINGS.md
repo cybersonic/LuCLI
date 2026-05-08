@@ -83,3 +83,8 @@ Append new entries at the bottom under the appropriate date/session.
 ## 2026-05-07
 
 - In `.lucli` command normalization, stripping a leading `lucli` prefix must operate on the raw command string (substring after `lucli`) rather than reparsing/rejoining tokens; rebuilding from `parseCommand(...)` drops original quoting and can split values like `\"Mark Drew\"` into multiple arguments.
+
+## 2026-05-08
+
+- For `lucli --version`, the most user-friendly Java runtime line comes from the first line of `java -version` output (normalized to remove quotes and the literal `version` token), with fallback to `java.runtime.name` + `java.runtime.version` when process execution is unavailable.
+- `tests/test-bats.sh` only rebuilds `target/lucli.jar` / `target/lucli` when artifacts are missing or unrunnable; after source changes, rebuild artifacts manually before running BATS to avoid stale-binary false negatives.

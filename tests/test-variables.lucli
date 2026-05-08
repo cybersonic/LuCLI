@@ -1,3 +1,4 @@
+
 cfml elvis="elvis"
 cfml writeoutput(elvis);
 cfml echo("Current time is: " & now() )
@@ -13,3 +14,4 @@ echo ${var1}
 echo "hello from the dev environment"
 #@end
 
+bitbucket demo_method name="Mark Drew" age=51 gender="male" attractiveness=100

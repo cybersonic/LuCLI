@@ -993,7 +993,7 @@ public class LuCLI implements Callable<Integer> {
      * 
      * Examples:
      *   getVersionInfo(false) -> "LuCLI 0.1.207-SNAPSHOT"
-     *   getVersionInfo(true)  -> "LuCLI 0.1.207-SNAPSHOT\nLucee Version: 6.2.2.91"
+     *   getVersionInfo(true)  -> "LuCLI 0.1.207-SNAPSHOT\nLucee Version: 6.2.2.91\nJava Version: openjdk 21.0.5 2024-10-15 LTS"
      */
     public static String getVersionInfo(boolean includeLucee) {
         StringBuilder info = new StringBuilder();
@@ -1017,6 +1017,8 @@ public class LuCLI implements Callable<Integer> {
                 info.append("Lucee Version: Error - ").append(e.getMessage()).append("\n");
             }
         }
+
+        info.append("Java Version: ").append(getJavaVersionInfo()).append("\n");
         
         // Copyright and repository information
         info.append("\n");
@@ -1057,6 +1059,54 @@ public class LuCLI implements Callable<Integer> {
         
         // Final fallback
         return "unknown";
+    }
+
+    private static String getJavaVersionInfo() {
+        try {
+            String javaExecutable = System.getProperty("os.name", "").toLowerCase().contains("win")
+                ? Paths.get(System.getProperty("java.home"), "bin", "java.exe").toString()
+                : Paths.get(System.getProperty("java.home"), "bin", "java").toString();
+
+            Process process = new ProcessBuilder(javaExecutable, "-version")
+                .redirectErrorStream(true)
+                .start();
+            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            process.waitFor();
+            if (output != null && !output.trim().isEmpty()) {
+                String[] lines = output.split("\\R");
+                for (String line : lines) {
+                    if (line == null || line.trim().isEmpty()) {
+                        continue;
+                    }
+                    return normalizeJavaVersionLine(line);
+                }
+            }
+        } catch (Exception e) {
+            // Fall back to runtime properties
+        }
+
+        String runtimeName = System.getProperty("java.runtime.name");
+        if (runtimeName == null || runtimeName.trim().isEmpty()) {
+            runtimeName = "java";
+        }
+        String runtimeVersion = System.getProperty("java.runtime.version");
+        if (runtimeVersion == null || runtimeVersion.trim().isEmpty()) {
+            runtimeVersion = System.getProperty("java.version");
+        }
+        if (runtimeVersion == null || runtimeVersion.trim().isEmpty()) {
+            return runtimeName;
+        }
+        return runtimeName + " " + runtimeVersion;
+    }
+
+    private static String normalizeJavaVersionLine(String line) {
+        String normalized = line == null ? "" : line.trim();
+        if (normalized.isEmpty()) {
+            return normalized;
+        }
+        normalized = normalized.replaceAll("\"", "");
+        normalized = normalized.replaceFirst("(?i)\\bversion\\b\\s+", "");
+        return normalized.trim();
     }
     
     /**

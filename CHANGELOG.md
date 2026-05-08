@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Version Output Includes Java Runtime:** `lucli --version` now includes a `Java Version:` line alongside LuCLI and Lucee versions, sourced from the active Java runtime (`java -version`) with a runtime-property fallback for portability.
 - **Fix: `.lucli` Leading `lucli` Prefix Now Preserves Quoted Arguments:** Script-line normalization no longer rebuilds commands from parsed tokens when stripping an initial `lucli` prefix. We now remove only the leading command token from the raw line, preserving quoted values like `name=\"Mark Drew\"` for module and `run` invocations. Added regression test coverage for quoted argument preservation.
 - **Fix: OpenAI AI Config Timeout Compatibility:** `lucli ai config add` now omits `custom.timeout` for OpenAI-compatible providers (`openai`, `copilot`, `deepseek`, `grok`, `ollama`, `perplexity`, `other`) because newer OpenAI-compatible APIs reject it as an unsupported request argument. When `--timeout` is provided for those providers, LuCLI now warns that the value is ignored.
 - **Admin Disabled Security Env Enforcement:** When `admin.enabled=false`, LuCLI now enforces `LUCEE_ADMIN_ENABLED=false` in runtime process environments and Tomcat `setenv.sh`/`setenv.bat` generation, and surfaces it in dry-run `--include-env` previews.
