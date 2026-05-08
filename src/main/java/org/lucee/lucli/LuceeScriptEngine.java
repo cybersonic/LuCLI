@@ -317,7 +317,7 @@ public class LuceeScriptEngine {
             String subCommand = "main";
 
             // Parse key=value arguments into a map
-            Map<String, String> argsMap = new java.util.HashMap<>();
+            Map<String, String> argsMap = new java.util.LinkedHashMap<>();
 
             // Check the first argument, if it doesnt have = then its the subcommand
             if (scriptArgs.length > 0) {

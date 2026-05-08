@@ -1558,6 +1558,19 @@ public class LuCLI implements Callable<Integer> {
     private static String getExecEvaluationInnerCommand(String command) {
         return command.substring(2, command.length() - 1).trim();
     }
+
+    private static boolean startsWithLucliCommandPrefix(String line) {
+        if (line == null) {
+            return false;
+        }
+        if (line.length() < 5) {
+            return false;
+        }
+        if (!line.regionMatches(true, 0, "lucli", 0, 5)) {
+            return false;
+        }
+        return line.length() == 5 || Character.isWhitespace(line.charAt(5));
+    }
     /**
      * Pre-scan a .lucli script for ${secret:...} placeholders so that we can
      * unlock the secret store and validate that all referenced secrets exist
@@ -1659,17 +1672,11 @@ public class LuCLI implements Callable<Integer> {
         }
 
 
-        String[] firstTokens = commandProcessor.parseCommand(scriptLine);
-        if (firstTokens.length > 0 && "lucli".equalsIgnoreCase(firstTokens[0])) {
-            if (firstTokens.length == 1) {
+        if (startsWithLucliCommandPrefix(scriptLine)) {
+            scriptLine = scriptLine.substring(5).trim();
+            if (scriptLine.isEmpty()) {
                 return new ScriptCommandResult("", 0); // bare "lucli"
             }
-            StringBuilder sb = new StringBuilder();
-            for (int i = 1; i < firstTokens.length; i++) {
-                if (i > 1) sb.append(' ');
-                sb.append(firstTokens[i]);
-            }
-            scriptLine = sb.toString();
         }
         
 
