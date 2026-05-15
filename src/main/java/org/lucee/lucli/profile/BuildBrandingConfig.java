@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.util.Properties;
+import org.lucee.lucli.LuCLI;
 
 /**
  * Build-time branding configuration loaded from a filtered resource file.
@@ -25,6 +26,7 @@ final class BuildBrandingConfig {
     private final String homeDirName;
     private final String backupsDirName;
     private final String bannerText;
+    private final String productVersion;
 
     private BuildBrandingConfig(
         boolean enabled,
@@ -34,7 +36,8 @@ final class BuildBrandingConfig {
         String promptPrefix,
         String homeDirName,
         String backupsDirName,
-        String bannerText
+        String bannerText,
+        String productVersion
     ) {
         this.enabled = enabled;
         this.binaryName = binaryName;
@@ -44,6 +47,7 @@ final class BuildBrandingConfig {
         this.homeDirName = homeDirName;
         this.backupsDirName = backupsDirName;
         this.bannerText = bannerText;
+        this.productVersion = productVersion;
     }
 
     static CliProfile resolveProfile(String normalizedBinaryName) {
@@ -68,7 +72,10 @@ final class BuildBrandingConfig {
         String promptPrefix = trimToNull(props.getProperty("branding.promptPrefix"));
         String homeDirName = trimToNull(props.getProperty("branding.homeDirName"));
         String backupsDirName = trimToNull(props.getProperty("branding.backupsDirName"));
-        String bannerText = decodeEscapedNewlines(trimToNull(props.getProperty("branding.bannerText")));
+        String bannerText = interpolateBannerTokens(
+            decodeEscapedNewlines(trimToNull(props.getProperty("branding.bannerText")))
+        );
+        String productVersion = trimToNull(props.getProperty("branding.productVersion"));
 
         return new BuildBrandingConfig(
             enabled,
@@ -78,7 +85,8 @@ final class BuildBrandingConfig {
             promptPrefix,
             homeDirName,
             backupsDirName,
-            bannerText
+            bannerText,
+            productVersion
         );
     }
 
@@ -102,7 +110,7 @@ final class BuildBrandingConfig {
     private static BuildBrandingConfig loadFromResource() {
         try (InputStream in = BuildBrandingConfig.class.getResourceAsStream(RESOURCE_PATH)) {
             if (in == null) {
-                return new BuildBrandingConfig(false, null, null, null, null, null, null, null);
+                return new BuildBrandingConfig(false, null, null, null, null, null, null, null, null);
             }
             Properties props = new Properties();
             props.load(in);
@@ -119,6 +127,7 @@ final class BuildBrandingConfig {
         String resolvedHome = firstNonBlank(homeDirName, "." + resolvedName);
         String resolvedBanner = firstNonBlank(bannerText, new DefaultProfile().bannerText());
         String resolvedBackups = trimToNull(backupsDirName);
+        String resolvedProductVersion = trimToNull(productVersion);
 
         return new CliProfile() {
             @Override
@@ -145,6 +154,10 @@ final class BuildBrandingConfig {
             public String displayName() {
                 return resolvedDisplayName;
             }
+            @Override
+            public String productVersionOverride() {
+                return resolvedProductVersion;
+            }
 
             @Override
             public String backupsDirName() {
@@ -165,6 +178,13 @@ final class BuildBrandingConfig {
             return null;
         }
         return value.replace("\\n", "\n");
+    }
+
+    private static String interpolateBannerTokens(String bannerText) {
+        if (bannerText == null || bannerText.isBlank()) {
+            return bannerText;
+        }
+        return bannerText.replace("${LUCLI_VERSION}", LuCLI.getVersion());
     }
 
     private static String firstNonBlank(String... values) {

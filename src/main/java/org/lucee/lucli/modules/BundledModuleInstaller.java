@@ -115,7 +115,10 @@ public final class BundledModuleInstaller {
             walk.forEach(path -> {
                 try {
                     Path relative = source.relativize(path);
-                    Path destination = target.resolve(relative);
+                    Path destination = target;
+                    for (Path part : relative) {
+                        destination = destination.resolve(part.toString());
+                    }
                     if (Files.isDirectory(path)) {
                         Files.createDirectories(destination);
                     } else {

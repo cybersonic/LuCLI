@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.regex.Matcher;
@@ -1006,7 +1007,12 @@ public class LuCLI implements Callable<Integer> {
         // Version information header first so tools/tests that only see the
         // first few lines can still parse the version without needing to
         // strip the ASCII art banner.
-        String ver = getVersion();
+        String ver = activeProfile.productVersionOverride();
+        if (ver == null || ver.trim().isEmpty()) {
+            ver = getVersion();
+        } else {
+            ver = ver.trim();
+        }
         info.append(activeProfile.displayName()).append(" Version: ").append(ver).append("\n");
 
         // ASCII art banner — provided by the active profile
@@ -1038,6 +1044,12 @@ public class LuCLI implements Callable<Integer> {
      * @return version in pom
      */
     public static String getVersion() {
+        // Preferred source: filtered build resource available in both
+        // mvn exec:java development runs and packaged JAR executions.
+        String resourceVersion = readVersionFromResource();
+        if (resourceVersion != null && !resourceVersion.isBlank()) {
+            return resourceVersion;
+        }
         // Try to read version from JAR manifest
         Package pkg = LuCLI.class.getPackage();
         if (pkg != null) {
@@ -1064,6 +1076,24 @@ public class LuCLI implements Callable<Integer> {
         
         // Final fallback
         return "unknown";
+    }
+
+    private static String readVersionFromResource() {
+        try (java.io.InputStream in = LuCLI.class.getResourceAsStream("/lucli/version.properties")) {
+            if (in == null) {
+                return null;
+            }
+            Properties props = new Properties();
+            props.load(in);
+            String version = props.getProperty("lucli.version");
+            if (version == null) {
+                return null;
+            }
+            version = version.trim();
+            return version.isEmpty() ? null : version;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private static String getJavaVersionInfo() {

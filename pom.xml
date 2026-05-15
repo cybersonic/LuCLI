@@ -38,6 +38,7 @@
     <branding.homeDirName></branding.homeDirName>
     <branding.backupsDirName></branding.backupsDirName>
     <branding.bannerText></branding.bannerText>
+    <branding.productVersion></branding.productVersion>
   </properties>
 
 

@@ -26,6 +26,17 @@ public interface CliProfile {
     String displayName();
 
     /**
+     * Optional product version override used for the top "DisplayName Version"
+     * line in {@code --version} output.
+     *
+     * <p>When {@code null} or blank, LuCLI falls back to its own implementation
+     * version from the JAR manifest.</p>
+     */
+    default String productVersionOverride() {
+        return null;
+    }
+
+    /**
      * Directory name for backups, placed alongside the home directory.
      * Defaults to {@code homeDirName() + "_backups"} (e.g. {@code ".lucli_backups"}).
      */

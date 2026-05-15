@@ -142,6 +142,9 @@ brew install bats-core
 
 # Filter BATS tests by name
 TEST_FILTER="dry-run" ./tests/test-bats.sh
+
+# Show full command output for failing BATS tests
+bats --print-output-on-failure tests/bats/01_smoke.bats
 ```
 
 Migration guidance:
