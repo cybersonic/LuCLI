@@ -39,6 +39,7 @@ import org.lucee.lucli.cli.commands.deps.InstallCommand;
 import org.lucee.lucli.cli.commands.logic.IfCommand;
 import org.lucee.lucli.cli.commands.logic.XSetCommand;
 import org.lucee.lucli.modules.ModuleCommand;
+import org.lucee.lucli.modules.BundledModuleInstaller;
 import org.lucee.lucli.script.LucliScriptPreprocessor;
 import org.lucee.lucli.secrets.LocalSecretStore;
 import org.lucee.lucli.secrets.SecretStore;
@@ -530,6 +531,10 @@ public class LuCLI implements Callable<Integer> {
     public static int executeInProcess(String[] args) throws Exception {
         // Suppress JLine "Unable to create a system terminal" warning
         java.util.logging.Logger.getLogger("org.jline").setLevel(java.util.logging.Level.SEVERE);
+
+        // Install any modules bundled into /modules-install in the active profile home.
+        // Runs once per process and is safe to call from both CLI entry and embedded flows.
+        BundledModuleInstaller.ensureBundledModulesInstalled();
 
         // For one-shot in-process invocations, default runtime CWD to JVM user.dir
         // unless a session flow has already provided an explicit value.
