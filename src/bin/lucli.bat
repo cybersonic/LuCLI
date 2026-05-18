@@ -20,8 +20,8 @@ rem Prefer embedded JRE
 if exist "%SCRIPT_DIR%\jre\bin\java.exe" (
     set "JAVA_CMD=%SCRIPT_DIR%\jre\bin\java.exe"
 ) else (
-    rem Then JAVA_HOME
-    if defined JAVA_HOME (
+    rem Then JAVA_HOME (only when it points at a real java.exe)
+    if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" (
         set "JAVA_CMD=%JAVA_HOME%\bin\java.exe"
     ) else (
         rem Fallback to PATH

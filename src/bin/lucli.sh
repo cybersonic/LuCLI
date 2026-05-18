@@ -52,10 +52,14 @@ esac
 # Default the Java command to be global java call
 java=java
 
-# Check if JAVA_HOME is set, then use it
+# Check if JAVA_HOME is set and valid, then use it
 if [ -n "$JAVA_HOME" ]
 then
-    java="$JAVA_HOME/bin/java"
+    java_from_home="$JAVA_HOME/bin/java"
+    if [ -x "$java_from_home" ]
+    then
+        java="$java_from_home"
+    fi
 fi
 
 # Verify if we have an embedded version, if we do use that instead.

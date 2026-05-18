@@ -149,6 +149,29 @@ class JavaRuntimeCheckTest {
     }
 
     @Test
+    void findJavaRuntimeErrorInMapAllowsJavaFromPathWhenHomesUnset(@TempDir Path tmp) throws IOException {
+        Path javaOnPathDir = Files.createDirectories(tmp.resolve("bin-on-path"));
+        Files.createFile(javaOnPathDir.resolve("java"));
+
+        Map<String, String> childEnv = new HashMap<>();
+        childEnv.put("PATH", javaOnPathDir.toString());
+
+        assertNull(JavaRuntimeCheck.findJavaRuntimeErrorInMap(childEnv, LINUX),
+                "java on PATH should satisfy runtime preflight when JAVA_HOME/JRE_HOME are unset");
+    }
+
+    @Test
+    void findJavaRuntimeErrorInMapFailsWhenHomesUnsetAndPathHasNoJava(@TempDir Path tmp) throws IOException {
+        Path emptyPathDir = Files.createDirectories(tmp.resolve("empty-path"));
+
+        Map<String, String> childEnv = new HashMap<>();
+        childEnv.put("PATH", emptyPathDir.toString());
+
+        assertNotNull(JavaRuntimeCheck.findJavaRuntimeErrorInMap(childEnv, LINUX),
+                "Missing JAVA_HOME/JRE_HOME with no java on PATH should still error");
+    }
+
+    @Test
     void errorMessageUsesActionableFormat() {
         // Smoke-test that the exact format hasn't regressed on users who may
         // have scripted around the error (e.g. grep in CI logs).
