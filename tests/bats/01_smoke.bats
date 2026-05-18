@@ -30,6 +30,7 @@ teardown() {
     run_lucli --version
     assert_success
     assert_output_contains "LuCLI"
+    assert_output_contains "Java Version:"
 }
 
 @test "lucee version output includes Lucee" {

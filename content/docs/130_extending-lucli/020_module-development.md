@@ -17,6 +17,8 @@ A module is a CFML component that LuCLI executes as a first-class command. It li
 
 For **using** modules (running them, shortcuts, arguments), see [Running Modules](../040_cfml-execution/040_modules/).
 
+For packaging a module as a standalone branded binary for distribution, see [Building Branded Binaries](./030_building-branded-binaries/).
+
 ## Creating a new module
 
 The easiest way to start is with the built‑in template:

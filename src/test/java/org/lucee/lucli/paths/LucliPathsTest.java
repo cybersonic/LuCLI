@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.profile.CliProfile;
 import org.lucee.lucli.profile.DefaultProfile;
+import org.lucee.lucli.profile.MarkspressoProfile;
 import org.lucee.lucli.profile.WheelsProfile;
 
 class LucliPathsTest {
@@ -102,6 +103,21 @@ class LucliPathsTest {
         LucliPaths.ResolvedPaths paths = LucliPaths.forHome(Path.of("/tmp/wheels"), "test");
 
         assertEquals(Path.of("/tmp/.wheels_backups").toAbsolutePath().normalize(), paths.backupsDir());
+    }
+
+    @Test
+    void resolveFallsBackToMarkspressoHomeWhenProfileIsMarkspresso() {
+        LuCLI.setActiveProfile(new MarkspressoProfile());
+
+        LucliPaths.ResolvedPaths paths = LucliPaths.resolve(
+            null,
+            null,
+            "/tmp/home"
+        );
+
+        assertEquals(Path.of("/tmp/home/.markspresso").toAbsolutePath().normalize(), paths.home());
+        assertEquals("default", paths.homeSource());
+        assertEquals(Path.of("/tmp/home/.markspresso_backups").toAbsolutePath().normalize(), paths.backupsDir());
     }
 
     @Test

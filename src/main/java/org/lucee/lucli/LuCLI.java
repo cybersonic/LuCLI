@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.regex.Matcher;
@@ -39,6 +40,7 @@ import org.lucee.lucli.cli.commands.deps.InstallCommand;
 import org.lucee.lucli.cli.commands.logic.IfCommand;
 import org.lucee.lucli.cli.commands.logic.XSetCommand;
 import org.lucee.lucli.modules.ModuleCommand;
+import org.lucee.lucli.modules.BundledModuleInstaller;
 import org.lucee.lucli.script.LucliScriptPreprocessor;
 import org.lucee.lucli.secrets.LocalSecretStore;
 import org.lucee.lucli.secrets.SecretStore;
@@ -531,6 +533,10 @@ public class LuCLI implements Callable<Integer> {
         // Suppress JLine "Unable to create a system terminal" warning
         java.util.logging.Logger.getLogger("org.jline").setLevel(java.util.logging.Level.SEVERE);
 
+        // Install any modules bundled into /modules-install in the active profile home.
+        // Runs once per process and is safe to call from both CLI entry and embedded flows.
+        BundledModuleInstaller.ensureBundledModulesInstalled();
+
         // For one-shot in-process invocations, default runtime CWD to JVM user.dir
         // unless a session flow has already provided an explicit value.
         if (runtimeCwd == null) {
@@ -993,7 +999,7 @@ public class LuCLI implements Callable<Integer> {
      * 
      * Examples:
      *   getVersionInfo(false) -> "LuCLI 0.1.207-SNAPSHOT"
-     *   getVersionInfo(true)  -> "LuCLI 0.1.207-SNAPSHOT\nLucee Version: 6.2.2.91"
+     *   getVersionInfo(true)  -> "LuCLI 0.1.207-SNAPSHOT\nLucee Version: 6.2.2.91\nJava Version: openjdk 21.0.5 2024-10-15 LTS"
      */
     public static String getVersionInfo(boolean includeLucee) {
         StringBuilder info = new StringBuilder();
@@ -1001,7 +1007,12 @@ public class LuCLI implements Callable<Integer> {
         // Version information header first so tools/tests that only see the
         // first few lines can still parse the version without needing to
         // strip the ASCII art banner.
-        String ver = getVersion();
+        String ver = activeProfile.productVersionOverride();
+        if (ver == null || ver.trim().isEmpty()) {
+            ver = getVersion();
+        } else {
+            ver = ver.trim();
+        }
         info.append(activeProfile.displayName()).append(" Version: ").append(ver).append("\n");
 
         // ASCII art banner — provided by the active profile
@@ -1017,6 +1028,8 @@ public class LuCLI implements Callable<Integer> {
                 info.append("Lucee Version: Error - ").append(e.getMessage()).append("\n");
             }
         }
+
+        info.append("Java Version: ").append(getJavaVersionInfo()).append("\n");
         
         // Copyright and repository information
         info.append("\n");
@@ -1031,6 +1044,12 @@ public class LuCLI implements Callable<Integer> {
      * @return version in pom
      */
     public static String getVersion() {
+        // Preferred source: filtered build resource available in both
+        // mvn exec:java development runs and packaged JAR executions.
+        String resourceVersion = readVersionFromResource();
+        if (resourceVersion != null && !resourceVersion.isBlank()) {
+            return resourceVersion;
+        }
         // Try to read version from JAR manifest
         Package pkg = LuCLI.class.getPackage();
         if (pkg != null) {
@@ -1057,6 +1076,72 @@ public class LuCLI implements Callable<Integer> {
         
         // Final fallback
         return "unknown";
+    }
+
+    private static String readVersionFromResource() {
+        try (java.io.InputStream in = LuCLI.class.getResourceAsStream("/lucli/version.properties")) {
+            if (in == null) {
+                return null;
+            }
+            Properties props = new Properties();
+            props.load(in);
+            String version = props.getProperty("lucli.version");
+            if (version == null) {
+                return null;
+            }
+            version = version.trim();
+            return version.isEmpty() ? null : version;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String getJavaVersionInfo() {
+        try {
+            String javaExecutable = System.getProperty("os.name", "").toLowerCase().contains("win")
+                ? Paths.get(System.getProperty("java.home"), "bin", "java.exe").toString()
+                : Paths.get(System.getProperty("java.home"), "bin", "java").toString();
+
+            Process process = new ProcessBuilder(javaExecutable, "-version")
+                .redirectErrorStream(true)
+                .start();
+            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            process.waitFor();
+            if (output != null && !output.trim().isEmpty()) {
+                String[] lines = output.split("\\R");
+                for (String line : lines) {
+                    if (line == null || line.trim().isEmpty()) {
+                        continue;
+                    }
+                    return normalizeJavaVersionLine(line);
+                }
+            }
+        } catch (Exception e) {
+            // Fall back to runtime properties
+        }
+
+        String runtimeName = System.getProperty("java.runtime.name");
+        if (runtimeName == null || runtimeName.trim().isEmpty()) {
+            runtimeName = "java";
+        }
+        String runtimeVersion = System.getProperty("java.runtime.version");
+        if (runtimeVersion == null || runtimeVersion.trim().isEmpty()) {
+            runtimeVersion = System.getProperty("java.version");
+        }
+        if (runtimeVersion == null || runtimeVersion.trim().isEmpty()) {
+            return runtimeName;
+        }
+        return runtimeName + " " + runtimeVersion;
+    }
+
+    private static String normalizeJavaVersionLine(String line) {
+        String normalized = line == null ? "" : line.trim();
+        if (normalized.isEmpty()) {
+            return normalized;
+        }
+        normalized = normalized.replaceAll("\"", "");
+        normalized = normalized.replaceFirst("(?i)\\bversion\\b\\s+", "");
+        return normalized.trim();
     }
     
     /**

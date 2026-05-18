@@ -6,7 +6,7 @@
 
   <groupId>org.lucee</groupId>
   <artifactId>lucli</artifactId>
-  <version>0.3.11-SNAPSHOT</version>
+  <version>0.3.13-SNAPSHOT</version>
 
   <name>LuCLI</name>
   <description>A CLI for Lucee</description>
@@ -30,6 +30,15 @@
     <jarsigner.alias>lucli</jarsigner.alias>
     <jarsigner.storepass></jarsigner.storepass>
     <jarsigner.keypass></jarsigner.keypass>
+    <branding.enabled>false</branding.enabled>
+    <branding.binaryName></branding.binaryName>
+    <branding.profileName></branding.profileName>
+    <branding.displayName></branding.displayName>
+    <branding.promptPrefix></branding.promptPrefix>
+    <branding.homeDirName></branding.homeDirName>
+    <branding.backupsDirName></branding.backupsDirName>
+    <branding.bannerText></branding.bannerText>
+    <branding.productVersion></branding.productVersion>
   </properties>
 
 
@@ -163,6 +172,21 @@
   </dependencies>
 
   <build>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+        <filtering>false</filtering>
+      </resource>
+      <resource>
+        <directory>src/main/resources-filtered</directory>
+        <filtering>true</filtering>
+      </resource>
+      <resource>
+        <directory>${project.build.directory}/modules-install</directory>
+        <targetPath>modules-install</targetPath>
+        <filtering>false</filtering>
+      </resource>
+    </resources>
     <plugins>
       <plugin>
         <groupId>org.jreleaser</groupId>

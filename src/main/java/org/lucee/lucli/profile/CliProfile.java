@@ -26,6 +26,17 @@ public interface CliProfile {
     String displayName();
 
     /**
+     * Optional product version override used for the top "DisplayName Version"
+     * line in {@code --version} output.
+     *
+     * <p>When {@code null} or blank, LuCLI falls back to its own implementation
+     * version from the JAR manifest.</p>
+     */
+    default String productVersionOverride() {
+        return null;
+    }
+
+    /**
      * Directory name for backups, placed alongside the home directory.
      * Defaults to {@code homeDirName() + "_backups"} (e.g. {@code ".lucli_backups"}).
      */
@@ -44,12 +55,20 @@ public interface CliProfile {
      *
      * @param binaryName the name the CLI was invoked as (may be {@code null})
      * @return a {@link WheelsProfile} when the normalised binary name is
-     *         {@code "wheels"} (case-insensitive), otherwise a {@link DefaultProfile}
+     *         {@code "wheels"} (case-insensitive), a {@link MarkspressoProfile}
+     *         when it is {@code "markspresso"}, otherwise a {@link DefaultProfile}
      */
     static CliProfile forBinaryName(String binaryName) {
         String normalised = normalizeBinaryName(binaryName);
+        CliProfile buildBrandedProfile = BuildBrandingConfig.resolveProfile(normalised);
+        if (buildBrandedProfile != null) {
+            return buildBrandedProfile;
+        }
         if (normalised != null && normalised.equalsIgnoreCase("wheels")) {
             return new WheelsProfile();
+        }
+        if (normalised != null && normalised.equalsIgnoreCase("markspresso")) {
+            return new MarkspressoProfile();
         }
         return new DefaultProfile();
     }

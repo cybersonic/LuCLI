@@ -26,6 +26,23 @@ class CliProfileTest {
     }
 
     @Test
+    void forBinaryName_returnsMarkspressoProfile() {
+        CliProfile profile = CliProfile.forBinaryName("markspresso");
+        assertInstanceOf(MarkspressoProfile.class, profile);
+        assertEquals("markspresso", profile.name());
+        assertEquals(".markspresso", profile.homeDirName());
+        assertEquals("markspresso", profile.promptPrefix());
+        assertEquals("Markspresso", profile.displayName());
+    }
+
+    @Test
+    void forBinaryName_returnsMarkspressoProfileCaseInsensitive() {
+        CliProfile profile = CliProfile.forBinaryName("MarkSpresso");
+        assertInstanceOf(MarkspressoProfile.class, profile);
+        assertEquals("markspresso", profile.name());
+    }
+
+    @Test
     void forBinaryName_returnsDefaultProfileForLucli() {
         CliProfile profile = CliProfile.forBinaryName("lucli");
         assertInstanceOf(DefaultProfile.class, profile);
@@ -75,6 +92,12 @@ class CliProfileTest {
     void forBinaryName_lucliShReturnsDefault() {
         CliProfile profile = CliProfile.forBinaryName("lucli.sh");
         assertInstanceOf(DefaultProfile.class, profile);
+    }
+
+    @Test
+    void forBinaryName_stripsPathAndExtensionForMarkspresso() {
+        CliProfile profile = CliProfile.forBinaryName("/opt/lucli/bin/markspresso.sh");
+        assertInstanceOf(MarkspressoProfile.class, profile);
     }
 
     @Test
