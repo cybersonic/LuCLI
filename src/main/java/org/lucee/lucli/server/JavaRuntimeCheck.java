@@ -4,6 +4,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Preflight check for the Java runtime used by the child server process.
@@ -56,7 +57,22 @@ public final class JavaRuntimeCheck {
     public static String findJavaRuntimeErrorInMap(Map<String, String> env, String osName) {
         String javaHome = env != null ? env.get("JAVA_HOME") : null;
         String jreHome = env != null ? env.get("JRE_HOME") : null;
-        return findJavaRuntimeError(javaHome, jreHome, osName);
+        String error = findJavaRuntimeError(javaHome, jreHome, osName);
+        if (error == null) {
+            return null;
+        }
+
+        // Tomcat startup scripts also accept a runtime discoverable from PATH
+        // when JAVA_HOME/JRE_HOME are unset.
+        if ((javaHome == null || javaHome.trim().isEmpty())
+                && (jreHome == null || jreHome.trim().isEmpty())) {
+            String pathValue = env != null ? env.get("PATH") : null;
+            if (isJavaAvailableOnPath(pathValue, osName)) {
+                return null;
+            }
+        }
+
+        return error;
     }
 
     /**
@@ -104,6 +120,33 @@ public final class JavaRuntimeCheck {
         } catch (RuntimeException e) {
             return false;
         }
+    }
+
+    private static boolean isJavaAvailableOnPath(String pathValue, String osName) {
+        if (pathValue == null || pathValue.trim().isEmpty()) {
+            return false;
+        }
+        boolean isWindows = osName != null && osName.toLowerCase().contains("win");
+        String pathSeparator = isWindows ? ";" : ":";
+        String javaBinary = isWindows ? "java.exe" : "java";
+        for (String rawEntry : pathValue.split(Pattern.quote(pathSeparator))) {
+            if (rawEntry == null) {
+                continue;
+            }
+            String entry = rawEntry.trim();
+            if (entry.isEmpty()) {
+                continue;
+            }
+            try {
+                Path candidate = Paths.get(entry, javaBinary);
+                if (Files.isExecutable(candidate) || Files.exists(candidate)) {
+                    return true;
+                }
+            } catch (RuntimeException ignored) {
+                // Ignore malformed PATH entries
+            }
+        }
+        return false;
     }
 
     private static String unsetMessage() {
