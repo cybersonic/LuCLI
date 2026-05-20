@@ -550,6 +550,10 @@ public class LucliCompleter implements Completer {
                     String suggestion = "my_server";
                     candidates.add(new Candidate(suggestion, suggestion, "suggested-names", "Suggested server name", null, null, true));
                 }
+                // Complete include section tokens for dry-run previews
+                else if ("--include".equals(prevWord)) {
+                    completeDryRunIncludeSections(subcommand, lastWord, candidates);
+                }
                 // Directory-aware completion for --webroot values
                 else if ("--webroot".equals(prevWord)) {
                     // Reuse file completion but force directory-only behaviour by pretending this is a 'cd' command
@@ -569,6 +573,8 @@ public class LucliCompleter implements Completer {
                     completeServerVersions(lastWord, candidates);
                 } else if ("--name".equals(prevWord) || "-n".equals(prevWord)) {
                     completeServerNames(lastWord, candidates);
+                } else if ("--include".equals(prevWord)) {
+                    completeDryRunIncludeSections(subcommand, lastWord, candidates);
                 } else if ("--webroot".equals(prevWord)) {
                     completeFilePaths(lastWord, candidates, "cd");
                 } else if (!lastWord.startsWith("-")) {
@@ -698,10 +704,10 @@ public class LucliCompleter implements Completer {
         
         switch (subcommand.toLowerCase()) {
             case "start":
-                flags = new String[]{"--version", "--name", "--force", "--webroot", "--prewarm", "-v", "-n", "-f"};
+                flags = new String[]{"--version", "--name", "--force", "--webroot", "--dry-run", "--include", "--include-env", "--include-all", "--include-lucee", "--include-tomcat-web", "--include-tomcat-server", "--include-https-keystore-plan", "--include-https-redirect-rules", "--prewarm", "-v", "-n", "-f"};
                 break;
             case "run":
-                flags = new String[]{"--version", "--name", "--force", "--webroot", "--prewarm", "-v", "-n", "-f"};
+                flags = new String[]{"--version", "--name", "--force", "--webroot", "--dry-run", "--include", "--include-env", "--prewarm", "-v", "-n", "-f"};
                 break;
             case "stop":
                 flags = new String[]{"--name", "--config", "--all", "-n", "-c"};
@@ -769,6 +775,24 @@ public class LucliCompleter implements Completer {
             case "--force":
             case "-f":
                 return "Force replace existing server";
+            case "--dry-run":
+                return "Preview resolved configuration without starting";
+            case "--include":
+                return "Select dry-run sections to print (comma-separated)";
+            case "--include-env":
+                return "Include environment preview section";
+            case "--include-all":
+                return "Include all dry-run preview sections";
+            case "--include-lucee":
+                return "Include Lucee CFConfig dry-run preview";
+            case "--include-tomcat-web":
+                return "Include generated web.xml dry-run preview";
+            case "--include-tomcat-server":
+                return "Include generated server.xml dry-run preview";
+            case "--include-https-keystore-plan":
+                return "Include HTTPS keystore dry-run plan";
+            case "--include-https-redirect-rules":
+                return "Include HTTPS redirect rules dry-run plan";
             case "--prewarm":
                 return "Download runtime artifacts and exit without starting";
             case "--all":
@@ -779,6 +803,22 @@ public class LucliCompleter implements Completer {
                 return "Show only running servers";
             default:
                 return "Server option";
+        }
+    }
+
+    private void completeDryRunIncludeSections(String subcommand, String partial, List<Candidate> candidates) {
+        String[] sections;
+        if ("run".equalsIgnoreCase(subcommand)) {
+            sections = new String[]{"config", "env", "all"};
+        } else {
+            sections = new String[]{"config", "env", "lucee", "tomcat-web", "tomcat-server", "https-keystore-plan", "https-redirect-rules", "all"};
+        }
+
+        String lowerPartial = partial.toLowerCase();
+        for (String section : sections) {
+            if (section.startsWith(lowerPartial)) {
+                candidates.add(new Candidate(section, section, "dry-run-sections", "Dry-run include section", null, null, true));
+            }
         }
     }
     

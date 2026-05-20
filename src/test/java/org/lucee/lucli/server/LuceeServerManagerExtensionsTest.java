@@ -56,4 +56,62 @@ class LuceeServerManagerExtensionsTest {
 
         assertEquals("", luceeExtensions);
     }
+
+    @Test
+    void buildLuceeExtensions_ignoresDisabledProviderExtensionsFromLuceeJson() throws Exception {
+        Files.writeString(tempDir.resolve("lucee.json"), """
+            {
+              "name": "disabled-provider-ext",
+              "dependencySettings": {
+                "useLockFile": false
+              },
+              "dependencies": {
+                "h2": {
+                  "type": "extension",
+                  "id": "465E1E35-2425-4F4E-8B3FAB638BD7280A",
+                  "enabled": false
+                }
+              }
+            }
+            """);
+
+        String luceeExtensions = LuceeServerManager.buildLuceeExtensions(tempDir);
+        assertEquals("", luceeExtensions);
+    }
+
+    @Test
+    void buildLuceeExtensions_ignoresDisabledExtensionsFromLockFileWhenConfiguredDisabled() throws Exception {
+        Files.writeString(tempDir.resolve("lucee.json"), """
+            {
+              "name": "disabled-provider-ext-lock",
+              "dependencySettings": {
+                "useLockFile": true
+              },
+              "dependencies": {
+                "h2": {
+                  "type": "extension",
+                  "id": "465E1E35-2425-4F4E-8B3FAB638BD7280A",
+                  "enabled": false
+                }
+              }
+            }
+            """);
+
+        Files.writeString(tempDir.resolve("lucee-lock.json"), """
+            {
+              "dependencies": {
+                "h2": {
+                  "type": "extension",
+                  "version": "unknown",
+                  "source": "extension-provider",
+                  "id": "465E1E35-2425-4F4E-8B3FAB638BD7280A"
+                }
+              },
+              "devDependencies": {}
+            }
+            """);
+
+        String luceeExtensions = LuceeServerManager.buildLuceeExtensions(tempDir);
+        assertEquals("", luceeExtensions);
+    }
 }

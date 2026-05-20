@@ -282,7 +282,8 @@ public class LuceeServerConfig {
      */
     public static ServerConfig loadConfig(Path projectDir, String configFileName) throws IOException {
         // Reset any previously loaded .env variables for this new project/config load
-        envVariables.clear();
+        clearLoadedEnvFileVariables();
+        clearRealizedEnvVariables();
 
         Path configFile = projectDir.resolve(configFileName);
         
@@ -328,9 +329,7 @@ public class LuceeServerConfig {
         }
 
         // Load environment variables from the configured envFile (or default .env)
-        String envFileName = (config.envFile == null || config.envFile.trim().isEmpty())
-                ? ".env"
-                : config.envFile.trim();
+        String envFileName = resolveConfiguredEnvFileName(config);
         loadEnvFile(projectDir, envFileName);
 
         // Perform variable substitution on string fields
@@ -754,6 +753,45 @@ public class LuceeServerConfig {
     // Map to store environment variables loaded from .env / envFile for the current config.
     // This map is cleared at the start of each loadConfig call.
     private static final Map<String, String> envVariables = new java.util.HashMap<>();
+    // Map tracking variables that were actually realized while resolving #env:...#
+    // (or deprecated ${...}) placeholders during configuration substitution.
+    // Keys are variable names; values are the resolved values (including defaults when used).
+    private static final Map<String, String> realizedEnvVariables = new java.util.LinkedHashMap<>();
+
+    private static void clearLoadedEnvFileVariables() {
+        envVariables.clear();
+    }
+
+    private static String resolveConfiguredEnvFileName(ServerConfig config) {
+        String envFileName = (config == null || config.envFile == null || config.envFile.trim().isEmpty())
+                ? ".env"
+                : config.envFile.trim();
+        return substituteField(envFileName);
+    }
+    private static void clearRealizedEnvVariables() {
+        synchronized (realizedEnvVariables) {
+            realizedEnvVariables.clear();
+        }
+    }
+
+    private static void recordRealizedEnvVariable(String name, String value) {
+        if (name == null || name.trim().isEmpty() || value == null) {
+            return;
+        }
+        synchronized (realizedEnvVariables) {
+            realizedEnvVariables.put(name, value);
+        }
+    }
+
+    /**
+     * Returns a snapshot of environment variables that were realized while substituting
+     * placeholders in the most recent configuration load/apply flow.
+     */
+    public static Map<String, String> getRealizedEnvVariables() {
+        synchronized (realizedEnvVariables) {
+            return new java.util.LinkedHashMap<>(realizedEnvVariables);
+        }
+    }
     
     /**
      * Apply the currently loaded .env / envFile variables into a target process
@@ -783,10 +821,18 @@ public class LuceeServerConfig {
     private static String getEnvVar(String name) {
         // Check .env file variables first
         if (envVariables.containsKey(name)) {
-            return envVariables.get(name);
+            String value = envVariables.get(name);
+            if (value != null) {
+                recordRealizedEnvVariable(name, value);
+            }
+            return value;
         }
         // Fall back to system environment variables
-        return System.getenv(name);
+        String value = System.getenv(name);
+        if (value != null) {
+            recordRealizedEnvVariable(name, value);
+        }
+        return value;
     }
     
     /**
@@ -1323,6 +1369,7 @@ public class LuceeServerConfig {
                 replacement = getEnvVar(varName);
                 if (replacement == null) {
                     replacement = defaultValue;
+                    recordRealizedEnvVariable(varName, defaultValue);
                 }
             } else {
                 // Just the variable name
@@ -1471,6 +1518,7 @@ public class LuceeServerConfig {
                 replacement = getEnvVar(varName);
                 if (replacement == null) {
                     replacement = defaultValue;
+                    recordRealizedEnvVariable(varName, defaultValue);
                 }
             } else {
                 // Just the variable name
@@ -2084,7 +2132,21 @@ public class LuceeServerConfig {
                 }
             }
             
-            return deepMergeConfigs(base, rawEnvNode);
+            ServerConfig merged = deepMergeConfigs(base, rawEnvNode);
+            if (projectDir != null) {
+                // Re-evaluate env file after environment overrides are applied so that
+                // runtime env preview/process env reflect the realized envFile value.
+                clearLoadedEnvFileVariables();
+                loadEnvFile(projectDir, resolveConfiguredEnvFileName(merged));
+            }
+            // Re-run substitution after environment merge so placeholders introduced
+            // by environment-specific overrides are realized.
+            clearRealizedEnvVariables();
+            substituteEnvironmentVariables(merged);
+            if (projectDir != null) {
+                resolveRelativeEnvVarPaths(merged, projectDir);
+            }
+            return merged;
         } catch (IOException e) {
             throw new RuntimeException("Failed to merge environment configuration: " + e.getMessage(), e);
         }
@@ -2213,6 +2275,9 @@ public class LuceeServerConfig {
             
             // Process production dependencies
             for (org.lucee.lucli.config.DependencyConfig dep : config.parseDependencies()) {
+                if (!dep.isEnabled()) {
+                    continue;
+                }
                 if (dep.getMapping() != null && dep.getInstallPath() != null) {
                     addComputedMapping(mappingsNode, dep, projectDir);
                 }
@@ -2220,6 +2285,9 @@ public class LuceeServerConfig {
             
             // Process dev dependencies
             for (org.lucee.lucli.config.DependencyConfig dep : config.parseDevDependencies()) {
+                if (!dep.isEnabled()) {
+                    continue;
+                }
                 if (dep.getMapping() != null && dep.getInstallPath() != null) {
                     addComputedMapping(mappingsNode, dep, projectDir);
                 }

@@ -179,13 +179,15 @@ lucli start [OPTIONS]
 | `-c, --config` | Configuration file to use (defaults to lucee.json) |
 | `--env, --environment` | Environment to use (e.g., prod, dev, staging) |
 | `--dry-run` | Show configuration without starting the server |
+| `--include` | Comma-separated dry-run sections: config,env,lucee,tomcat-web,tomcat-server,https-keystore-plan,https-redirect-rules,all |
+| `--include-env` | Include environment previews in dry-run output (alias for `--include env`) |
 | `--prewarm` | Download/cache runtime artifacts and exit without starting a server |
-| `--include-lucee` | Include Lucee CFConfig in dry-run output |
-| `--include-tomcat-web` | Include Tomcat web.xml in dry-run output |
-| `--include-tomcat-server` | Include Tomcat server.xml in dry-run output |
-| `--include-https-keystore-plan` | Include HTTPS keystore plan in dry-run output |
-| `--include-https-redirect-rules` | Include HTTPS redirect rules in dry-run output |
-| `--include-all` | Include all available dry-run previews |
+| `--include-lucee` | Legacy alias for `--include lucee` |
+| `--include-tomcat-web` | Legacy alias for `--include tomcat-web` |
+| `--include-tomcat-server` | Legacy alias for `--include tomcat-server` |
+| `--include-https-keystore-plan` | Legacy alias for `--include https-keystore-plan` |
+| `--include-https-redirect-rules` | Legacy alias for `--include https-redirect-rules` |
+| `--include-all` | Legacy alias for `--include all` |
 | `--no-agents` | Disable all Java agents |
 | `--agents` | Comma-separated list of agent IDs to include |
 | `--enable-agent` | Enable a specific agent by ID (repeatable) |
@@ -215,13 +217,15 @@ lucli start [OPTIONS]
 | `-c, --config` | Configuration file to use (defaults to lucee.json) |
 | `--env, --environment` | Environment to use (e.g., prod, dev, staging) |
 | `--dry-run` | Show configuration without starting the server |
+| `--include` | Comma-separated dry-run sections: config,env,lucee,tomcat-web,tomcat-server,https-keystore-plan,https-redirect-rules,all |
+| `--include-env` | Include environment previews in dry-run output (alias for `--include env`) |
 | `--prewarm` | Download/cache runtime artifacts and exit without starting a server |
-| `--include-lucee` | Include Lucee CFConfig in dry-run output |
-| `--include-tomcat-web` | Include Tomcat web.xml in dry-run output |
-| `--include-tomcat-server` | Include Tomcat server.xml in dry-run output |
-| `--include-https-keystore-plan` | Include HTTPS keystore plan in dry-run output |
-| `--include-https-redirect-rules` | Include HTTPS redirect rules in dry-run output |
-| `--include-all` | Include all available dry-run previews |
+| `--include-lucee` | Legacy alias for `--include lucee` |
+| `--include-tomcat-web` | Legacy alias for `--include tomcat-web` |
+| `--include-tomcat-server` | Legacy alias for `--include tomcat-server` |
+| `--include-https-keystore-plan` | Legacy alias for `--include https-keystore-plan` |
+| `--include-https-redirect-rules` | Legacy alias for `--include https-redirect-rules` |
+| `--include-all` | Legacy alias for `--include all` |
 | `--no-agents` | Disable all Java agents |
 | `--agents` | Comma-separated list of agent IDs to include |
 | `--enable-agent` | Enable a specific agent by ID (repeatable) |
@@ -250,6 +254,9 @@ lucli run [OPTIONS]
 | `-f, --force` | Force replace existing server with same name |
 | `-c, --config` | Configuration file to use (defaults to lucee.json) |
 | `--env, --environment` | Environment to use (e.g., prod, dev, staging) |
+| `--dry-run` | Show configuration without running the server |
+| `--include` | Comma-separated dry-run sections: config,env,all |
+| `--include-env` | Include environment previews in dry-run output (alias for `--include env`) |
 | `--prewarm` | Download/cache runtime artifacts and exit without starting a server |
 | `--no-agents` | Disable all Java agents |
 | `--agents` | Comma-separated list of agent IDs to include |

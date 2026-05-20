@@ -60,6 +60,10 @@ public class DependencyConfig {
     // Extension specific (Lucee .lex files)
     @JsonProperty("id")
     private String id;
+
+    // Whether this dependency is enabled (default: true)
+    @JsonProperty("enabled")
+    private Boolean enabled = true;
     
     // Constructors
     public DependencyConfig() {
@@ -73,6 +77,9 @@ public class DependencyConfig {
      * Apply defaults based on dependency name, type, and source
      */
     public void applyDefaults() {
+        if (enabled == null) {
+            enabled = true;
+        }
         // Infer type from properties if not set
         if (type == null || type.equals("cfml")) {
             if (groupId != null && artifactId != null) {
@@ -327,6 +334,18 @@ public class DependencyConfig {
     
     public void setId(String id) {
         this.id = id;
+    }
+
+    public Boolean getEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(Boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    public boolean isEnabled() {
+        return !Boolean.FALSE.equals(enabled);
     }
     
     @Override

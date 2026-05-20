@@ -7,6 +7,36 @@ setup_file() {
     setup_lucli_home
 }
 
+@test "server start dry-run include env,lucee shows only selected sections" {
+    local project_dir
+    project_dir="$(create_env_test_project)"
+
+    run_lucli_in_dir "${project_dir}" server start --dry-run --include env,lucee
+    assert_success
+    assert_output_contains "Realized environment variables used to resolve lucee.json placeholders"
+    assert_output_contains ".CFConfig.json"
+    [[ "${output}" != *"Realized lucee.json for:"* ]]
+}
+
+@test "server run dry-run include env omits realized lucee.json section" {
+    local project_dir
+    project_dir="$(create_env_test_project)"
+
+    run_lucli_in_dir "${project_dir}" server run --dry-run --include env
+    assert_success
+    assert_output_contains "Realized environment variables used to resolve lucee.json placeholders"
+    [[ "${output}" != *"Realized lucee.json for:"* ]]
+}
+
+@test "server run dry-run include rejects unsupported sections" {
+    local project_dir
+    project_dir="$(create_env_test_project)"
+
+    run_lucli_in_dir "${project_dir}" server run --dry-run --include env,lucee
+    assert_failure
+    assert_output_contains "Unknown --include section 'lucee' for server run"
+}
+
 teardown_file() {
     cleanup_lucli_home
 }
@@ -120,4 +150,85 @@ EOF
     assert_success
     assert_output_contains "LUCEE_EXTENSIONS"
     assert_output_contains "465E1E35-2425-4F4E-8B3FAB638BD7280A"
+    [[ "${output}" != *"Realized lucee.json for:"* ]]
+}
+
+create_realized_env_preview_project() {
+    local project_dir
+    project_dir="$(mktemp -d "${BATS_TEST_TMPDIR}/realized-env-preview.XXXXXX")"
+
+    cat > "${project_dir}/lucee.json" << 'EOF'
+{
+  "name": "#env:PREVIEW_SERVER_NAME#",
+  "port": 8080,
+  "envVars": {
+    "APP_MODE": "#env:PREVIEW_MODE:-dev#",
+    "FALLBACK_MODE": "#env:MISSING_PREVIEW_MODE:-fallback-value#"
+  }
+}
+EOF
+
+    cat > "${project_dir}/.env" << 'EOF'
+PREVIEW_SERVER_NAME=realized-env-preview
+PREVIEW_MODE=preview-dot-env
+EOF
+
+    printf '%s\n' "${project_dir}"
+}
+
+@test "server start dry-run include-env shows realized lucee.json substitution variables" {
+    local project_dir
+    project_dir="$(create_realized_env_preview_project)"
+
+    run_lucli_in_dir "${project_dir}" server start --dry-run --include-env
+    assert_success
+    assert_output_contains "Realized environment variables used to resolve lucee.json placeholders"
+    assert_output_contains "\"PREVIEW_SERVER_NAME\" : \"realized-env-preview\""
+    assert_output_contains "\"PREVIEW_MODE\" : \"preview-dot-env\""
+    assert_output_contains "\"MISSING_PREVIEW_MODE\" : \"fallback-value\""
+    [[ "${output}" != *"Realized lucee.json for:"* ]]
+}
+
+create_env_file_override_preview_project() {
+    local project_dir
+    project_dir="$(mktemp -d "${BATS_TEST_TMPDIR}/env-file-override-preview.XXXXXX")"
+
+    cat > "${project_dir}/lucee.json" << 'EOF'
+{
+  "name": "env-file-override-preview",
+  "port": 8080,
+  "envFile": "./default.env",
+  "envVars": {
+    "SETTING1": "from-base"
+  },
+  "environments": {
+    "prod": {
+      "envFile": "./prod.env",
+      "envVars": {
+        "SETTING1": "overridden-in-prod"
+      }
+    }
+  }
+}
+EOF
+
+    cat > "${project_dir}/default.env" << 'EOF'
+DEFAULT=from-default
+EOF
+
+    cat > "${project_dir}/prod.env" << 'EOF'
+DEFAULT=from-prod
+EOF
+
+    printf '%s\n' "${project_dir}"
+}
+
+@test "server start dry-run include-env with --env prod uses environment-specific envFile values" {
+    local project_dir
+    project_dir="$(create_env_file_override_preview_project)"
+
+    run_lucli_in_dir "${project_dir}" server start --dry-run --env prod --include env
+    assert_success
+    assert_output_contains "\"DEFAULT\" : \"from-prod\""
+    assert_output_contains "\"SETTING1\" : \"overridden-in-prod\""
 }

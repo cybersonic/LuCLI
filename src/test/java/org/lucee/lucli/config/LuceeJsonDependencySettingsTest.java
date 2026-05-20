@@ -144,4 +144,57 @@ class LuceeJsonDependencySettingsTest {
         assertEquals(Boolean.FALSE, config.getDependencySettings().getMaterializeExtensionsOnInstall());
         assertFalse(config.getDependencySettings().isMaterializeExtensionsOnInstallEnabled());
     }
+
+    @Test
+    void dependency_enabled_defaultsToTrue() throws Exception {
+        Files.writeString(tempDir.resolve("lucee.json"), """
+            {
+              "name": "enabled-default-test",
+              "dependencies": {
+                "h2": {
+                  "type": "extension",
+                  "id": "465E1E35-2425-4F4E-8B3FAB638BD7280A"
+                }
+              }
+            }
+            """);
+
+        LuceeJsonConfig config = LuceeJsonConfig.load(tempDir);
+        java.util.List<DependencyConfig> deps = config.parseDependencies();
+
+        assertEquals(1, deps.size());
+        assertTrue(deps.get(0).isEnabled());
+    }
+
+    @Test
+    void environmentOverride_canDisableDependencyViaEnabledFlag() throws Exception {
+        Files.writeString(tempDir.resolve("lucee.json"), """
+            {
+              "name": "dep-enabled-override-test",
+              "dependencies": {
+                "h2": {
+                  "type": "extension",
+                  "id": "465E1E35-2425-4F4E-8B3FAB638BD7280A",
+                  "enabled": true
+                }
+              },
+              "environments": {
+                "prod": {
+                  "dependencies": {
+                    "h2": {
+                      "enabled": false
+                    }
+                  }
+                }
+              }
+            }
+            """);
+
+        LuceeJsonConfig config = LuceeJsonConfig.load(tempDir);
+        assertTrue(config.parseDependencies().get(0).isEnabled());
+
+        config.applyEnvironment("prod");
+
+        assertFalse(config.parseDependencies().get(0).isEnabled());
+    }
 }

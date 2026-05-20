@@ -1866,6 +1866,14 @@ public class LuceeServerManager {
                 devDeps = depConfig.parseDevDependencies();
             }
 
+            java.util.Set<String> disabledExtensionNames = findDisabledExtensionNames(depConfig);
+            prodDeps = prodDeps.stream()
+                    .filter(org.lucee.lucli.config.DependencyConfig::isEnabled)
+                    .toList();
+            devDeps = devDeps.stream()
+                    .filter(org.lucee.lucli.config.DependencyConfig::isEnabled)
+                    .toList();
+
             if ((prodDeps == null || prodDeps.isEmpty()) && (devDeps == null || devDeps.isEmpty())) {
                 return; // Nothing to do
             }
@@ -1880,6 +1888,11 @@ public class LuceeServerManager {
                     new java.util.LinkedHashMap<>(existingLock.getDependencies());
             java.util.Map<String, org.lucee.lucli.deps.LockedDependency> newDev =
                     new java.util.LinkedHashMap<>(existingLock.getDevDependencies());
+
+            for (String name : disabledExtensionNames) {
+                newProd.remove(name);
+                newDev.remove(name);
+            }
 
             boolean materializeExtensionsOnInstall = settings.isMaterializeExtensionsOnInstallEnabled();
             ExtensionDependencyInstaller extInstaller =
@@ -2048,16 +2061,18 @@ public class LuceeServerManager {
         java.util.List<org.lucee.lucli.deps.LockedDependency> fromLock = java.util.List.of();
         org.lucee.lucli.config.LuceeJsonConfig config = null;
         boolean preferLockFile = false;
+        java.util.Set<String> disabledExtensionNames = new java.util.HashSet<>();
 
         try {
             config = org.lucee.lucli.config.LuceeJsonConfig.load(projectDir);
             preferLockFile = config.getDependencySettings().isUseLockFileEnabled();
+            disabledExtensionNames = findDisabledExtensionNames(config);
         } catch (Exception ignored) {
             // If lucee.json can't be read, we'll fall back to lockfile-only behavior.
         }
 
         if (preferLockFile || config == null) {
-            fromLock = readExtensionDepsFromLockFile(projectDir);
+            fromLock = readExtensionDepsFromLockFile(projectDir, disabledExtensionNames);
             if (!fromLock.isEmpty()) {
                 return fromLock;
             }
@@ -2073,21 +2088,31 @@ public class LuceeServerManager {
 
         // Final fallback: use lock entries if present, even when not preferred.
         if (fromLock.isEmpty()) {
-            fromLock = readExtensionDepsFromLockFile(projectDir);
+            fromLock = readExtensionDepsFromLockFile(projectDir, disabledExtensionNames);
         }
         return fromLock;
     }
 
-    private static java.util.List<org.lucee.lucli.deps.LockedDependency> readExtensionDepsFromLockFile(Path projectDir) {
+    private static java.util.List<org.lucee.lucli.deps.LockedDependency> readExtensionDepsFromLockFile(
+            Path projectDir,
+            java.util.Set<String> disabledExtensionNames
+    ) {
         org.lucee.lucli.config.LuceeLockFile lockFile = org.lucee.lucli.config.LuceeLockFile.read(projectDir);
         java.util.List<org.lucee.lucli.deps.LockedDependency> allExtensions = new java.util.ArrayList<>();
-
-        for (org.lucee.lucli.deps.LockedDependency dep : lockFile.getDependencies().values()) {
+        for (java.util.Map.Entry<String, org.lucee.lucli.deps.LockedDependency> entry : lockFile.getDependencies().entrySet()) {
+            if (disabledExtensionNames.contains(entry.getKey())) {
+                continue;
+            }
+            org.lucee.lucli.deps.LockedDependency dep = entry.getValue();
             if ("extension".equals(dep.getType())) {
                 allExtensions.add(dep);
             }
         }
-        for (org.lucee.lucli.deps.LockedDependency dep : lockFile.getDevDependencies().values()) {
+        for (java.util.Map.Entry<String, org.lucee.lucli.deps.LockedDependency> entry : lockFile.getDevDependencies().entrySet()) {
+            if (disabledExtensionNames.contains(entry.getKey())) {
+                continue;
+            }
+            org.lucee.lucli.deps.LockedDependency dep = entry.getValue();
             if ("extension".equals(dep.getType())) {
                 allExtensions.add(dep);
             }
@@ -2106,6 +2131,9 @@ public class LuceeServerManager {
 
         java.util.List<org.lucee.lucli.deps.LockedDependency> out = new java.util.ArrayList<>();
         for (org.lucee.lucli.config.DependencyConfig dep : deps) {
+            if (!dep.isEnabled()) {
+                continue;
+            }
             if (!"extension".equals(dep.getType())) {
                 continue;
             }
@@ -2150,6 +2178,21 @@ public class LuceeServerManager {
             }
 
             out.add(locked);
+        }
+        return out;
+    }
+
+    private static java.util.Set<String> findDisabledExtensionNames(org.lucee.lucli.config.LuceeJsonConfig config) {
+        java.util.Set<String> out = new java.util.HashSet<>();
+        for (org.lucee.lucli.config.DependencyConfig dep : config.parseDependencies()) {
+            if ("extension".equals(dep.getType()) && !dep.isEnabled()) {
+                out.add(dep.getName());
+            }
+        }
+        for (org.lucee.lucli.config.DependencyConfig dep : config.parseDevDependencies()) {
+            if ("extension".equals(dep.getType()) && !dep.isEnabled()) {
+                out.add(dep.getName());
+            }
         }
         return out;
     }

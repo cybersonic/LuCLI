@@ -108,10 +108,17 @@ public class ServerCommand implements Callable<Integer> {
         @Option(names = {"--dry-run"}, 
                 description = "Show configuration without starting the server")
         private boolean dryRun = false;
+        @Option(names = {"--include"},
+                split = ",",
+                description = "Comma-separated dry-run sections: config,env,lucee,tomcat-web,tomcat-server,https-keystore-plan,https-redirect-rules,all")
+        private java.util.List<String> includeSections;
 
         @Option(names = {"--include-lucee"}, 
                 description = "Include Lucee CFConfig in dry-run output")
         private boolean includeLucee = false;
+        @Option(names = {"--include-env"},
+                description = "Include environment previews in dry-run output (same as --include env)")
+        private boolean includeEnv = false;
 
         @Option(names = {"--include-tomcat-web"}, 
                 description = "Include Tomcat web.xml in dry-run output")
@@ -142,7 +149,7 @@ public class ServerCommand implements Callable<Integer> {
         private String dest;
 
         @Option(names = {"--include-all"}, 
-                description = "Include all available dry-run previews")
+                description = "Include all dry-run sections (same as --include all)")
         private boolean includeAll = false;
 
         @Option(names = {"--no-agents"}, 
@@ -276,11 +283,18 @@ public class ServerCommand implements Callable<Integer> {
             if (dryRun) {
                 args.add("--dry-run");
             }
+            if (includeSections != null && !includeSections.isEmpty()) {
+                args.add("--include");
+                args.add(String.join(",", includeSections));
+            }
             if (createConfig) {
                 args.add("--create-config");
             }
             if (includeLucee) {
                 args.add("--include-lucee");
+            }
+            if (includeEnv) {
+                args.add("--include-env");
             }
             if (webroot != null) {
                 args.add("--webroot");
@@ -413,6 +427,16 @@ public class ServerCommand implements Callable<Integer> {
         @Option(names = {"--webroot"},
                 description = "Override webroot (relative to project directory, like lucee.json)")
         private String webroot;
+        @Option(names = {"--dry-run"},
+                description = "Show configuration without running the server")
+        private boolean dryRun = false;
+        @Option(names = {"--include-env"},
+                description = "Include environment previews in dry-run output (same as --include env)")
+        private boolean includeEnv = false;
+        @Option(names = {"--include"},
+                split = ",",
+                description = "Comma-separated dry-run sections: config,env,all")
+        private java.util.List<String> includeSections;
 
         @Option(names = {"--disable-lucee"},
                 description = "Disable Lucee CFML engine for this run (static server)")
@@ -494,6 +518,16 @@ public class ServerCommand implements Callable<Integer> {
             if (environment != null) {
                 args.add("--env");
                 args.add(environment);
+            }
+            if (dryRun) {
+                args.add("--dry-run");
+            }
+            if (includeSections != null && !includeSections.isEmpty()) {
+                args.add("--include");
+                args.add(String.join(",", includeSections));
+            }
+            if (includeEnv) {
+                args.add("--include-env");
             }
             if (webroot != null) {
                 args.add("--webroot");

@@ -508,6 +508,41 @@ public class LuceeServerConfigTest {
         assertEquals(3000, config.environments.get("dev").port);
     }
 
+    @Test
+    void applyEnvironment_usesEnvironmentSpecificEnvFileForRuntimeEnvPreview() throws IOException {
+        Files.writeString(tempDir.resolve("default.env"), "DEFAULT=from-default\n");
+        Files.writeString(tempDir.resolve("prod.env"), "DEFAULT=from-prod\n");
+
+        String json = """
+            {
+              "name": "env-file-override-test",
+              "envFile": "./default.env",
+              "envVars": {
+                "SETTING1": "from-base"
+              },
+              "environments": {
+                "prod": {
+                  "envFile": "./prod.env",
+                  "envVars": {
+                    "SETTING1": "overridden-in-prod"
+                  }
+                }
+              }
+            }
+            """;
+        Files.writeString(tempDir.resolve("lucee.json"), json);
+
+        LuceeServerConfig.ServerConfig base = LuceeServerConfig.loadConfig(tempDir);
+        LuceeServerConfig.ServerConfig merged = LuceeServerConfig.applyEnvironment(base, "prod", tempDir);
+
+        java.util.Map<String, String> envPreview = new java.util.HashMap<>();
+        LuceeServerConfig.applyLoadedEnvToProcessEnvironment(envPreview);
+
+        assertEquals("./prod.env", merged.envFile);
+        assertEquals("overridden-in-prod", merged.envVars.get("SETTING1"));
+        assertEquals("from-prod", envPreview.get("DEFAULT"));
+    }
+
     // ===================
     // Agent Configuration Tests
     // ===================

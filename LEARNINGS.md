@@ -88,3 +88,17 @@ Append new entries at the bottom under the appropriate date/session.
 
 - For `lucli --version`, the most user-friendly Java runtime line comes from the first line of `java -version` output (normalized to remove quotes and the literal `version` token), with fallback to `java.runtime.name` + `java.runtime.version` when process execution is unavailable.
 - `tests/test-bats.sh` only rebuilds `target/lucli.jar` / `target/lucli` when artifacts are missing or unrunnable; after source changes, rebuild artifacts manually before running BATS to avoid stale-binary false negatives.
+
+## 2026-05-18
+
+- Dependency descriptors in `lucee.json` now support `enabled` (default `true`); setting `enabled: false` on `type: "extension"` entries suppresses extension install/materialization and runtime activation, and environment-level dependency overrides can flip this flag via `environments.<env>.dependencies.<name>.enabled`.
+
+## 2026-05-19
+
+- To make `server start --dry-run --include-env` explain config substitution clearly, track a dedicated ordered map of realized placeholders in `LuceeServerConfig` during `#env:`/legacy `${}` resolution (including `:-default` fallbacks) and render that map separately from runtime process env vars.
+- After `applyEnvironment(...)` deep-merges `environments.<env>` overrides into base config, rerun placeholder substitution and relative env path normalization on the merged tree; env-specific overlays can introduce new placeholders and relative `envVars` paths that are not present in the base config.
+- Dry-run preview selection now uses an explicit section model: default `--dry-run` prints realized `config`, but any explicit selector (`--include ...` or alias flags like `--include-env`) disables implicit config output unless `config` is explicitly requested (for example `--include config,env`).
+
+## 2026-05-20
+
+- When applying environment overrides, reloading the realized merged `envFile` is required before building runtime env previews/process env; otherwise `--env <name>` can show/use variables from the base env file even when `envFile` is correctly overridden in `environments.<name>`.
