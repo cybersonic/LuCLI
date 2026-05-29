@@ -66,6 +66,45 @@ then
 fi
 
 ##############################################################################
+##  JAVA VERSION CHECK                                                       ##
+##############################################################################
+
+java_version_output=`"$java" -version 2>&1`
+java_status=$?
+if [ $java_status -ne 0 ]
+then
+    echo "❌ Unable to run Java command: $java" 1>&2
+    echo "LuCLI requires Java 21 or newer." 1>&2
+    echo "$java_version_output" | sed -n '1p' 1>&2
+    exit 1
+fi
+
+java_version=`echo "$java_version_output" | awk -F'"' '/version/ {print $2; exit}'`
+if [ -z "$java_version" ]
+then
+    echo "❌ Unable to detect Java version from command output." 1>&2
+    echo "LuCLI requires Java 21 or newer." 1>&2
+    echo "$java_version_output" | sed -n '1p' 1>&2
+    exit 1
+fi
+
+java_major=`echo "$java_version" | awk -F. '{if ($1 == "1") print $2; else print $1}' | sed 's/[^0-9].*$//'`
+case "$java_major" in
+    ''|*[!0-9]*)
+        echo "❌ Unable to parse Java major version from: $java_version" 1>&2
+        echo "LuCLI requires Java 21 or newer." 1>&2
+        exit 1
+        ;;
+esac
+
+if [ "$java_major" -lt 21 ]
+then
+    echo "❌ Java 21 or newer is required. Detected: $java_version" 1>&2
+    echo "Please install Java 21+ and set JAVA_HOME if needed." 1>&2
+    exit 1
+fi
+
+##############################################################################
 ##  BINARY NAME DETECTION                                                    ##
 ##############################################################################
 
