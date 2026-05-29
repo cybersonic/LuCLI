@@ -1,0 +1,10 @@
+{
+  "testbox": {
+    "type": "cfml",
+    "source": "forgebox"
+  },
+  "fw1": {
+    "type": "cfml",
+    "source": "forgebox"
+  }
+}
