@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -238,6 +239,42 @@ public class CatalinaBaseConfigGeneratorTest {
                 "setenv.bat should not set LUCEE_ADMIN_ENABLED when admin.enabled=true");
     }
 
+    @Test
+    void generateConfiguration_defaultRewriteRulesBypassStaticAssetsAndKeepFrameworkRouting() throws IOException {
+        LuceeServerConfig.ServerConfig config = createTestConfig();
+        config.urlRewrite.enabled = true;
+
+        generator.generateConfiguration(catalinaBase, config, projectDir, catalinaHome, 0, false);
+
+        Path rewriteConfig = catalinaBase.resolve("conf/Catalina/localhost/rewrite.config");
+        assertTrue(Files.exists(rewriteConfig),
+                "rewrite.config should be generated when URL rewrite is enabled");
+
+        String rewriteRules = Files.readString(rewriteConfig, StandardCharsets.UTF_8);
+        assertTrue(rewriteRules.contains("LuCLI URL Rewrite Rules"),
+                "When no project rewrite.config exists, the default LuCLI rewrite template should be generated");
+
+        assertEquals("-", firstMatchingRewriteRuleTarget(rewriteRules, "/assets/styles.css"),
+                "Static CSS assets should bypass router rewriting");
+        assertEquals("-", firstMatchingRewriteRuleTarget(rewriteRules, "/images/HERO.WEBP"),
+                "Common static image extensions should bypass router rewriting");
+        assertEquals("-", firstMatchingRewriteRuleTarget(rewriteRules, "/js/app.MJS"),
+                "Modern JS module assets should bypass router rewriting");
+        assertEquals("-", firstMatchingRewriteRuleTarget(rewriteRules, "/fonts/icon.WOFF2"),
+                "Font assets should bypass router rewriting");
+        assertEquals("-", firstMatchingRewriteRuleTarget(rewriteRules, "/assets"),
+                "Static directories should bypass router rewriting even without a file extension");
+        assertEquals("-", firstMatchingRewriteRuleTarget(rewriteRules, "/public"),
+                "Common static root directories should bypass router rewriting");
+        assertEquals("-", firstMatchingRewriteRuleTarget(rewriteRules, "/favicon.ico"),
+                "Root-level static assets should bypass router rewriting");
+
+        assertEquals("/index.cfm/$1", firstMatchingRewriteRuleTarget(rewriteRules, "/hello"),
+                "Non-static app URLs should still be routed through the framework router");
+        assertEquals("/index.cfm/$1", firstMatchingRewriteRuleTarget(rewriteRules, "/products/laptop"),
+                "Multi-segment app URLs should still be routed through the framework router");
+    }
+
     // ── generateConfiguration: Tomcat version handling ───────────────────
 
     @Test
@@ -399,6 +436,27 @@ public class CatalinaBaseConfigGeneratorTest {
     }
 
     // ── Helper methods ──────────────────────────────────────────────────
+
+    private String firstMatchingRewriteRuleTarget(String rewriteRules, String requestPath) {
+        for (String rawLine : rewriteRules.split("\\R")) {
+            String line = rawLine.trim();
+            if (!line.startsWith("RewriteRule ")) {
+                continue;
+            }
+
+            String[] parts = line.split("\\s+", 4);
+            if (parts.length < 4) {
+                continue;
+            }
+
+            int patternFlags = parts[3].contains("NC") ? Pattern.CASE_INSENSITIVE : 0;
+            Pattern pattern = Pattern.compile(parts[1], patternFlags);
+            if (pattern.matcher(requestPath).matches()) {
+                return parts[2];
+            }
+        }
+        return null;
+    }
 
     private LuceeServerConfig.ServerConfig createTestConfig() {
         LuceeServerConfig.ServerConfig config = new LuceeServerConfig.ServerConfig();
