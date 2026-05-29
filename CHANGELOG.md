@@ -3,6 +3,9 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Java 21 Runtime Gate in Wrapper Scripts:** Added early runtime checks in `src/bin/lucli.sh` and `src/bin/lucli.bat` so LuCLI fails fast with a clear error when Java is missing, unparseable, or older than Java 21.
+- **Dependency Shortcut Templates for `deps add`:** `lucli deps add <shortcut>` now supports non-interactive shortcut templates loaded from `src/main/resources/dependencies/dependency-shortcuts.json` (including built-in `testbox` and `fw1`), and `--dev` writes the shortcut dependency to `devDependencies`.
+- **Fix: Numeric `#env:` Placeholder Deserialization in `lucee.json`:** Server config loading now preprocesses typed numeric port fields before strict Jackson binding, so values like `"port": "#env:HTTP_PORT#"` (including env overrides) resolve correctly from `.env`/system variables instead of failing with `not a valid int value`.
 - **Fix: Environment Override `envFile` Reload:** Applying `--env` overrides now reloads the realized merged `envFile` before runtime env assembly, so dry-run env previews and server runtime env variables use the environment-specific file (for example `prod.env`) instead of the base file.
 - **Dry-Run `--include` Section Selector:** `lucli server start --dry-run` and `lucli server run --dry-run` now support explicit section selection via `--include` (for example `--include env,lucee,tomcat-web,tomcat-server`). `--include-env` no longer implicitly includes realized `lucee.json`; once any include selector is provided, only requested sections are printed. Legacy start preview flags remain available as aliases.
 - **Dry-Run Realized Env Variable Preview:** `lucli server start --dry-run --include-env` now prints a dedicated section showing environment variables realized during `lucee.json` placeholder substitution (`#env:VAR#`, deprecated `${VAR}`, and default fallbacks), in addition to the runtime env preview.

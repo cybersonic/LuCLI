@@ -102,3 +102,11 @@ Append new entries at the bottom under the appropriate date/session.
 ## 2026-05-20
 
 - When applying environment overrides, reloading the realized merged `envFile` is required before building runtime env previews/process env; otherwise `--env <name>` can show/use variables from the base env file even when `envFile` is correctly overridden in `environments.<name>`.
+
+## 2026-05-27
+
+- `LuceeServerConfig` does strict Jackson binding to typed numeric fields (`port`, `shutdownPort`, `https.port`, `ajp.port`, `monitoring.jmx.port`). If those values can contain placeholders (for example `"#env:HTTP_PORT#"`), resolve them on the raw JSON tree before `treeToValue(...)`; otherwise deserialization fails before normal string substitution runs.
+
+## 2026-05-28
+
+- Runtime startup guards for distributed binaries belong in wrapper sources (`src/bin/lucli.sh`, `src/bin/lucli.bat`): `build.sh` and Maven's `binary` profile concatenate `src/bin/lucli.sh` with `target/lucli.jar` to produce `target/lucli`, so wrapper-level checks are the authoritative first gate for self-executing launches.
