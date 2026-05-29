@@ -55,6 +55,32 @@ class ServerCommandHandlerTest {
                 "Dry-run output should include overridden runtime port");
         assertTrue(after.has("dependencies"), "Dependencies block must remain intact");
     }
+    @Test
+    void serverStartDryRun_missingEnvironmentFallsBackToBaseConfig() throws Exception {
+        Path configFile = tempDir.resolve("lucee.json");
+        Files.writeString(configFile, """
+            {
+              "name": "missing-env-fallback-test",
+              "port": 8080,
+              "environments": {
+                "prod": {
+                  "port": 80
+                }
+              }
+            }
+            """);
+
+        ServerCommandHandler handler = new ServerCommandHandler(true, tempDir);
+        String output = handler.executeCommand("server", new String[] {
+                "start", "--dry-run", "--env", "nonexistent"
+        });
+
+        assertNotNull(output);
+        assertTrue(output.contains("DRY RUN: Server configuration that would be used"),
+                "Missing --env should not fail; command should still produce dry-run output");
+        assertFalse(output.contains("not found in lucee.json"),
+                "Missing --env should not surface as an error message in command output");
+    }
 
     @Test
     void serverRunDryRun_includeEnv_doesNotIncludeRealizedConfigSection() throws Exception {

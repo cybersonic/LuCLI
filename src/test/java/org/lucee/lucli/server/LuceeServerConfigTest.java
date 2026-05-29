@@ -507,6 +507,30 @@ public class LuceeServerConfigTest {
         assertEquals(80, config.environments.get("prod").port);
         assertEquals(3000, config.environments.get("dev").port);
     }
+    @Test
+    void applyEnvironment_missingEnvironmentFallsBackToBaseConfig() throws IOException {
+        String json = """
+            {
+              "name": "env-fallback-test",
+              "port": 8080,
+              "webroot": "./public",
+              "environments": {
+                "prod": {
+                  "port": 80
+                }
+              }
+            }
+            """;
+        Path configFile = tempDir.resolve("lucee.json");
+        Files.writeString(configFile, json);
+
+        LuceeServerConfig.ServerConfig base = LuceeServerConfig.loadConfig(tempDir);
+        LuceeServerConfig.ServerConfig merged = LuceeServerConfig.applyEnvironment(base, "nonexistent", tempDir);
+
+        assertSame(base, merged, "Missing environment should return the base config unchanged");
+        assertEquals(8080, merged.port);
+        assertEquals("./public", merged.webroot);
+    }
 
     @Test
     void applyEnvironment_usesEnvironmentSpecificEnvFileForRuntimeEnvPreview() throws IOException {
@@ -595,6 +619,49 @@ public class LuceeServerConfigTest {
         LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(tempDir);
 
         assertEquals("hash-test-server", config.name);
+    }
+
+    @Test
+    void loadConfig_envPrefixVarSubstitutesInPort() throws IOException {
+        Path envFile = tempDir.resolve(".env");
+        Files.writeString(envFile, "HTTP_PORT=9090\n");
+
+        String json = """
+            {
+                "name": "port-env-test",
+                "port": "#env:HTTP_PORT#"
+            }
+            """;
+        Path configFile = tempDir.resolve("lucee.json");
+        Files.writeString(configFile, json);
+
+        LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(tempDir);
+
+        assertEquals(9090, config.port);
+    }
+
+    @Test
+    void loadConfig_envPrefixVarInvalidPortValueShowsClearError() throws IOException {
+        Path envFile = tempDir.resolve(".env");
+        Files.writeString(envFile, "HTTP_PORT=ELVIS IS THE GREATEST\n");
+
+        String json = """
+            {
+                "name": "port-env-invalid-test",
+                "port": "#env:HTTP_PORT#"
+            }
+            """;
+        Path configFile = tempDir.resolve("lucee.json");
+        Files.writeString(configFile, json);
+
+        IOException exception = assertThrows(IOException.class, () -> LuceeServerConfig.loadConfig(tempDir));
+        String message = exception.getMessage();
+
+        assertNotNull(message);
+        String normalized = message.toLowerCase();
+        assertTrue(normalized.contains("port"), "Error message should identify the port field");
+        assertTrue(normalized.contains("int"), "Error message should identify integer parsing");
+        assertTrue(normalized.contains("not a valid"), "Error message should explain why parsing failed");
     }
 
     @Test

@@ -294,7 +294,16 @@ public class LuceeServerConfig {
             return defaultConfig;
         }
         
-        ServerConfig config = objectMapper.readValue(configFile.toFile(), ServerConfig.class);
+        // Parse as JsonNode first so we can preprocess placeholder-backed numeric fields
+        // (e.g. "port": "#env:HTTP_PORT#") before strict int deserialization.
+        JsonNode rawConfigNode = objectMapper.readTree(configFile.toFile());
+
+        // Load env vars early so numeric placeholder preprocessing can resolve #env values.
+        String initialEnvFileName = resolveConfiguredEnvFileName(rawConfigNode);
+        loadEnvFile(projectDir, initialEnvFileName);
+
+        JsonNode preprocessedConfigNode = preprocessNumericFieldsForDeserialization(rawConfigNode);
+        ServerConfig config = objectMapper.treeToValue(preprocessedConfigNode, ServerConfig.class);
         
         // Migrate legacy top-level "version" to the new "lucee" block
         migrateLegacyLuceeVersion(config);
@@ -329,6 +338,7 @@ public class LuceeServerConfig {
         }
 
         // Load environment variables from the configured envFile (or default .env)
+        clearLoadedEnvFileVariables();
         String envFileName = resolveConfiguredEnvFileName(config);
         loadEnvFile(projectDir, envFileName);
 
@@ -375,6 +385,8 @@ public class LuceeServerConfig {
     public static final String MIN_SUPPORTED_LUCEE_VERSION = "6.1.0.0";
     private static final int MIN_SUPPORTED_LUCEE_MAJOR = 6;
     private static final int MIN_SUPPORTED_LUCEE_MINOR = 1;
+    private static final java.util.regex.Pattern INTEGER_LITERAL_PATTERN =
+            java.util.regex.Pattern.compile("^[+-]?\\d+$");
 
     // Track whether we've already shown the deprecation warning for this session
     private static boolean hasShownDeprecationWarning = false;
@@ -768,6 +780,20 @@ public class LuceeServerConfig {
                 : config.envFile.trim();
         return substituteField(envFileName);
     }
+
+    private static String resolveConfiguredEnvFileName(JsonNode configNode) {
+        String envFileName = ".env";
+        if (configNode != null && configNode.isObject()) {
+            JsonNode envFileNode = configNode.get("envFile");
+            if (envFileNode != null && envFileNode.isTextual()) {
+                String rawValue = envFileNode.asText();
+                if (rawValue != null && !rawValue.trim().isEmpty()) {
+                    envFileName = rawValue.trim();
+                }
+            }
+        }
+        return substituteField(envFileName);
+    }
     private static void clearRealizedEnvVariables() {
         synchronized (realizedEnvVariables) {
             realizedEnvVariables.clear();
@@ -833,6 +859,86 @@ public class LuceeServerConfig {
             recordRealizedEnvVariable(name, value);
         }
         return value;
+    }
+
+    /**
+     * Preprocess numeric fields that are strongly typed as integers in ServerConfig
+     * so placeholders like "#env:HTTP_PORT#" can be resolved before Jackson's strict
+     * int deserialization.
+     */
+    private static JsonNode preprocessNumericFieldsForDeserialization(JsonNode rootNode) {
+        if (rootNode == null || !rootNode.isObject()) {
+            return rootNode;
+        }
+        JsonNode copy = rootNode.deepCopy();
+        preprocessServerConfigNumericFields((com.fasterxml.jackson.databind.node.ObjectNode) copy);
+        return copy;
+    }
+
+    private static void preprocessServerConfigNumericFields(
+            com.fasterxml.jackson.databind.node.ObjectNode configNode) {
+        if (configNode == null) {
+            return;
+        }
+
+        preprocessIntegerField(configNode, "port");
+        preprocessIntegerField(configNode, "shutdownPort");
+
+        JsonNode httpsNode = configNode.get("https");
+        if (httpsNode != null && httpsNode.isObject()) {
+            preprocessIntegerField((com.fasterxml.jackson.databind.node.ObjectNode) httpsNode, "port");
+        }
+
+        JsonNode ajpNode = configNode.get("ajp");
+        if (ajpNode != null && ajpNode.isObject()) {
+            preprocessIntegerField((com.fasterxml.jackson.databind.node.ObjectNode) ajpNode, "port");
+        }
+
+        JsonNode monitoringNode = configNode.get("monitoring");
+        if (monitoringNode != null && monitoringNode.isObject()) {
+            JsonNode jmxNode = monitoringNode.get("jmx");
+            if (jmxNode != null && jmxNode.isObject()) {
+                preprocessIntegerField((com.fasterxml.jackson.databind.node.ObjectNode) jmxNode, "port");
+            }
+        }
+
+        JsonNode environmentsNode = configNode.get("environments");
+        if (environmentsNode != null && environmentsNode.isObject()) {
+            environmentsNode.fields().forEachRemaining(entry -> {
+                JsonNode envNode = entry.getValue();
+                if (envNode != null && envNode.isObject()) {
+                    preprocessServerConfigNumericFields((com.fasterxml.jackson.databind.node.ObjectNode) envNode);
+                }
+            });
+        }
+    }
+
+    private static void preprocessIntegerField(
+            com.fasterxml.jackson.databind.node.ObjectNode objectNode, String fieldName) {
+        if (objectNode == null || fieldName == null) {
+            return;
+        }
+        JsonNode valueNode = objectNode.get(fieldName);
+        if (valueNode == null || !valueNode.isTextual()) {
+            return;
+        }
+
+        String substituted = substituteField(valueNode.asText());
+        if (substituted == null) {
+            return;
+        }
+
+        String trimmed = substituted.trim();
+        if (INTEGER_LITERAL_PATTERN.matcher(trimmed).matches()) {
+            try {
+                objectNode.put(fieldName, Integer.parseInt(trimmed));
+                return;
+            } catch (NumberFormatException ignored) {
+                // Leave as string; normal Jackson validation will report invalid range.
+            }
+        }
+
+        objectNode.put(fieldName, substituted);
     }
     
     /**
@@ -2075,7 +2181,6 @@ public class LuceeServerConfig {
      * @param base The base ServerConfig loaded from lucee.json
      * @param envName The environment name to apply (e.g., "prod", "dev", "staging")
      * @return A new ServerConfig with environment overrides deep-merged into the base
-     * @throws IllegalArgumentException if the environment name is not found
      */
     public static ServerConfig applyEnvironment(ServerConfig base, String envName) {
         return applyEnvironment(base, envName, null);
@@ -2088,33 +2193,27 @@ public class LuceeServerConfig {
      * @param envName The environment name to apply (e.g., "prod", "dev", "staging")
      * @param projectDir The project directory (used to read raw environment JSON)
      * @return A new ServerConfig with environment overrides deep-merged into the base
-     * @throws IllegalArgumentException if the environment name is not found
      */
     public static ServerConfig applyEnvironment(ServerConfig base, String envName, Path projectDir) {
         if (envName == null || envName.trim().isEmpty()) {
             return base; // No environment specified
         }
+        String normalizedEnvName = envName.trim();
         
-        if (base.environments == null || !base.environments.containsKey(envName)) {
-            // Build a helpful error message listing available environments
-            StringBuilder errorMsg = new StringBuilder();
-            errorMsg.append("Environment '").append(envName).append("' not found in lucee.json");
-            
-            if (base.environments != null && !base.environments.isEmpty()) {
-                errorMsg.append("\nAvailable environments: ");
-                errorMsg.append(String.join(", ", base.environments.keySet()));
-            } else {
-                errorMsg.append("\nNo environments are defined in lucee.json");
-            }
-            
-            throw new IllegalArgumentException(errorMsg.toString());
+        // Missing environments should be a no-op so callers can pass --env values
+        // safely and continue with already computed defaults/base config.
+        if (base.environments == null || !base.environments.containsKey(normalizedEnvName)) {
+            System.err.println(
+                "⚠️  Environment '" + normalizedEnvName + "' not found in lucee.json; using base configuration."
+            );
+            return base;
         }
         
         // Prevent recursive environment definitions
-        ServerConfig envOverrides = base.environments.get(envName);
+        ServerConfig envOverrides = base.environments.get(normalizedEnvName);
         if (envOverrides.environments != null && !envOverrides.environments.isEmpty()) {
             throw new IllegalArgumentException(
-                "Environment '" + envName + "' cannot contain nested 'environments' definitions"
+                "Environment '" + normalizedEnvName + "' cannot contain nested 'environments' definitions"
             );
         }
         
@@ -2126,8 +2225,8 @@ public class LuceeServerConfig {
                 if (Files.exists(configFile)) {
                     JsonNode rootNode = objectMapper.readTree(configFile.toFile());
                     JsonNode envsNode = rootNode.get("environments");
-                    if (envsNode != null && envsNode.has(envName)) {
-                        rawEnvNode = envsNode.get(envName);
+                    if (envsNode != null && envsNode.has(normalizedEnvName)) {
+                        rawEnvNode = envsNode.get(normalizedEnvName);
                     }
                 }
             }
@@ -2199,6 +2298,9 @@ public class LuceeServerConfig {
             // put merged "configuration" back into the merged node
             ((com.fasterxml.jackson.databind.node.ObjectNode) mergedNode).set("configuration", mergedConfig);
 
+            // Environment overrides may introduce placeholder-backed numeric strings
+            // (e.g. "port": "#env:HTTP_PORT#"), so preprocess before strict binding.
+            mergedNode = preprocessNumericFieldsForDeserialization(mergedNode);
             return objectMapper.treeToValue(mergedNode, ServerConfig.class);
         }
         catch (Exception e) {
