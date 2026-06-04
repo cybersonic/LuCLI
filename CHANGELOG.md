@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Docs: Dependency Examples Page:** Added `content/docs/100_dependencies-and-extensions/020_dependency-examples.md` with copy/paste `lucee.json` snippets for supported dependency types (`git`, `forgebox`, and `extension` via ID/slug, URL, and local path), plus install command examples; linked it from the dependency section in docs index and dependency management page.
 - **Java 21 Runtime Gate in Wrapper Scripts:** Added early runtime checks in `src/bin/lucli.sh` and `src/bin/lucli.bat` so LuCLI fails fast with a clear error when Java is missing, unparseable, or older than Java 21.
 - **Dependency Shortcut Templates for `deps add`:** `lucli deps add <shortcut>` now supports non-interactive shortcut templates loaded from `src/main/resources/dependencies/dependency-shortcuts.json` (including built-in `testbox` and `fw1`), and `--dev` writes the shortcut dependency to `devDependencies`.
 - **Fix: Numeric `#env:` Placeholder Deserialization in `lucee.json`:** Server config loading now preprocesses typed numeric port fields before strict Jackson binding, so values like `"port": "#env:HTTP_PORT#"` (including env overrides) resolve correctly from `.env`/system variables instead of failing with `not a valid int value`.
