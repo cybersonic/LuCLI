@@ -21,6 +21,7 @@ jobs:
           java-version: 21
           distribution: temurin
 
+
       - name: Cache Maven
         uses: actions/cache@v4
         with:
@@ -53,6 +54,15 @@ jobs:
         with:
           java-version: 21
           distribution: temurin
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-21-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-21-
+            ${{ runner.os }}-m2-
 
       - name: Get version
         id: version
@@ -180,7 +190,7 @@ jobs:
 
       - name: Build JAR for Docker image
         if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
-        run: mvn -q -DskipTests package
+        run: mvn -o -q -DskipTests package
 
       - name: Set up Docker Buildx
         if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
@@ -210,7 +220,7 @@ jobs:
 
       - name: Build JAR for Docker image (snapshot)
         if: steps.version.outputs.is_snapshot == 'true'
-        run: mvn -q -DskipTests package
+        run: mvn -o -q -DskipTests package
 
       - name: Set up Docker Buildx (snapshot)
         if: steps.version.outputs.is_snapshot == 'true'

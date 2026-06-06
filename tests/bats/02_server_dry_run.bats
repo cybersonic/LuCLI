@@ -35,12 +35,12 @@ teardown() {
     assert_output_contains "with environment: prod"
 }
 
-@test "invalid environment returns a clear error message" {
+@test "invalid environment falls back to base configuration with warning" {
     local project_dir
     project_dir="$(create_env_test_project)"
 
     run_lucli server start --env=invalid --dry-run "${project_dir}"
-    assert_failure
-    assert_output_contains "not found in lucee.json"
-    assert_output_contains "Available environments:"
+    assert_success
+    assert_output_contains "not found in lucee.json; using base configuration"
+    assert_output_contains "\"port\" : 8080"
 }

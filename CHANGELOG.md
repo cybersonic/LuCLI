@@ -3,6 +3,9 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+
+## 0.3.17
+- **CI + Release Stability for Environment Fallback/Snapshot Builds:** Updated BATS dry-run coverage to match current missing `--env` behavior (warn and use base config instead of failing), and hardened `release.yml` publish Docker build steps by restoring Maven cache in `publish` and building JARs in offline mode to avoid snapshot-resolution 403 regressions.
 - **Docs: Dependency Examples Page:** Added `content/docs/100_dependencies-and-extensions/020_dependency-examples.md` with copy/paste `lucee.json` snippets for supported dependency types (`git`, `forgebox`, and `extension` via ID/slug, URL, and local path), plus install command examples; linked it from the dependency section in docs index and dependency management page.
 - **Java 21 Runtime Gate in Wrapper Scripts:** Added early runtime checks in `src/bin/lucli.sh` and `src/bin/lucli.bat` so LuCLI fails fast with a clear error when Java is missing, unparseable, or older than Java 21.
 - **Dependency Shortcut Templates for `deps add`:** `lucli deps add <shortcut>` now supports non-interactive shortcut templates loaded from `src/main/resources/dependencies/dependency-shortcuts.json` (including built-in `testbox` and `fw1`), and `--dev` writes the shortcut dependency to `devDependencies`.

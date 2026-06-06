@@ -110,3 +110,8 @@ Append new entries at the bottom under the appropriate date/session.
 ## 2026-05-28
 
 - Runtime startup guards for distributed binaries belong in wrapper sources (`src/bin/lucli.sh`, `src/bin/lucli.bat`): `build.sh` and Maven's `binary` profile concatenate `src/bin/lucli.sh` with `target/lucli.jar` to produce `target/lucli`, so wrapper-level checks are the authoritative first gate for self-executing launches.
+
+## 2026-06-06
+
+- Current server dry-run semantics for unknown environments are intentionally non-fatal in `LuceeServerConfig.applyEnvironment(...)`: LuCLI warns and falls back to base config, so integration tests should assert success + warning text rather than expecting a non-zero exit.
+- In `release.yml`, the `publish` job can fail resolving Lucee snapshot artifacts even when the matrix build already succeeded; restoring `~/.m2` cache in `publish` and using `mvn -o` for the Docker-image JAR build avoids flaky remote snapshot lookups.
