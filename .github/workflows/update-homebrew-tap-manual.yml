@@ -1,8 +1,12 @@
-name: Update Homebrew tap (LuCLI)
+name: Update Homebrew tap (LuCLI) - Manual
 
 on:
-  release:
-    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release tag to publish to Homebrew tap (e.g. v0.3.17)'
+        required: true
+        type: string
 
 jobs:
   update-tap:
@@ -11,6 +15,6 @@ jobs:
       formula_name: lucli
       formula_type: os_split
       release_repo: cybersonic/LuCLI
-      version: ${{ github.event.release.tag_name }}
+      version: ${{ github.event.inputs.version }}
     secrets:
       tap_repo_token: ${{ secrets.HOMEBREW_TAP_TOKEN }}

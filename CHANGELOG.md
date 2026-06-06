@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
-- **Homebrew Tap Workflow Manual Dispatch:** Added `workflow_dispatch` support to `.github/workflows/update-homebrew-tap.yml` with a required `version` input, and split release/manual execution into separate jobs to avoid startup-time expression parsing failures; tap updates can now be triggered manually for current or previous release tags when needed.
+- **Homebrew Tap Workflow Manual Dispatch:** Added a dedicated `.github/workflows/update-homebrew-tap-manual.yml` (`workflow_dispatch`, required `version`) so tap updates can be triggered manually for current or previous release tags, while keeping `.github/workflows/update-homebrew-tap.yml` release-only.
 
 ## 0.3.17
 - **CI + Release Stability for Environment Fallback/Snapshot Builds:** Updated BATS dry-run coverage to match current missing `--env` behavior (warn and use base config instead of failing), and hardened `release.yml` publish Docker build steps by restoring Maven cache in `publish` and building JARs in offline mode to avoid snapshot-resolution 403 regressions.
