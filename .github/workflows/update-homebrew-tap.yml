@@ -1,0 +1,16 @@
+name: Update Homebrew tap (LuCLI)
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  update-tap:
+    uses: cybersonic/homebrew-tap/.github/workflows/update-formula.yml@main
+    with:
+      formula_name: lucli
+      formula_type: os_split
+      release_repo: cybersonic/LuCLI
+      version: ${{ github.event.release.tag_name }}
+    secrets:
+      tap_repo_token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
