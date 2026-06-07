@@ -18,6 +18,7 @@ jobs:
       formula_name: lucli
       formula_type: os_split
       release_repo: cybersonic/LuCLI
+      tap_repository: cybersonic/homebrew-tap
       version: ${{ github.event.inputs.version }}
     secrets:
       tap_repo_token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
