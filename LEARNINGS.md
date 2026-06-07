@@ -115,3 +115,7 @@ Append new entries at the bottom under the appropriate date/session.
 
 - Current server dry-run semantics for unknown environments are intentionally non-fatal in `LuceeServerConfig.applyEnvironment(...)`: LuCLI warns and falls back to base config, so integration tests should assert success + warning text rather than expecting a non-zero exit.
 - In `release.yml`, the `publish` job can fail resolving Lucee snapshot artifacts even when the matrix build already succeeded; restoring `~/.m2` cache in `publish` and using `mvn -o` for the Docker-image JAR build avoids flaky remote snapshot lookups.
+
+## 2026-06-07
+
+- For reusable workflow calls (`jobs.<job>.uses`), the caller workflow must grant at least the same `GITHUB_TOKEN` scopes that the called workflow requests; if omitted, caller defaults can remain `contents: read` / `pull-requests: none` and GitHub rejects the workflow as invalid before it runs.

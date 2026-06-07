@@ -7,6 +7,9 @@ on:
         description: 'Release tag to publish to Homebrew tap (e.g. v0.3.17)'
         required: true
         type: string
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
   update-tap:

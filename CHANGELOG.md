@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Fix: Homebrew Tap Reusable Workflow Permissions:** Added explicit `permissions` (`contents: write`, `pull-requests: write`) to both tap-caller workflows (`.github/workflows/update-homebrew-tap.yml` and `.github/workflows/update-homebrew-tap-manual.yml`) so they can invoke `cybersonic/homebrew-tap/.github/workflows/update-formula.yml@main` without validation errors.
 - **Homebrew Tap Workflow Manual Dispatch:** Added a dedicated `.github/workflows/update-homebrew-tap-manual.yml` (`workflow_dispatch`, required `version`) so tap updates can be triggered manually for current or previous release tags, while keeping `.github/workflows/update-homebrew-tap.yml` release-only.
 
 ## 0.3.17
