@@ -125,3 +125,4 @@ Append new entries at the bottom under the appropriate date/session.
 
 - To gate release publishing on the exact same validation matrix as normal CI, add `workflow_call` to `.github/workflows/ci.yml` and invoke that workflow from `release.yml` via `jobs.<name>.uses`, instead of duplicating unit/integration/build jobs.
 - In this repo, release publishing with JReleaser should not use `-Pbinary` because that profile bumps `project.version` to the next `*-SNAPSHOT`; build without `-Pbinary` and assemble launcher artifacts before running `jreleaser:full-release`.
+- Markspresso's `build` command treats extra positional tokens as source path input; `lucli markspresso build clean` resolves source as `./clean` and can break Pages builds. Use `lucli markspresso build` or explicit flags like `--clean true` instead.
