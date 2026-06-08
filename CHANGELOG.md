@@ -3,8 +3,8 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
-- **Fix: Homebrew Tap Reusable Workflow Permissions:** Added explicit `permissions` (`contents: write`, `pull-requests: write`) to both tap-caller workflows (`.github/workflows/update-homebrew-tap.yml` and `.github/workflows/update-homebrew-tap-manual.yml`) so they can invoke `cybersonic/homebrew-tap/.github/workflows/update-formula.yml@main` without validation errors.
-- **Homebrew Tap Workflow Manual Dispatch:** Added a dedicated `.github/workflows/update-homebrew-tap-manual.yml` (`workflow_dispatch`, required `version`) so tap updates can be triggered manually for current or previous release tags, while keeping `.github/workflows/update-homebrew-tap.yml` release-only.
+- **Release Pipeline: CI-Gated JReleaser Publishing:** Refactored `.github/workflows/release.yml` to gate publishing behind the reusable CI workflow and switched non-snapshot publishing to `jreleaser:full-release` for GitHub release and Homebrew tap automation, replacing standalone tap update workflows.
+- **Default Version Semantics: App Version vs Lucee Version:** Updated defaults so new configs use app `version: "1.0.0"` while Lucee engine defaults to `lucee.version: "7.0.4.34"`. Also tightened Lucee version resolution to treat top-level `version` as a legacy Lucee value only when it matches Lucee-style version format, preventing app-version values from being misinterpreted as runtime engine versions.
 
 ## 0.3.17
 - **CI + Release Stability for Environment Fallback/Snapshot Builds:** Updated BATS dry-run coverage to match current missing `--env` behavior (warn and use base config instead of failing), and hardened `release.yml` publish Docker build steps by restoring Maven cache in `publish` and building JARs in offline mode to avoid snapshot-resolution 403 regressions.

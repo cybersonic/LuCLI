@@ -119,3 +119,9 @@ Append new entries at the bottom under the appropriate date/session.
 ## 2026-06-07
 
 - For reusable workflow calls (`jobs.<job>.uses`), the caller workflow must grant at least the same `GITHUB_TOKEN` scopes that the called workflow requests; if omitted, caller defaults can remain `contents: read` / `pull-requests: none` and GitHub rejects the workflow as invalid before it runs.
+- After introducing app-level top-level `version` defaults (for example `1.0.0`), Lucee runtime version resolution must only treat top-level `version` as a legacy engine value when it matches Lucee's `N.N.N.N`-style version pattern; otherwise fallback to `lucee.version` defaults to avoid misclassifying app versions as unsupported Lucee versions.
+
+## 2026-06-08
+
+- To gate release publishing on the exact same validation matrix as normal CI, add `workflow_call` to `.github/workflows/ci.yml` and invoke that workflow from `release.yml` via `jobs.<name>.uses`, instead of duplicating unit/integration/build jobs.
+- In this repo, release publishing with JReleaser should not use `-Pbinary` because that profile bumps `project.version` to the next `*-SNAPSHOT`; build without `-Pbinary` and assemble launcher artifacts before running `jreleaser:full-release`.
