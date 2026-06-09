@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Fix: Per-Subcommand `--help` for Modules:** `lucli modules run <module> <subcommand> --help` (e.g. `wheels migrate --help`) now forwards the subcommand to the module's `showHelp` so modules can render per-subcommand help. Previously the trailing subcommand was discarded and every `<module> <subcommand> --help` printed the module's global help. Modules whose `showHelp` ignores the extra argument fall back to global help unchanged, so behavior is preserved for them.
 - **Install Validation Workflow Across macOS/Linux/Windows:** Added `.github/workflows/install-validation.yml` with a manual `workflow_dispatch` smoke test matrix that validates LuCLI installation on Linux via the bootstrap installer, macOS via Homebrew tap install, and Windows via Scoop bucket install.
 - **Fix: Pages Workflow Markspresso Build Invocation:** Updated `.github/workflows/static.yml` to run `lucli markspresso build` instead of `lucli markspresso build clean`, which was incorrectly treating `clean` as a source directory and preventing `public/` artifact generation.
 - **Release Pipeline: CI-Gated JReleaser Publishing:** Refactored `.github/workflows/release.yml` to gate publishing behind the reusable CI workflow and switched non-snapshot publishing to `jreleaser:full-release` for GitHub release and Homebrew tap automation, replacing standalone tap update workflows.
