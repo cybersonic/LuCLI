@@ -70,12 +70,15 @@ jobs:
           cat src/bin/lucli.sh target/lucli.jar > target/lucli
           chmod +x target/lucli
           cat src/bin/lucli.bat target/lucli.jar > target/lucli.bat
+          rm -f target/lucli-windows.zip
+          zip -j target/lucli-windows.zip target/lucli.bat
 
-      - name: Publish GitHub release and Homebrew tap with JReleaser
+      - name: Publish GitHub release, Homebrew tap, and Scoop bucket with JReleaser
         if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
         env:
           JRELEASER_GITHUB_TOKEN: ${{ secrets.JRELEASER_GITHUB_TOKEN || secrets.HOMEBREW_TAP_TOKEN }}
           JRELEASER_HOMEBREW_GITHUB_TOKEN: ${{ secrets.JRELEASER_HOMEBREW_GITHUB_TOKEN || secrets.HOMEBREW_TAP_TOKEN || secrets.JRELEASER_GITHUB_TOKEN }}
+          JRELEASER_SCOOP_GITHUB_TOKEN: ${{ secrets.JRELEASER_SCOOP_GITHUB_TOKEN || secrets.JRELEASER_GITHUB_TOKEN || secrets.HOMEBREW_TAP_TOKEN }}
         run: mvn -DskipTests=true jreleaser:full-release
 
       - name: Build JAR for Docker image

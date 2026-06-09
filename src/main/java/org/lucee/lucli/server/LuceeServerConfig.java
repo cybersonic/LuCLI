@@ -40,18 +40,18 @@ public class LuceeServerConfig {
         /**
          * @deprecated Top-level "version" now refers to the app/project version.
          * Lucee engine version should be specified under the "lucee" block:
-         * {@code "lucee": { "version": "6.2.2.91" }}.
+         * {@code "lucee": { "version": "7.0.4.34" }}.
          * This field is kept for backward-compatible deserialization of legacy
          * lucee.json files. Use {@link LuceeServerConfig#getLuceeVersion(ServerConfig)}
          * to obtain the effective Lucee engine version.
          */
         @Deprecated
-        public String version = "6.2.2.91";
+        public String version = "1.0.0";
 
         /**
          * Lucee engine configuration (version and variant).
          * New-format lucee.json files should use this block:
-         * {@code "lucee": { "version": "6.2.2.91", "variant": "standard" }}
+         * {@code "lucee": { "version": "7.0.4.34", "variant": "standard" }}
          */
         public LuceeEngineConfig lucee;
         /**
@@ -245,10 +245,10 @@ public class LuceeServerConfig {
      */
     public static class LuceeEngineConfig {
         /**
-         * Lucee engine version (e.g. "6.2.2.91", "7.0.0.346-RC").
+         * Lucee engine version (e.g. "7.0.4.34", "7.0.0.346-RC").
          * Classifiers like -RC or -SNAPSHOT are part of this string.
          */
-        public String version = "6.2.2.91";
+        public String version = "7.0.4.34";
 
         /**
          * Lucee JAR variant: "standard" (default), "light", or "zero".
@@ -451,7 +451,7 @@ public class LuceeServerConfig {
      */
     public static String getLuceeVersion(ServerConfig config) {
         if (config == null) {
-            return "6.2.2.91";
+            return "7.0.4.34";
         }
         if (config.lucee != null && config.lucee.version != null
                 && !config.lucee.version.trim().isEmpty()) {
@@ -459,7 +459,10 @@ public class LuceeServerConfig {
         }
         @SuppressWarnings("deprecation")
         String legacy = config.version;
-        return (legacy != null && !legacy.trim().isEmpty()) ? legacy : "6.2.2.91";
+        if (legacy != null && !legacy.trim().isEmpty() && LUCEE_VERSION_PATTERN.matcher(legacy.trim()).matches()) {
+            return legacy.trim();
+        }
+        return "7.0.4.34";
     }
 
     /**

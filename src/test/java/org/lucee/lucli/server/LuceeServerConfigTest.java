@@ -65,7 +65,7 @@ public class LuceeServerConfigTest {
         assertNotNull(config.environments);
         // New lucee block should be populated by default
         assertNotNull(config.lucee);
-        assertEquals("6.2.2.91", config.lucee.version);
+        assertEquals("7.0.4.34", config.lucee.version);
         assertEquals("standard", config.lucee.variant);
         assertFalse(config.urlRewrite.enabled,
             "URL rewrite should be disabled by default unless explicitly enabled");
@@ -235,7 +235,7 @@ public class LuceeServerConfigTest {
         config.lucee = null;
         config.version = null;
 
-        assertEquals("6.2.2.91", LuceeServerConfig.getLuceeVersion(config));
+        assertEquals("7.0.4.34", LuceeServerConfig.getLuceeVersion(config));
     }
 
     @Test
