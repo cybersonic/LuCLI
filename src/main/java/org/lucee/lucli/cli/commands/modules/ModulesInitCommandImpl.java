@@ -48,6 +48,16 @@ public class ModulesInitCommandImpl implements Callable<Integer> {
     }
 
     /**
+     * The name the CLI was invoked as — {@code lucli} by default, or the alias
+     * (e.g. {@code wheels}) passed via {@code -Dlucli.binary.name}. User-facing
+     * usage and next-step hints reference this so an aliased binary tells the
+     * user to run <em>itself</em>, not the underlying {@code lucli} runtime.
+     */
+    private static String binaryName() {
+        return System.getProperty("lucli.binary.name", "lucli");
+    }
+
+    /**
      * Initialize a new module with the given name
      */
     private void initModule() throws IOException {
@@ -56,7 +66,7 @@ public class ModulesInitCommandImpl implements Callable<Integer> {
             moduleName = readLineFromConsole("Enter module name: ");
             if (moduleName == null) {
                 System.err.println("Module name is required when running non-interactively.");
-                System.err.println("Usage: lucli module init <MODULE_NAME>");
+                System.err.println("Usage: " + binaryName() + " module init <MODULE_NAME>");
                 System.exit(1);
             }
             if (moduleName.isEmpty()) {
@@ -100,7 +110,7 @@ public class ModulesInitCommandImpl implements Callable<Integer> {
         System.out.println("Next steps:");
         System.out.println("  1. Edit " + moduleDir.resolve("Module.cfc") + " to implement your module");
         System.out.println("  2. Update " + moduleDir.resolve("module.json") + " with module metadata");
-        System.out.println("  3. Test your module with: lucli " + moduleDir.resolve("Module.cfc"));
+        System.out.println("  3. Test your module with: " + binaryName() + " " + moduleDir.resolve("Module.cfc"));
        
     }
 
