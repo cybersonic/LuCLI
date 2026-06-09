@@ -1,0 +1,55 @@
+name: Install Validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to validate (for Linux installer). Use "latest" for latest release.
+        required: false
+        default: latest
+
+jobs:
+  install-smoke:
+    name: Install Smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    env:
+      LUCLI_TEST_VERSION: ${{ github.event.inputs.version || 'latest' }}
+
+    steps:
+      - name: Validate Linux installer install
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          if [ "$LUCLI_TEST_VERSION" = "latest" ]; then
+            curl -LsSf https://lucli.dev/install.sh | sh
+          else
+            LUCLI_VERSION="$LUCLI_TEST_VERSION" curl -LsSf https://lucli.dev/install.sh | sh
+          fi
+
+          if command -v lucli >/dev/null 2>&1; then
+            lucli --version
+          else
+            "$HOME/.local/bin/lucli" --version
+          fi
+
+      - name: Validate macOS Homebrew install
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          brew tap cybersonic/homebrew-tap
+          brew install cybersonic/homebrew-tap/lucli
+          lucli --version
+
+      - name: Validate Windows Scoop install
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+          Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+          scoop bucket add lucli https://github.com/cybersonic/scoop-bucket.git
+          scoop install lucli/lucli
+          lucli --version
