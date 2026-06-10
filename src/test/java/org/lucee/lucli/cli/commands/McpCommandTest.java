@@ -172,6 +172,57 @@ class McpCommandTest {
         assertTrue(names.contains("greet"), "expected greet. Got: " + names);
     }
 
+    @Test
+    void toolsListUsesModuleDeclaredInputSchema() throws Exception {
+        List<JsonNode> responses = runMcpSession(List.of(
+            "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"test\",\"version\":\"1.0\"}}}",
+            "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}",
+            "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\",\"params\":{}}"
+        ));
+
+        JsonNode listResp = responses.stream()
+                .filter(n -> n.has("id") && n.get("id").asInt() == 2)
+                .findFirst()
+                .orElseThrow();
+
+        JsonNode tools = listResp.get("result").get("tools");
+
+        JsonNode greet = null;
+        JsonNode echo = null;
+        List<String> names = new ArrayList<>();
+        for (JsonNode t : tools) {
+            String n = t.get("name").asText().toLowerCase();
+            names.add(n);
+            if (n.equals("greet")) greet = t;
+            if (n.equals("echo")) echo = t;
+        }
+
+        // The registry function itself must never surface as a tool.
+        assertFalse(names.contains("mcptoolspecs"),
+                "mcpToolSpecs must not be advertised as a tool. Got: " + names);
+
+        // greet has a declared entry in mcpToolSpecs() — the declared schema
+        // must win over the signature-derived one. The declared description
+        // deliberately differs from the @subject doc hint so this assertion
+        // can only pass via the declared path.
+        assertNotNull(greet, "expected greet tool. Got: " + names);
+        JsonNode schema = greet.get("inputSchema");
+        assertEquals("object", schema.get("type").asText());
+        assertTrue(schema.get("properties").has("subject"),
+                "declared schema must expose 'subject'. Got: " + schema);
+        assertEquals("string",
+                schema.get("properties").get("subject").get("type").asText());
+        assertEquals("Greeting target (declared via mcpToolSpecs)",
+                schema.get("properties").get("subject").get("description").asText());
+        assertFalse(schema.get("additionalProperties").asBoolean());
+
+        // echo has no declared entry — it keeps the signature-derived schema
+        // (no formal params → empty properties).
+        assertNotNull(echo, "expected echo tool. Got: " + names);
+        assertEquals(0, echo.get("inputSchema").get("properties").size(),
+                "echo must fall back to the signature-derived schema");
+    }
+
     // Send the given JSON-RPC lines to `dev-lucli.sh mcp mcpfixture` as a
     // subprocess. Returns each parsed response as a JsonNode.
     private List<JsonNode> runMcpSession(List<String> requests) throws Exception {
