@@ -172,6 +172,35 @@ class McpCommandTest {
         assertTrue(names.contains("greet"), "expected greet. Got: " + names);
     }
 
+    @Test
+    void toolsListStripsHintPrefixFromDescriptions() throws Exception {
+        List<JsonNode> responses = runMcpSession(List.of(
+            "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"test\",\"version\":\"1.0\"}}}",
+            "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}",
+            "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\",\"params\":{}}"
+        ));
+
+        JsonNode listResp = responses.stream()
+                .filter(n -> n.has("id") && n.get("id").asInt() == 2)
+                .findFirst()
+                .orElseThrow();
+
+        JsonNode echo = null;
+        for (JsonNode t : listResp.get("result").get("tools")) {
+            if (t.get("name").asText().equalsIgnoreCase("echo")) echo = t;
+        }
+        assertNotNull(echo, "expected echo tool");
+
+        // The fixture documents echo as `/** hint: Emit a known string ... */`.
+        // Lucee surfaces the metadata hint with the literal "hint:" key prefix;
+        // tools/list descriptions must have that prefix stripped.
+        String description = echo.get("description").asText();
+        assertFalse(description.toLowerCase().startsWith("hint:"),
+                "tool description must not retain the 'hint:' key prefix, got: '" + description + "'");
+        assertTrue(description.startsWith("Emit a known string"),
+                "expected the clean hint text, got: '" + description + "'");
+    }
+
     // Send the given JSON-RPC lines to `dev-lucli.sh mcp mcpfixture` as a
     // subprocess. Returns each parsed response as a JsonNode.
     private List<JsonNode> runMcpSession(List<String> requests) throws Exception {
