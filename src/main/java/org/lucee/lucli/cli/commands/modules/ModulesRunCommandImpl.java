@@ -39,7 +39,20 @@ public class ModulesRunCommandImpl implements Callable<Integer> {
     public Integer call() throws Exception {
         if (helpRequested) {
             LuceeScriptEngine engine = LuceeScriptEngine.getInstance();
-            engine.executeModule(moduleName, new String[]{"showHelp"});
+            // When a subcommand was supplied (e.g. `wheels migrate --help` →
+            // `modules run wheels migrate --help`), forward it to the module's
+            // showHelp so the module can render per-subcommand help. Modules whose
+            // showHelp ignores the extra argument fall back to their global help —
+            // i.e. behavior is unchanged for them. Without this the subcommand was
+            // discarded and every `<module> <subcommand> --help` showed global help.
+            if (moduleArgs != null && !moduleArgs.isEmpty()) {
+                java.util.List<String> helpArgs = new java.util.ArrayList<>();
+                helpArgs.add("showHelp");
+                helpArgs.addAll(moduleArgs);
+                engine.executeModule(moduleName, helpArgs.toArray(new String[0]));
+            } else {
+                engine.executeModule(moduleName, new String[]{"showHelp"});
+            }
             return 0;
         }
         runModule();
