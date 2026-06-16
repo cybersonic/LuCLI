@@ -6,13 +6,14 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import org.lucee.lucli.paths.LucliPaths;
 
 /**
  * Lightweight loader for LuCLI module repositories.
@@ -210,20 +211,15 @@ public class ModuleRepositoryIndex {
     }
 
     /**
-     * Compute the path to ~/.lucli/settings.json (respecting lucli.home and
-     * LUCLI_HOME overrides).
+     * Compute the path to the active profile's {@code settings.json} file.
+     *
+     * <p>Delegates to {@link LucliPaths#resolve()} so the same resolution rules
+     * (system property → env var → profile-default home dir) apply everywhere
+     * and the path tracks the active CLI profile (e.g., {@code ~/.lucli/settings.json}
+     * or {@code ~/.wheels/settings.json}).</p>
      */
     private static Path getSettingsFilePath() {
-        String lucliHomeStr = System.getProperty("lucli.home");
-        if (lucliHomeStr == null) {
-            lucliHomeStr = System.getenv("LUCLI_HOME");
-        }
-        if (lucliHomeStr == null) {
-            String userHome = System.getProperty("user.home");
-            lucliHomeStr = Paths.get(userHome, ".lucli").toString();
-        }
-        Path lucliHome = Paths.get(lucliHomeStr);
-        return lucliHome.resolve("settings.json");
+        return LucliPaths.resolve().settingsFile();
     }
 
     public Map<String, RepoModule> getModulesByName() {
