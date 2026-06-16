@@ -235,6 +235,7 @@ public class LuceeServerConfigTest {
     @Test
     void getLuceeVersion_fallsBackToDefault() {
         LuceeServerConfig.ServerConfig config = new LuceeServerConfig.ServerConfig();
+        config.version = "1.0.0";
         config.lucee = null;
         config.version = null;
 
@@ -263,13 +264,14 @@ public class LuceeServerConfigTest {
     }
 
     @Test
-    void setLuceeVersion_updatesBothFields() {
+    void setLuceeVersion_updatesLuceeBlockWithoutOverwritingAppVersion() {
         LuceeServerConfig.ServerConfig config = new LuceeServerConfig.ServerConfig();
         LuceeServerConfig.setLuceeVersion(config, "7.0.0.100-RC");
 
         assertNotNull(config.lucee);
         assertEquals("7.0.0.100-RC", config.lucee.version);
         assertEquals("7.0.0.100-RC", LuceeServerConfig.getLuceeVersion(config));
+        assertEquals("1.0.0", config.version);
     }
 
     // ===================
@@ -568,6 +570,58 @@ public class LuceeServerConfigTest {
         assertEquals("./prod.env", merged.envFile);
         assertEquals("overridden-in-prod", merged.envVars.get("SETTING1"));
         assertEquals("from-prod", envPreview.get("DEFAULT"));
+    }
+
+    @Test
+    void applyEnvironment_usesProvidedConfigFileForRawEnvironmentOverrides() throws IOException {
+        String defaultConfigJson = """
+            {
+              "name": "default-config",
+              "port": 8080,
+              "configuration": {
+                "preserveCase": true
+              },
+              "environments": {
+                "prod": {
+                  "port": 81,
+                  "configuration": {
+                    "errorGeneralTemplate": "/wrong-from-default.cfm"
+                  }
+                }
+              }
+            }
+            """;
+        Files.writeString(tempDir.resolve("lucee.json"), defaultConfigJson);
+
+        String customConfigJson = """
+            {
+              "name": "custom-config",
+              "port": 9090,
+              "configuration": {
+                "preserveCase": true
+              },
+              "environments": {
+                "prod": {
+                  "port": 80,
+                  "configuration": {
+                    "errorGeneralTemplate": "/right-from-custom.cfm"
+                  }
+                }
+              }
+            }
+            """;
+        Files.writeString(tempDir.resolve("lucee-env.json"), customConfigJson);
+
+        LuceeServerConfig.ServerConfig base = LuceeServerConfig.loadConfig(tempDir, "lucee-env.json");
+        LuceeServerConfig.ServerConfig merged =
+            LuceeServerConfig.applyEnvironment(base, "prod", tempDir, "lucee-env.json");
+
+        assertEquals(80, merged.port);
+        assertNotNull(merged.configuration);
+        assertEquals(
+            "/right-from-custom.cfm",
+            merged.configuration.path("errorGeneralTemplate").asText()
+        );
     }
 
     // ===================

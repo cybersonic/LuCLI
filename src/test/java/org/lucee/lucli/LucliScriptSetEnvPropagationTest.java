@@ -96,4 +96,35 @@ class LucliScriptSetEnvPropagationTest {
         String envOutput = Files.readString(outputFile, StandardCharsets.UTF_8);
         assertTrue(envOutput.contains(expected), "Expected external command environment to include FORGE_WEBTRIGGER_URL");
     }
+
+    @Test
+    void envFlagValueIsExposedAsLucliEnvInScriptEnvironment() throws Exception {
+        Path cfsFile = tempDir.resolve("print_lucli_env.cfs");
+        Path lucliFile = tempDir.resolve("script_envflag.lucli");
+        String expected = "prod";
+        Files.writeString(
+            cfsFile,
+            "writeOutput(structKeyExists(__env, \"LUCLI_ENV\") ? __env[\"LUCLI_ENV\"] : \"missing\");",
+            StandardCharsets.UTF_8
+        );
+
+        Files.write(
+            lucliFile,
+            List.of("run " + cfsFile.toAbsolutePath()),
+            StandardCharsets.UTF_8
+        );
+
+        ByteArrayOutputStream captured = new ByteArrayOutputStream();
+        PrintStream originalOut = System.out;
+        try {
+            System.setOut(new PrintStream(captured, true, StandardCharsets.UTF_8));
+            int exit = LuCLI.executeInProcess(new String[]{"--env", expected, lucliFile.toString()});
+            assertEquals(0, exit);
+        } finally {
+            System.setOut(originalOut);
+        }
+
+        String output = captured.toString(StandardCharsets.UTF_8);
+        assertTrue(output.contains(expected), "Expected __env[\"LUCLI_ENV\"] to reflect --env value");
+    }
 }
