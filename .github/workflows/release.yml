@@ -88,7 +88,7 @@ jobs:
           JRELEASER_GITHUB_TOKEN: ${{ secrets.JRELEASER_GITHUB_TOKEN || secrets.HOMEBREW_TAP_TOKEN }}
           JRELEASER_HOMEBREW_GITHUB_TOKEN: ${{ secrets.JRELEASER_HOMEBREW_GITHUB_TOKEN || secrets.HOMEBREW_TAP_TOKEN || secrets.JRELEASER_GITHUB_TOKEN }}
           JRELEASER_SCOOP_GITHUB_TOKEN: ${{ secrets.JRELEASER_SCOOP_GITHUB_TOKEN || secrets.JRELEASER_GITHUB_TOKEN || secrets.HOMEBREW_TAP_TOKEN }}
-        run: mvn -DskipTests=true jreleaser:full-release
+        run: mvn -DskipTests=true -Djreleaser.config.file=jreleaser.yml jreleaser:full-release
 
       - name: Build JAR for Docker image
         if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'

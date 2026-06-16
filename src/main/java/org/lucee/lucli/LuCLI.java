@@ -1236,6 +1236,9 @@ public class LuCLI implements Callable<Integer> {
         String env = getCurrentEnvironment();
         if (env != null) {
             verbose("Executing with environment: " + env);
+            // Expose the resolved execution environment to script consumers
+            // through the mutable script environment map used by __env.
+            scriptEnvironment.put("LUCLI_ENV", env);
         }
 
         // Pre-load --envfile if specified (covers the RunCommand path)
