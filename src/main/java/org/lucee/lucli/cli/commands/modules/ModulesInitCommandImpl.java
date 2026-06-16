@@ -3,11 +3,11 @@ package org.lucee.lucli.cli.commands.modules;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.concurrent.Callable;
 
 import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.StringOutput;
+import org.lucee.lucli.paths.LucliPaths;
 
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -48,6 +48,16 @@ public class ModulesInitCommandImpl implements Callable<Integer> {
     }
 
     /**
+     * The name the CLI was invoked as — {@code lucli} by default, or the alias
+     * (e.g. {@code wheels}) passed via {@code -Dlucli.binary.name}. User-facing
+     * usage and next-step hints reference this so an aliased binary tells the
+     * user to run <em>itself</em>, not the underlying {@code lucli} runtime.
+     */
+    private static String binaryName() {
+        return System.getProperty("lucli.binary.name", "lucli");
+    }
+
+    /**
      * Initialize a new module with the given name
      */
     private void initModule() throws IOException {
@@ -56,7 +66,7 @@ public class ModulesInitCommandImpl implements Callable<Integer> {
             moduleName = readLineFromConsole("Enter module name: ");
             if (moduleName == null) {
                 System.err.println("Module name is required when running non-interactively.");
-                System.err.println("Usage: lucli module init <MODULE_NAME>");
+                System.err.println("Usage: " + binaryName() + " module init <MODULE_NAME>");
                 System.exit(1);
             }
             if (moduleName.isEmpty()) {
@@ -100,7 +110,7 @@ public class ModulesInitCommandImpl implements Callable<Integer> {
         System.out.println("Next steps:");
         System.out.println("  1. Edit " + moduleDir.resolve("Module.cfc") + " to implement your module");
         System.out.println("  2. Update " + moduleDir.resolve("module.json") + " with module metadata");
-        System.out.println("  3. Test your module with: lucli " + moduleDir.resolve("Module.cfc"));
+        System.out.println("  3. Test your module with: " + binaryName() + " " + moduleDir.resolve("Module.cfc"));
        
     }
 
@@ -143,24 +153,14 @@ public class ModulesInitCommandImpl implements Callable<Integer> {
     }
 
     /**
-     * Get the modules directory (~/.lucli/modules)
+     * Get the active profile's modules directory, creating it if needed.
+     *
+     * <p>Delegates to {@link LucliPaths#resolve()} so the path tracks the active
+     * CLI profile (e.g., {@code ~/.lucli/modules} or {@code ~/.wheels/modules}).</p>
      */
     private Path getModulesDirectory() throws IOException {
-        String lucliHomeStr = System.getProperty("lucli.home");
-        if (lucliHomeStr == null) {
-            lucliHomeStr = System.getenv("LUCLI_HOME");
-        }
-        if (lucliHomeStr == null) {
-            String userHome = System.getProperty("user.home");
-            lucliHomeStr = Paths.get(userHome, ".lucli").toString();
-        }
-        
-        Path lucliHome = Paths.get(lucliHomeStr);
-        Path modulesDir = lucliHome.resolve("modules");
-        
-        // Ensure the directories exist
+        Path modulesDir = LucliPaths.resolve().modulesDir();
         Files.createDirectories(modulesDir);
-        
         return modulesDir;
     }
 

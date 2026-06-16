@@ -3,25 +3,27 @@ package org.lucee.lucli.cli.commands.modules;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.Callable;
 
+import org.lucee.lucli.LuCLI;
 import org.lucee.lucli.StringOutput;
 import org.lucee.lucli.modules.ModuleConfig;
 import org.lucee.lucli.modules.ModuleRepositoryIndex;
+import org.lucee.lucli.paths.LucliPaths;
 import org.lucee.lucli.ui.Table;
 
 import picocli.CommandLine.Command;
 
 /**
- * Lists available LuCLI modules (both installed and available from repository)
- * 
- * This command scans ~/.lucli/modules for installed modules and compares with
- * the bundled repository index to show what's available.
+ * Lists available modules (both installed and available from repository).
+ *
+ * <p>Scans the active profile's modules directory ({@code ~/.lucli/modules} by
+ * default, {@code ~/.wheels/modules} when invoked as {@code wheels}, etc.) and
+ * compares with the bundled repository index to show what's available.</p>
  */
 @Command(
     name = "list",
@@ -41,11 +43,11 @@ public class ModulesListCommandImpl implements Callable<Integer> {
     }
 
     /**
-     * List installed modules under ~/.lucli/modules and known modules from
-     * the bundled repository index.
+     * List installed modules under the active profile's modules directory and
+     * known modules from the bundled repository index.
      */
     private void listModules() throws IOException {
-        Path modulesDir = getModulesDirectory();
+        Path modulesDir = LucliPaths.resolve().modulesDir();
 
         if (!Files.exists(modulesDir)) {
             StringOutput.getInstance().println("${EMOJI_INFO} No modules directory found at: " + modulesDir);
@@ -77,9 +79,11 @@ public class ModulesListCommandImpl implements Callable<Integer> {
         allNames.addAll(installed.keySet());
         allNames.addAll(repoModules.keySet());
 
-        // Build the table
+        // Build the table — use the active profile's display name so the
+        // heading matches the branding of whatever binary invoked the CLI
+        // (e.g., "Wheels Modules" when invoked as `wheels`).
         Table.Builder tableBuilder = Table.builder()
-            .title("LuCLI Modules")
+            .title(LuCLI.getActiveProfile().displayName() + " Modules")
             .title("Module directory: " + modulesDir)
             .headers("NAME", "INSTALLED", "STATUS", "VERSION", "DESCRIPTION");
 
@@ -121,19 +125,5 @@ public class ModulesListCommandImpl implements Callable<Integer> {
         
         tableBuilder.footer("Total: " + count + " module" + (count != 1 ? "s" : ""));
         tableBuilder.build().print();
-    }
-
-    /**
-     * Get the modules directory path
-     */
-    private Path getModulesDirectory() {
-        String lucliHome = System.getProperty("lucli.home");
-        if (lucliHome == null || lucliHome.trim().isEmpty()) {
-            lucliHome = System.getenv("LUCLI_HOME");
-        }
-        if (lucliHome == null || lucliHome.trim().isEmpty()) {
-            lucliHome = System.getProperty("user.home") + "/.lucli";
-        }
-        return Paths.get(lucliHome).resolve("modules");
     }
 }

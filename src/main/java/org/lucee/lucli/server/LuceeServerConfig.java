@@ -1,7 +1,10 @@
     package org.lucee.lucli.server;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
+import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -1852,10 +1855,49 @@ public class LuceeServerConfig {
     }
     
     /**
-     * Check if a port is available
+     * Check if a port is available.
+     *
+     * <p>Two probes, because neither alone is sufficient on a dual-stack host:
+     * <ol>
+     *   <li><b>Connect probe</b> against both loopback families (127.0.0.1 and
+     *       ::1). A successful connect means something is actively LISTENing on
+     *       the port. This is what catches IPv4-only listeners that the bind
+     *       probe misses: on a dual-stack JVM (no -Djava.net.preferIPv4Stack)
+     *       {@code new ServerSocket(port)} binds the IPv6 wildcard, which does
+     *       not conflict with a socket bound to the IPv4 family — so an
+     *       IPv4-only listener (python http.server, Django runserver,
+     *       Postgres/Redis on 127.0.0.1, ...) would otherwise be reported as
+     *       "available" and the server would start on top of it. Connecting is
+     *       not fooled by sockets in TIME_WAIT, so it does not regress quick
+     *       restarts.</li>
+     *   <li><b>Bind probe</b> on the wildcard, preserving the original behaviour
+     *       for ports that cannot be bound even though nothing is accepting
+     *       connections there.</li>
+     * </ol>
      */
     public static boolean isPortAvailable(int port) {
+        // A listener on either loopback family means the port is already in use.
+        if (isListening("127.0.0.1", port) || isListening("::1", port)) {
+            return false;
+        }
+        // Fall back to a bind probe for ports that are reserved/bind-blocked
+        // without an accepting listener.
         try (ServerSocket socket = new ServerSocket(port)) {
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    /**
+     * True if a TCP connection to {@code host:port} succeeds quickly — i.e. some
+     * process is actively LISTENing there. Connection refused, timeout, or an
+     * unresolvable/unreachable address all mean "nothing listening on this
+     * address" and return false.
+     */
+    private static boolean isListening(String host, int port) {
+        try (Socket probe = new Socket()) {
+            probe.connect(new InetSocketAddress(InetAddress.getByName(host), port), 200);
             return true;
         } catch (IOException e) {
             return false;

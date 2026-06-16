@@ -3,6 +3,9 @@ package org.lucee.lucli.server;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
@@ -1466,5 +1469,49 @@ public class LuceeServerConfigTest {
         String expected = "jdbc:sqlite:" + tempDir.toAbsolutePath() + "/db/test.db";
         assertEquals(expected, dsn);
         assertFalse(dsn.contains("#project:path#"), "DSN should not contain unresolved #project:path#");
+    }
+
+    // ===================
+    // Port Availability Tests
+    // ===================
+
+    /**
+     * Regression test for the IPv4-blind port check.
+     *
+     * On a dual-stack JVM (no -Djava.net.preferIPv4Stack), `new ServerSocket(port)`
+     * binds the IPv6 wildcard, which does NOT conflict with a listener bound to the
+     * IPv4 address family. Before the fix, isPortAvailable() therefore reported a
+     * port held by an IPv4-only process (e.g. python http.server, Django runserver,
+     * Postgres/Redis on 127.0.0.1) as "available", so `wheels start` would collide
+     * with it instead of picking the next free port.
+     */
+    @Test
+    void isPortAvailableReturnsFalseForPortHeldByIPv4OnlyListener() throws IOException {
+        try (ServerSocket ipv4Only = new ServerSocket()) {
+            ipv4Only.setReuseAddress(false);
+            ipv4Only.bind(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 0));
+            int port = ipv4Only.getLocalPort();
+
+            assertFalse(
+                LuceeServerConfig.isPortAvailable(port),
+                "A port held by an IPv4-only listener (127.0.0.1) must be reported unavailable");
+        }
+    }
+
+    /**
+     * Guards against an over-correction that reports every port as unavailable:
+     * a port with nothing listening must still be reported available.
+     */
+    @Test
+    void isPortAvailableReturnsTrueForFreePort() throws IOException {
+        int freePort;
+        try (ServerSocket probe = new ServerSocket()) {
+            probe.bind(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 0));
+            freePort = probe.getLocalPort();
+        } // closed here -> port is now free
+
+        assertTrue(
+            LuceeServerConfig.isPortAvailable(freePort),
+            "A port with no listener must be reported available");
     }
 }

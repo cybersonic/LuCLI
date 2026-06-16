@@ -238,7 +238,7 @@ private static ObjectNode loadSettingsRoot(ObjectMapper mapper, Path settingsFil
 
         if (!Files.exists(modulesDir)) {
             StringOutput.getInstance().println("${EMOJI_INFO} No modules directory found at: " + modulesDir);
-            StringOutput.getInstance().println("${EMOJI_BULB} Use 'lucli modules init <module-name>' to create your first module.");
+            StringOutput.getInstance().println("${EMOJI_BULB} Use '" + binaryName() + " modules init <module-name>' to create your first module.");
             return;
         }
 
@@ -262,7 +262,7 @@ private static ObjectNode loadSettingsRoot(ObjectMapper mapper, Path settingsFil
 
         if (installed.isEmpty() && repoModules.isEmpty()) {
             System.out.println("No modules found.");
-            System.out.println("Use 'lucli modules init <module-name>' to create a new module.");
+            System.out.println("Use '" + binaryName() + " modules init <module-name>' to create a new module.");
             return;
         }
 
@@ -320,7 +320,7 @@ private static ObjectNode loadSettingsRoot(ObjectMapper mapper, Path settingsFil
             moduleName = readLineFromConsole("Enter module name: ");
             if (moduleName == null) {
                 System.err.println("Module name is required when running non-interactively.");
-                System.err.println("Usage: lucli module init <MODULE_NAME>");
+                System.err.println("Usage: " + binaryName() + " module init <MODULE_NAME>");
                 System.exit(1);
             }
             if (moduleName.isEmpty()) {
@@ -364,7 +364,7 @@ private static ObjectNode loadSettingsRoot(ObjectMapper mapper, Path settingsFil
         System.out.println("Next steps:");
         System.out.println("  1. Edit " + moduleDir.resolve("Module.cfc") + " to implement your module");
         System.out.println("  2. Update " + moduleDir.resolve("module.json") + " with module metadata");
-        System.out.println("  3. Test your module with: lucli " + moduleDir.resolve("Module.cfc"));
+        System.out.println("  3. Test your module with: " + binaryName() + " " + moduleDir.resolve("Module.cfc"));
    
     }
 
@@ -413,11 +413,21 @@ private static ObjectNode loadSettingsRoot(ObjectMapper mapper, Path settingsFil
      */
     public static Path getModulesDirectory() throws IOException {
         Path modulesDir = LucliPaths.resolve().modulesDir();
-        
+
         // Ensure the directories exist
         Files.createDirectories(modulesDir);
-        
+
         return modulesDir;
+    }
+
+    /**
+     * The name the CLI was invoked as — {@code lucli} by default, or the alias
+     * (e.g. {@code wheels}) passed via {@code -Dlucli.binary.name}. User-facing
+     * hints and errors reference this so an aliased binary points the user at
+     * <em>itself</em>, not the underlying {@code lucli} runtime.
+     */
+    private static String binaryName() {
+        return System.getProperty("lucli.binary.name", "lucli");
     }
     
     /**
@@ -719,7 +729,7 @@ private static ModuleOptions parseArguments(String[] args) {
         Path moduleDir = modulesDir.resolve(moduleName);
         
         if (!Files.exists(moduleDir)) {
-            throw new IllegalArgumentException("Module '" + moduleName + "' not found. Run 'lucli modules list' to see available modules.");
+            throw new IllegalArgumentException("Module '" + moduleName + "' not found. Run '" + binaryName() + " modules list' to see available modules.");
         }
         
         // Look for Module.cfc first
@@ -1201,7 +1211,7 @@ public static void installModule(String moduleName, String installName, String g
         Path moduleDir = modulesDir.resolve(moduleName);
         if (Files.isDirectory(moduleDir.resolve(".git"))) {
             System.err.println("Module '" + moduleName + "' is a Git working copy at: " + moduleDir);
-            System.err.println("Please update it using git (e.g. git pull) instead of 'lucli modules update'.");
+            System.err.println("Please update it using git (e.g. git pull) instead of '" + binaryName() + " modules update'.");
             System.exit(1);
         }
 
@@ -1212,7 +1222,7 @@ public static void installModule(String moduleName, String installName, String g
             ModuleSource source = loadModuleSource(moduleName);
             if (source == null || source.repository == null || source.repository.trim().isEmpty()) {
                 System.err.println("No stored repository URL for module '" + moduleName + "'.");
-                System.err.println("Use: lucli modules update " + moduleName + " --url=<git-url>");
+                System.err.println("Use: " + binaryName() + " modules update " + moduleName + " --url=<git-url>");
                 System.exit(1);
             }
 
