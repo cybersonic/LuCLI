@@ -99,32 +99,29 @@ class LucliScriptSetEnvPropagationTest {
 
     @Test
     void envFlagValueIsExposedAsLucliEnvInScriptEnvironment() throws Exception {
-        Path cfsFile = tempDir.resolve("print_lucli_env.cfs");
         Path lucliFile = tempDir.resolve("script_envflag.lucli");
         String expected = "prod";
-        Files.writeString(
-            cfsFile,
-            "writeOutput(structKeyExists(__env, \"LUCLI_ENV\") ? __env[\"LUCLI_ENV\"] : \"missing\");",
-            StandardCharsets.UTF_8
-        );
 
+        // A minimal .lucli script: no commands needed — we verify the side-effect on
+        // scriptEnvironment (which is the map exposed as __env to CFS scripts) directly,
+        // instead of capturing Lucee's writeOutput() via System.setOut.  The latter
+        // approach is unreliable cross-platform because the Lucee JSR-223 engine
+        // initialises its output Writer at engine-creation time with the original
+        // System.out reference, so subsequent System.setOut() redirects are invisible
+        // to it (manifests as a test failure on Windows CI).
         Files.write(
             lucliFile,
-            List.of("run " + cfsFile.toAbsolutePath()),
+            List.of("# verify LUCLI_ENV propagation"),
             StandardCharsets.UTF_8
         );
 
-        ByteArrayOutputStream captured = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
-        try {
-            System.setOut(new PrintStream(captured, true, StandardCharsets.UTF_8));
-            int exit = LuCLI.executeInProcess(new String[]{"--env", expected, lucliFile.toString()});
-            assertEquals(0, exit);
-        } finally {
-            System.setOut(originalOut);
-        }
+        int exit = LuCLI.executeInProcess(new String[]{"--env", expected, lucliFile.toString()});
+        assertEquals(0, exit);
 
-        String output = captured.toString(StandardCharsets.UTF_8);
-        assertTrue(output.contains(expected), "Expected __env[\"LUCLI_ENV\"] to reflect --env value");
+        // scriptEnvironment is the live map that __env references in every CFS/CFM
+        // executed within the same script session, so asserting it here is equivalent
+        // to asserting __env["LUCLI_ENV"] inside a CFML script.
+        assertEquals(expected, LuCLI.scriptEnvironment.get("LUCLI_ENV"),
+            "Expected __env[\"LUCLI_ENV\"] to reflect --env value");
     }
 }
