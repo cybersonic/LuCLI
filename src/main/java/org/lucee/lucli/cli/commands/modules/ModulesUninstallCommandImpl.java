@@ -3,11 +3,11 @@ package org.lucee.lucli.cli.commands.modules;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.concurrent.Callable;
 import java.util.stream.Stream;
 
 import org.lucee.lucli.StringOutput;
+import org.lucee.lucli.paths.LucliPaths;
 
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
@@ -34,7 +34,8 @@ public class ModulesUninstallCommandImpl implements Callable<Integer> {
     }
 
     /**
-     * Uninstall (remove) a module by deleting its directory under ~/.lucli/modules
+     * Uninstall (remove) a module by deleting its directory under the active
+     * profile's modules directory.
      */
     private void uninstallModule() throws IOException {
         if (moduleName == null || moduleName.trim().isEmpty()) {
@@ -64,24 +65,14 @@ public class ModulesUninstallCommandImpl implements Callable<Integer> {
     }
 
     /**
-     * Get the modules directory (~/.lucli/modules)
+     * Get the active profile's modules directory, creating it if needed.
+     *
+     * <p>Delegates to {@link LucliPaths#resolve()} so the path tracks the active
+     * CLI profile (e.g., {@code ~/.lucli/modules} or {@code ~/.wheels/modules}).</p>
      */
     private Path getModulesDirectory() throws IOException {
-        String lucliHomeStr = System.getProperty("lucli.home");
-        if (lucliHomeStr == null) {
-            lucliHomeStr = System.getenv("LUCLI_HOME");
-        }
-        if (lucliHomeStr == null) {
-            String userHome = System.getProperty("user.home");
-            lucliHomeStr = Paths.get(userHome, ".lucli").toString();
-        }
-        
-        Path lucliHome = Paths.get(lucliHomeStr);
-        Path modulesDir = lucliHome.resolve("modules");
-        
-        // Ensure the directories exist
+        Path modulesDir = LucliPaths.resolve().modulesDir();
         Files.createDirectories(modulesDir);
-        
         return modulesDir;
     }
 }
