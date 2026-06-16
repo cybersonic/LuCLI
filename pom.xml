@@ -193,14 +193,17 @@
         <artifactId>jreleaser-maven-plugin</artifactId>
         <version>1.22.0</version>
         <configuration>
-          <jreleaser>
-            <release>
-              <github>
-                <!-- Owner can be inferred from the Git remote; override here if needed -->
-                <token>${env.JRELEASER_GITHUB_TOKEN}</token>
-              </github>
-            </release>
-          </jreleaser>
+          <!--
+            Read the release model (distributions, packagers) from the root
+            jreleaser.yml. An inline <jreleaser> DSL block here takes precedence
+            over the external file — that is how v0.3.18 shipped with no binaries:
+            the inline block only carried the GitHub token, so JReleaser saw zero
+            distributions ("No files configured for checksum. Skipping") and
+            published an empty release. The token does not need to be declared at
+            all; JReleaser resolves JRELEASER_GITHUB_TOKEN from the environment
+            natively.
+          -->
+          <configFile>${project.basedir}/jreleaser.yml</configFile>
         </configuration>
       </plugin>
       <plugin>
