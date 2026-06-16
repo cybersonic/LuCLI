@@ -85,15 +85,19 @@ public class McpCommand implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
+        // Use the active binary name (e.g. "wheels") in user-facing usage text
+        // rather than the literal "lucli", which leaks the runtime brand to
+        // users of an aliased distribution.
+        String binaryName = System.getProperty("lucli.binary.name", "lucli");
         String mod = resolveModuleName();
         if (mod == null || mod.isBlank()) {
-            System.err.println("mcp: missing module name. Usage: lucli mcp <module>");
+            System.err.println("mcp: missing module name. Usage: " + binaryName + " mcp <module>");
             return 2;
         }
 
         if (!ModuleCommand.moduleExists(mod)) {
             System.err.println("mcp: module not found: '" + mod + "'");
-            System.err.println("Try: lucli modules list");
+            System.err.println("Try: " + binaryName + " modules list");
             return 1;
         }
 
