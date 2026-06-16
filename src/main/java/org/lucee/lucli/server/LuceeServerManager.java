@@ -602,12 +602,12 @@ public class LuceeServerManager {
                 System.out.println("ℹ️  Using locked server configuration for env '" + envKey + "' (lucee-lock.json)");
             }
         } else {
-            // No active lock: load configuration from lucee.json as usual
+            // No active lock: load configuration from the resolved config file
             config = LuceeServerConfig.loadConfig(projectDir, cfgFile);
 
             // Apply environment overrides if specified
             if (environment != null && !environment.trim().isEmpty()) {
-                config = LuceeServerConfig.applyEnvironment(config, environment, projectDir);
+                config = LuceeServerConfig.applyEnvironment(config, environment, projectDir, cfgFile);
             }
         }
 

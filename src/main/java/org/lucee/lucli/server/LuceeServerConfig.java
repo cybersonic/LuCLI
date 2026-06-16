@@ -484,16 +484,16 @@ public class LuceeServerConfig {
 
     /**
      * Set the Lucee engine version on a configuration, writing to the new
-     * {@code lucee} block (and keeping the deprecated field in sync).
+     * {@code lucee} block.
+     *
+     * IMPORTANT: this must not overwrite the top-level {@code version} field.
+     * The top-level field is now reserved for app/project versioning.
      */
     public static void setLuceeVersion(ServerConfig config, String version) {
         if (config.lucee == null) {
             config.lucee = new LuceeEngineConfig();
         }
         config.lucee.version = version;
-        // Keep deprecated field in sync for one release cycle
-        @SuppressWarnings("deprecation")
-        String ignored = config.version = version;
     }
 
     /**
@@ -2186,7 +2186,7 @@ public class LuceeServerConfig {
      * @return A new ServerConfig with environment overrides deep-merged into the base
      */
     public static ServerConfig applyEnvironment(ServerConfig base, String envName) {
-        return applyEnvironment(base, envName, null);
+        return applyEnvironment(base, envName, null, "lucee.json");
     }
     
     /**
@@ -2198,16 +2198,36 @@ public class LuceeServerConfig {
      * @return A new ServerConfig with environment overrides deep-merged into the base
      */
     public static ServerConfig applyEnvironment(ServerConfig base, String envName, Path projectDir) {
+        return applyEnvironment(base, envName, projectDir, "lucee.json");
+    }
+
+    /**
+     * Apply environment-specific overrides to a base ServerConfig.
+     * 
+     * @param base The base ServerConfig loaded from the provided config file
+     * @param envName The environment name to apply (e.g., "prod", "dev", "staging")
+     * @param projectDir The project directory (used to read raw environment JSON)
+     * @param configFileName The config file name to read environment overrides from
+     * @return A new ServerConfig with environment overrides deep-merged into the base
+     */
+    public static ServerConfig applyEnvironment(
+            ServerConfig base,
+            String envName,
+            Path projectDir,
+            String configFileName) {
         if (envName == null || envName.trim().isEmpty()) {
             return base; // No environment specified
         }
         String normalizedEnvName = envName.trim();
+        String resolvedConfigFileName = (configFileName == null || configFileName.trim().isEmpty())
+                ? "lucee.json"
+                : configFileName.trim();
         
         // Missing environments should be a no-op so callers can pass --env values
         // safely and continue with already computed defaults/base config.
         if (base.environments == null || !base.environments.containsKey(normalizedEnvName)) {
             System.err.println(
-                "⚠️  Environment '" + normalizedEnvName + "' not found in lucee.json; using base configuration."
+                "⚠️  Environment '" + normalizedEnvName + "' not found in " + resolvedConfigFileName + "; using base configuration."
             );
             return base;
         }
@@ -2224,7 +2244,7 @@ public class LuceeServerConfig {
             // Try to read raw environment JSON from file to get only explicitly set fields
             JsonNode rawEnvNode = null;
             if (projectDir != null) {
-                Path configFile = projectDir.resolve("lucee.json");
+                Path configFile = projectDir.resolve(resolvedConfigFileName);
                 if (Files.exists(configFile)) {
                     JsonNode rootNode = objectMapper.readTree(configFile.toFile());
                     JsonNode envsNode = rootNode.get("environments");

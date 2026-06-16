@@ -331,7 +331,7 @@ public class ServerCommandHandler {
         // Apply environment overrides if --env flag was provided
         if (environment != null && !environment.trim().isEmpty()) {
             try {
-                finalConfig = LuceeServerConfig.applyEnvironment(finalConfig, environment, projectDir);
+                finalConfig = LuceeServerConfig.applyEnvironment(finalConfig, environment, projectDir, cfgFile);
             } catch (IllegalArgumentException e) {
                 return formatOutput("❌ " + e.getMessage(), true);
             }
@@ -827,7 +827,7 @@ public class ServerCommandHandler {
 
             if (environment != null && !environment.trim().isEmpty()) {
                 try {
-                    finalConfig = LuceeServerConfig.applyEnvironment(finalConfig, environment, projectDir);
+                    finalConfig = LuceeServerConfig.applyEnvironment(finalConfig, environment, projectDir, cfgFile);
                 } catch (IllegalArgumentException e) {
                     return formatOutput("❌ " + e.getMessage(), true);
                 }
@@ -857,7 +857,7 @@ public class ServerCommandHandler {
             
             if (environment != null && !environment.trim().isEmpty()) {
                 try {
-                    finalConfig = LuceeServerConfig.applyEnvironment(finalConfig, environment, projectDir);
+                    finalConfig = LuceeServerConfig.applyEnvironment(finalConfig, environment, projectDir, cfgFile);
                 } catch (IllegalArgumentException e) {
                     return formatOutput("❌ " + e.getMessage(), true);
                 }
@@ -1536,7 +1536,7 @@ public class ServerCommandHandler {
         // Apply environment overrides if specified
         if (environment != null && !environment.trim().isEmpty()) {
             try {
-                config = LuceeServerConfig.applyEnvironment(config, environment.trim(), projectDir);
+                config = LuceeServerConfig.applyEnvironment(config, environment.trim(), projectDir, cfgFile);
             } catch (IllegalArgumentException e) {
                 return formatOutput("❌ " + e.getMessage(), true);
             }
@@ -1685,7 +1685,7 @@ public class ServerCommandHandler {
         // Apply environment overrides if specified (for envVars overrides).
         if (environment != null && !environment.trim().isEmpty()) {
             try {
-                config = LuceeServerConfig.applyEnvironment(config, environment.trim(), projectDir);
+                config = LuceeServerConfig.applyEnvironment(config, environment.trim(), projectDir, cfgFile);
             } catch (IllegalArgumentException e) {
                 return formatOutput("❌ " + e.getMessage(), true);
             }
@@ -2013,7 +2013,7 @@ public class ServerCommandHandler {
             // Load effective config for this env
             LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(currentWorkingDirectory, cfgFile);
             if (environment != null && !environment.trim().isEmpty()) {
-                config = LuceeServerConfig.applyEnvironment(config, environment.trim(), currentWorkingDirectory);
+                config = LuceeServerConfig.applyEnvironment(config, environment.trim(), currentWorkingDirectory, cfgFile);
             }
 
             // For server lock, resolve secrets so the locked snapshot does not
@@ -2180,7 +2180,7 @@ public class ServerCommandHandler {
             // Apply environment overrides if specified
             if (environment != null && !environment.trim().isEmpty()) {
                 try {
-                    config = LuceeServerConfig.applyEnvironment(config, environment.trim(), projectDir);
+                    config = LuceeServerConfig.applyEnvironment(config, environment.trim(), projectDir, cfgFile);
                 } catch (IllegalArgumentException e) {
                     return formatOutput("❌ " + e.getMessage(), true);
                 }
