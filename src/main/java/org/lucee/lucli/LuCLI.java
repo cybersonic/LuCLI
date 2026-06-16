@@ -391,6 +391,17 @@ public class LuCLI implements Callable<Integer> {
         if (args != null && args.length > 0) {
             cmdArgs.addAll(Arrays.asList(args));
         }
+        // Re-inject root-level flags that picocli consumed at the root before the
+        // module shortcut dispatched, so the module can see them (e.g. the wheels
+        // module's `doctor --verbose` / `stats --verbose` / `test --verbose`).
+        // Appended AFTER the module args so the subcommand stays the first
+        // positional; the module's arg parser reads --verbose/--debug from there.
+        if (isVerbose()) {
+            cmdArgs.add("--verbose");
+        }
+        if (isDebug()) {
+            cmdArgs.add("--debug");
+        }
         return spec.commandLine().execute(cmdArgs.toArray(new String[0]));
     }
 
@@ -543,12 +554,17 @@ public class LuCLI implements Callable<Integer> {
             setRuntimeCwd(Paths.get(System.getProperty("user.dir")));
         }
 
-        // Pre-process: if first arg is a module name and --help/-h is present,
-        // rewrite to "modules run <module> --help" so picocli routes to
-        // ModulesRunCommandImpl (which delegates to the module's showHelp())
-        // instead of showing root-level help.
+        // Pre-process: if first arg is a module name and --help/-h (or the bare
+        // `help` verb) is present, rewrite to "modules run <module> ... --help" so
+        // picocli routes to ModulesRunCommandImpl (which delegates to the module's
+        // showHelp()) instead of showing root-level help.
         args = preprocessModuleHelp(args);
-        
+        // Pre-process: rewrite `<module> [subs...] --version=<value>` to
+        // "modules run <module> ... --version=<value>" so the root --version flag
+        // (versionHelp, boolean) doesn't short-circuit on a value-bearing
+        // `--version=<tag>` a module wants (e.g. `wheels deploy --version=v1`).
+        args = preprocessModuleVersion(args);
+
         // Create Picocli CommandLine with our main command
         CommandLine cmd = new CommandLine(new LuCLI());
         cmd.setExpandAtFiles(false);
@@ -621,7 +637,28 @@ public class LuCLI implements Callable<Integer> {
         String first = args[0];
         if (first.startsWith("-")) return args;
 
-        // Check whether --help / -h appears anywhere after the first arg
+        // Only rewrite when the first arg is an installed module (e.g. the
+        // binary-name-aliased `wheels`). Bare `lucli help` (first arg not a
+        // module) is left to LuCLI's builtin HelpCommand, unchanged.
+        if (!ModuleCommand.moduleExists(first)) return args;
+
+        // (a) `<module> help [subcommand...]` — the bare `help` verb right after
+        // the module name. Drop it and append --help so it routes to the
+        // module's showHelp instead of LuCLI's builtin HelpCommand (which would
+        // print the root/global banner — the `wheels help` brand-leak).
+        if ("help".equals(args[1])) {
+            List<String> rewritten = new ArrayList<>();
+            rewritten.add("modules");
+            rewritten.add("run");
+            rewritten.add(first);
+            for (int i = 2; i < args.length; i++) {
+                rewritten.add(args[i]);
+            }
+            rewritten.add("--help");
+            return rewritten.toArray(new String[0]);
+        }
+
+        // (b) --help / -h anywhere after the module name.
         boolean hasHelp = false;
         for (int i = 1; i < args.length; i++) {
             if ("--help".equals(args[i]) || "-h".equals(args[i])) {
@@ -631,10 +668,41 @@ public class LuCLI implements Callable<Integer> {
         }
         if (!hasHelp) return args;
 
-        // Only rewrite when the first arg is an installed module
+        // Prepend "modules run" so picocli delegates to ModulesRunCommandImpl
+        List<String> rewritten = new ArrayList<>();
+        rewritten.add("modules");
+        rewritten.add("run");
+        for (String arg : args) {
+            rewritten.add(arg);
+        }
+        return rewritten.toArray(new String[0]);
+    }
+
+    /**
+     * Rewrite `<module> [subcommands...] --version=<value>` to
+     * "modules run <module> [subcommands...] --version=<value>" so a module that
+     * accepts a value-bearing --version (e.g. `wheels deploy --version=v1.2.3`,
+     * Kamal-compatible) is not blocked by the root's boolean versionHelp --version
+     * flag, which would short-circuit with "Invalid value for option '--version'".
+     * A bare `--version` (no value) and bare `lucli --version` (first arg not a
+     * module) are untouched, preserving the root version-banner behavior.
+     */
+    private static String[] preprocessModuleVersion(String[] args) {
+        if (args.length < 2) return args;
+
+        String first = args[0];
+        if (first.startsWith("-")) return args;
         if (!ModuleCommand.moduleExists(first)) return args;
 
-        // Prepend "modules run" so picocli delegates to ModulesRunCommandImpl
+        boolean hasVersionValue = false;
+        for (int i = 1; i < args.length; i++) {
+            if (args[i].startsWith("--version=")) {
+                hasVersionValue = true;
+                break;
+            }
+        }
+        if (!hasVersionValue) return args;
+
         List<String> rewritten = new ArrayList<>();
         rewritten.add("modules");
         rewritten.add("run");
