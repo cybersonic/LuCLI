@@ -66,3 +66,29 @@ teardown() {
     assert_success
     assert_output_matches 'LuCLI Version: [0-9]+\.[0-9]+\.[0-9]+'
 }
+
+@test "trailing question mark shows server command help" {
+    run_lucli server '?'
+    assert_help_exit_code
+    assert_output_contains "Usage:"
+    assert_output_contains "server"
+}
+
+@test "trailing question mark shows server start help" {
+    run_lucli server start '?'
+    assert_help_exit_code
+    assert_output_contains "Usage:"
+    assert_output_contains "server start"
+}
+
+@test "terminal mode trailing question mark shows server command help" {
+    run bash -c 'printf "server ?\nexit\n" | java -jar "$1"' _ "${LUCLI_JAR}"
+    assert_success
+    assert_output_contains "Usage: lucli server"
+}
+
+@test "terminal mode trailing question mark shows server start help" {
+    run bash -c 'printf "server start ?\nexit\n" | java -jar "$1"' _ "${LUCLI_JAR}"
+    assert_success
+    assert_output_contains "Usage: lucli server start"
+}
