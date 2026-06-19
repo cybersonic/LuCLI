@@ -193,8 +193,9 @@ lucli modules --help
 When you run an unrecognized command, LuCLI uses smart detection:
 
 1. First, it checks if it's a known built‑in subcommand (like `server`, `modules`, `terminal`).
-2. Next, it checks if it's an existing CFML file (`.cfs`, `.cfm`, `.cfc`).
-3. Then it tries to run it as a **module shortcut** (looking under `~/.lucli/modules/<name>/Module.cfc`).
-4. If nothing matches, it shows you what’s available.
+2. Next, it checks if it's an existing direct-execution CFML file (`.cfs`, `.cfm`).
+3. If the target is `.cfc`, LuCLI returns a contract error and points to module entrypoints.
+4. Then it tries to run it as a **module shortcut** (looking under `~/.lucli/modules/<name>/Module.cfc`).
+5. If nothing matches, it shows you what’s available.
 
 This means you can just type `lucli hello-world` instead of the longer `lucli modules run hello-world`—the shortcut form is usually what you’ll use day‑to‑day.
