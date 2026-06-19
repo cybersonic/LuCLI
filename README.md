@@ -3,6 +3,7 @@
 [![CI](https://github.com/cybersonic/LuCLI/actions/workflows/ci.yml/badge.svg)](https://github.com/cybersonic/LuCLI/actions/workflows/ci.yml)
 [![Release](https://github.com/cybersonic/LuCLI/actions/workflows/release.yml/badge.svg)](https://github.com/cybersonic/LuCLI/actions/workflows/release.yml)
 [![Docs](https://github.com/cybersonic/LuCLI/actions/workflows/static.yml/badge.svg)](https://github.com/cybersonic/LuCLI/actions/workflows/static.yml)
+[![Benchmarks](https://github.com/cybersonic/LuCLI/actions/workflows/perf-benchmark.yml/badge.svg)](https://github.com/cybersonic/LuCLI/actions/workflows/perf-benchmark.yml)
 [![Java 21+](https://img.shields.io/badge/java-21+-blue)](https://adoptium.net/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Alpha](https://img.shields.io/badge/status-alpha-orange)](https://github.com/cybersonic/LuCLI/releases)
