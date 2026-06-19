@@ -79,6 +79,11 @@ public class TomcatWebXmlPatcher {
                 disableRestServlet(document);
             }
 
+            // Enforce Lucee admin endpoint disabling when explicitly configured.
+            if (config != null && config.enableLucee && isAdminDisabled(config)) {
+                enforceAdminDisabled(document);
+            }
+
             TransformerFactory tf = TransformerFactory.newInstance();
             Transformer transformer = tf.newTransformer();
             transformer.setOutputProperty(OutputKeys.INDENT, "yes");
@@ -392,7 +397,7 @@ public class TomcatWebXmlPatcher {
             // Add CFMLServlet if not present
             if (!hasCfmlServlet) {
                 addCfmlServlet(root, luceeServerRoot, luceeWebRoot);
-                addCfmlServletMappings(root);
+                addCfmlServletMappings(root, !isAdminDisabled(config));
                 addCfmlWelcomeFiles(root);
                 System.out.println("Added Lucee CFMLServlet to web.xml");
             }
@@ -409,6 +414,11 @@ public class TomcatWebXmlPatcher {
 
             // Also ensure lucee.json is protected
             ensureLuceeJsonProtected(document);
+
+            // Keep generated web.xml aligned with admin.enabled behavior.
+            if (isAdminDisabled(config)) {
+                enforceAdminDisabled(document);
+            }
 
             // Write back
             TransformerFactory tf = TransformerFactory.newInstance();
@@ -521,12 +531,112 @@ public class TomcatWebXmlPatcher {
      * Add CFML servlet mappings.
      */
     private void addCfmlServletMappings(Element root) {
-        String[] patterns = {"*.cfm", "*.cfml", "*.cfc", "*.cfs", "/index.cfm/*", "/lucee/admin.cfm"};
+        addCfmlServletMappings(root, true);
+    }
+
+    /**
+     * Add CFML servlet mappings.
+     *
+     * @param root                  web.xml root element
+     * @param includeAdminEntrypoint whether /lucee/admin.cfm should be mapped
+     */
+    private void addCfmlServletMappings(Element root, boolean includeAdminEntrypoint) {
+        List<String> patterns = new ArrayList<>();
+        patterns.add("*.cfm");
+        patterns.add("*.cfml");
+        patterns.add("*.cfc");
+        patterns.add("*.cfs");
+        patterns.add("/index.cfm/*");
+        if (includeAdminEntrypoint) {
+            patterns.add("/lucee/admin.cfm");
+        }
         for (String pattern : patterns) {
             Element mapping = append(root, "servlet-mapping", null);
             append(mapping, "servlet-name", "CFMLServlet");
             append(mapping, "url-pattern", pattern);
         }
+    }
+
+    /**
+     * Returns true when admin endpoint access is explicitly disabled.
+     */
+    private boolean isAdminDisabled(LuceeServerConfig.ServerConfig config) {
+        return config != null
+                && config.admin != null
+                && !config.admin.enabled;
+    }
+
+    /**
+     * Remove admin servlet mappings and add a deny-all constraint for admin URLs.
+     */
+    private void enforceAdminDisabled(Document document) {
+        if (document == null) {
+            return;
+        }
+
+        Element root = document.getDocumentElement();
+        if (root == null) {
+            return;
+        }
+
+        // Remove explicit admin mappings if present.
+        removeAdminServletMappings(root);
+
+        // Add a deny-all security-constraint for admin URLs.
+        ensureLuceeAdminProtected(document);
+    }
+
+    /**
+     * Remove explicit admin servlet mappings from servlet-mapping blocks.
+     */
+    private void removeAdminServletMappings(Element root) {
+        NodeList mappingNodes = root.getElementsByTagName("servlet-mapping");
+        for (int i = 0; i < mappingNodes.getLength(); i++) {
+            Node node = mappingNodes.item(i);
+            if (!(node instanceof Element)) {
+                continue;
+            }
+            Element mapping = (Element) node;
+            String pattern = getChildText(mapping, "url-pattern");
+            if ("/lucee/admin.cfm".equals(pattern) || "/lucee/admin/*".equals(pattern)) {
+                root.removeChild(mapping);
+                i--; // Adjust index because NodeList is live
+            }
+        }
+    }
+
+    /**
+     * Ensure Lucee admin URLs are denied by security-constraint when admin is disabled.
+     */
+    private void ensureLuceeAdminProtected(Document document) {
+        if (document == null) {
+            return;
+        }
+
+        Element root = document.getDocumentElement();
+        if (root == null) {
+            return;
+        }
+
+        try {
+            boolean alreadyProtected = exists(
+                document,
+                "//security-constraint" +
+                "[web-resource-collection/url-pattern[normalize-space(text())='/lucee/admin.cfm']]"
+            );
+            if (alreadyProtected) {
+                return;
+            }
+        } catch (XPathExpressionException e) {
+            return;
+        }
+
+        Element securityConstraint = append(root, "security-constraint", null);
+        Element webResourceCollection = append(securityConstraint, "web-resource-collection", null);
+        append(webResourceCollection, "web-resource-name", "Lucee admin endpoint disabled");
+        append(webResourceCollection, "url-pattern", "/lucee/admin.cfm");
+        append(webResourceCollection, "url-pattern", "/lucee/admin/*");
+        append(securityConstraint, "auth-constraint", null);
     }
 
     /**
