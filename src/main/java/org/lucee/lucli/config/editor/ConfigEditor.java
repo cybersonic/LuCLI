@@ -84,8 +84,8 @@ public class ConfigEditor {
             updaters.put("host", () -> config.host = host);
         }
 
-        // version
-        printFieldHelp("version", props);
+        // lucee.version
+        description("Lucee engine version for this server (stored at lucee.version).");
 
         // Show a short suggestion list of known versions (if available)
         List<String> suggestedVersions = null;
@@ -122,7 +122,7 @@ public class ConfigEditor {
                 }
             }
             final String applyVersion = chosenVersion;
-            updaters.put("version", () -> LuceeServerConfig.setLuceeVersion(config, applyVersion));
+            updaters.put("lucee.version", () -> LuceeServerConfig.setLuceeVersion(config, applyVersion));
         }
 
         // port
@@ -425,7 +425,7 @@ public class ConfigEditor {
         String currentPassword = (config.admin != null) ? nullToEmpty(config.admin.password) : "";
         if (currentPassword.isEmpty()) {
             description("Admin password: (not set)");
-        } else if (currentPassword.matches("^\\$\\{.+}$")) {
+        } else if (currentPassword.matches("^(\\$\\{.+\\}|#(?:env|secret):.+#)$")) {
             description("Admin password uses placeholder reference (env var or secret).");
         } else {
             description("Admin password is plain text (consider switching to a placeholder reference).");
@@ -433,8 +433,8 @@ public class ConfigEditor {
 
         System.out.println("Admin password options:");
         description("k) keep current");
-        description("e) use environment variable reference (e.g. ${LUCEE_ADMIN_PASSWORD})");
-        description("s) use secret store placeholder (e.g. ${secret:admin.password})");
+        description("e) use environment variable reference (e.g. #env:LUCEE_ADMIN_PASSWORD#)");
+        description("s) use secret store placeholder (e.g. #secret:admin.password#)");
         description("p) set plain password");
         System.out.print("Choice [k]: ");
         String adminChoice = scanner.nextLine().trim().toLowerCase();
@@ -450,7 +450,7 @@ public class ConfigEditor {
             if (var.isEmpty()) {
                 var = "LUCEE_ADMIN_PASSWORD";
             }
-            newAdminPassword = "${" + var + "}";
+            newAdminPassword = "#env:" + var + "#";
         } else if (adminChoice.equals("s")) {
             newAdminPassword = configureAdminPasswordSecret(scanner, config);
         } else if (adminChoice.equals("p")) {
@@ -802,7 +802,7 @@ public class ConfigEditor {
                 System.out.print("Secret '" + name + "' already exists. Use it for admin password? (Y/n): ");
                 String useExisting = scanner.nextLine().trim().toLowerCase();
                 if (useExisting.isEmpty() || useExisting.equals("y") || useExisting.equals("yes")) {
-                    return "${secret:" + name + "}";
+                    return "#secret:" + name + "#";
                 }
                 System.out.println("Skipping secret-based admin password.");
                 return null;
@@ -829,7 +829,7 @@ public class ConfigEditor {
             String desc = "Lucee admin password for server '" + (config.name != null ? config.name : "<unnamed>") + "'";
             store.put(name, v1, desc);
             System.out.println("Stored secret '" + name + "'.");
-            return "${secret:" + name + "}";
+            return "#secret:" + name + "#";
         } catch (SecretStoreException e) {
             System.out.println("⚠️ Failed to use secret store for admin password: " + e.getMessage());
             return null;

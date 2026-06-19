@@ -30,6 +30,7 @@ import com.fasterxml.jackson.core.JsonParser;
  * Handles Lucee server configuration from lucee.json files
  */
 public class LuceeServerConfig {
+    private static final String DEFAULT_APP_VERSION = "1.0.0";
     
     @JsonIgnoreProperties({"dependencies", "devDependencies", "packages", "dependencySettings"})
     public static class ServerConfig {
@@ -49,7 +50,7 @@ public class LuceeServerConfig {
          * to obtain the effective Lucee engine version.
          */
         @Deprecated
-        public String version = "1.0.0";
+        public String version = DEFAULT_APP_VERSION;
 
         /**
          * Lucee engine configuration (version and variant).
@@ -412,6 +413,7 @@ public class LuceeServerConfig {
      *    no {@code lucee} block exists → migrate it and emit a deprecation warning.
      * 3. If both exist, the {@code lucee.version} takes precedence.
      */
+    @SuppressWarnings("deprecation")
     private static void migrateLegacyLuceeVersion(ServerConfig config) {
         if (config.lucee != null && config.lucee.version != null
                 && !config.lucee.version.trim().isEmpty()) {
@@ -427,6 +429,7 @@ public class LuceeServerConfig {
                 config.lucee = new LuceeEngineConfig();
             }
             config.lucee.version = legacyVersion;
+            config.version = DEFAULT_APP_VERSION;
 
             // Migrate runtime.variant into lucee.variant if present
             if (config.runtime != null && config.runtime.variant != null

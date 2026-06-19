@@ -4,13 +4,10 @@ load './test_helper.bash'
 
 setup_file() {
     require_lucli_artifacts
-}
-
-setup() {
     setup_lucli_home
 }
 
-teardown() {
+teardown_file() {
     cleanup_lucli_home
 }
 

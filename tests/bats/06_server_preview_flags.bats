@@ -49,7 +49,11 @@ create_https_preview_project() {
 {
   "name": "https-preview",
   "port": 8080,
-  "version": "6.2.2.91",
+  "version": "1.0.0",
+  "lucee": {
+    "version": "7.0.4.34",
+    "variant": "zero"
+  },
   "https": {
     "enabled": true,
     "port": 8443,

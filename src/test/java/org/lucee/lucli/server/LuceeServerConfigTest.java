@@ -45,6 +45,7 @@ public class LuceeServerConfigTest {
         LuceeServerConfig.ServerConfig config = LuceeServerConfig.createDefaultConfig(tempDir);
         
         assertEquals(tempDir.getFileName().toString(), config.name);
+        assertEquals("1.0.0", config.version);
         // Note: Default version may change - just verify it's set
         assertNotNull(LuceeServerConfig.getLuceeVersion(config));
         // Default port should be in the expected range (8000-8999)
@@ -207,6 +208,7 @@ public class LuceeServerConfigTest {
         assertNotNull(config.lucee, "lucee block should be created during migration");
         assertEquals("6.2.2.91", config.lucee.version);
         assertEquals("6.2.2.91", LuceeServerConfig.getLuceeVersion(config));
+        assertEquals("1.0.0", config.version);
     }
 
     @Test

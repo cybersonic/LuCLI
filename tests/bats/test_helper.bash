@@ -29,6 +29,9 @@ setup_lucli_home() {
     local tmp_base
     tmp_base="${BATS_TEST_TMPDIR:-${BATS_FILE_TMPDIR:-${TMPDIR:-/tmp}}}"
     LUCLI_HOME="$(mktemp -d "${tmp_base%/}/lucli-home.XXXXXX")"
+    if [[ -n "${LUCLI_BATS_EXPRESS_CACHE_DIR:-}" && -d "${LUCLI_BATS_EXPRESS_CACHE_DIR}" ]]; then
+        ln -s "${LUCLI_BATS_EXPRESS_CACHE_DIR}" "${LUCLI_HOME}/express"
+    fi
 }
 
 cleanup_lucli_home() {
@@ -49,6 +52,28 @@ run_lucli_in_dir() {
     local workdir="$1"
     shift
     run bash -c 'cd "$1" && shift && jar="$1" && shift && java -jar "$jar" "$@"' _ "${workdir}" "${LUCLI_JAR}" "$@"
+}
+
+prewarm_test_lucee_runtime() {
+    local tmp_base
+    local project_dir
+    tmp_base="${BATS_TEST_TMPDIR:-${BATS_FILE_TMPDIR:-${TMPDIR:-/tmp}}}"
+    project_dir="$(mktemp -d "${tmp_base%/}/prewarm-project.XXXXXX")"
+
+    cat > "${project_dir}/lucee.json" << 'EOF'
+{
+  "name": "bats-runtime-prewarm",
+  "version": "1.0.0",
+  "lucee": {
+    "version": "7.0.4.34",
+    "variant": "zero"
+  },
+  "openBrowser": false
+}
+EOF
+
+    java -jar "${LUCLI_JAR}" server start --prewarm "${project_dir}" >/dev/null 2>&1
+    rm -rf "${project_dir}"
 }
 
 stop_all_servers_if_possible() {
@@ -126,7 +151,11 @@ create_env_test_project() {
 {
   "name": "env-test",
   "port": 8080,
-  "version": "6.2.2.91",
+  "version": "1.0.0",
+  "lucee": {
+    "version": "7.0.4.34",
+    "variant": "zero"
+  },
   "jvm": {
     "maxMemory": "512m",
     "minMemory": "128m"
