@@ -23,6 +23,8 @@ else
     exit 1
 fi
 
+export BATS_TEST_TIMEOUT="${BATS_TEST_TIMEOUT:-10}"
+
 if [[ "${CI:-}" == "true" && -z "${TERM:-}" ]]; then
     export TERM="dumb"
 fi
@@ -48,6 +50,26 @@ if [[ "${NEEDS_BUILD}" == "true" ]]; then
         chmod 755 target/lucli
     )
 fi
+
+
+BATS_CACHE_HOME="${BATS_CACHE_HOME:-${TMPDIR:-/tmp}/lucli-bats-cache}"
+mkdir -p "${BATS_CACHE_HOME}"
+PREWARM_PROJECT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/lucli-prewarm.XXXXXX")"
+cat > "${PREWARM_PROJECT_DIR}/lucee.json" << 'EOF'
+{
+  "name": "bats-runtime-cache",
+  "version": "1.0.0",
+  "lucee": {
+    "version": "7.0.4.34",
+    "variant": "zero"
+  },
+  "openBrowser": false
+}
+EOF
+if LUCLI_HOME="${BATS_CACHE_HOME}" java -jar "${LUCLI_JAR}" server start --prewarm "${PREWARM_PROJECT_DIR}" >/dev/null 2>&1; then
+    export LUCLI_BATS_EXPRESS_CACHE_DIR="${BATS_CACHE_HOME}/express"
+fi
+rm -rf "${PREWARM_PROJECT_DIR}"
 
 if [[ -n "${BATS_JUNIT_XML_OUTPUT}" ]]; then
     BATS_REPORT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/bats-report.XXXXXX")"

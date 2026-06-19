@@ -164,7 +164,7 @@
         },
         "password": {
           "type": "string",
-          "description": "Administrator password. SECURITY WARNING: Using plain text passwords is strongly discouraged. Use environment variable syntax like ${LUCEE_ADMIN_PASSWORD} or ${LUCEE_ADMIN_PASSWORD:-defaultValue} instead to avoid committing secrets to version control.",
+          "description": "Administrator password. SECURITY WARNING: Using plain text passwords is strongly discouraged. Use LuCLI placeholders like #env:LUCEE_ADMIN_PASSWORD# or #secret:admin.password# instead to avoid committing secrets to version control.",
           "default": ""
         }
       }
@@ -250,7 +250,7 @@
     },
     "envVars": {
       "type": "object",
-      "description": "Additional environment variables to inject into the Tomcat process. Keys are environment variable names; values are strings that support `${VAR}` and `${VAR:-default}` substitution. Resolved values are passed to the child Java process via its environment.",
+      "description": "Additional environment variables to inject into the Tomcat process. Keys are environment variable names; values are strings that support #env:VAR# and #env:VAR:-default# substitution (deprecated ${VAR} syntax still works for backward compatibility). Resolved values are passed to the child Java process via its environment.",
       "additionalProperties": {
         "type": "string"
       },
