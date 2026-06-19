@@ -126,3 +126,9 @@ Append new entries at the bottom under the appropriate date/session.
 - To gate release publishing on the exact same validation matrix as normal CI, add `workflow_call` to `.github/workflows/ci.yml` and invoke that workflow from `release.yml` via `jobs.<name>.uses`, instead of duplicating unit/integration/build jobs.
 - In this repo, release publishing with JReleaser should not use `-Pbinary` because that profile bumps `project.version` to the next `*-SNAPSHOT`; build without `-Pbinary` and assemble launcher artifacts before running `jreleaser:full-release`.
 - Markspresso's `build` command treats extra positional tokens as source path input; `lucli markspresso build clean` resolves source as `./clean` and can break Pages builds. Use `lucli markspresso build` or explicit flags like `--clean true` instead.
+
+## 2026-06-19
+
+- For LuCLI performance coverage, keep BATS perf checks as coarse smoke guards with conservative, env-overridable thresholds (for example `LUCLI_PERF_SMOKE_VERSION_MS` and `LUCLI_PERF_SMOKE_CFML_NOW_MS`) to avoid flaky CI while still catching major regressions.
+- `BATS_TEST_TIMEOUT` applies to setup/teardown hooks too; expensive one-time runtime prep should happen in the runner (`tests/test-bats.sh` / `tests/test.sh`) rather than `setup_file`, otherwise hook prewarm can be killed as a timeout failure before any test runs.
+- For BATS suites that create fresh `LUCLI_HOME` sandboxes per test, exporting a shared express cache path (for example `LUCLI_BATS_EXPRESS_CACHE_DIR`) and symlinking it in `setup_lucli_home` avoids repeated Lucee runtime downloads while preserving per-test home isolation.

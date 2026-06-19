@@ -1,0 +1,111 @@
+name: Performance Benchmarks
+
+on:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: Number of measured runs per benchmark
+        required: false
+        default: "20"
+      warmup:
+        description: Number of warmup runs per benchmark
+        required: false
+        default: "3"
+      max_regression_pct:
+        description: Optional max allowed median regression percentage
+        required: false
+        default: ""
+  schedule:
+    - cron: "0 6 * * *"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/perf-benchmark.yml"
+      - "tests/perf/**"
+      - "tests/bats/12_perf_smoke.bats"
+      - "pom.xml"
+      - "src/**"
+
+jobs:
+  benchmark:
+    name: Benchmark Startup + CFML Now
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-21-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-21-
+            ${{ runner.os }}-m2-
+
+      - name: Build JAR and binary
+        run: mvn clean package -DskipTests -Pbinary
+
+      - name: Run startup benchmarks
+        run: |
+          RUNS="${RUNS_INPUT:-20}"
+          WARMUP="${WARMUP_INPUT:-3}"
+          MAX_REGRESSION="${MAX_REGRESSION_INPUT:-}"
+
+          BENCHMARK_ARGS=(--runs "$RUNS" --warmup "$WARMUP" --output "tests/perf/benchmark-latest.json")
+          if [[ -n "${MAX_REGRESSION}" ]]; then
+            BENCHMARK_ARGS+=(--max-regression-pct "$MAX_REGRESSION")
+          fi
+
+          ./tests/perf/benchmark-startup.sh "${BENCHMARK_ARGS[@]}"
+        env:
+          RUNS_INPUT: ${{ github.event.inputs.runs }}
+          WARMUP_INPUT: ${{ github.event.inputs.warmup }}
+          MAX_REGRESSION_INPUT: ${{ github.event.inputs.max_regression_pct }}
+
+      - name: Publish benchmark summary
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          data = json.loads(Path("tests/perf/benchmark-latest.json").read_text())
+          startup = data["results"]["startup_version"]
+          cfml_now = data["results"]["cfml_now"]
+
+          lines = [
+              "## Performance Benchmarks",
+              "",
+              f"- Runs: {data['runs']} (warmup: {data['warmup_runs']})",
+              "",
+              "### startup_version",
+              f"- median: {startup['median_ms']} ms",
+              f"- p95: {startup['p95_ms']} ms",
+              f"- mean: {startup['mean_ms']} ms",
+              "",
+              "### cfml_now",
+              f"- median: {cfml_now['median_ms']} ms",
+              f"- p95: {cfml_now['p95_ms']} ms",
+              f"- mean: {cfml_now['mean_ms']} ms",
+          ]
+
+          with open(Path(__import__('os').environ["GITHUB_STEP_SUMMARY"]), "a", encoding="utf-8") as f:
+              f.write("\n".join(lines) + "\n")
+          PY
+
+      - name: Upload benchmark artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: tests/perf/benchmark-latest.json
+          retention-days: 30
+          if-no-files-found: error
