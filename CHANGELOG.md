@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Trailing `?` Help Alias (One-Shot + Terminal):** Added support for a trailing `?` token as a help alias so `lucli server ?` shows `server` help and `lucli server start ?` shows `server start` help in both one-shot command mode and interactive terminal mode. Includes BATS coverage for both execution paths.
 - **Fix: `admin.enabled=false` Now Enforces Tomcat Admin Endpoint Blocking in `web.xml`:** `TomcatWebXmlPatcher` now enforces admin disablement at servlet-mapping level and security-constraint level by removing explicit `/lucee/admin.cfm` and `/lucee/admin/*` servlet mappings (when present), skipping admin mapping generation for newly-added CFML servlet mappings, and adding a deny-all security constraint for admin URL patterns. Added unit coverage in `CatalinaBaseConfigGeneratorTest` and a new BATS regression test (`tests/bats/12_admin_security.bats`).
 - **BATS Local Runtime Cache Reuse:** `tests/bats/test_helper.bash` now reuses local Lucee Express downloads by symlinking `~/.lucli/express` into each per-test temporary `LUCLI_HOME`, avoiding repeated runtime downloads and significantly improving local BATS execution speed.
 - **Benchmark Workflow + README Badge:** Added `.github/workflows/perf-benchmark.yml` to run startup/`cfml now()` benchmarks on schedule, manual dispatch, and relevant `main` pushes, publish a run summary, and upload benchmark JSON artifacts. Added a benchmark status badge to `README.md` linking to the new workflow.
