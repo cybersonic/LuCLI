@@ -624,6 +624,43 @@ public class LuceeServerConfigTest {
         );
     }
 
+    @Test
+    void resolveConfigurationNode_mergesExtensionsFromConfigurationFileAndInlineConfiguration() throws IOException {
+        Files.writeString(tempDir.resolve("cfconfig-base.json"), """
+            {
+              "extensions": [
+                { "id": "A", "version": "1.0.0" },
+                { "id": "B", "version": "1.0.0" }
+              ]
+            }
+            """);
+
+        Files.writeString(tempDir.resolve("lucee.json"), """
+            {
+              "name": "extension-merge-test",
+              "configurationFile": "./cfconfig-base.json",
+              "configuration": {
+                "extensions": [
+                  { "id": "B", "version": "2.0.0" },
+                  { "id": "C", "version": "1.0.0" }
+                ]
+              }
+            }
+            """);
+
+        LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(tempDir);
+        JsonNode resolved = LuceeServerConfig.resolveConfigurationNode(config, tempDir);
+
+        JsonNode extensions = resolved.path("extensions");
+        assertTrue(extensions.isArray(), "Expected extensions array in resolved CFConfig");
+        assertEquals(3, extensions.size(), "Expected base + override extension union without dropping unique base entries");
+        assertEquals("A", extensions.get(0).path("id").asText());
+        assertEquals("B", extensions.get(1).path("id").asText());
+        assertEquals("2.0.0", extensions.get(1).path("version").asText(),
+                "Expected inline configuration entry to override matching extension from configurationFile");
+        assertEquals("C", extensions.get(2).path("id").asText());
+    }
+
     // ===================
     // Agent Configuration Tests
     // ===================
