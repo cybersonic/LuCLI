@@ -36,6 +36,16 @@ import org.lucee.lucli.ui.ProgressBar;
  * Manages Lucee server instances - downloading, configuring, starting, and stopping servers
  */
 public class LuceeServerManager {
+
+    private static class ServerPidRecord {
+        private final long pid;
+        private final int port;
+
+        private ServerPidRecord(long pid, int port) {
+            this.pid = pid;
+            this.port = port;
+        }
+    }
     
     /**
      * Runtime overrides for Java agent activation when starting a server.
@@ -951,13 +961,24 @@ public class LuceeServerManager {
             }
         }
 
-        if (instance.getPid() <= 0) {
+        long pidToStop = instance.getPid();
+        if (pidToStop <= 0 || !isProcessRunning(pidToStop, serverDir)) {
+            ServerPidRecord pidRecord = readServerPidRecord(serverDir);
+            if (pidRecord != null) {
+                Long recoveredPid = resolveRunningPidWithCatalinaFallback(serverDir, pidRecord.pid, pidRecord.port);
+                if (recoveredPid != null) {
+                    pidToStop = recoveredPid.longValue();
+                }
+            }
+        }
+
+        if (pidToStop <= 0) {
             return false;
         }
         
         try {
             // Try graceful shutdown first
-            ProcessHandle processHandle = ProcessHandle.of(instance.getPid()).orElse(null);
+            ProcessHandle processHandle = ProcessHandle.of(pidToStop).orElse(null);
             if (processHandle != null && processHandle.isAlive()) {
                 processHandle.destroy();
                 
@@ -1023,23 +1044,18 @@ public class LuceeServerManager {
             for (Path serverDir : stream.filter(Files::isDirectory).toList()) {
                 String serverName = serverDir.getFileName().toString();
                 
-                // Try to read PID file
-                Path pidFile = serverDir.resolve("server.pid");
                 long pid = -1;
                 int port = -1;
                 boolean isRunning = false;
-                
-                if (Files.exists(pidFile)) {
-                    try {
-                        String pidContent = Files.readString(pidFile).trim();
-                        String[] parts = pidContent.split(":");
-                        if (parts.length >= 2) {
-                            pid = Long.parseLong(parts[0]);
-                            port = Integer.parseInt(parts[1]);
-                            isRunning = isProcessRunning(pid, serverDir);
-                        }
-                    } catch (Exception e) {
-                        // Invalid PID file, server is not running
+
+                ServerPidRecord pidRecord = readServerPidRecord(serverDir);
+                if (pidRecord != null) {
+                    pid = pidRecord.pid;
+                    port = pidRecord.port;
+                    Long resolvedPid = resolveRunningPidWithCatalinaFallback(serverDir, pidRecord.pid, pidRecord.port);
+                    if (resolvedPid != null) {
+                        pid = resolvedPid.longValue();
+                        isRunning = true;
                     }
                 }
                 
@@ -1273,6 +1289,72 @@ public class LuceeServerManager {
             return null;
         }
     }
+
+    private ServerPidRecord readServerPidRecord(Path serverDir) {
+        Path pidFile = serverDir.resolve("server.pid");
+        if (!Files.exists(pidFile)) {
+            return null;
+        }
+
+        try {
+            String pidContent = Files.readString(pidFile).trim();
+            if (pidContent.isEmpty()) {
+                return null;
+            }
+
+            String[] parts = pidContent.split(":");
+            if (parts.length < 2) {
+                return null;
+            }
+
+            long pid = Long.parseLong(parts[0].trim());
+            int port = Integer.parseInt(parts[1].trim());
+            return new ServerPidRecord(pid, port);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private Long readCatalinaPid(Path serverDir) {
+        Path catalinaPidFile = serverDir.resolve("catalina.pid");
+        if (!Files.exists(catalinaPidFile)) {
+            return null;
+        }
+
+        try {
+            String catalinaPidContent = Files.readString(catalinaPidFile).trim();
+            if (catalinaPidContent.isEmpty()) {
+                return null;
+            }
+            return Long.parseLong(catalinaPidContent);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private Long resolveRunningPidWithCatalinaFallback(Path serverDir, long expectedPid, int port) {
+        if (isProcessRunning(expectedPid, serverDir)) {
+            return expectedPid;
+        }
+
+        Long catalinaPid = readCatalinaPid(serverDir);
+        if (catalinaPid != null && catalinaPid.longValue() > 0 && isProcessRunning(catalinaPid.longValue(), serverDir)) {
+            if (port > 0) {
+                refreshServerPid(serverDir, catalinaPid.longValue(), port);
+            }
+            return catalinaPid;
+        }
+
+        return null;
+    }
+
+    private void refreshServerPid(Path serverDir, long pid, int port) {
+        Path pidFile = serverDir.resolve("server.pid");
+        try {
+            Files.writeString(pidFile, pid + ":" + port);
+        } catch (IOException ignored) {
+        }
+    }
     
     public void checkAndReportPortConflicts(LuceeServerConfig.ServerConfig config, LuceeServerConfig.PortConflictResult portResult)
                 throws IOException {
@@ -1406,24 +1488,11 @@ public class LuceeServerManager {
      */
     private boolean isServerRunning(String serverName) {
         Path serverDir = serversDir.resolve(serverName);
-        Path pidFile = serverDir.resolve("server.pid");
-        
-        if (!Files.exists(pidFile)) {
+        ServerPidRecord pidRecord = readServerPidRecord(serverDir);
+        if (pidRecord == null) {
             return false;
         }
-        
-        try {
-            String pidContent = Files.readString(pidFile).trim();
-            String[] parts = pidContent.split(":");
-            if (parts.length >= 1) {
-                long pid = Long.parseLong(parts[0]);
-                return isProcessRunning(pid, serverDir);
-            }
-        } catch (Exception e) {
-            // Invalid PID file
-        }
-        
-        return false;
+        return resolveRunningPidWithCatalinaFallback(serverDir, pidRecord.pid, pidRecord.port) != null;
     }
     
     /**
@@ -1451,23 +1520,18 @@ public class LuceeServerManager {
             return null;
         }
         
-        // Try to read PID file
-        Path pidFile = serverDir.resolve("server.pid");
         long pid = -1;
         int port = -1;
         boolean isRunning = false;
-        
-        if (Files.exists(pidFile)) {
-            try {
-                String pidContent = Files.readString(pidFile).trim();
-                String[] parts = pidContent.split(":");
-                if (parts.length >= 2) {
-                    pid = Long.parseLong(parts[0]);
-                    port = Integer.parseInt(parts[1]);
-                    isRunning = isProcessRunning(pid, serverDir);
-                }
-            } catch (Exception e) {
-                // Invalid PID file, server is not running
+
+        ServerPidRecord pidRecord = readServerPidRecord(serverDir);
+        if (pidRecord != null) {
+            pid = pidRecord.pid;
+            port = pidRecord.port;
+            Long resolvedPid = resolveRunningPidWithCatalinaFallback(serverDir, pidRecord.pid, pidRecord.port);
+            if (resolvedPid != null) {
+                pid = resolvedPid.longValue();
+                isRunning = true;
             }
         }
 
@@ -1636,24 +1700,17 @@ public class LuceeServerManager {
         
         try (var stream = Files.list(serversDir)) {
             for (Path serverDir : stream.filter(Files::isDirectory).toList()) {
-                Path pidFile = serverDir.resolve("server.pid");
-                
-                if (Files.exists(pidFile)) {
-                    try {
-                        String pidContent = Files.readString(pidFile).trim();
-                        String[] parts = pidContent.split(":");
-                        if (parts.length >= 2) {
-                            long pid = Long.parseLong(parts[0]);
-                            int serverPort = Integer.parseInt(parts[1]);
-                            
-                            // Check if this server is using the requested port and is still running
-                            if ((serverPort == port || LuceeServerConfig.getShutdownPort(serverPort) == port) 
-                                && isProcessRunning(pid, serverDir)) {
-                                return serverDir.getFileName().toString();
-                            }
+                ServerPidRecord pidRecord = readServerPidRecord(serverDir);
+                if (pidRecord != null) {
+                    int serverPort = pidRecord.port;
+
+                    // Check if this server is using the requested port and is still running
+                    if (serverPort == port || LuceeServerConfig.getShutdownPort(serverPort) == port) {
+                        Long resolvedPid = resolveRunningPidWithCatalinaFallback(serverDir, pidRecord.pid, pidRecord.port);
+                        boolean running = resolvedPid != null || isProcessRunning(pidRecord.pid, serverDir);
+                        if (running) {
+                            return serverDir.getFileName().toString();
                         }
-                    } catch (Exception e) {
-                        // Invalid PID file, skip
                     }
                 }
             }
