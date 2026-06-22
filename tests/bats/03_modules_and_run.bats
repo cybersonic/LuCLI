@@ -106,6 +106,16 @@ EOF
     run_lucli run "${LUCLI_ROOT_DIR}/tests/cfml/Run.cfc"
     assert_failure
     assert_output_contains ".cfc"
+    assert_output_contains "not supported"
+    assert_output_contains "modules run"
+}
+
+@test "shortcut command blocks direct cfc execution" {
+    run_lucli "${LUCLI_ROOT_DIR}/tests/cfml/Run.cfc"
+    assert_failure
+    assert_output_contains ".cfc"
+    assert_output_contains "not supported"
+    assert_output_contains "modules run"
 }
 
 @test "lucli script works via shortcut and run" {

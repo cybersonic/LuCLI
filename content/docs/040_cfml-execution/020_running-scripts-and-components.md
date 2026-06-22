@@ -3,7 +3,7 @@ title: Running Scripts and Components
 layout: docs
 ---
 
-▪  One-shot execution of .cfs, .cfm, .cfc
+▪  One-shot execution of .cfs and .cfm
 ▪  Examples per file type.
 # Executing Commands and Scripts with LuCLI
 
@@ -13,10 +13,9 @@ Welcome! This guide shows you how to run one-shot commands and scripts directly 
 
 LuCLI gives you multiple ways to execute code and commands straight from the command line:
 
-1. **CFML Scripts** - Execute `.cfm`, `.cfs`, and `.cfml` files
-2. **CFML Components** - Execute `.cfc` files  
-3. **Module Commands** - Run LuCLI modules with full syntax or shortcuts
-4. **LuCLI Command Scripts** - Execute `.lucli` / `.luc` automation scripts (see dedicated page)
+1. **CFML Scripts** - Execute `.cfm` and `.cfs` files
+2. **Module Commands** - Execute component-based commands through `Module.cfc` entrypoints
+3. **LuCLI Command Scripts** - Execute `.lucli` / `.luc` automation scripts (see dedicated page)
 
 All of these execution modes support helpful global flags:
 - `--verbose` / `-v` - See what's happening behind the scenes
@@ -94,7 +93,7 @@ Arguments passed: 4
   Arg 4: baz
 ```
 
-#### For .cfm and .cfc files
+#### For .cfm files
 
 Arguments are available through the built-in `__arguments` variable:
 
@@ -128,49 +127,17 @@ writeOutput("Working Dir: " & __cwd & chr(10));
 writeOutput("Arguments: " & __argumentCount & chr(10));
 ```
 
-## 2. Executing CFML Components
+## 2. Using Modules for Component-Based Commands
 
-You can also run CFC (ColdFusion Component) files directly - great for creating reusable command-line tools!
+Direct `.cfc` execution is intentionally not supported in one-shot mode (`lucli run file.cfc` or `lucli file.cfc`).
 
-### Basic Syntax
-
-```bash
-lucli <component-file> [arguments...]
-```
-
-### Examples
+Use module entrypoints backed by `Module.cfc` instead:
 
 ```bash
-# Execute a component
-lucli MyComponent.cfc
-
-# With arguments
-lucli MyComponent.cfc arg1 arg2
-
-# With flags
-lucli --verbose --debug MyComponent.cfc param1 param2
+lucli modules run my-module arg1 arg2
+# or shortcut form
+lucli my-module arg1 arg2
 ```
-
-### Component Structure
-
-For direct execution, structure your component with a main function - here's a simple example:
-
-```cfml
-component {
-    public void function main() {
-        // Component logic here
-        writeOutput("Component executed!" & chr(10));
-        
-        // Access arguments
-        if (structKeyExists(variables, "__arguments")) {
-            for (var arg in __arguments) {
-                writeOutput("Argument: " & arg & chr(10));
-            }
-        }
-    }
-}
-```
-
 
 ## 3. LuCLI Command Scripts (`.lucli` / `.luc`)
 
@@ -184,7 +151,7 @@ When you run `lucli something`, LuCLI determines what to execute using this prec
 
 1. **Known subcommands** - `server`, `modules`, `terminal`, `cfml`, `help`
 2. **LuCLI command scripts** - Existing `.lucli` / `.luc` files  
-3. **CFML files** - Existing `.cfs`, `.cfm`, or `.cfc` files
+3. **CFML files** - Existing `.cfs` or `.cfm` files (`.cfc` is blocked with guidance to use modules)
 4. **Module shortcuts** - Modules in `~/.lucli/modules/`
 5. **Error** - Show help if nothing matches
 
@@ -211,7 +178,7 @@ Error: File not found: nonexistent.cfs
 
 ```bash
 $ lucli document.pdf
-Error: 'document.pdf' is not a CFML file (.cfm, .cfc, or .cfs)
+Error: Unsupported script file extension for 'document.pdf'. Supported extensions are .cfm, .cfs, and .lucli
 ```
 
 ### Module Not Found
@@ -269,7 +236,7 @@ Here are some tips we've learned from building and using LuCLI:
 ### 1. Use appropriate file types
 - **`.cfs`** for pure CFML script (best choice for command-line tools)
 - **`.cfm`** for templates with mixed CFML/HTML
-- **`.cfc`** for reusable components
+- **`Module.cfc`** in LuCLI modules for reusable component-based commands
 
 ### 2. Handle arguments properly
 It's always a good idea to check if arguments exist before using them:
@@ -361,14 +328,9 @@ fi
 # CFML Scripts
 lucli script.cfs arg1 arg2
 lucli template.cfm param1 param2
-
-# CFML Components  
-lucli Component.cfc arg1 arg2
-
-# Module Commands (full syntax)
+# Module-backed component commands
+# (direct .cfc execution is not supported)
 lucli modules run module-name args...
-
-# Module Shortcuts
 lucli module-name args...
 
 # LuCLI Command Scripts
