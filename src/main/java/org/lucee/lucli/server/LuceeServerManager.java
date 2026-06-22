@@ -2269,6 +2269,51 @@ public class LuceeServerManager {
         Path raw = Path.of(configuredPath);
         return raw.isAbsolute() ? raw : projectDir.resolve(raw).normalize();
     }
+
+    static boolean isWindowsOsName(String osName) {
+        return osName != null && osName.toLowerCase().contains("win");
+    }
+
+    static boolean isWindowsPlatform() {
+        return isWindowsOsName(System.getProperty("os.name", ""));
+    }
+
+    static String tomcatLaunchScriptName(boolean foreground, boolean windows) {
+        if (foreground) {
+            return windows ? "catalina.bat" : "catalina.sh";
+        }
+        return windows ? "startup.bat" : "startup.sh";
+    }
+
+    static Path resolveTomcatLaunchScript(Path catalinaHome, boolean foreground, boolean windows) {
+        String scriptName = tomcatLaunchScriptName(foreground, windows);
+        Path scriptPath = catalinaHome.resolve("bin").resolve(scriptName);
+        if (!foreground && !Files.exists(scriptPath)) {
+            // Lucee Express keeps startup scripts in the runtime root.
+            scriptPath = catalinaHome.resolve(scriptName);
+        }
+        return scriptPath;
+    }
+
+    static List<String> buildTomcatLaunchCommand(Path scriptPath, boolean foreground, boolean windows) {
+        List<String> command = new ArrayList<>();
+        if (windows) {
+            // .bat scripts must run through cmd on Windows.
+            command.add("cmd");
+            command.add("/c");
+            command.add(scriptPath.toString());
+            if (foreground) {
+                command.add("run");
+            }
+            return command;
+        }
+
+        command.add(scriptPath.toString());
+        if (foreground) {
+            command.add("run");
+        }
+        return command;
+    }
     
     /**
      * Launch a Tomcat server process using separate CATALINA_HOME and CATALINA_BASE.
@@ -2291,27 +2336,11 @@ public class LuceeServerManager {
                                               String environment,
                                               boolean foreground,
                                               String runtimeType) throws Exception {
-
-        boolean isWindows = System.getProperty("os.name", "").toLowerCase().contains("win");
+        boolean isWindows = isWindowsPlatform();
 
         // Build command — look for scripts in bin/ first, then root (Express compat)
-        List<String> command = new ArrayList<>();
-        Path scriptPath;
-
-        if (foreground) {
-            String scriptName = isWindows ? "catalina.bat" : "catalina.sh";
-            scriptPath = catalinaHome.resolve("bin").resolve(scriptName);
-            command.add(scriptPath.toString());
-            command.add("run");
-        } else {
-            String scriptName = isWindows ? "startup.bat" : "startup.sh";
-            scriptPath = catalinaHome.resolve("bin").resolve(scriptName);
-            // Lucee Express puts startup.sh in root; fall back
-            if (!Files.exists(scriptPath)) {
-                scriptPath = catalinaHome.resolve(scriptName);
-            }
-            command.add(scriptPath.toString());
-        }
+        Path scriptPath = resolveTomcatLaunchScript(catalinaHome, foreground, isWindows);
+        List<String> command = buildTomcatLaunchCommand(scriptPath, foreground, isWindows);
 
         if (!Files.exists(scriptPath)) {
             throw new Exception("Tomcat script not found: " + scriptPath);
