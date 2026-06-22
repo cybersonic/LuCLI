@@ -81,6 +81,26 @@ if %JAVA_VERSION_MAJOR_NUM% LSS 21 (
     >&2 echo Please install Java 21+ and set JAVA_HOME if needed.
     exit /b 1
 )
+rem ##########################################################################
+rem # JAVA 24+ RUNTIME NOISE CONTROL                                         #
+rem ##########################################################################
+
+set "LUCLI_UNSAFE_MEMORY_ACCESS_ARG="
+if %JAVA_VERSION_MAJOR_NUM% GEQ 24 (
+    set "LUCLI_HAS_UNSAFE_MEMORY_ACCESS_FLAG="
+    if defined LUCLI_JAVA_ARGS (
+        echo %LUCLI_JAVA_ARGS% | findstr /i /c:"--sun-misc-unsafe-memory-access=" >nul && set "LUCLI_HAS_UNSAFE_MEMORY_ACCESS_FLAG=1"
+    )
+    if not defined LUCLI_HAS_UNSAFE_MEMORY_ACCESS_FLAG if defined JDK_JAVA_OPTIONS (
+        echo %JDK_JAVA_OPTIONS% | findstr /i /c:"--sun-misc-unsafe-memory-access=" >nul && set "LUCLI_HAS_UNSAFE_MEMORY_ACCESS_FLAG=1"
+    )
+    if not defined LUCLI_HAS_UNSAFE_MEMORY_ACCESS_FLAG if defined JAVA_TOOL_OPTIONS (
+        echo %JAVA_TOOL_OPTIONS% | findstr /i /c:"--sun-misc-unsafe-memory-access=" >nul && set "LUCLI_HAS_UNSAFE_MEMORY_ACCESS_FLAG=1"
+    )
+    if not defined LUCLI_HAS_UNSAFE_MEMORY_ACCESS_FLAG (
+        set "LUCLI_UNSAFE_MEMORY_ACCESS_ARG=--sun-misc-unsafe-memory-access=allow"
+    )
+)
 
 rem ##########################################################################
 rem # EXECUTION                                                              #
@@ -88,7 +108,7 @@ rem ##########################################################################
 
 rem This script is concatenated with a JAR file
 rem The JAR starts after the :JAR_BOUNDARY label
-"%JAVA_CMD%" %LUCLI_JAVA_ARGS% -jar "%~f0" %*
+"%JAVA_CMD%" %LUCLI_JAVA_ARGS% %LUCLI_UNSAFE_MEMORY_ACCESS_ARG% -jar "%~f0" %*
 exit /b %ERRORLEVEL%
 
 :JAR_BOUNDARY

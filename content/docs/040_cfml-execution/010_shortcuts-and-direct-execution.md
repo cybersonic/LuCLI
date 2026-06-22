@@ -48,12 +48,12 @@ lucli script.cfs arg1 arg2 "arg with spaces"
 
 - `.cfs` files (CFML script files) - **Fully supported with ARGS array**
 - `.cfm` files (CFML template files) - Uses existing execution path
-- `.cfc` files (CFML component files) - Uses existing execution path
+- `.cfc` files (CFML component files) - **not supported for direct execution**; use `lucli modules run <module>` or module shortcuts
 
 ### How CFML File Shortcuts Work
 
 1. When LuCLI encounters an unrecognized command, it checks if the argument is an existing file
-2. If the file exists and has a CFML extension (`.cfs`, `.cfm`, or `.cfc`), it executes the file
+2. If the file exists and has a supported direct-execution extension (`.cfs` or `.cfm`), it executes the file
 3. For `.cfs` files, an `ARGS` array is automatically set up with the filename and all arguments
 4. Arguments are passed properly, including those with spaces when quoted
 
@@ -93,7 +93,7 @@ If a module doesn't exist, LuCLI shows:
 If neither a module nor a file matches the argument, LuCLI falls back to showing the standard help/usage information.
 
 ### Invalid File Type
-Only files with CFML extensions (`.cfs`, `.cfm`, `.cfc`) can be executed via shortcuts. Other file types are ignored and fall back to help.
+Only `.cfs` and `.cfm` files can be executed via shortcuts. Direct `.cfc` execution is intentionally blocked; use module entrypoints (`lucli modules run <module>`). Other file types are ignored and fall back to help.
 
 ## Flag Support
 
@@ -127,7 +127,7 @@ For `.cfs` files, the shortcut:
 3. Wraps the file content with the ARGS setup
 4. Executes the wrapped script using `LuceeScriptEngine.eval()`
 
-For `.cfm` and `.cfc` files, it uses the existing `LuceeScriptEngine.executeScript()` method.
+For `.cfm` files, LuCLI uses the existing template execution path. For `.cfc`, LuCLI returns a contract error directing users to module entrypoints.
 
 ### Module Processing  
 Module shortcuts create a new command line and execute it as:
