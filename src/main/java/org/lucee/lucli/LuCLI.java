@@ -558,6 +558,7 @@ public class LuCLI implements Callable<Integer> {
         // `help` verb) is present, rewrite to "modules run <module> ... --help" so
         // picocli routes to ModulesRunCommandImpl (which delegates to the module's
         // showHelp()) instead of showing root-level help.
+        args = preprocessQuestionMarkHelpAlias(args);
         args = preprocessModuleHelp(args);
         // Pre-process: rewrite `<module> [subs...] --version=<value>` to
         // "modules run <module> ... --version=<value>" so the root --version flag
@@ -676,6 +677,29 @@ public class LuCLI implements Callable<Integer> {
             rewritten.add(arg);
         }
         return rewritten.toArray(new String[0]);
+    }
+
+    /**
+     * Treat a trailing literal {@code ?} token as help shorthand by rewriting it
+     * to {@code --help} before picocli parsing.
+     *
+     * Examples:
+     * - {@code lucli server ?} -> {@code lucli server --help}
+     * - {@code lucli server start ?} -> {@code lucli server start --help}
+     */
+    private static String[] preprocessQuestionMarkHelpAlias(String[] args) {
+        if (args == null || args.length == 0) {
+            return args;
+        }
+
+        int lastIndex = args.length - 1;
+        if (!"?".equals(args[lastIndex])) {
+            return args;
+        }
+
+        String[] rewritten = Arrays.copyOf(args, args.length);
+        rewritten[lastIndex] = "--help";
+        return rewritten;
     }
 
     /**

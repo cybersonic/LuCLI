@@ -145,6 +145,8 @@ echo -e "${BLUE}=== Run Command and LuCLI Script Tests ===${NC}"
 run_test_with_output ".cfm via run" "timeout 10 java -jar $LUCLI_JAR run tests/cfml/run.cfm 2>&1" "Hello from a tag based file"
 # .cfc via run should be blocked
 run_test ".cfc via run is blocked" "timeout 10 java -jar $LUCLI_JAR run tests/cfml/Run.cfc > /dev/null 2>&1" 1
+# .cfc via shortcut should also be blocked
+run_test ".cfc shortcut is blocked" "timeout 10 java -jar $LUCLI_JAR tests/cfml/Run.cfc > /dev/null 2>&1" 1
 # .lucli via shortcut and via run
 cat > test_run.lucli << 'EOF'
 # Simple LuCLI script used for testing

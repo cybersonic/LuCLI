@@ -27,8 +27,17 @@ require_lucli_artifacts() {
 setup_lucli_home() {
     export LUCLI_HOME
     local tmp_base
+    local shared_express_dir
     tmp_base="${BATS_TEST_TMPDIR:-${BATS_FILE_TMPDIR:-${TMPDIR:-/tmp}}}"
     LUCLI_HOME="$(mktemp -d "${tmp_base%/}/lucli-home.XXXXXX")"
+    shared_express_dir="${HOME}/.lucli/express"
+
+    # Speed up local BATS runs by reusing already-downloaded Lucee Express
+    # distributions from the user's default cache when available.
+    # Symlinking is effectively instant and avoids expensive per-test copies.
+    if [[ -d "${shared_express_dir}" ]]; then
+        ln -s "${shared_express_dir}" "${LUCLI_HOME}/express" 2>/dev/null || true
+    fi
 }
 
 cleanup_lucli_home() {
