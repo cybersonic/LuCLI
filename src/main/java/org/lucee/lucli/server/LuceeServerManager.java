@@ -139,6 +139,10 @@ public class LuceeServerManager {
     private static final String LUCEE_WARMUP_ENV_VALUE = "true";
     private static final String LUCEE_WARMUP_JVM_ARG_PREFIX = "-Dlucee.enable.warmup=";
     private static final String LUCEE_WARMUP_JVM_ARG_TRUE = "-Dlucee.enable.warmup=true";
+    private static final String LUCEE_VERSION_MARKER_FILE = ".lucee-version";
+    private static final String LUCEE_VARIANT_MARKER_FILE = ".lucee-variant";
+    private static final java.util.regex.Pattern LUCEE_JAR_FILE_PATTERN =
+            java.util.regex.Pattern.compile("^lucee(?:-(light|zero))?-(.+)\\.jar$");
 
     // Lucee engine JAR variants
     private static final String LUCEE_JAR_STANDARD_TEMPLATE = "https://cdn.lucee.org/lucee-{version}.jar";
@@ -162,6 +166,16 @@ public class LuceeServerManager {
      * Currently this is always the Lucee Express provider.
      */
     private final RuntimeProvider defaultRuntimeProvider;
+
+    static class LuceeRuntimeInfo {
+        final String version;
+        final String variant;
+
+        LuceeRuntimeInfo(String version, String variant) {
+            this.version = version;
+            this.variant = variant;
+        }
+    }
     
     public LuceeServerManager() throws IOException {
         this.lucliHome = getLucliHome();
@@ -641,6 +655,8 @@ public class LuceeServerManager {
         if (foreground) {
             config.openBrowser = false;
         }
+
+        LuceeServerConfig.RuntimeConfig runtimeConfig = LuceeServerConfig.getEffectiveRuntime(config);
         
         // Check if server with this name already exists
         Path existingServerDir = serversDir.resolve(config.name);
@@ -656,9 +672,15 @@ public class LuceeServerManager {
             ServerInfo existingServerInfo = getExistingServerForProject(projectDir, config.name);
             
             if (existingServerInfo != null) {
-                // This server exists and matches the current project directory, just restart it
-                System.out.println("Restarting existing server '" + config.name + "' for this project...");
-                // Don't throw an exception - continue with server startup
+                if (shouldRecreateServerForVersionChange(existingServerDir, config, runtimeConfig.type)) {
+                    System.out.println("Detected Lucee version/variant change for existing server '" + config.name
+                            + "'. Recreating server directory (prune not required).");
+                    deleteServerDirectory(existingServerDir);
+                    forceReplace = true;
+                } else {
+                    // This server exists and matches the current project directory, just restart it
+                    System.out.println("Restarting existing server '" + config.name + "' for this project...");
+                }
             } else if (!forceReplace) {
                 // Server exists but doesn't match this project directory
                 String suggestedName = LuceeServerConfig.getUniqueServerName(config.name, serversDir);
@@ -672,8 +694,6 @@ public class LuceeServerManager {
         // At this point the logical server name and environment are resolved
         // and any existing LuCLI-managed server directories have been checked.
         // Delegate the actual runtime-specific startup to a RuntimeProvider.
-
-        LuceeServerConfig.RuntimeConfig runtimeConfig = LuceeServerConfig.getEffectiveRuntime(config);
         LuceeServerConfig.validateLuceeVersionSupportForRuntime(config, runtimeConfig.type);
         LuceeServerConfig.validateCfConfigSupport(config);
         RuntimeProvider provider = getRuntimeProvider(runtimeConfig.type);
@@ -748,6 +768,127 @@ public class LuceeServerManager {
         }
         args.add(LUCEE_WARMUP_JVM_ARG_TRUE);
         config.jvm.additionalArgs = args.toArray(new String[0]);
+    }
+
+    boolean shouldRecreateServerForVersionChange(Path serverDir,
+                                                 LuceeServerConfig.ServerConfig config,
+                                                 String runtimeType) {
+        if (serverDir == null || config == null) {
+            return false;
+        }
+
+        String desiredVersion = LuceeServerConfig.getLuceeVersion(config);
+        String desiredVariant = normalizeLuceeVariant(LuceeServerConfig.getLuceeVariant(config));
+        LuceeRuntimeInfo existingRuntime = readLuceeRuntimeInfo(serverDir, runtimeType);
+
+        if (existingRuntime == null) {
+            // Legacy Lucee Express server directories don't carry Lucee version metadata.
+            // Recreate once so the directory is aligned to the requested version and
+            // future restarts can compare version markers safely.
+            return "lucee-express".equalsIgnoreCase(runtimeType);
+        }
+
+        String existingVariant = normalizeLuceeVariant(existingRuntime.variant);
+        return !desiredVersion.equals(existingRuntime.version)
+                || !desiredVariant.equals(existingVariant);
+    }
+
+    private LuceeRuntimeInfo readLuceeRuntimeInfo(Path serverDir, String runtimeType) {
+        String markerVersion = readMarkerValue(serverDir.resolve(LUCEE_VERSION_MARKER_FILE));
+        if (markerVersion != null) {
+            String markerVariant = readMarkerValue(serverDir.resolve(LUCEE_VARIANT_MARKER_FILE));
+            return new LuceeRuntimeInfo(markerVersion, normalizeLuceeVariant(markerVariant));
+        }
+        return inferLuceeRuntimeInfoFromArtifacts(serverDir, runtimeType);
+    }
+
+    private LuceeRuntimeInfo inferLuceeRuntimeInfoFromArtifacts(Path serverDir, String runtimeType) {
+        List<Path> candidateDirs = new ArrayList<>();
+        if ("tomcat".equalsIgnoreCase(runtimeType)) {
+            candidateDirs.add(serverDir.resolve("lib"));
+        } else if ("jetty".equalsIgnoreCase(runtimeType)) {
+            candidateDirs.add(serverDir.resolve("lib").resolve("ext"));
+        } else {
+            candidateDirs.add(serverDir.resolve("lib"));
+            candidateDirs.add(serverDir.resolve("lib").resolve("ext"));
+        }
+
+        for (Path dir : candidateDirs) {
+            LuceeRuntimeInfo inferred = inferLuceeRuntimeInfoFromDirectory(dir);
+            if (inferred != null) {
+                return inferred;
+            }
+        }
+        return null;
+    }
+
+    private LuceeRuntimeInfo inferLuceeRuntimeInfoFromDirectory(Path dir) {
+        if (dir == null || !Files.isDirectory(dir)) {
+            return null;
+        }
+        try (var stream = Files.list(dir)) {
+            for (Path jar : stream
+                    .filter(Files::isRegularFile)
+                    .sorted(Comparator.comparing(path -> path.getFileName().toString()))
+                    .toList()) {
+                LuceeRuntimeInfo parsed = parseLuceeRuntimeInfoFromJarName(jar.getFileName().toString());
+                if (parsed != null) {
+                    return parsed;
+                }
+            }
+        } catch (IOException ignored) {
+            return null;
+        }
+        return null;
+    }
+
+    private LuceeRuntimeInfo parseLuceeRuntimeInfoFromJarName(String fileName) {
+        if (fileName == null || fileName.isBlank()) {
+            return null;
+        }
+        java.util.regex.Matcher matcher = LUCEE_JAR_FILE_PATTERN.matcher(fileName);
+        if (!matcher.matches()) {
+            return null;
+        }
+
+        String variant = normalizeLuceeVariant(matcher.group(1));
+        String version = matcher.group(2);
+        if (version == null || version.isBlank()) {
+            return null;
+        }
+        return new LuceeRuntimeInfo(version, variant);
+    }
+
+    private String readMarkerValue(Path markerFile) {
+        if (markerFile == null || !Files.exists(markerFile)) {
+            return null;
+        }
+        try {
+            String value = Files.readString(markerFile).trim();
+            return value.isEmpty() ? null : value;
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    private static String normalizeLuceeVariant(String variant) {
+        if (variant == null || variant.trim().isEmpty()) {
+            return "standard";
+        }
+        return variant.trim().toLowerCase();
+    }
+
+    private void writeLuceeRuntimeMarkers(Path serverDir, LuceeServerConfig.ServerConfig config) {
+        if (serverDir == null || config == null) {
+            return;
+        }
+        try {
+            Files.writeString(serverDir.resolve(LUCEE_VERSION_MARKER_FILE), LuceeServerConfig.getLuceeVersion(config));
+            Files.writeString(serverDir.resolve(LUCEE_VARIANT_MARKER_FILE),
+                    normalizeLuceeVariant(LuceeServerConfig.getLuceeVariant(config)));
+        } catch (IOException e) {
+            // Metadata write failures should never block startup.
+        }
     }
     
     /**
@@ -2413,6 +2554,7 @@ public class LuceeServerManager {
         if (runtimeType != null && !runtimeType.isEmpty()) {
             Files.writeString(catalinaBase.resolve(".runtime-type"), runtimeType);
         }
+        writeLuceeRuntimeMarkers(catalinaBase, config);
 
         if (foreground) {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -2576,6 +2718,7 @@ public class LuceeServerManager {
             Files.writeString(jettyBase.resolve(".environment"), environment.trim());
         }
         Files.writeString(jettyBase.resolve(".runtime-type"), "jetty");
+        writeLuceeRuntimeMarkers(jettyBase, config);
 
         // Write Jetty stop markers so stopServer() can perform graceful shutdown
         Files.writeString(jettyBase.resolve(".jetty-stop-port"), String.valueOf(stopPort));
