@@ -173,7 +173,7 @@ class McpCommandTest {
     }
 
     @Test
-    void toolsListStripsHintPrefixFromDescriptions() throws Exception {
+    void toolsListUsesModuleDeclaredInputSchema() throws Exception {
         List<JsonNode> responses = runMcpSession(List.of(
             "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"test\",\"version\":\"1.0\"}}}",
             "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}",
@@ -185,20 +185,42 @@ class McpCommandTest {
                 .findFirst()
                 .orElseThrow();
 
-        JsonNode echo = null;
-        for (JsonNode t : listResp.get("result").get("tools")) {
-            if (t.get("name").asText().equalsIgnoreCase("echo")) echo = t;
-        }
-        assertNotNull(echo, "expected echo tool");
+        JsonNode tools = listResp.get("result").get("tools");
 
-        // The fixture documents echo as `/** hint: Emit a known string ... */`.
-        // Lucee surfaces the metadata hint with the literal "hint:" key prefix;
-        // tools/list descriptions must have that prefix stripped.
-        String description = echo.get("description").asText();
-        assertFalse(description.toLowerCase().startsWith("hint:"),
-                "tool description must not retain the 'hint:' key prefix, got: '" + description + "'");
-        assertTrue(description.startsWith("Emit a known string"),
-                "expected the clean hint text, got: '" + description + "'");
+        JsonNode greet = null;
+        JsonNode echo = null;
+        List<String> names = new ArrayList<>();
+        for (JsonNode t : tools) {
+            String n = t.get("name").asText().toLowerCase();
+            names.add(n);
+            if (n.equals("greet")) greet = t;
+            if (n.equals("echo")) echo = t;
+        }
+
+        // The registry function itself must never surface as a tool.
+        assertFalse(names.contains("mcptoolspecs"),
+                "mcpToolSpecs must not be advertised as a tool. Got: " + names);
+
+        // greet has a declared entry in mcpToolSpecs() — the declared schema
+        // must win over the signature-derived one. The declared description
+        // deliberately differs from the @subject doc hint so this assertion
+        // can only pass via the declared path.
+        assertNotNull(greet, "expected greet tool. Got: " + names);
+        JsonNode schema = greet.get("inputSchema");
+        assertEquals("object", schema.get("type").asText());
+        assertTrue(schema.get("properties").has("subject"),
+                "declared schema must expose 'subject'. Got: " + schema);
+        assertEquals("string",
+                schema.get("properties").get("subject").get("type").asText());
+        assertEquals("Greeting target (declared via mcpToolSpecs)",
+                schema.get("properties").get("subject").get("description").asText());
+        assertFalse(schema.get("additionalProperties").asBoolean());
+
+        // echo has no declared entry — it keeps the signature-derived schema
+        // (no formal params → empty properties).
+        assertNotNull(echo, "expected echo tool. Got: " + names);
+        assertEquals(0, echo.get("inputSchema").get("properties").size(),
+                "echo must fall back to the signature-derived schema");
     }
 
     // Send the given JSON-RPC lines to `dev-lucli.sh mcp mcpfixture` as a

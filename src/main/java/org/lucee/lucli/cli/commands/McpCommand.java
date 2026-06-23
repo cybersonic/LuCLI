@@ -77,7 +77,7 @@ public class McpCommand implements Callable<Integer> {
                     "init", "out", "err", "getenv", "verbose",
                     "getsecret", "getabsolutepath", "executecommand",
                     "version", "showhelp",
-                    "mcphiddentools"
+                    "mcphiddentools", "mcptoolspecs"
             );
 
     private boolean initialized = false;
@@ -285,6 +285,9 @@ public class McpCommand implements Callable<Integer> {
         // Per-module hidden list returned by optional mcpHiddenTools() function
         java.util.Set<String> moduleHidden = getModuleHiddenTools(mod);
 
+        // Per-tool declared input schemas returned by optional mcpToolSpecs()
+        Map<String, Struct> declaredSpecs = getModuleToolSpecs(mod);
+
         List<Map<String, Object>> tools = new ArrayList<>();
         for (int i = 1; i <= meta.size(); i++) {
             Object itemObj = meta.get(i, null);
@@ -311,7 +314,22 @@ public class McpCommand implements Callable<Integer> {
             String hint = getString(fn, "hint");
             String description = firstLine(stripHintPrefix(hint));
 
-            Map<String, Object> inputSchema = buildInputSchema(fn);
+            // A module-declared schema wins over the signature-derived one.
+            // Modules whose command functions take no formal parameters
+            // (e.g. wheels' structured-argCollection commands) declare real
+            // parameter schemas via mcpToolSpecs(); reflection alone would
+            // advertise an empty object with additionalProperties:false,
+            // telling MCP clients the tool accepts no arguments at all.
+            Struct declared = declaredSpecs.get(name.toLowerCase());
+            Map<String, Object> inputSchema;
+            if (declared != null) {
+                Object converted = cfmlToJava(declared);
+                inputSchema = (converted instanceof Map)
+                        ? castSchemaMap(converted)
+                        : buildInputSchema(fn);
+            } else {
+                inputSchema = buildInputSchema(fn);
+            }
 
             Map<String, Object> tool = new LinkedHashMap<>();
             tool.put("name", name);
@@ -361,6 +379,72 @@ public class McpCommand implements Callable<Integer> {
             System.setErr(origErr);
         }
         return java.util.Collections.emptySet();
+    }
+
+    /**
+     * If the module defines a public `mcpToolSpecs()` function returning a
+     * struct of {toolName: inputSchema-struct}, return it keyed by lowercase
+     * tool name. Otherwise empty. Same optional-convention mechanism (and
+     * same stdout/stderr discipline) as {@link #getModuleHiddenTools}.
+     */
+    private Map<String, Struct> getModuleToolSpecs(String mod) {
+        PrintStream origOut = System.out;
+        PrintStream origErr = System.err;
+        java.io.ByteArrayOutputStream sink = new java.io.ByteArrayOutputStream();
+        PrintStream silent = new PrintStream(sink, true, StandardCharsets.UTF_8);
+        try {
+            System.setOut(silent);
+            System.setErr(silent);
+            Object result = LuceeScriptEngine.getInstance()
+                    .executeModuleAndReturn(mod, new String[] { "mcpToolSpecs" });
+            if (result instanceof Struct) {
+                Map<String, Struct> byName = new LinkedHashMap<>();
+                for (Map.Entry<?, ?> entry : ((Map<?, ?>) result).entrySet()) {
+                    Object value = entry.getValue();
+                    if (value instanceof Struct) {
+                        byName.put(entry.getKey().toString().toLowerCase(), (Struct) value);
+                    }
+                }
+                return byName;
+            }
+        } catch (Exception e) {
+            // Function may not exist on this module — that's fine.
+            if (LuCLI.debug) e.printStackTrace();
+        } finally {
+            System.setOut(origOut);
+            System.setErr(origErr);
+        }
+        return java.util.Collections.emptyMap();
+    }
+
+    /**
+     * Deep-converts a CFML value (Struct/Array/simple) into plain Java
+     * collections so Jackson can serialize a module-declared inputSchema.
+     * Struct keys keep their stored case (quoted CFML struct keys preserve
+     * case, which JSON Schema property names require).
+     */
+    private Object cfmlToJava(Object value) {
+        if (value instanceof Struct) {
+            Map<String, Object> map = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) {
+                map.put(entry.getKey().toString(), cfmlToJava(entry.getValue()));
+            }
+            return map;
+        }
+        if (value instanceof Array) {
+            Array arr = (Array) value;
+            List<Object> list = new ArrayList<>();
+            for (int i = 1; i <= arr.size(); i++) {
+                list.add(cfmlToJava(arr.get(i, null)));
+            }
+            return list;
+        }
+        return value;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> castSchemaMap(Object converted) {
+        return (Map<String, Object>) converted;
     }
 
     private Map<String, Object> buildInputSchema(Struct fn) {
