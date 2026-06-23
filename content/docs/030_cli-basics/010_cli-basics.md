@@ -141,7 +141,7 @@ When you run `lucli something`, LuCLI determines what to execute using this prec
 
 1. **Known subcommands** - `server`, `modules`, `terminal`, `cfml`, `help`
 2. **LuCLI command scripts** - Existing `.lucli` / `.luc` files  
-3. **CFML files** - Existing `.cfs`, `.cfm`, or `.cfc` files
+3. **CFML files** - Existing `.cfs` or `.cfm` files (`.cfc` is blocked with guidance to use modules)
 4. **Module shortcuts** - Modules in `~/.lucli/modules/`
 5. **Error** - Show help if nothing matches
 
@@ -168,7 +168,7 @@ Error: File not found: nonexistent.cfs
 
 ```bash
 $ lucli document.pdf
-Error: 'document.pdf' is not a CFML file (.cfm, .cfc, or .cfs)
+Error: Unsupported script file extension for 'document.pdf'. Supported extensions are .cfm, .cfs, and .lucli
 ```
 
 ### Module Not Found
@@ -242,7 +242,7 @@ Here are some tips we've learned from building and using LuCLI:
 ### 1. Use appropriate file types
 - **`.cfs`** for pure CFML script (best choice for command-line tools)
 - **`.cfm`** for templates with mixed CFML/HTML
-- **`.cfc`** for reusable components
+- **`Module.cfc`** in LuCLI modules for reusable component-based commands
 
 ### 2. Handle arguments properly
 It's always a good idea to check if arguments exist before using them:
@@ -318,15 +318,11 @@ fi
 lucli script.cfs arg=hello bla=world
 lucli script.cfs
 lucli template.cfm param1 param2
-
-# CFML Components  
-lucli Component.cfc arg=hello bla=world
-
-# Module Commands (full syntax)
+# Module-backed component commands
+# (direct .cfc execution is not supported)
 lucli modules run module-name args...
-
-# Module Shortcuts
 lucli module-name args...
+
 
 # LuCLI Batch Scripts
 lucli script.lucli

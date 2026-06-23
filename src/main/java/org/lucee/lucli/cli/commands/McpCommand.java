@@ -312,7 +312,7 @@ public class McpCommand implements Callable<Integer> {
             }
 
             String hint = getString(fn, "hint");
-            String description = firstLine(hint);
+            String description = firstLine(stripHintPrefix(hint));
 
             // A module-declared schema wins over the signature-derived one.
             // Modules whose command functions take no formal parameters
@@ -477,7 +477,7 @@ public class McpCommand implements Callable<Integer> {
 
                 String pHint = getString(p, "hint");
                 if (pHint != null && !pHint.isBlank()) {
-                    pSchema.put("description", firstLine(pHint));
+                    pSchema.put("description", firstLine(stripHintPrefix(pHint)));
                 }
 
                 Object def = p.get("default", null);
@@ -701,6 +701,22 @@ public class McpCommand implements Callable<Integer> {
         if (v == null) return false;
         if (v instanceof Boolean) return (Boolean) v;
         return Boolean.parseBoolean(v.toString());
+    }
+
+    /**
+     * Strip a leading {@code "hint:"} key prefix from a CFML metadata hint.
+     *
+     * <p>The {@code /** hint: ... *​/} doc-comment convention (used by the
+     * Wheels module, among others) is surfaced by Lucee with the literal
+     * {@code hint:} key included in the function/argument metadata value. Left
+     * untouched it leaks into MCP {@code tools/list} descriptions as, e.g.,
+     * {@code "hint: Run the test suite"}. Normalise it here so tool and
+     * parameter descriptions read cleanly — mirroring how modules strip it for
+     * their own CLI help output.
+     */
+    private String stripHintPrefix(String text) {
+        if (text == null) return null;
+        return text.replaceFirst("(?i)^\\s*hint\\s*:\\s*", "");
     }
 
     private String firstLine(String text) {

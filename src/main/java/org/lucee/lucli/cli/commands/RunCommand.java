@@ -33,7 +33,10 @@ import picocli.CommandLine.ParentCommand;
         "  lucli run script.cfs arg1 arg2     # Execute CFML script file",
         "  lucli run script.lucli             # Execute LuCLI batch script",
         "  lucli hello.cfm                    # Shortcut for 'lucli run hello.cfm'",
-        "  lucli script.lucli                 # Shortcut for 'lucli run script.lucli'"
+        "  lucli script.lucli                 # Shortcut for 'lucli run script.lucli'",
+        "",
+        "Note:",
+        "  Direct .cfc execution is not supported; use 'lucli modules run <module>'"
     }
 )
 public class RunCommand implements Callable<Integer> {
