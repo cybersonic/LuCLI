@@ -36,6 +36,37 @@ public class LuceeServerConfigTest {
         // Clean environment for each test
     }
 
+    @Test
+    void reloadConfiguredEnvFile_withEnvironmentLayersBaseAndEnvironmentEnvFiles() throws IOException {
+        Files.writeString(tempDir.resolve("default.env"), "DEFAULT=from-default\nBASE_ONLY=base-only\n");
+        Files.writeString(tempDir.resolve("prod.env"), "DEFAULT=from-prod\nPROD_ONLY=prod-only\n");
+
+        String json = """
+            {
+              "name": "env-file-layering-test",
+              "envFile": "./default.env",
+              "environments": {
+                "prod": {
+                  "envFile": "./prod.env"
+                }
+              }
+            }
+            """;
+        Files.writeString(tempDir.resolve("lucee.json"), json);
+
+        LuceeServerConfig.ServerConfig base = LuceeServerConfig.loadConfig(tempDir);
+        LuceeServerConfig.ServerConfig merged = LuceeServerConfig.applyEnvironment(base, "prod", tempDir);
+
+        LuceeServerConfig.reloadConfiguredEnvFile(merged, tempDir, "lucee.json", "prod");
+
+        java.util.Map<String, String> envPreview = new java.util.HashMap<>();
+        LuceeServerConfig.applyLoadedEnvToProcessEnvironment(envPreview);
+
+        assertEquals("from-prod", envPreview.get("DEFAULT"));
+        assertEquals("base-only", envPreview.get("BASE_ONLY"));
+        assertEquals("prod-only", envPreview.get("PROD_ONLY"));
+    }
+
     // ===================
     // Default Configuration Tests
     // ===================
@@ -539,8 +570,8 @@ public class LuceeServerConfigTest {
 
     @Test
     void applyEnvironment_usesEnvironmentSpecificEnvFileForRuntimeEnvPreview() throws IOException {
-        Files.writeString(tempDir.resolve("default.env"), "DEFAULT=from-default\n");
-        Files.writeString(tempDir.resolve("prod.env"), "DEFAULT=from-prod\n");
+        Files.writeString(tempDir.resolve("default.env"), "DEFAULT=from-default\nBASE_ONLY=base-only\n");
+        Files.writeString(tempDir.resolve("prod.env"), "DEFAULT=from-prod\nPROD_ONLY=prod-only\n");
 
         String json = """
             {
@@ -570,6 +601,59 @@ public class LuceeServerConfigTest {
         assertEquals("./prod.env", merged.envFile);
         assertEquals("overridden-in-prod", merged.envVars.get("SETTING1"));
         assertEquals("from-prod", envPreview.get("DEFAULT"));
+        assertEquals("base-only", envPreview.get("BASE_ONLY"));
+        assertEquals("prod-only", envPreview.get("PROD_ONLY"));
+    }
+
+    @Test
+    void applyConfigEnvVarsToProcessEnvironment_nullValueUnsetsExistingKey() {
+        java.util.Map<String, String> env = new java.util.HashMap<>();
+        env.put("VAR", "from-env-file");
+        env.put("KEEP", "keep-me");
+
+        java.util.Map<String, String> envVars = new java.util.HashMap<>();
+        envVars.put("VAR", null);
+
+        LuceeServerConfig.applyConfigEnvVarsToProcessEnvironment(env, envVars);
+
+        assertFalse(env.containsKey("VAR"));
+        assertEquals("keep-me", env.get("KEEP"));
+    }
+
+    @Test
+    void applyEnvironment_envVarNullUnsetsLayeredEnvFileValue() throws IOException {
+        Files.writeString(tempDir.resolve("default.env"), "VAR=2\n");
+        Files.writeString(tempDir.resolve("prod.env"), "VAR=4\n");
+
+        String json = """
+            {
+              "name": "env-var-null-unset-test",
+              "envFile": "./default.env",
+              "envVars": {
+                "VAR": "3"
+              },
+              "environments": {
+                "prod": {
+                  "envFile": "./prod.env",
+                  "envVars": {
+                    "VAR": null
+                  }
+                }
+              }
+            }
+            """;
+        Files.writeString(tempDir.resolve("lucee.json"), json);
+
+        LuceeServerConfig.ServerConfig base = LuceeServerConfig.loadConfig(tempDir);
+        LuceeServerConfig.ServerConfig merged = LuceeServerConfig.applyEnvironment(base, "prod", tempDir);
+
+        LuceeServerConfig.reloadConfiguredEnvFile(merged, tempDir, "lucee.json", "prod");
+
+        java.util.Map<String, String> effectiveEnv = new java.util.HashMap<>(System.getenv());
+        LuceeServerConfig.applyLoadedEnvToProcessEnvironment(effectiveEnv);
+        LuceeServerConfig.applyConfigEnvVarsToProcessEnvironment(effectiveEnv, merged.envVars);
+
+        assertFalse(effectiveEnv.containsKey("VAR"));
     }
 
     @Test
@@ -622,6 +706,40 @@ public class LuceeServerConfigTest {
             "/right-from-custom.cfm",
             merged.configuration.path("errorGeneralTemplate").asText()
         );
+    }
+
+    @Test
+    void reloadConfiguredEnvFile_loadsEnvFileForMaterializedConfig() throws IOException {
+        Files.writeString(tempDir.resolve("runtime.env"), "RUNTIME_ONLY=from-env-file\n");
+
+        LuceeServerConfig.ServerConfig config = new LuceeServerConfig.ServerConfig();
+        config.envFile = "./runtime.env";
+
+        LuceeServerConfig.reloadConfiguredEnvFile(config, tempDir);
+
+        java.util.Map<String, String> envPreview = new java.util.HashMap<>();
+        LuceeServerConfig.applyLoadedEnvToProcessEnvironment(envPreview);
+
+        assertEquals("from-env-file", envPreview.get("RUNTIME_ONLY"));
+    }
+
+    @Test
+    void reloadConfiguredEnvFile_clearsPreviouslyLoadedValues() throws IOException {
+        Files.writeString(tempDir.resolve("first.env"), "ONLY_FIRST=first\n");
+        Files.writeString(tempDir.resolve("second.env"), "ONLY_SECOND=second\n");
+
+        LuceeServerConfig.ServerConfig config = new LuceeServerConfig.ServerConfig();
+        config.envFile = "./first.env";
+        LuceeServerConfig.reloadConfiguredEnvFile(config, tempDir);
+
+        config.envFile = "./second.env";
+        LuceeServerConfig.reloadConfiguredEnvFile(config, tempDir);
+
+        java.util.Map<String, String> envPreview = new java.util.HashMap<>();
+        LuceeServerConfig.applyLoadedEnvToProcessEnvironment(envPreview);
+
+        assertFalse(envPreview.containsKey("ONLY_FIRST"));
+        assertEquals("second", envPreview.get("ONLY_SECOND"));
     }
 
     // ===================

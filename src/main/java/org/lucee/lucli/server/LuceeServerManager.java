@@ -364,6 +364,7 @@ public class LuceeServerManager {
 
         // Do not auto-open browser for sandbox foreground runs
         config.openBrowser = false;
+        LuceeServerConfig.reloadConfiguredEnvFile(config, projectDir);
 
         // Enforce LuCLI-supported version/runtime and .CFConfig cutoffs.
         LuceeServerConfig.validateLuceeVersionSupportForRuntime(config, "lucee-express");
@@ -489,6 +490,7 @@ public class LuceeServerManager {
 
         // For sandbox background servers, do not auto-open browser by default
         config.openBrowser = false;
+        LuceeServerConfig.reloadConfiguredEnvFile(config, projectDir);
 
         // Enforce LuCLI-supported version/runtime and .CFConfig cutoffs.
         LuceeServerConfig.validateLuceeVersionSupportForRuntime(config, "lucee-express");
@@ -613,6 +615,9 @@ public class LuceeServerManager {
 
         // Apply one-shot invocation overrides in memory (never persisted).
         applyStartConfigOverrides(config, startConfigOverrides);
+        // Ensure envFile variables are reloaded for the effective startup config.
+        // This is required for paths that bypass loadConfig (for example lock snapshots).
+        LuceeServerConfig.reloadConfiguredEnvFile(config, projectDir, cfgFile, environment);
         
         // Resolve secrets only for actual server startup (not for generic config reads)
         LuceeServerConfig.resolveSecretPlaceholders(config, projectDir);
@@ -2301,13 +2306,7 @@ public class LuceeServerManager {
             env.put("LUCEE_EXTENSIONS", luceeExtensions);
         }
 
-        if (config.envVars != null) {
-            for (Map.Entry<String, String> entry : config.envVars.entrySet()) {
-                if (entry.getKey() != null && !entry.getKey().trim().isEmpty() && entry.getValue() != null) {
-                    env.put(entry.getKey(), entry.getValue());
-                }
-            }
-        }
+        LuceeServerConfig.applyConfigEnvVarsToProcessEnvironment(env, config.envVars);
         TomcatConfigSupport.applyAdminSecurityEnvironment(env, config);
 
         // Preflight: catalina.sh/startup.sh require JAVA_HOME (or JRE_HOME).
@@ -2471,13 +2470,7 @@ public class LuceeServerManager {
             env.put("LUCEE_EXTENSIONS", luceeExtensions);
         }
 
-        if (config.envVars != null) {
-            for (Map.Entry<String, String> entry : config.envVars.entrySet()) {
-                if (entry.getKey() != null && !entry.getKey().trim().isEmpty() && entry.getValue() != null) {
-                    env.put(entry.getKey(), entry.getValue());
-                }
-            }
-        }
+        LuceeServerConfig.applyConfigEnvVarsToProcessEnvironment(env, config.envVars);
         TomcatConfigSupport.applyAdminSecurityEnvironment(env, config);
 
         // Marker files

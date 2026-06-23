@@ -800,6 +800,21 @@ public class LuceeServerConfig {
         }
         return substituteField(envFileName);
     }
+
+    private static String resolveOptionalConfiguredEnvFileName(JsonNode configNode) {
+        if (configNode == null || !configNode.isObject()) {
+            return null;
+        }
+        JsonNode envFileNode = configNode.get("envFile");
+        if (envFileNode == null || !envFileNode.isTextual()) {
+            return null;
+        }
+        String rawValue = envFileNode.asText();
+        if (rawValue == null || rawValue.trim().isEmpty()) {
+            return null;
+        }
+        return substituteField(rawValue.trim());
+    }
     private static void clearRealizedEnvVariables() {
         synchronized (realizedEnvVariables) {
             realizedEnvVariables.clear();
@@ -844,6 +859,106 @@ public class LuceeServerConfig {
                 continue;
             }
             targetEnv.putIfAbsent(key, value);
+        }
+    }
+
+    /**
+     * Apply {@code envVars} from config into a target environment map.
+     *
+     * Semantics:
+     * - non-null value: set/override target key
+     * - null value: explicitly unset/remove target key
+     */
+    public static void applyConfigEnvVarsToProcessEnvironment(
+            Map<String, String> targetEnv,
+            Map<String, String> configuredEnvVars
+    ) {
+        if (targetEnv == null || configuredEnvVars == null || configuredEnvVars.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, String> entry : configuredEnvVars.entrySet()) {
+            String key = entry.getKey();
+            if (key == null || key.trim().isEmpty()) {
+                continue;
+            }
+            String value = entry.getValue();
+            if (value == null) {
+                targetEnv.remove(key);
+            } else {
+                targetEnv.put(key, value);
+            }
+        }
+    }
+
+    /**
+     * Reload env variables from the currently effective {@code envFile} for an
+     * already materialized config object.
+     *
+     * This is used for startup flows that may bypass {@link #loadConfig(Path, String)}
+     * (for example locked snapshots or in-memory sandbox configs), ensuring runtime
+     * process environment is always sourced from the effective envFile/default .env.
+     */
+    public static void reloadConfiguredEnvFile(ServerConfig config, Path projectDir) {
+        clearLoadedEnvFileVariables();
+        if (projectDir == null) {
+            return;
+        }
+        String envFileName = resolveConfiguredEnvFileName(config);
+        loadEnvFile(projectDir, envFileName);
+    }
+
+    /**
+     * Reload env variables for server startup while supporting layered env files
+     * when an environment-specific override is active.
+     *
+     * Layering behavior:
+     * - Load base envFile first (or default .env)
+     * - Then load environments.{env}.envFile (if explicitly configured), allowing
+     *   keys in the environment-specific file to override matching base-file keys.
+     *
+     * If the config file cannot be read, this gracefully falls back to the
+     * effective config's envFile/default .env behavior.
+     */
+    public static void reloadConfiguredEnvFile(
+            ServerConfig config,
+            Path projectDir,
+            String configFileName,
+            String environmentName
+    ) {
+        clearLoadedEnvFileVariables();
+        if (projectDir == null) {
+            return;
+        }
+
+        String resolvedConfigFileName = (configFileName == null || configFileName.trim().isEmpty())
+                ? "lucee.json"
+                : configFileName.trim();
+
+        try {
+            Path configFilePath = projectDir.resolve(resolvedConfigFileName);
+            if (!Files.exists(configFilePath)) {
+                String envFileName = resolveConfiguredEnvFileName(config);
+                loadEnvFile(projectDir, envFileName);
+                return;
+            }
+
+            JsonNode rootNode = objectMapper.readTree(configFilePath.toFile());
+            String baseEnvFileName = resolveConfiguredEnvFileName(rootNode);
+            loadEnvFile(projectDir, baseEnvFileName);
+
+            if (environmentName != null && !environmentName.trim().isEmpty()) {
+                JsonNode environmentsNode = rootNode.get("environments");
+                if (environmentsNode != null && environmentsNode.isObject()) {
+                    JsonNode envNode = environmentsNode.get(environmentName.trim());
+                    String envOverrideEnvFileName = resolveOptionalConfiguredEnvFileName(envNode);
+                    if (envOverrideEnvFileName != null) {
+                        loadEnvFile(projectDir, envOverrideEnvFileName);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            String envFileName = resolveConfiguredEnvFileName(config);
+            loadEnvFile(projectDir, envFileName);
         }
     }
     
@@ -2298,10 +2413,16 @@ public class LuceeServerConfig {
             
             ServerConfig merged = deepMergeConfigs(base, rawEnvNode);
             if (projectDir != null) {
-                // Re-evaluate env file after environment overrides are applied so that
-                // runtime env preview/process env reflect the realized envFile value.
+                // Re-evaluate env files after environment overrides are applied.
+                // Layering behavior:
+                //   base envFile -> environment-specific envFile override
+                // so environment-specific keys can override matching base-file keys.
                 clearLoadedEnvFileVariables();
-                loadEnvFile(projectDir, resolveConfiguredEnvFileName(merged));
+                loadEnvFile(projectDir, resolveConfiguredEnvFileName(base));
+                String envOverrideEnvFileName = resolveOptionalConfiguredEnvFileName(rawEnvNode);
+                if (envOverrideEnvFileName != null) {
+                    loadEnvFile(projectDir, envOverrideEnvFileName);
+                }
             }
             // Re-run substitution after environment merge so placeholders introduced
             // by environment-specific overrides are realized.
