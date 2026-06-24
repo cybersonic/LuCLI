@@ -18,6 +18,7 @@ import javax.script.ScriptException;
 
 import org.lucee.lucli.LuceeScriptEngine;
 import org.lucee.lucli.secrets.LucliSecretProviderSupport;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -117,6 +118,13 @@ public class LuceeServerConfig {
          * against the project directory when starting the server.
          */
         public String configurationFile;
+
+        /**
+         * Internal-only path to the base configurationFile when environment overrides
+         * specify their own configurationFile. Used to preserve base->env layering.
+         */
+        @JsonIgnore
+        public String baseConfigurationFile;
 
         /**
          * Optional path to a project-specific environment file. When set, this
@@ -2256,32 +2264,26 @@ public class LuceeServerConfig {
 
         JsonNode result = null;
 
-        // Start with external configuration file as base (if specified and exists)
-        if (config.configurationFile != null && !config.configurationFile.trim().isEmpty()) {
-            Path cfConfigPath = Paths.get(config.configurationFile);
-            if (!cfConfigPath.isAbsolute()) {
-                cfConfigPath = projectDir.resolve(cfConfigPath);
-            }
+        // Layer external configuration files (if configured):
+        //   baseConfigurationFile (set by applyEnvironment when env overrides file)
+        //   -> configurationFile (effective file after environment merge)
+        Path baseConfigurationFilePath = resolveConfigurationFilePath(projectDir, config.baseConfigurationFile);
+        Path effectiveConfigurationFilePath = resolveConfigurationFilePath(projectDir, config.configurationFile);
 
-            if (Files.exists(cfConfigPath)) {
-                result = objectMapper.readTree(cfConfigPath.toFile());
-            }
+        if (baseConfigurationFilePath != null && Files.exists(baseConfigurationFilePath)) {
+            result = objectMapper.readTree(baseConfigurationFilePath.toFile());
+        }
+        if (effectiveConfigurationFilePath != null
+                && Files.exists(effectiveConfigurationFilePath)
+                && (baseConfigurationFilePath == null
+                    || !baseConfigurationFilePath.equals(effectiveConfigurationFilePath))) {
+            JsonNode effectiveFileConfig = objectMapper.readTree(effectiveConfigurationFilePath.toFile());
+            result = mergeCfConfigNodes(result, effectiveFileConfig);
         }
 
         // Merge inline configuration (if present) as overrides
         if (config.configuration != null && !config.configuration.isNull()) {
-            if (result == null) {
-                // No base config file; use inline config directly
-                result = config.configuration;
-            } else {
-                // Merge inline config into the base; inline values override file values
-                try {
-                    result = mergeLuceeConfigSection(result, config.configuration);
-                }
-                catch (Exception e) {
-                    throw new IOException("ConfigMerge via Lucee failed: " + e.getMessage(), e);
-                }
-            }
+            result = mergeCfConfigNodes(result, config.configuration);
         }
         
         // Add dependency mappings as final layer (highest precedence)
@@ -2304,6 +2306,35 @@ public class LuceeServerConfig {
         }
 
         return result;
+    }
+
+    private static JsonNode mergeCfConfigNodes(JsonNode baseConfig, JsonNode overrideConfig) throws IOException {
+        if (overrideConfig == null || overrideConfig.isNull()) {
+            return baseConfig;
+        }
+        if (baseConfig == null || baseConfig.isNull()) {
+            return overrideConfig;
+        }
+        try {
+            return mergeLuceeConfigSection(baseConfig, overrideConfig);
+        }
+        catch (Exception e) {
+            throw new IOException("ConfigMerge via Lucee failed: " + e.getMessage(), e);
+        }
+    }
+
+    private static Path resolveConfigurationFilePath(Path projectDir, String configurationFile) {
+        if (configurationFile == null || configurationFile.trim().isEmpty()) {
+            return null;
+        }
+        Path cfConfigPath = Paths.get(configurationFile.trim());
+        if (!cfConfigPath.isAbsolute()) {
+            if (projectDir == null) {
+                return null;
+            }
+            cfConfigPath = projectDir.resolve(cfConfigPath);
+        }
+        return cfConfigPath.normalize();
     }
 
     /**
@@ -2412,7 +2443,16 @@ public class LuceeServerConfig {
                 }
             }
             
+            boolean hasEnvironmentConfigurationFileOverride =
+                hasExplicitEnvironmentConfigurationFileOverride(rawEnvNode);
             ServerConfig merged = deepMergeConfigs(base, rawEnvNode);
+            if (hasEnvironmentConfigurationFileOverride) {
+                String inheritedBaseConfigurationFile =
+                    (base.baseConfigurationFile != null && !base.baseConfigurationFile.trim().isEmpty())
+                        ? base.baseConfigurationFile
+                        : base.configurationFile;
+                merged.baseConfigurationFile = inheritedBaseConfigurationFile;
+            }
             if (projectDir != null) {
                 // Re-evaluate env files after environment overrides are applied.
                 // Layering behavior:
@@ -2436,6 +2476,17 @@ public class LuceeServerConfig {
         } catch (IOException e) {
             throw new RuntimeException("Failed to merge environment configuration: " + e.getMessage(), e);
         }
+    }
+
+    private static boolean hasExplicitEnvironmentConfigurationFileOverride(JsonNode rawEnvNode) {
+        if (rawEnvNode == null || !rawEnvNode.isObject()) {
+            return false;
+        }
+        JsonNode configurationFileNode = rawEnvNode.get("configurationFile");
+        return configurationFileNode != null
+            && !configurationFileNode.isNull()
+            && configurationFileNode.isTextual()
+            && !configurationFileNode.asText().trim().isEmpty();
     }
     
     /**

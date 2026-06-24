@@ -141,3 +141,7 @@ Append new entries at the bottom under the appropriate date/session.
 - For Java 24+ on Windows, LuCLI startup noise from terminally deprecated `sun.misc.Unsafe` access can be reduced at launcher level by conditionally adding `--sun-misc-unsafe-memory-access=allow` in `src/bin/lucli.bat`, but only when no explicit mode is already provided via `LUCLI_JAVA_ARGS`, `JDK_JAVA_OPTIONS`, or `JAVA_TOOL_OPTIONS`.
 - For CFConfig layering, keep explicit regression coverage around `configurationFile` + inline `configuration.extensions` behavior (base extensions retained, inline duplicates overriding by identity) so future ConfigMerge changes do not silently drop base extensions.
 - For server lifecycle/state resolution, treat `server.pid` as potentially stale and use a shared recovery path that can fall back to `catalina.pid` and then refresh `server.pid`; otherwise `status`, `stop`, `prune`, and port-conflict checks can disagree about whether the same server is running.
+
+## 2026-06-24
+
+- `applyEnvironment(...)` can overwrite top-level `configurationFile` when an environment sets `environments.<env>.configurationFile`; to preserve documented layering, keep the original base file reference and have `resolveConfigurationNode(...)` merge base file -> environment file -> inline `configuration`.
