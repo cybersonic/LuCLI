@@ -815,6 +815,7 @@ public class LuceeServerConfig {
         }
         return substituteField(rawValue.trim());
     }
+
     private static void clearRealizedEnvVariables() {
         synchronized (realizedEnvVariables) {
             realizedEnvVariables.clear();
