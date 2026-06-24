@@ -231,35 +231,37 @@ public final class DockerRuntimeProvider implements RuntimeProvider {
         cmd.add("-v");
         cmd.add(projectDir.toAbsolutePath() + ":" + appPath);
 
-        // Environment variables: reuse values from config where possible.
+        // Build the effective environment with the same precedence used by
+        // Tomcat/Jetty startup:
+        //   envFile/.env (defaults) < LuCLI runtime env < config.envVars
+        // where later entries override earlier entries.
+        Map<String, String> runtimeEnv = new java.util.LinkedHashMap<>();
+        LuceeServerConfig.applyLoadedEnvToProcessEnvironment(runtimeEnv);
+
         // LUCEE_ADMIN_PASSWORD from admin.password, when present.
         if (config.admin != null && config.admin.password != null && !config.admin.password.isEmpty()) {
-            cmd.add("-e");
-            cmd.add("LUCEE_ADMIN_PASSWORD=" + config.admin.password);
+            runtimeEnv.put("LUCEE_ADMIN_PASSWORD", config.admin.password);
         }
 
         // LUCEE_EXTENSIONS from dependency lock file via existing helper.
         String extensions = LuceeServerManager.buildLuceeExtensions(projectDir);
         if (extensions != null && !extensions.isEmpty()) {
-            cmd.add("-e");
-            cmd.add("LUCEE_EXTENSIONS=" + extensions);
+            runtimeEnv.put("LUCEE_EXTENSIONS", extensions);
         }
 
-        // Additional envVars from lucee.json.
-        if (config.envVars != null && !config.envVars.isEmpty()) {
-            for (Map.Entry<String, String> entry : config.envVars.entrySet()) {
-                String key = entry.getKey();
-                String value = entry.getValue();
-                if (key == null || key.trim().isEmpty() || value == null) {
-                    continue;
-                }
-                cmd.add("-e");
-                cmd.add(key + "=" + value);
+        // Additional envVars from lucee.json (null unsets, non-null overrides).
+        LuceeServerConfig.applyConfigEnvVarsToProcessEnvironment(runtimeEnv, config.envVars);
+
+        TomcatConfigSupport.applyAdminSecurityEnvironment(runtimeEnv, config);
+
+        for (Map.Entry<String, String> entry : runtimeEnv.entrySet()) {
+            String key = entry.getKey();
+            String value = entry.getValue();
+            if (key == null || key.trim().isEmpty() || value == null) {
+                continue;
             }
-        }
-        if (TomcatConfigSupport.isAdminDisabled(config)) {
             cmd.add("-e");
-            cmd.add("LUCEE_ADMIN_ENABLED=false");
+            cmd.add(key + "=" + value);
         }
 
         // Honour basic docker runtime image/tag overrides when provided.

@@ -1155,10 +1155,8 @@ public class ServerCommandHandler {
             // ignore — not critical for preview
         }
 
-        // 3) User-defined envVars from lucee.json
-        if (config.envVars != null && !config.envVars.isEmpty()) {
-            envPreview.putAll(config.envVars);
-        }
+        // 3) User-defined envVars from lucee.json (null unsets keys)
+        LuceeServerConfig.applyConfigEnvVarsToProcessEnvironment(envPreview, config.envVars);
         TomcatConfigSupport.applyAdminSecurityEnvironment(envPreview, config);
 
         try {
@@ -1698,9 +1696,7 @@ public class ServerCommandHandler {
         // 2) Build effective environment map (System + envFile + envVars)
         java.util.Map<String, String> effectiveEnv = new java.util.HashMap<>(System.getenv());
         LuceeServerConfig.applyLoadedEnvToProcessEnvironment(effectiveEnv);
-        if (config.envVars != null && !config.envVars.isEmpty()) {
-            effectiveEnv.putAll(config.envVars);
-        }
+        LuceeServerConfig.applyConfigEnvVarsToProcessEnvironment(effectiveEnv, config.envVars);
 
         // For non-global view, restrict to keys coming from envFile and/or envVars.
         java.util.Map<String, String> toDisplay;
@@ -1716,7 +1712,9 @@ public class ServerCommandHandler {
             }
             java.util.Map<String, String> scoped = new java.util.LinkedHashMap<>();
             for (String key : keys) {
-                scoped.put(key, effectiveEnv.get(key));
+                if (effectiveEnv.containsKey(key)) {
+                    scoped.put(key, effectiveEnv.get(key));
+                }
             }
             toDisplay = scoped;
             scopeLabel = "envFile + envVars (project-scoped)";
