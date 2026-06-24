@@ -304,6 +304,9 @@ public class CatalinaBaseConfigGeneratorTest {
         config.urlRewrite.enabled = true;
 
         generator.generateConfiguration(catalinaBase, config, projectDir, catalinaHome, 0, false);
+        String serverXml = Files.readString(catalinaBase.resolve("conf/server.xml"), StandardCharsets.UTF_8);
+        assertTrue(serverXml.contains("org.apache.catalina.valves.rewrite.RewriteValve"),
+                "server.xml should include Tomcat RewriteValve when URL rewrite is enabled");
 
         Path rewriteConfig = catalinaBase.resolve("conf/Catalina/localhost/rewrite.config");
         assertTrue(Files.exists(rewriteConfig),

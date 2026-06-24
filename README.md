@@ -22,7 +22,8 @@ A modern, feature-rich command line interface for Lucee CFML that brings the pow
 ## ✨ Key Features
 
 ### 🎯 Core Capabilities
-- **CFML Script Execution**: Run .cfs, .cfm, and .cfc files with full Lucee support
+- **CFML Script Execution**: Run `.cfs` and `.cfm` files with full Lucee support
+- **Module-Based Component Commands**: Run `Module.cfc` entrypoints via `lucli modules run <module>` or module shortcuts
 - **Server Management**: Start, stop, monitor, and manage Lucee server instances  
 - **Module System**: Create and manage reusable CFML modules
 
@@ -194,11 +195,14 @@ lucli my-module arg1 arg2
 ```bash
 # Execute CFML scripts
 lucli script.cfs
-lucli component.cfc
 lucli template.cfm
 
 # With arguments
 lucli script.cfs --verbose --output=/tmp/results.json
+
+# Component-backed commands run as modules
+lucli modules run my-module arg1 arg2
+lucli my-module arg1 arg2
 ```
 
 ## 🎨 Smart Output Processing
@@ -452,7 +456,7 @@ lucli/
 ### Test Categories
 - ✅ Basic functionality (help, version commands)
 - ✅ Comprehensive help system (all commands and subcommands)  
-- ✅ CFML script execution (.cfs, .cfm, .cfc)
+- ✅ CFML script execution (.cfs, .cfm) + explicit direct `.cfc` block contract
 - ✅ Server management (start, stop, status, monitor) with --port option
 - ✅ File system operations and navigation
 - ✅ Module system (create, list, execute)
