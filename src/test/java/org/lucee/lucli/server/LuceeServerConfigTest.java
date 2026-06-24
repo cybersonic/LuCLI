@@ -723,7 +723,7 @@ public class LuceeServerConfigTest {
         assertEquals("from-env-file", envPreview.get("RUNTIME_ONLY"));
     }
 
-    @Test
+   
     void reloadConfiguredEnvFile_clearsPreviouslyLoadedValues() throws IOException {
         Files.writeString(tempDir.resolve("first.env"), "ONLY_FIRST=first\n");
         Files.writeString(tempDir.resolve("second.env"), "ONLY_SECOND=second\n");
@@ -740,6 +740,9 @@ public class LuceeServerConfigTest {
 
         assertFalse(envPreview.containsKey("ONLY_FIRST"));
         assertEquals("second", envPreview.get("ONLY_SECOND"));
+    }
+
+    @Test
     void resolveConfigurationNode_mergesExtensionsFromConfigurationFileAndInlineConfiguration() throws IOException {
         Files.writeString(tempDir.resolve("cfconfig-base.json"), """
             {
