@@ -2147,9 +2147,13 @@ public class LuceeServerManager {
      * Called before server startup.
      */
     public void deployExtensionsForServer(Path projectDir, Path serverInstanceDir) {
+        deployExtensionsForServer(projectDir, serverInstanceDir, null);
+    }
+
+    public void deployExtensionsForServer(Path projectDir, Path serverInstanceDir, String environment) {
         try {
             java.util.List<org.lucee.lucli.deps.LockedDependency> allExtensions =
-                resolveExtensionDependenciesForRuntime(projectDir);
+                resolveExtensionDependenciesForRuntime(projectDir, environment);
             
             if (!allExtensions.isEmpty()) {
                 // Deploy extensions that have URL or path
@@ -2208,9 +2212,13 @@ public class LuceeServerManager {
      * and entries are comma-separated.
      */
     public static String buildLuceeExtensions(Path projectDir) {
+        return buildLuceeExtensions(projectDir, null);
+    }
+
+    public static String buildLuceeExtensions(Path projectDir, String environment) {
         try {
             java.util.List<org.lucee.lucli.deps.LockedDependency> extensionDeps =
-                resolveExtensionDependenciesForRuntime(projectDir);
+                resolveExtensionDependenciesForRuntime(projectDir, environment);
             java.util.List<String> entries = new java.util.ArrayList<>();
 
             for (org.lucee.lucli.deps.LockedDependency dep : extensionDeps) {
@@ -2255,7 +2263,7 @@ public class LuceeServerManager {
      * 1) When dependencySettings.useLockFile=true: extension entries from lucee-lock.json
      * 2) Fallback: extension entries synthesized from lucee.json dependencies
      */
-    private static java.util.List<org.lucee.lucli.deps.LockedDependency> resolveExtensionDependenciesForRuntime(Path projectDir) {
+    private static java.util.List<org.lucee.lucli.deps.LockedDependency> resolveExtensionDependenciesForRuntime(Path projectDir, String environment) {
         java.util.List<org.lucee.lucli.deps.LockedDependency> fromLock = java.util.List.of();
         org.lucee.lucli.config.LuceeJsonConfig config = null;
         boolean preferLockFile = false;
@@ -2263,6 +2271,9 @@ public class LuceeServerManager {
 
         try {
             config = org.lucee.lucli.config.LuceeJsonConfig.load(projectDir);
+            if (environment != null && !environment.trim().isEmpty()) {
+                config.applyEnvironment(environment.trim());
+            }
             preferLockFile = config.getDependencySettings().isUseLockFileEnabled();
             disabledExtensionNames = findDisabledExtensionNames(config);
         } catch (Exception ignored) {
@@ -2523,7 +2534,7 @@ public class LuceeServerManager {
             env.put("LUCEE_ADMIN_PASSWORD", config.admin.password);
         }
 
-        String luceeExtensions = LuceeServerManager.buildLuceeExtensions(projectDir);
+        String luceeExtensions = LuceeServerManager.buildLuceeExtensions(projectDir, environment);
         if (luceeExtensions != null && !luceeExtensions.isEmpty()) {
             env.put("LUCEE_EXTENSIONS", luceeExtensions);
         }
@@ -2694,7 +2705,7 @@ public class LuceeServerManager {
             env.put("LUCEE_ADMIN_PASSWORD", config.admin.password);
         }
 
-        String luceeExtensions = LuceeServerManager.buildLuceeExtensions(projectDir);
+        String luceeExtensions = LuceeServerManager.buildLuceeExtensions(projectDir, environment);
         if (luceeExtensions != null && !luceeExtensions.isEmpty()) {
             env.put("LUCEE_EXTENSIONS", luceeExtensions);
         }

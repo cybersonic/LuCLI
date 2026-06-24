@@ -80,6 +80,84 @@ class LuceeServerManagerExtensionsTest {
     }
 
     @Test
+    void buildLuceeExtensions_envOverrideDisablesExtension_noLockFile() throws Exception {
+        Files.writeString(tempDir.resolve("lucee.json"), """
+            {
+              "name": "env-override-disable",
+              "dependencySettings": {
+                "useLockFile": false
+              },
+              "dependencies": {
+                "h2": {
+                  "type": "extension",
+                  "id": "465E1E35-2425-4F4E-8B3FAB638BD7280A",
+                  "enabled": true
+                }
+              },
+              "environments": {
+                "prod": {
+                  "dependencies": {
+                    "h2": {
+                      "enabled": false
+                    }
+                  }
+                }
+              }
+            }
+            """);
+
+        String luceeExtensions = LuceeServerManager.buildLuceeExtensions(tempDir, "prod");
+        assertEquals("", luceeExtensions,
+                "env override setting enabled=false should exclude extension from LUCEE_EXTENSIONS");
+    }
+
+    @Test
+    void buildLuceeExtensions_envOverrideDisablesExtension_withLockFile() throws Exception {
+        Files.writeString(tempDir.resolve("lucee.json"), """
+            {
+              "name": "env-override-disable-lock",
+              "dependencySettings": {
+                "useLockFile": true
+              },
+              "dependencies": {
+                "h2": {
+                  "type": "extension",
+                  "id": "465E1E35-2425-4F4E-8B3FAB638BD7280A",
+                  "enabled": true
+                }
+              },
+              "environments": {
+                "prod": {
+                  "dependencies": {
+                    "h2": {
+                      "enabled": false
+                    }
+                  }
+                }
+              }
+            }
+            """);
+
+        Files.writeString(tempDir.resolve("lucee-lock.json"), """
+            {
+              "dependencies": {
+                "h2": {
+                  "type": "extension",
+                  "version": "unknown",
+                  "source": "extension-provider",
+                  "id": "465E1E35-2425-4F4E-8B3FAB638BD7280A"
+                }
+              },
+              "devDependencies": {}
+            }
+            """);
+
+        String luceeExtensions = LuceeServerManager.buildLuceeExtensions(tempDir, "prod");
+        assertEquals("", luceeExtensions,
+                "env override setting enabled=false should exclude extension from lock file path too");
+    }
+
+    @Test
     void buildLuceeExtensions_ignoresDisabledExtensionsFromLockFileWhenConfiguredDisabled() throws Exception {
         Files.writeString(tempDir.resolve("lucee.json"), """
             {
