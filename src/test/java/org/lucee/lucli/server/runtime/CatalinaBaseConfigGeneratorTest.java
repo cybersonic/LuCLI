@@ -134,6 +134,65 @@ public class CatalinaBaseConfigGeneratorTest {
     }
 
     @Test
+    void generateConfiguration_whenAdminDisabled_doesNotAddAdminServletMappingAndAddsDenyConstraint() throws IOException {
+        // Use a minimal CATALINA_HOME web.xml without pre-existing Lucee servlets
+        Path minimalHome = tempDir.resolve("minimal-home-admin-disabled");
+        Files.createDirectories(minimalHome.resolve("conf"));
+        Files.writeString(minimalHome.resolve("conf/server.xml"), MINIMAL_SERVER_XML);
+        Files.writeString(minimalHome.resolve("conf/web.xml"), MINIMAL_WEB_XML);
+
+        Path base = tempDir.resolve("minimal-base-admin-disabled");
+        Files.createDirectories(base);
+
+        LuceeServerConfig.ServerConfig config = createTestConfig();
+        config.admin.enabled = false;
+
+        generator.generateConfiguration(base, config, projectDir, minimalHome, 0, false);
+
+        String webXml = Files.readString(base.resolve("conf/web.xml"), StandardCharsets.UTF_8);
+        String compactXml = webXml.replaceAll("\\s+", "");
+
+        assertFalse(compactXml.contains(
+                "<servlet-mapping><servlet-name>CFMLServlet</servlet-name><url-pattern>/lucee/admin.cfm</url-pattern></servlet-mapping>"),
+                "Generated web.xml should not include CFML admin servlet mapping when admin.enabled=false");
+        assertTrue(compactXml.contains("<url-pattern>/lucee/admin.cfm</url-pattern>"),
+                "Generated web.xml should include a deny-list pattern for /lucee/admin.cfm");
+        assertTrue(compactXml.contains("<auth-constraint"),
+                "Generated web.xml should include auth-constraint to deny admin endpoint access");
+    }
+
+    @Test
+    void generateConfiguration_whenAdminDisabled_removesExistingAdminServletMappings() throws IOException {
+        // Use a CATALINA_HOME web.xml that already has explicit admin mappings
+        Path adminMappedHome = tempDir.resolve("home-existing-admin-mapping");
+        Files.createDirectories(adminMappedHome.resolve("conf"));
+        Files.writeString(adminMappedHome.resolve("conf/server.xml"), MINIMAL_SERVER_XML);
+        Files.writeString(adminMappedHome.resolve("conf/web.xml"), WEB_XML_WITH_EXPLICIT_ADMIN_MAPPING);
+
+        Path base = tempDir.resolve("base-existing-admin-mapping");
+        Files.createDirectories(base);
+
+        LuceeServerConfig.ServerConfig config = createTestConfig();
+        config.admin.enabled = false;
+
+        generator.generateConfiguration(base, config, projectDir, adminMappedHome, 0, false);
+
+        String webXml = Files.readString(base.resolve("conf/web.xml"), StandardCharsets.UTF_8);
+        String compactXml = webXml.replaceAll("\\s+", "");
+
+        assertFalse(compactXml.contains(
+                "<servlet-mapping><servlet-name>CFMLServlet</servlet-name><url-pattern>/lucee/admin.cfm</url-pattern></servlet-mapping>"),
+                "Existing CFML admin servlet mapping should be removed when admin.enabled=false");
+        assertFalse(compactXml.contains(
+                "<servlet-mapping><servlet-name>CFMLServlet</servlet-name><url-pattern>/lucee/admin/*</url-pattern></servlet-mapping>"),
+                "Existing wildcard admin servlet mapping should be removed when admin.enabled=false");
+        assertTrue(compactXml.contains("<url-pattern>/lucee/admin.cfm</url-pattern>"),
+                "Generated web.xml should include a deny-list pattern for /lucee/admin.cfm");
+        assertTrue(compactXml.contains("<auth-constraint"),
+                "Generated web.xml should include auth-constraint to deny admin endpoint access");
+    }
+
+    @Test
     void generateConfiguration_migratesLegacyProjectWebXmlAdminMappings() throws IOException {
         Path webInf = projectDir.resolve("WEB-INF");
         Files.createDirectories(webInf);
@@ -245,6 +304,9 @@ public class CatalinaBaseConfigGeneratorTest {
         config.urlRewrite.enabled = true;
 
         generator.generateConfiguration(catalinaBase, config, projectDir, catalinaHome, 0, false);
+        String serverXml = Files.readString(catalinaBase.resolve("conf/server.xml"), StandardCharsets.UTF_8);
+        assertTrue(serverXml.contains("org.apache.catalina.valves.rewrite.RewriteValve"),
+                "server.xml should include Tomcat RewriteValve when URL rewrite is enabled");
 
         Path rewriteConfig = catalinaBase.resolve("conf/Catalina/localhost/rewrite.config");
         assertTrue(Files.exists(rewriteConfig),
@@ -517,6 +579,37 @@ public class CatalinaBaseConfigGeneratorTest {
               <servlet-mapping>
                 <servlet-name>default</servlet-name>
                 <url-pattern>/</url-pattern>
+              </servlet-mapping>
+            </web-app>
+            """;
+
+    private static final String WEB_XML_WITH_EXPLICIT_ADMIN_MAPPING = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <web-app xmlns="http://xmlns.jcp.org/xml/ns/javaee"
+                     version="4.0">
+              <servlet>
+                <servlet-name>default</servlet-name>
+                <servlet-class>org.apache.catalina.servlets.DefaultServlet</servlet-class>
+              </servlet>
+              <servlet>
+                <servlet-name>CFMLServlet</servlet-name>
+                <servlet-class>lucee.loader.servlet.CFMLServlet</servlet-class>
+              </servlet>
+              <servlet-mapping>
+                <servlet-name>default</servlet-name>
+                <url-pattern>/</url-pattern>
+              </servlet-mapping>
+              <servlet-mapping>
+                <servlet-name>CFMLServlet</servlet-name>
+                <url-pattern>*.cfm</url-pattern>
+              </servlet-mapping>
+              <servlet-mapping>
+                <servlet-name>CFMLServlet</servlet-name>
+                <url-pattern>/lucee/admin.cfm</url-pattern>
+              </servlet-mapping>
+              <servlet-mapping>
+                <servlet-name>CFMLServlet</servlet-name>
+                <url-pattern>/lucee/admin/*</url-pattern>
               </servlet-mapping>
             </web-app>
             """;
