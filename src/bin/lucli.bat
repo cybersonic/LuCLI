@@ -105,10 +105,12 @@ if %JAVA_VERSION_MAJOR_NUM% GEQ 24 (
 rem ##########################################################################
 rem # EXECUTION                                                              #
 rem ##########################################################################
+set "LUCLI_JAR=%SCRIPT_DIR%lucli.jar"
+if not exist "%LUCLI_JAR%" (
+    >&2 echo [ERROR] Unable to find LuCLI JAR at "%LUCLI_JAR%".
+    >&2 echo Please ensure lucli.jar is in the same directory as lucli.bat.
+    exit /b 1
+)
 
-rem This script is concatenated with a JAR file
-rem The JAR starts after the :JAR_BOUNDARY label
-"%JAVA_CMD%" %LUCLI_JAVA_ARGS% %LUCLI_UNSAFE_MEMORY_ACCESS_ARG% -jar "%~f0" %*
+"%JAVA_CMD%" %LUCLI_JAVA_ARGS% %LUCLI_UNSAFE_MEMORY_ACCESS_ARG% -jar "%LUCLI_JAR%" %*
 exit /b %ERRORLEVEL%
-
-:JAR_BOUNDARY

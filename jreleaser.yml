@@ -40,7 +40,7 @@ files:
   artifacts:
     - path: target/lucli-{{projectVersion}}-linux
     - path: target/lucli-{{projectVersion}}-macos
-    - path: target/lucli-{{projectVersion}}.bat
+    - path: target/lucli-{{projectVersion}}.exe
     - path: target/lucli-{{projectVersion}}.jar
     - path: target/lucli.jar
 

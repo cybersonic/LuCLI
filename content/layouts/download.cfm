@@ -105,7 +105,7 @@
                         <span class="download-os-label">For Windows machines</span>
                         <span class="download-os-name">Windows</span>
                         <p class="download-description">
-                            Self-contained Windows launcher (.bat). No separate Java install required.
+                            Single-file Windows executable launcher (.exe) built with Launch4j.
                         </p>
                     </div>
                     <div class="download-card-footer">
@@ -113,12 +113,12 @@
                             id="download-windows"
                             class="download-secondary-button"
                             data-os="windows"
-                            data-file-template="lucli-__LATEST_VERSION__.bat"
+                            data-file-template="lucli-__LATEST_VERSION__.exe"
                             href="#"
                         >
                             Download for Windows
                         </a>
-                        <span class="download-size-hint">Batch file launcher</span>
+                        <span class="download-size-hint">Executable launcher (.exe)</span>
                     </div>
                 </article>
 

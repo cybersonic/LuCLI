@@ -145,3 +145,7 @@ Append new entries at the bottom under the appropriate date/session.
 ## 2026-06-24
 
 - `applyEnvironment(...)` can overwrite top-level `configurationFile` when an environment sets `environments.<env>.configurationFile`; to preserve documented layering, keep the original base file reference and have `resolveConfigurationNode(...)` merge base file -> environment file -> inline `configuration`.
+## 2026-06-26
+
+- Launch4j `windows-exe` packaging in this repo requires an explicit application JAR path of `target/lucli.jar` and a non-empty JRE lookup path (`%JAVA_HOME%;%PATH%`) in `pom.xml`; using `lucli.jar` without `target/` or leaving `<jre><path>` empty causes launch4j build failures during `mvn ... -Pwindows-exe`.
+- Keep a Windows executable smoke check in CI (`.github/workflows/ci.yml`) by building with `-Pwindows-exe` and running `.\target\lucli.exe --version` so release/installer changes to Windows packaging are validated before publish.

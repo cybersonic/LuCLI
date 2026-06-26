@@ -1,5 +1,6 @@
 package org.lucee.lucli.bootstrap;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -28,5 +29,13 @@ class LucliBatBootstrapScriptTest {
                 "lucli.bat should respect explicit user flags in JDK_JAVA_OPTIONS");
         assertTrue(script.contains("if defined JAVA_TOOL_OPTIONS ("),
                 "lucli.bat should respect explicit user flags in JAVA_TOOL_OPTIONS");
+        assertTrue(script.contains("set \"LUCLI_JAR=%SCRIPT_DIR%lucli.jar\""),
+                "lucli.bat should execute a sibling lucli.jar wrapper path");
+        assertTrue(script.contains("-jar \"%LUCLI_JAR%\" %*"),
+                "lucli.bat should invoke Java with the resolved sibling lucli.jar");
+        assertFalse(script.contains("-jar \"%~f0\""),
+                "lucli.bat should not use self-referential -jar execution");
+        assertFalse(script.contains(":JAR_BOUNDARY"),
+                "lucli.bat should not rely on concatenated payload boundary markers");
     }
 }
