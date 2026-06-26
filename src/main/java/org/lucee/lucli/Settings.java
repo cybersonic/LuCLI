@@ -258,10 +258,11 @@ public class Settings {
     }
     
     /**
-     * Check if emojis are enabled
+     * Check if emojis are enabled and supported by the current platform.
+     * Returns the effective enabled state: user preference AND platform capability.
      */
     public boolean showEmojis() {
-        return getBoolean("showEmojis", WindowsSupport.supportsEmojis());
+        return getBoolean("showEmojis", WindowsSupport.supportsEmojis()) && WindowsSupport.supportsEmojis();
     }
     
     /**
