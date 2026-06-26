@@ -161,7 +161,7 @@ public class ExternalCommandProcessor {
             if (commandParts != null
                 && commandParts.length > 0
                 && "env".equalsIgnoreCase(commandParts[0])
-                && System.getProperty("os.name").toLowerCase().contains("windows")) {
+                && System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT).contains("windows")) {
                 normalizedCommandParts = new String[] { "cmd", "/c", "set" };
             }
 
