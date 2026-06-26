@@ -142,6 +142,9 @@ Append new entries at the bottom under the appropriate date/session.
 - For CFConfig layering, keep explicit regression coverage around `configurationFile` + inline `configuration.extensions` behavior (base extensions retained, inline duplicates overriding by identity) so future ConfigMerge changes do not silently drop base extensions.
 - For server lifecycle/state resolution, treat `server.pid` as potentially stale and use a shared recovery path that can fall back to `catalina.pid` and then refresh `server.pid`; otherwise `status`, `stop`, `prune`, and port-conflict checks can disagree about whether the same server is running.
 
+## 2026-06-24
+
+- `applyEnvironment(...)` can overwrite top-level `configurationFile` when an environment sets `environments.<env>.configurationFile`; to preserve documented layering, keep the original base file reference and have `resolveConfigurationNode(...)` merge base file -> environment file -> inline `configuration`.
 ## 2026-06-26
 
 - Launch4j `windows-exe` packaging in this repo requires an explicit application JAR path of `target/lucli.jar` and a non-empty JRE lookup path (`%JAVA_HOME%;%PATH%`) in `pom.xml`; using `lucli.jar` without `target/` or leaving `<jre><path>` empty causes launch4j build failures during `mvn ... -Pwindows-exe`.

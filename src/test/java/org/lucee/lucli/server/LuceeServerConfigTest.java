@@ -778,6 +778,51 @@ public class LuceeServerConfigTest {
                 "Expected inline configuration entry to override matching extension from configurationFile");
         assertEquals("C", extensions.get(2).path("id").asText());
     }
+    @Test
+    void resolveConfigurationNode_environmentConfigurationFileMergesOverBaseConfigurationFile() throws IOException {
+        Files.writeString(tempDir.resolve("cfconfig-base.json"), """
+            {
+              "baseOnly": "from-base-file",
+              "shared": {
+                "winner": "base",
+                "baseValue": true
+              }
+            }
+            """);
+
+        Files.writeString(tempDir.resolve("cfconfig-dev.json"), """
+            {
+              "envOnly": "from-env-file",
+              "shared": {
+                "winner": "env",
+                "envValue": true
+              }
+            }
+            """);
+
+        Files.writeString(tempDir.resolve("lucee.json"), """
+            {
+              "name": "env-config-file-merge-test",
+              "configurationFile": "./cfconfig-base.json",
+              "environments": {
+                "dev": {
+                  "configurationFile": "./cfconfig-dev.json"
+                }
+              }
+            }
+            """);
+
+        LuceeServerConfig.ServerConfig base = LuceeServerConfig.loadConfig(tempDir);
+        LuceeServerConfig.ServerConfig merged = LuceeServerConfig.applyEnvironment(base, "dev", tempDir);
+        JsonNode resolved = LuceeServerConfig.resolveConfigurationNode(merged, tempDir);
+
+        assertEquals("from-base-file", resolved.path("baseOnly").asText(),
+            "Environment configurationFile should layer on top of base configurationFile");
+        assertEquals("from-env-file", resolved.path("envOnly").asText());
+        assertEquals("env", resolved.path("shared").path("winner").asText());
+        assertTrue(resolved.path("shared").path("baseValue").asBoolean());
+        assertTrue(resolved.path("shared").path("envValue").asBoolean());
+    }
 
     // ===================
     // Agent Configuration Tests
