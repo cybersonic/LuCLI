@@ -97,6 +97,13 @@ Write-Info "Downloading $asset from $tag..."
 try {
     Invoke-WebRequest -Uri $downloadUrl -OutFile $tempPath -ErrorAction Stop
 } catch {
+    $statusCode = $null
+    if ($_.Exception.Response -ne $null) {
+        $statusCode = [int]$_.Exception.Response.StatusCode
+    }
+    if ($statusCode -ne 404) {
+        throw
+    }
     Write-Info "Windows .exe asset not found for $tag, trying legacy .bat launcher..."
     $asset = "lucli-$versionOnly.bat"
     $downloadUrl = "$baseDownloadUrl/$asset"
