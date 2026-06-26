@@ -79,19 +79,34 @@ function Add-ToUserPathIfMissing {
 
 $tag = Resolve-ReleaseTag -RequestedVersion $Version -Repository $Repo
 $versionOnly = $tag.TrimStart("v")
-$asset = "lucli-$versionOnly.bat"
-$downloadUrl = "https://github.com/$Repo/releases/download/$tag/$asset"
+$baseDownloadUrl = "https://github.com/$Repo/releases/download/$tag"
+$asset = "lucli-$versionOnly.exe"
+$downloadUrl = "$baseDownloadUrl/$asset"
+$targetFileName = "lucli.exe"
+$tempExtension = ".exe"
 
 $targetDir = Resolve-InstallDir -RequestedDir $InstallDir
 if (-not (Test-Path $targetDir)) {
     New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
 }
 
-$targetPath = Join-Path $targetDir "lucli.bat"
-$tempPath = Join-Path ([System.IO.Path]::GetTempPath()) ("lucli-install-" + [guid]::NewGuid() + ".bat")
+$targetPath = Join-Path $targetDir $targetFileName
+$tempPath = Join-Path ([System.IO.Path]::GetTempPath()) ("lucli-install-" + [guid]::NewGuid() + $tempExtension)
 
 Write-Info "Downloading $asset from $tag..."
-Invoke-WebRequest -Uri $downloadUrl -OutFile $tempPath
+try {
+    Invoke-WebRequest -Uri $downloadUrl -OutFile $tempPath -ErrorAction Stop
+} catch {
+    Write-Info "Windows .exe asset not found for $tag, trying legacy .bat launcher..."
+    $asset = "lucli-$versionOnly.bat"
+    $downloadUrl = "$baseDownloadUrl/$asset"
+    $targetFileName = "lucli.bat"
+    $tempExtension = ".bat"
+    $targetPath = Join-Path $targetDir $targetFileName
+    $tempPath = Join-Path ([System.IO.Path]::GetTempPath()) ("lucli-install-" + [guid]::NewGuid() + $tempExtension)
+    Write-Info "Downloading $asset from $tag..."
+    Invoke-WebRequest -Uri $downloadUrl -OutFile $tempPath -ErrorAction Stop
+}
 
 Move-Item -Path $tempPath -Destination $targetPath -Force
 Write-Info "Installed LuCLI launcher to $targetPath"

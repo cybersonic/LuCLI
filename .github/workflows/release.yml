@@ -66,12 +66,11 @@ jobs:
       - name: Build artifacts for JReleaser
         if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
         run: |
-          mvn -DskipTests=true clean package
+          mvn -DskipTests=true clean package -Pwindows-exe
           cat src/bin/lucli.sh target/lucli.jar > target/lucli
           chmod +x target/lucli
-          cat src/bin/lucli.bat target/lucli.jar > target/lucli.bat
           rm -f target/lucli-windows.zip
-          zip -j target/lucli-windows.zip target/lucli.bat
+          zip -j target/lucli-windows.zip target/lucli.exe
           # Legacy asset names (released as files.artifacts in jreleaser.yml).
           # Every release up to v0.3.17 shipped these names and downstream
           # consumers (Wheels CI, Homebrew formulas, Scoop manifests, the
@@ -79,7 +78,7 @@ jobs:
           VERSION="${{ steps.version.outputs.VERSION }}"
           cp target/lucli     "target/lucli-$VERSION-linux"
           cp target/lucli     "target/lucli-$VERSION-macos"
-          cp target/lucli.bat "target/lucli-$VERSION.bat"
+          cp target/lucli.exe "target/lucli-$VERSION.exe"
           cp target/lucli.jar "target/lucli-$VERSION.jar"
 
       - name: Publish GitHub release, Homebrew tap, and Scoop bucket with JReleaser

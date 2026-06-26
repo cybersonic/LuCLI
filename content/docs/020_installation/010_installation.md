@@ -32,7 +32,7 @@ powershell -ExecutionPolicy Bypass -NoProfile -Command "& { $env:LUCLI_VERSION='
 
 - Java 17 or later on your PATH (`java -version`)
 - (Optional) Maven 3.x if you want to build LuCLI yourself
-- macOS ,  Linux or Windows (via .bat file)
+- macOS ,  Linux or Windows (via `.exe` launcher)
 
 ## Installing from a JAR
 
@@ -49,7 +49,7 @@ alias lucli='java -jar /path/to/lucli.jar'
 ```
 
 ## Installing the Self-Contained Binary
-The self-coontained binary runs the jar without needing to type `java -jar` each time. We provide pre-built binaries for macOS and Linux. As well as a windows .bat file.
+The self-coontained binary runs the jar without needing to type `java -jar` each time. We provide pre-built binaries for macOS and Linux, plus a Windows `.exe` launcher.
 
 1. Download the latest binary from the [releases page](https://github.com/cybersonic/LuCLI/releases/latest).
 1. Make it executable:
