@@ -16,8 +16,8 @@ public class WindowsSupport {
      */
     public static boolean supportsEmojis() {
         if (IS_WINDOWS) {
-            String charset = Charset.defaultCharset().name();
-            if (charset == null || !charset.toLowerCase().contains("utf-8")) {
+            String normalizedCharset = Charset.defaultCharset().name().replace("-", "").toLowerCase(java.util.Locale.ROOT);
+            if (!"utf8".equals(normalizedCharset)) {
                 return false;
             }
         }
