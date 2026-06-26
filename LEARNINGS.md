@@ -141,3 +141,8 @@ Append new entries at the bottom under the appropriate date/session.
 - For Java 24+ on Windows, LuCLI startup noise from terminally deprecated `sun.misc.Unsafe` access can be reduced at launcher level by conditionally adding `--sun-misc-unsafe-memory-access=allow` in `src/bin/lucli.bat`, but only when no explicit mode is already provided via `LUCLI_JAVA_ARGS`, `JDK_JAVA_OPTIONS`, or `JAVA_TOOL_OPTIONS`.
 - For CFConfig layering, keep explicit regression coverage around `configurationFile` + inline `configuration.extensions` behavior (base extensions retained, inline duplicates overriding by identity) so future ConfigMerge changes do not silently drop base extensions.
 - For server lifecycle/state resolution, treat `server.pid` as potentially stale and use a shared recovery path that can fall back to `catalina.pid` and then refresh `server.pid`; otherwise `status`, `stop`, `prune`, and port-conflict checks can disagree about whether the same server is running.
+
+## 2026-06-26
+
+- Launch4j `windows-exe` packaging in this repo requires an explicit application JAR path of `target/lucli.jar` and a non-empty JRE lookup path (`%JAVA_HOME%;%PATH%`) in `pom.xml`; using `lucli.jar` without `target/` or leaving `<jre><path>` empty causes launch4j build failures during `mvn ... -Pwindows-exe`.
+- Keep a Windows executable smoke check in CI (`.github/workflows/ci.yml`) by building with `-Pwindows-exe` and running `.\target\lucli.exe --version` so release/installer changes to Windows packaging are validated before publish.

@@ -64,7 +64,7 @@ docker run --interactive markdrew/lucli:latest repl
 Visit the [Releases Page](https://github.com/cybersonic/LuCLI/releases) to download:
 - **lucli.jar** - Universal JAR file (requires Java 21+)
 - **lucli** - Self-executing binary for Linux/macOS
-- **lucli.bat** - Windows batch file
+- **lucli.exe** - Windows executable launcher
 - **install.sh** - Automated installation script
 
 Also available as a [Docker image](https://hub.docker.com/r/markdrew/lucli)
