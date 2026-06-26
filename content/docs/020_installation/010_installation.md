@@ -49,7 +49,7 @@ alias lucli='java -jar /path/to/lucli.jar'
 ```
 
 ## Installing the Self-Contained Binary
-The self-coontained binary runs the jar without needing to type `java -jar` each time. We provide pre-built binaries for macOS and Linux, plus a Windows `.exe` launcher.
+The self-contained binary runs the jar without needing to type `java -jar` each time. We provide pre-built binaries for macOS and Linux, plus a Windows `.exe` launcher.
 
 1. Download the latest binary from the [releases page](https://github.com/cybersonic/LuCLI/releases/latest).
 1. Make it executable:
