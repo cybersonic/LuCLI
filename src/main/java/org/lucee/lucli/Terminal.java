@@ -186,7 +186,7 @@ public class Terminal {
                 // Dispatch command
                 String result = dispatchCommand(trimmed);
                 if (result != null && !result.isEmpty()) {
-                    terminal.writer().println(result);
+                    terminal.writer().println(EmojiSupport.process(result));
                 }
                 
                 terminal.writer().flush();
