@@ -203,7 +203,7 @@ class SettingsTest {
     void testSetShowEmojis() {
         Settings settings = new Settings();
         settings.setShowEmojis(true);
-        assertTrue(settings.showEmojis());
+        assertEquals(WindowsSupport.supportsEmojis(), settings.showEmojis());
         
         settings.setShowEmojis(false);
         assertFalse(settings.showEmojis());
