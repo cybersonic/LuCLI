@@ -40,6 +40,71 @@ get_current_version() {
 is_snapshot_version() {
     [[ "$1" == *"-SNAPSHOT" ]]
 }
+get_unreleased_changelog_entries() {
+    local changelog_file="$PROJECT_ROOT/CHANGELOG.md"
+
+    if [ ! -f "$changelog_file" ]; then
+        return 1
+    fi
+
+    awk '
+        /^##[[:space:]]+Unreleased[[:space:]]*$/ { in_unreleased=1; next }
+        /^##[[:space:]]+/ { if (in_unreleased) exit }
+        in_unreleased && /^[[:space:]]*-[[:space:]]/ { print }
+    ' "$changelog_file"
+}
+
+suggest_bump_from_changelog() {
+    local changelog_file="$PROJECT_ROOT/CHANGELOG.md"
+    local entries
+
+    if [ ! -f "$changelog_file" ]; then
+        log_error "CHANGELOG.md not found at $changelog_file"
+        exit 1
+    fi
+
+    entries=$(get_unreleased_changelog_entries)
+
+    if [ -z "$entries" ]; then
+        log_warning "No bullet entries found under ## Unreleased. Defaulting to patch."
+        echo
+        log_info "Suggested bump: patch"
+        log_info "Suggested command: $0 bump patch"
+        return 0
+    fi
+
+    local major_count=0
+    local minor_count=0
+    local patch_count=0
+    local total_count=0
+
+    while IFS= read -r entry; do
+        [ -z "$entry" ] && continue
+
+        total_count=$((total_count + 1))
+        local normalized_entry
+        normalized_entry=$(printf '%s\n' "$entry" | tr '[:upper:]' '[:lower:]')
+
+        if printf '%s\n' "$normalized_entry" | grep -Eq '\[(major|breaking)\]|breaking[[:space:]-]?change|(^|[^a-z])breaking([^a-z]|$)|incompatible|removed'; then
+            major_count=$((major_count + 1))
+        elif printf '%s\n' "$normalized_entry" | grep -Eq '\[patch\]|^[[:space:]]*-[[:space:]]+\*\*(fix|docs?|documentation|test|tests|regression|chore|ci|refactor|cleanup|contract clarification|hotfix)[: ]'; then
+            patch_count=$((patch_count + 1))
+        else
+            minor_count=$((minor_count + 1))
+        fi
+    done <<< "$entries"
+
+    local suggestion="patch"
+    if [ "$major_count" -gt 0 ]; then
+        suggestion="major"
+    elif [ "$minor_count" -gt 0 ]; then
+        suggestion="minor"
+    fi
+
+    log_info "Suggested bump from CHANGELOG.md: $suggestion"
+    log_info "Entries scanned under ## Unreleased: $total_count (major signals: $major_count, minor signals: $minor_count, patch signals: $patch_count)"
+    log_info "Suggested command: $0 bump $suggestion"
+}
 
 bump_version() {
     local version_type=$1
@@ -185,6 +250,7 @@ Usage: $0 <command>
 
 Commands:
     status                  Show current version and git status
+    suggest-bump            Suggest major/minor/patch from CHANGELOG.md Unreleased entries
     bump <type>             Bump version (major, minor, patch)
     release                 Prepare release version (remove SNAPSHOT)
     next-snapshot           Set next development version (after release)
@@ -193,6 +259,7 @@ Commands:
     
 Examples:
     $0 status                        # Check current status
+    $0 suggest-bump                  # Recommend bump based on changelog entries
     $0 bump patch                   # Bump to next patch version
     $0 release                      # Prepare for release
     $0 jreleaser-dry-run           # Validate JReleaser config without publishing
@@ -223,6 +290,9 @@ EOF
 case "${1:-}" in
     status)
         check_status
+        ;;
+    suggest-bump)
+        suggest_bump_from_changelog
         ;;
     bump)
         if [ -z "$2" ]; then
