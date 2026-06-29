@@ -1,4 +1,5 @@
 package org.lucee.lucli;
+import java.nio.charset.Charset;
 
 /**
  * Utility class to handle Windows-specific terminal and display compatibility issues
@@ -14,6 +15,12 @@ public class WindowsSupport {
      * Can be used to auto-disable emojis on Windows: EmojiSupport.setEnabled(supportsEmojis())
      */
     public static boolean supportsEmojis() {
+        if (IS_WINDOWS) {
+            String normalizedCharset = Charset.defaultCharset().name().replace("-", "").toLowerCase(java.util.Locale.ROOT);
+            if (!"utf8".equals(normalizedCharset)) {
+                return false;
+            }
+        }
         // Windows Terminal and newer PowerShell versions support emojis
         if (IS_WINDOWS_TERMINAL) {
             return true;

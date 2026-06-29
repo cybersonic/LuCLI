@@ -63,6 +63,7 @@ Keep configuration repeatable and secrets out of source control:
 Manage libraries and extensions:
 
 - [Dependency Management](dependencies-and-extensions/dependency-management/)
+- [Dependency Examples](dependencies-and-extensions/dependency-examples/)
 
 ## AI Features
 

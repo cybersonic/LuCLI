@@ -19,38 +19,60 @@ The basic dry-run output shows:
 - The resolved `lucee.json` with all defaults applied and environment variables substituted
 - Confirmation that no server was actually started
 
-## Preview Flags
+## Section Selection with `--include`
 
-Use `--include-*` flags with `--dry-run` to preview specific configuration files that LuCLI will generate:
+Use `--include` with `--dry-run` to choose exactly which preview sections should be shown.
 
-| Flag | Output | Use Case |
-|------|--------|----------|
-| `--include-lucee` | `.CFConfig.json` | Verify Lucee server settings (datasources, mappings, extensions) |
-| `--include-tomcat-server` | `server.xml` | Review Tomcat connector configuration (HTTP/HTTPS ports, SSL) |
-| `--include-tomcat-web` | `web.xml` | Check servlet mappings, Lucee admin routes, URL rewrite filter |
-| `--include-https-keystore-plan` | Keystore plan | Review HTTPS certificate details and file paths |
-| `--include-https-redirect-rules` | Redirect rules | Verify HTTP→HTTPS redirect configuration |
-| `--include-all` | All of the above | Complete configuration audit |
+For `lucli server start`, valid sections are:
+- `config`
+- `env`
+- `lucee`
+- `tomcat-web`
+- `tomcat-server`
+- `https-keystore-plan`
+- `https-redirect-rules`
+- `all`
+
+For `lucli server run`, valid sections are:
+- `config`
+- `env`
+- `all`
+
+By default (`--dry-run` with no selector), LuCLI shows the realized `lucee.json` (`config`). Once you pass any explicit selector (`--include ...` or a legacy include flag), LuCLI only prints requested sections.
+
+Legacy aliases remain available for `server start`:
+- `--include-env` → `--include env`
+- `--include-lucee` → `--include lucee`
+- `--include-tomcat-web` → `--include tomcat-web`
+- `--include-tomcat-server` → `--include tomcat-server`
+- `--include-https-keystore-plan` → `--include https-keystore-plan`
+- `--include-https-redirect-rules` → `--include https-redirect-rules`
+- `--include-all` → `--include all`
+
+For `server run`, `--include-env` remains an alias for `--include env`.
 
 ### Examples
 
 ```bash
+# Preview only environment sections (no realized lucee.json section)
+lucli server start --dry-run --include env
+
+# Preview specific start sections in one run
+lucli server start --env prod --dry-run --include config,env,lucee,tomcat-web,tomcat-server
+
 # Preview just the Lucee configuration
-lucli server start --dry-run --include-lucee
+lucli server start --dry-run --include lucee
 
-# Preview Tomcat server.xml with HTTPS connector
-lucli server start --dry-run --include-tomcat-server
+# Preview everything for server start
+lucli server start --dry-run --include all
 
-# Preview web.xml servlet mappings
-lucli server start --dry-run --include-tomcat-web
-
-# Preview everything
-lucli server start --dry-run --include-all
+# Run mode supports config/env/all
+lucli server run --dry-run --include env
 ```
 
 ## Use Cases
 
-### 1. Verify Lucee Configuration (`--include-lucee`)
+### 1. Verify Lucee Configuration (`--include lucee`)
 
 **When to use:**
 - After setting up datasources or mappings in `lucee.json`
@@ -65,7 +87,7 @@ The deep-merged `.CFConfig.json` that combines:
 This is the exact JSON that will be written to `~/.lucli/servers/<name>/lucee-server/context/.CFConfig.json`.
 
 ```bash
-lucli server start --dry-run --include-lucee
+lucli server start --dry-run --include lucee
 ```
 
 **Example output:**
@@ -96,7 +118,7 @@ lucli server start --dry-run --include-lucee
 
 ---
 
-### 2. Review Tomcat Connectors (`--include-tomcat-server`)
+### 2. Review Tomcat Connectors (`--include tomcat-server`)
 
 **When to use:**
 - Setting up HTTPS
@@ -112,7 +134,7 @@ The patched `server.xml` with:
 - Host and context settings
 
 ```bash
-lucli server start --dry-run --include-tomcat-server
+lucli server start --dry-run --include tomcat-server
 ```
 
 **Common issues caught:**
@@ -123,7 +145,7 @@ lucli server start --dry-run --include-tomcat-server
 
 ---
 
-### 3. Check Servlet Mappings (`--include-tomcat-web`)
+### 3. Check Servlet Mappings (`--include tomcat-web`)
 
 **When to use:**
 - Debugging routing issues
@@ -140,7 +162,7 @@ The patched `web.xml` with:
 - Security constraints (prevents `lucee.json` from being served)
 
 ```bash
-lucli server start --dry-run --include-tomcat-web
+lucli server start --dry-run --include tomcat-web
 ```
 
 **Common issues caught:**
@@ -151,7 +173,7 @@ lucli server start --dry-run --include-tomcat-web
 
 ---
 
-### 4. Preview HTTPS Setup (`--include-https-keystore-plan`)
+### 4. Preview HTTPS Setup (`--include https-keystore-plan`)
 
 **When to use:**
 - Before enabling HTTPS for the first time
@@ -166,7 +188,7 @@ A plan for HTTPS keystore generation including:
 - SANs (DNS and IP)
 
 ```bash
-lucli server start --dry-run --include-https-keystore-plan
+lucli server start --dry-run --include https-keystore-plan
 ```
 
 **Example output:**
@@ -188,7 +210,7 @@ Note: Files are generated only when starting (no side effects in --dry-run).
 
 ---
 
-### 5. Verify HTTP→HTTPS Redirects (`--include-https-redirect-rules`)
+### 5. Verify HTTP→HTTPS Redirects (`--include https-redirect-rules`)
 
 **When to use:**
 - After enabling HTTPS with `https.redirect=true`
@@ -199,7 +221,7 @@ Note: Files are generated only when starting (no side effects in --dry-run).
 The `rewrite.config` rules that will redirect all HTTP traffic to HTTPS:
 
 ```bash
-lucli server start --dry-run --include-https-redirect-rules
+lucli server start --dry-run --include https-redirect-rules
 ```
 
 **Example output:**
@@ -217,7 +239,7 @@ RewriteRule ^/(.*)$ https://myapp.localhost:8443/$1 [R=302,L]
 
 ---
 
-### 6. Complete Configuration Audit (`--include-all`)
+### 6. Complete Configuration Audit (`--include all`)
 
 **When to use:**
 - Before first deployment
@@ -229,7 +251,7 @@ RewriteRule ^/(.*)$ https://myapp.localhost:8443/$1 [R=302,L]
 All preview sections combined in one output.
 
 ```bash
-lucli server start --dry-run --include-all
+lucli server start --dry-run --include all
 ```
 
 ---
@@ -261,7 +283,7 @@ cat > lucee.json << 'EOF'
 EOF
 
 # 2. Preview the CFConfig to verify datasource settings
-lucli server start --dry-run --include-lucee
+lucli server start --dry-run --include lucee
 
 # 3. Check output for correct DSN and credentials
 # Look for: "dsn" : "jdbc:postgresql://localhost:5432/myapp_db"
@@ -277,8 +299,8 @@ lucli server start
 lucli server config set https.enabled=true
 
 # 2. Preview HTTPS configuration
-lucli server start --dry-run --include-https-keystore-plan
-lucli server start --dry-run --include-tomcat-server
+lucli server start --dry-run --include https-keystore-plan
+lucli server start --dry-run --include tomcat-server
 
 # 3. Verify:
 #    - HTTPS port is available
@@ -294,7 +316,7 @@ lucli server start
 
 ```bash
 # 1. Preview web.xml to check servlet mappings
-lucli server start --dry-run --include-tomcat-web
+lucli server start --dry-run --include tomcat-web
 
 # 2. Look for:
 #    - CFMLServlet mapped to *.cfm
@@ -302,7 +324,7 @@ lucli server start --dry-run --include-tomcat-web
 #    - routerFile set correctly
 
 # 3. Check URL rewrite rules
-lucli server start --dry-run --include-tomcat-server | grep -A20 "RewriteValve"
+lucli server start --dry-run --include tomcat-server | grep -A20 "RewriteValve"
 
 # 4. If configuration looks correct, check actual rewrite.config
 cat ~/.lucli/servers/myapp/webapps/ROOT/WEB-INF/urlrewrite.xml
@@ -333,7 +355,7 @@ cat > lucee.json << 'EOF'
 EOF
 
 # 3. Preview the merged configuration
-lucli server start --dry-run --include-lucee
+lucli server start --dry-run --include lucee
 
 # 4. Verify:
 #    - Base settings from lucee-base.json are present
@@ -345,27 +367,26 @@ lucli server start --dry-run --include-lucee
 
 ## Environment Variable Preview
 
-When using environment variables in `lucee.json`, dry-run shows the resolved values:
+When using environment variables in `lucee.json`, use the env preview section to inspect resolved values:
 
 ```bash
 # Set environment variables
 export HTTP_PORT=9090
 export DB_HOST=production.example.com
 
-# Preview resolved configuration
-lucli server start --dry-run
+# Preview realized substitution variables and runtime env
+lucli server start --dry-run --include env
 ```
-
-The output shows `"port": 9090` and `"host": "production.example.com"` with variables substituted.
+The output shows realized placeholder values and the runtime environment map LuCLI will pass to the process. Add `config` if you also want the realized `lucee.json` section (for example `--include config,env`).
 
 ---
 
 ## Tips and Best Practices
 
 1. **Always dry-run after configuration changes:** Catch errors before starting the server
-2. **Use `--include-lucee` for CFConfig validation:** Especially important for datasources and extensions
-3. **Check `--include-tomcat-server` for port conflicts:** Before starting multiple servers
-4. **Review `--include-all` before production deployment:** Complete configuration audit
+2. **Use `--include lucee` for CFConfig validation:** Especially important for datasources and extensions
+3. **Check `--include tomcat-server` for port conflicts:** Before starting multiple servers
+4. **Review `--include all` before production deployment:** Complete configuration audit
 5. **Combine with version control:** Run dry-run in CI to validate configuration files
 6. **Document expected output:** Save dry-run output as reference documentation
 

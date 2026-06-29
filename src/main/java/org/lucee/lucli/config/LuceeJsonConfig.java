@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.LinkedHashMap;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -109,6 +110,12 @@ public class LuceeJsonConfig {
      * Populate DependencyConfig from a map
      */
     private void populateDependencyFromMap(DependencyConfig dep, Map<String, Object> map) {
+        if (map.containsKey("enabled")) {
+            Object enabledValue = map.get("enabled");
+            if (enabledValue instanceof Boolean) {
+                dep.setEnabled((Boolean) enabledValue);
+            }
+        }
         if (map.containsKey("type")) {
             dep.setType((String) map.get("type"));
         }
@@ -174,6 +181,13 @@ public class LuceeJsonConfig {
         
         EnvironmentConfig env = environments.get(envName);
         
+        // Merge dependencies and devDependencies
+        if (env.dependencies != null) {
+            dependencies = mergeDependencyMap(dependencies, env.dependencies);
+        }
+        if (env.devDependencies != null) {
+            devDependencies = mergeDependencyMap(devDependencies, env.devDependencies);
+        }
         // Merge dependencySettings configuration
         DependencySettingsConfig envSettings = env.dependencySettings != null ? env.dependencySettings : env.packages;
         if (envSettings != null) {
@@ -196,6 +210,70 @@ public class LuceeJsonConfig {
             base.setMaterializeExtensionsOnInstall(envSettings.getMaterializeExtensionsOnInstall());
         }
         // Add other settings as needed
+    }
+
+    /**
+     * Merge environment dependency map overrides into base dependency map.
+     * Supports deep merge for object-style dependency descriptors.
+     */
+    private Map<String, Object> mergeDependencyMap(Map<String, Object> baseMap, Map<String, Object> overrideMap) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        if (baseMap != null) {
+            out.putAll(baseMap);
+        }
+        if (overrideMap == null) {
+            return out;
+        }
+
+        for (Map.Entry<String, Object> entry : overrideMap.entrySet()) {
+            String key = entry.getKey();
+            Object overrideValue = entry.getValue();
+            if (overrideValue == null) {
+                out.remove(key);
+                continue;
+            }
+
+            Object baseValue = out.get(key);
+            if (baseValue instanceof Map && overrideValue instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> merged = deepMergeMap((Map<String, Object>) baseValue, (Map<String, Object>) overrideValue);
+                out.put(key, merged);
+            } else {
+                out.put(key, overrideValue);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Deep merge two maps where override values replace base values and null removes keys.
+     */
+    private Map<String, Object> deepMergeMap(Map<String, Object> base, Map<String, Object> override) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        if (base != null) {
+            out.putAll(base);
+        }
+        if (override == null) {
+            return out;
+        }
+
+        for (Map.Entry<String, Object> entry : override.entrySet()) {
+            String key = entry.getKey();
+            Object overrideValue = entry.getValue();
+            if (overrideValue == null) {
+                out.remove(key);
+                continue;
+            }
+            Object baseValue = out.get(key);
+            if (baseValue instanceof Map && overrideValue instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> merged = deepMergeMap((Map<String, Object>) baseValue, (Map<String, Object>) overrideValue);
+                out.put(key, merged);
+            } else {
+                out.put(key, overrideValue);
+            }
+        }
+        return out;
     }
     
     // Getters and setters
@@ -262,6 +340,11 @@ public class LuceeJsonConfig {
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class EnvironmentConfig {
+        @JsonProperty("dependencies")
+        public Map<String, Object> dependencies;
+
+        @JsonProperty("devDependencies")
+        public Map<String, Object> devDependencies;
         @JsonProperty("dependencySettings")
         public DependencySettingsConfig dependencySettings;
         

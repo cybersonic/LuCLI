@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -133,6 +134,65 @@ public class CatalinaBaseConfigGeneratorTest {
     }
 
     @Test
+    void generateConfiguration_whenAdminDisabled_doesNotAddAdminServletMappingAndAddsDenyConstraint() throws IOException {
+        // Use a minimal CATALINA_HOME web.xml without pre-existing Lucee servlets
+        Path minimalHome = tempDir.resolve("minimal-home-admin-disabled");
+        Files.createDirectories(minimalHome.resolve("conf"));
+        Files.writeString(minimalHome.resolve("conf/server.xml"), MINIMAL_SERVER_XML);
+        Files.writeString(minimalHome.resolve("conf/web.xml"), MINIMAL_WEB_XML);
+
+        Path base = tempDir.resolve("minimal-base-admin-disabled");
+        Files.createDirectories(base);
+
+        LuceeServerConfig.ServerConfig config = createTestConfig();
+        config.admin.enabled = false;
+
+        generator.generateConfiguration(base, config, projectDir, minimalHome, 0, false);
+
+        String webXml = Files.readString(base.resolve("conf/web.xml"), StandardCharsets.UTF_8);
+        String compactXml = webXml.replaceAll("\\s+", "");
+
+        assertFalse(compactXml.contains(
+                "<servlet-mapping><servlet-name>CFMLServlet</servlet-name><url-pattern>/lucee/admin.cfm</url-pattern></servlet-mapping>"),
+                "Generated web.xml should not include CFML admin servlet mapping when admin.enabled=false");
+        assertTrue(compactXml.contains("<url-pattern>/lucee/admin.cfm</url-pattern>"),
+                "Generated web.xml should include a deny-list pattern for /lucee/admin.cfm");
+        assertTrue(compactXml.contains("<auth-constraint"),
+                "Generated web.xml should include auth-constraint to deny admin endpoint access");
+    }
+
+    @Test
+    void generateConfiguration_whenAdminDisabled_removesExistingAdminServletMappings() throws IOException {
+        // Use a CATALINA_HOME web.xml that already has explicit admin mappings
+        Path adminMappedHome = tempDir.resolve("home-existing-admin-mapping");
+        Files.createDirectories(adminMappedHome.resolve("conf"));
+        Files.writeString(adminMappedHome.resolve("conf/server.xml"), MINIMAL_SERVER_XML);
+        Files.writeString(adminMappedHome.resolve("conf/web.xml"), WEB_XML_WITH_EXPLICIT_ADMIN_MAPPING);
+
+        Path base = tempDir.resolve("base-existing-admin-mapping");
+        Files.createDirectories(base);
+
+        LuceeServerConfig.ServerConfig config = createTestConfig();
+        config.admin.enabled = false;
+
+        generator.generateConfiguration(base, config, projectDir, adminMappedHome, 0, false);
+
+        String webXml = Files.readString(base.resolve("conf/web.xml"), StandardCharsets.UTF_8);
+        String compactXml = webXml.replaceAll("\\s+", "");
+
+        assertFalse(compactXml.contains(
+                "<servlet-mapping><servlet-name>CFMLServlet</servlet-name><url-pattern>/lucee/admin.cfm</url-pattern></servlet-mapping>"),
+                "Existing CFML admin servlet mapping should be removed when admin.enabled=false");
+        assertFalse(compactXml.contains(
+                "<servlet-mapping><servlet-name>CFMLServlet</servlet-name><url-pattern>/lucee/admin/*</url-pattern></servlet-mapping>"),
+                "Existing wildcard admin servlet mapping should be removed when admin.enabled=false");
+        assertTrue(compactXml.contains("<url-pattern>/lucee/admin.cfm</url-pattern>"),
+                "Generated web.xml should include a deny-list pattern for /lucee/admin.cfm");
+        assertTrue(compactXml.contains("<auth-constraint"),
+                "Generated web.xml should include auth-constraint to deny admin endpoint access");
+    }
+
+    @Test
     void generateConfiguration_migratesLegacyProjectWebXmlAdminMappings() throws IOException {
         Path webInf = projectDir.resolve("WEB-INF");
         Files.createDirectories(webInf);
@@ -236,6 +296,45 @@ public class CatalinaBaseConfigGeneratorTest {
                 "setenv.sh should not set LUCEE_ADMIN_ENABLED when admin.enabled=true");
         assertFalse(setenvBatContent.contains("LUCEE_ADMIN_ENABLED"),
                 "setenv.bat should not set LUCEE_ADMIN_ENABLED when admin.enabled=true");
+    }
+
+    @Test
+    void generateConfiguration_defaultRewriteRulesBypassStaticAssetsAndKeepFrameworkRouting() throws IOException {
+        LuceeServerConfig.ServerConfig config = createTestConfig();
+        config.urlRewrite.enabled = true;
+
+        generator.generateConfiguration(catalinaBase, config, projectDir, catalinaHome, 0, false);
+        String serverXml = Files.readString(catalinaBase.resolve("conf/server.xml"), StandardCharsets.UTF_8);
+        assertTrue(serverXml.contains("org.apache.catalina.valves.rewrite.RewriteValve"),
+                "server.xml should include Tomcat RewriteValve when URL rewrite is enabled");
+
+        Path rewriteConfig = catalinaBase.resolve("conf/Catalina/localhost/rewrite.config");
+        assertTrue(Files.exists(rewriteConfig),
+                "rewrite.config should be generated when URL rewrite is enabled");
+
+        String rewriteRules = Files.readString(rewriteConfig, StandardCharsets.UTF_8);
+        assertTrue(rewriteRules.contains("LuCLI URL Rewrite Rules"),
+                "When no project rewrite.config exists, the default LuCLI rewrite template should be generated");
+
+        assertEquals("-", firstMatchingRewriteRuleTarget(rewriteRules, "/assets/styles.css"),
+                "Static CSS assets should bypass router rewriting");
+        assertEquals("-", firstMatchingRewriteRuleTarget(rewriteRules, "/images/HERO.WEBP"),
+                "Common static image extensions should bypass router rewriting");
+        assertEquals("-", firstMatchingRewriteRuleTarget(rewriteRules, "/js/app.MJS"),
+                "Modern JS module assets should bypass router rewriting");
+        assertEquals("-", firstMatchingRewriteRuleTarget(rewriteRules, "/fonts/icon.WOFF2"),
+                "Font assets should bypass router rewriting");
+        assertEquals("-", firstMatchingRewriteRuleTarget(rewriteRules, "/assets"),
+                "Static directories should bypass router rewriting even without a file extension");
+        assertEquals("-", firstMatchingRewriteRuleTarget(rewriteRules, "/public"),
+                "Common static root directories should bypass router rewriting");
+        assertEquals("-", firstMatchingRewriteRuleTarget(rewriteRules, "/favicon.ico"),
+                "Root-level static assets should bypass router rewriting");
+
+        assertEquals("/index.cfm/$1", firstMatchingRewriteRuleTarget(rewriteRules, "/hello"),
+                "Non-static app URLs should still be routed through the framework router");
+        assertEquals("/index.cfm/$1", firstMatchingRewriteRuleTarget(rewriteRules, "/products/laptop"),
+                "Multi-segment app URLs should still be routed through the framework router");
     }
 
     // ── generateConfiguration: Tomcat version handling ───────────────────
@@ -400,6 +499,27 @@ public class CatalinaBaseConfigGeneratorTest {
 
     // ── Helper methods ──────────────────────────────────────────────────
 
+    private String firstMatchingRewriteRuleTarget(String rewriteRules, String requestPath) {
+        for (String rawLine : rewriteRules.split("\\R")) {
+            String line = rawLine.trim();
+            if (!line.startsWith("RewriteRule ")) {
+                continue;
+            }
+
+            String[] parts = line.split("\\s+", 4);
+            if (parts.length < 4) {
+                continue;
+            }
+
+            int patternFlags = parts[3].contains("NC") ? Pattern.CASE_INSENSITIVE : 0;
+            Pattern pattern = Pattern.compile(parts[1], patternFlags);
+            if (pattern.matcher(requestPath).matches()) {
+                return parts[2];
+            }
+        }
+        return null;
+    }
+
     private LuceeServerConfig.ServerConfig createTestConfig() {
         LuceeServerConfig.ServerConfig config = new LuceeServerConfig.ServerConfig();
         config.name = "test-server";
@@ -459,6 +579,37 @@ public class CatalinaBaseConfigGeneratorTest {
               <servlet-mapping>
                 <servlet-name>default</servlet-name>
                 <url-pattern>/</url-pattern>
+              </servlet-mapping>
+            </web-app>
+            """;
+
+    private static final String WEB_XML_WITH_EXPLICIT_ADMIN_MAPPING = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <web-app xmlns="http://xmlns.jcp.org/xml/ns/javaee"
+                     version="4.0">
+              <servlet>
+                <servlet-name>default</servlet-name>
+                <servlet-class>org.apache.catalina.servlets.DefaultServlet</servlet-class>
+              </servlet>
+              <servlet>
+                <servlet-name>CFMLServlet</servlet-name>
+                <servlet-class>lucee.loader.servlet.CFMLServlet</servlet-class>
+              </servlet>
+              <servlet-mapping>
+                <servlet-name>default</servlet-name>
+                <url-pattern>/</url-pattern>
+              </servlet-mapping>
+              <servlet-mapping>
+                <servlet-name>CFMLServlet</servlet-name>
+                <url-pattern>*.cfm</url-pattern>
+              </servlet-mapping>
+              <servlet-mapping>
+                <servlet-name>CFMLServlet</servlet-name>
+                <url-pattern>/lucee/admin.cfm</url-pattern>
+              </servlet-mapping>
+              <servlet-mapping>
+                <servlet-name>CFMLServlet</servlet-name>
+                <url-pattern>/lucee/admin/*</url-pattern>
               </servlet-mapping>
             </web-app>
             """;

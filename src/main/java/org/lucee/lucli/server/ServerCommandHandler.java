@@ -34,6 +34,46 @@ public class ServerCommandHandler {
         this.currentWorkingDirectory = currentWorkingDirectory != null ? 
             currentWorkingDirectory : Paths.get(System.getProperty("user.dir"));
     }
+
+    private static class DryRunIncludeSelection {
+        boolean explicitSelection = false;
+        boolean includeConfig = true;
+        boolean includeEnv = false;
+        boolean includeLuceeConfig = false;
+        boolean includeTomcatWeb = false;
+        boolean includeTomcatServer = false;
+        boolean includeHttpsKeystorePlan = false;
+        boolean includeHttpsRedirectRules = false;
+
+        void markExplicitSelection() {
+            if (!explicitSelection) {
+                explicitSelection = true;
+                includeConfig = false;
+            }
+        }
+
+        void includeAllStartSections() {
+            markExplicitSelection();
+            includeConfig = true;
+            includeEnv = true;
+            includeLuceeConfig = true;
+            includeTomcatWeb = true;
+            includeTomcatServer = true;
+            includeHttpsKeystorePlan = true;
+            includeHttpsRedirectRules = true;
+        }
+
+        void includeAllRunSections() {
+            markExplicitSelection();
+            includeConfig = true;
+            includeEnv = true;
+        }
+
+        boolean includesAnyStartPreviewSection() {
+            return includeLuceeConfig || includeTomcatWeb || includeTomcatServer
+                    || includeHttpsKeystorePlan || includeHttpsRedirectRules;
+        }
+    }
     
     /**
      * Execute a command and return the result as a string (for terminal mode)
@@ -121,12 +161,7 @@ public class ServerCommandHandler {
         String webrootOverride = null;
         boolean dryRun = false;
         boolean prewarm = false;
-        boolean includeEnv = false;
-        boolean includeLuceeConfig = false;
-        boolean includeTomcatWeb = false;
-        boolean includeTomcatServer = false;
-        boolean includeHttpsKeystorePlan = false;
-        boolean includeHttpsRedirectRules = false;
+        DryRunIncludeSelection includeSelection = new DryRunIncludeSelection();
         Boolean enableLuceeOverride = null;
         Boolean enableWarmupOverride = null;
         boolean sandbox = false;
@@ -182,17 +217,36 @@ public class ServerCommandHandler {
             } else if (args[i].equals("--prewarm")) {
                 prewarm = true;
             } else if (args[i].equals("--include-env")) {
-                includeEnv = true;
+                includeSelection.markExplicitSelection();
+                includeSelection.includeEnv = true;
             } else if (args[i].equals("--include-tomcat-web")) {
-                includeTomcatWeb = true;
+                includeSelection.markExplicitSelection();
+                includeSelection.includeTomcatWeb = true;
             } else if (args[i].equals("--include-lucee")) {
-                includeLuceeConfig = true;
+                includeSelection.markExplicitSelection();
+                includeSelection.includeLuceeConfig = true;
             } else if (args[i].equals("--include-tomcat-server")) {
-                includeTomcatServer = true;
+                includeSelection.markExplicitSelection();
+                includeSelection.includeTomcatServer = true;
             } else if (args[i].equals("--include-https-keystore-plan")) {
-                includeHttpsKeystorePlan = true;
+                includeSelection.markExplicitSelection();
+                includeSelection.includeHttpsKeystorePlan = true;
             } else if (args[i].equals("--include-https-redirect-rules")) {
-                includeHttpsRedirectRules = true;
+                includeSelection.markExplicitSelection();
+                includeSelection.includeHttpsRedirectRules = true;
+            } else if (args[i].equals("--include") && i + 1 < args.length) {
+                try {
+                    parseStartDryRunIncludeValue(args[i + 1], includeSelection);
+                } catch (IllegalArgumentException e) {
+                    return formatOutput("❌ " + e.getMessage(), true);
+                }
+                i++; // Skip next argument
+            } else if (args[i].startsWith("--include=")) {
+                try {
+                    parseStartDryRunIncludeValue(args[i].substring("--include=".length()), includeSelection);
+                } catch (IllegalArgumentException e) {
+                    return formatOutput("❌ " + e.getMessage(), true);
+                }
             } else if (args[i].equals("--create-config")) {
                 createConfig = true;
             } else if (args[i].equals("--source") && i + 1 < args.length) {
@@ -206,13 +260,7 @@ public class ServerCommandHandler {
             } else if (args[i].startsWith("--dest=")) {
                 destDirOverride = Paths.get(args[i].substring("--dest=".length()));
             } else if (args[i].equals("--include-all")) {
-                // Convenience flag for debugging: show all available dry-run previews.
-                includeEnv = true;
-                includeTomcatWeb = true;
-                includeTomcatServer = true;
-                includeHttpsKeystorePlan = true;
-                includeHttpsRedirectRules = true;
-                includeLuceeConfig=true;
+                includeSelection.includeAllStartSections();
             } else if (args[i].equals("--disable-lucee")) {
                 enableLuceeOverride = Boolean.FALSE;
             } else if (args[i].equals("--enable-lucee")) {
@@ -259,13 +307,10 @@ public class ServerCommandHandler {
 
         environment = resolveEnvironment(environment);
         // If sandbox mode is requested, disallow dry-run/preview flags which rely on lucee.json
-        if (sandbox && (dryRun || prewarm || includeLuceeConfig || includeTomcatWeb || includeTomcatServer
-                || includeHttpsKeystorePlan || includeHttpsRedirectRules || createConfig)) {
+        if (sandbox && (dryRun || prewarm || includeSelection.explicitSelection || createConfig)) {
             return formatOutput("❌ --sandbox cannot be combined with --dry-run, --prewarm, --create-config or preview flags (--include-*, --include-all).", true);
         }
-
-        if (prewarm && (dryRun || createConfig || includeLuceeConfig || includeTomcatWeb || includeTomcatServer
-                || includeHttpsKeystorePlan || includeHttpsRedirectRules || includeEnv)) {
+        if (prewarm && (dryRun || createConfig || includeSelection.explicitSelection)) {
             return formatOutput("❌ --prewarm cannot be combined with --dry-run, --create-config or preview flags (--include-*, --include-all).", true);
         }
 
@@ -286,7 +331,7 @@ public class ServerCommandHandler {
         // Apply environment overrides if --env flag was provided
         if (environment != null && !environment.trim().isEmpty()) {
             try {
-                finalConfig = LuceeServerConfig.applyEnvironment(finalConfig, environment, projectDir);
+                finalConfig = LuceeServerConfig.applyEnvironment(finalConfig, environment, projectDir, cfgFile);
             } catch (IllegalArgumentException e) {
                 return formatOutput("❌ " + e.getMessage(), true);
             }
@@ -360,23 +405,12 @@ public class ServerCommandHandler {
         if (dryRun) {
             StringBuilder result = new StringBuilder();
             result.append("📋 DRY RUN: Server configuration that would be used:\n\n");
-            result.append("Realized lucee.json for: ").append(projectDir);
-            if (environment != null && !environment.trim().isEmpty()) {
-                result.append(" (with environment: ").append(environment).append(")");
+            if (includeSelection.includeConfig) {
+                appendRealizedConfigPreview(result, projectDir, environment, finalConfig);
             }
-            result.append("\n═══════════════════════════════════════════\n");
-            try {
-                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                mapper.enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT);
-                String jsonString = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(finalConfig);
-                result.append(jsonString).append("\n");
-            } catch (Exception e) {
-                result.append("Error serializing config: ").append(e.getMessage());
-            }
-            result.append("═══════════════════════════════════════════\n");
             
             // Display Tomcat configuration files if requested
-            if (includeTomcatWeb || includeTomcatServer || includeHttpsKeystorePlan || includeHttpsRedirectRules || includeLuceeConfig) {
+            if (includeSelection.includesAnyStartPreviewSection()) {
                 result.append("\nGenerated Server Preview:\n");
                 result.append("═══════════════════════════════════════════\n");
 
@@ -386,7 +420,7 @@ public class ServerCommandHandler {
                     org.lucee.lucli.server.runtime.CatalinaBaseConfigGenerator tomcatGen = new org.lucee.lucli.server.runtime.CatalinaBaseConfigGenerator();
                     Path serverInstanceDir = serverManager.getServersDir().resolve(finalConfig.name);
 
-                    if(includeLuceeConfig) {
+                    if(includeSelection.includeLuceeConfig) {
                         result.append("\n📄 .CFConfig.json (effective, including existing file if present):\n");
                         result.append("────────────────────────────────────────────\n");
                         try {
@@ -418,7 +452,7 @@ public class ServerCommandHandler {
                         result.append("─────────────────────────────────────────\n");
                     }
 
-                    if (includeTomcatServer) {
+                    if (includeSelection.includeTomcatServer) {
                         result.append("\n📄 server.xml (patched, from lucee.json):\n");
                         result.append("─────────────────────────────────────────\n");
                         try {
@@ -430,7 +464,7 @@ public class ServerCommandHandler {
                         result.append("─────────────────────────────────────────\n");
                     }
 
-                    if (includeTomcatWeb) {
+                    if (includeSelection.includeTomcatWeb) {
                         result.append("\n📄 web.xml (project view, with LuCLI patching):\n");
                         result.append("─────────────────────────────────────────\n");
                         try {
@@ -442,11 +476,10 @@ public class ServerCommandHandler {
                         result.append("─────────────────────────────────────────\n");
                     }
 
-                    if (includeHttpsKeystorePlan) {
+                    if (includeSelection.includeHttpsKeystorePlan) {
                         appendHttpsKeystorePlan(result, finalConfig, serverInstanceDir);
                     }
-
-                    if (includeHttpsRedirectRules) {
+                    if (includeSelection.includeHttpsRedirectRules) {
                         String vendorServerXml = null;
                         try {
                             vendorServerXml = tomcatGen.generateServerXmlContent(finalConfig, serverInstanceDir, luceeExpressDir);
@@ -462,7 +495,7 @@ public class ServerCommandHandler {
                 }
             }
             
-            if (includeEnv) {
+            if (includeSelection.includeEnv) {
                 appendEnvPreview(result, finalConfig, projectDir, serverManager, agentOverrides);
             }
             
@@ -670,7 +703,7 @@ public class ServerCommandHandler {
         boolean sandbox = false;
         boolean dryRun = false;
         boolean prewarm = false;
-        boolean includeEnv = false;
+        DryRunIncludeSelection includeSelection = new DryRunIncludeSelection();
         Integer portOverride = null;
         Boolean enableLuceeOverride = null;
         Boolean enableWarmupOverride = null;
@@ -717,7 +750,22 @@ public class ServerCommandHandler {
             } else if ("--prewarm".equals(arg)) {
                 prewarm = true;
             } else if ("--include-env".equals(arg)) {
-                includeEnv = true;
+                includeSelection.markExplicitSelection();
+                includeSelection.includeEnv = true;
+            } else if ("--include".equals(arg) && i + 1 < args.length) {
+                try {
+                    parseRunDryRunIncludeValue(args[++i], includeSelection);
+                } catch (IllegalArgumentException e) {
+                    return formatOutput("❌ " + e.getMessage(), true);
+                }
+            } else if (arg.startsWith("--include=")) {
+                try {
+                    parseRunDryRunIncludeValue(arg.substring("--include=".length()), includeSelection);
+                } catch (IllegalArgumentException e) {
+                    return formatOutput("❌ " + e.getMessage(), true);
+                }
+            } else if ("--include-all".equals(arg)) {
+                includeSelection.includeAllRunSections();
             } else if ("--sandbox".equals(arg)) {
                 sandbox = true;
             } else if ("--disable-lucee".equals(arg)) {
@@ -762,12 +810,12 @@ public class ServerCommandHandler {
         environment = resolveEnvironment(environment);
         
         // Disallow --dry-run/--prewarm with --sandbox
-        if (sandbox && (dryRun || prewarm)) {
-            return formatOutput("❌ --sandbox cannot be combined with --dry-run or --prewarm.", true);
+        if (sandbox && (dryRun || prewarm || includeSelection.explicitSelection)) {
+            return formatOutput("❌ --sandbox cannot be combined with --dry-run, --prewarm or preview flags (--include-env, --include).", true);
         }
 
-        if (prewarm && (dryRun || includeEnv)) {
-            return formatOutput("❌ --prewarm cannot be combined with --dry-run or --include-env.", true);
+        if (prewarm && (dryRun || includeSelection.explicitSelection)) {
+            return formatOutput("❌ --prewarm cannot be combined with --dry-run or preview flags (--include-env, --include).", true);
         }
         
         LuceeServerManager.StartConfigOverrides startConfigOverrides =
@@ -779,7 +827,7 @@ public class ServerCommandHandler {
 
             if (environment != null && !environment.trim().isEmpty()) {
                 try {
-                    finalConfig = LuceeServerConfig.applyEnvironment(finalConfig, environment, projectDir);
+                    finalConfig = LuceeServerConfig.applyEnvironment(finalConfig, environment, projectDir, cfgFile);
                 } catch (IllegalArgumentException e) {
                     return formatOutput("❌ " + e.getMessage(), true);
                 }
@@ -809,7 +857,7 @@ public class ServerCommandHandler {
             
             if (environment != null && !environment.trim().isEmpty()) {
                 try {
-                    finalConfig = LuceeServerConfig.applyEnvironment(finalConfig, environment, projectDir);
+                    finalConfig = LuceeServerConfig.applyEnvironment(finalConfig, environment, projectDir, cfgFile);
                 } catch (IllegalArgumentException e) {
                     return formatOutput("❌ " + e.getMessage(), true);
                 }
@@ -818,22 +866,11 @@ public class ServerCommandHandler {
             
             StringBuilder result = new StringBuilder();
             result.append("📋 DRY RUN: Server configuration that would be used:\n\n");
-            result.append("Realized lucee.json for: ").append(projectDir);
-            if (environment != null && !environment.trim().isEmpty()) {
-                result.append(" (with environment: ").append(environment).append(")");
+            if (includeSelection.includeConfig) {
+                appendRealizedConfigPreview(result, projectDir, environment, finalConfig);
             }
-            result.append("\n═══════════════════════════════════════════\n");
-            try {
-                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                mapper.enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT);
-                String jsonString = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(finalConfig);
-                result.append(jsonString).append("\n");
-            } catch (Exception e) {
-                result.append("Error serializing config: ").append(e.getMessage());
-            }
-            result.append("═══════════════════════════════════════════\n");
             
-            if (includeEnv) {
+            if (includeSelection.includeEnv) {
                 appendEnvPreview(result, finalConfig, projectDir, serverManager, agentOverrides);
             }
             
@@ -911,6 +948,115 @@ public class ServerCommandHandler {
         overrides.enableWarmupOverride = enableWarmupOverride;
         return overrides.isEmpty() ? null : overrides;
     }
+    private void parseStartDryRunIncludeValue(String includeValue, DryRunIncludeSelection includeSelection) {
+        if (includeValue == null || includeValue.trim().isEmpty()) {
+            throw new IllegalArgumentException("--include requires at least one section (config,env,lucee,tomcat-web,tomcat-server,https-keystore-plan,https-redirect-rules,all).");
+        }
+
+        boolean parsedAny = false;
+        for (String rawToken : includeValue.split(",")) {
+            String token = rawToken.trim().toLowerCase(java.util.Locale.ROOT);
+            if (token.isEmpty()) {
+                continue;
+            }
+            parsedAny = true;
+
+            switch (token) {
+                case "all":
+                    includeSelection.includeAllStartSections();
+                    break;
+                case "config":
+                    includeSelection.markExplicitSelection();
+                    includeSelection.includeConfig = true;
+                    break;
+                case "env":
+                    includeSelection.markExplicitSelection();
+                    includeSelection.includeEnv = true;
+                    break;
+                case "lucee":
+                    includeSelection.markExplicitSelection();
+                    includeSelection.includeLuceeConfig = true;
+                    break;
+                case "tomcat-web":
+                    includeSelection.markExplicitSelection();
+                    includeSelection.includeTomcatWeb = true;
+                    break;
+                case "tomcat-server":
+                    includeSelection.markExplicitSelection();
+                    includeSelection.includeTomcatServer = true;
+                    break;
+                case "https-keystore-plan":
+                    includeSelection.markExplicitSelection();
+                    includeSelection.includeHttpsKeystorePlan = true;
+                    break;
+                case "https-redirect-rules":
+                    includeSelection.markExplicitSelection();
+                    includeSelection.includeHttpsRedirectRules = true;
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unknown --include section '" + token + "'. Valid values: config,env,lucee,tomcat-web,tomcat-server,https-keystore-plan,https-redirect-rules,all.");
+            }
+        }
+
+        if (!parsedAny) {
+            throw new IllegalArgumentException("--include requires at least one section (config,env,lucee,tomcat-web,tomcat-server,https-keystore-plan,https-redirect-rules,all).");
+        }
+    }
+
+    private void parseRunDryRunIncludeValue(String includeValue, DryRunIncludeSelection includeSelection) {
+        if (includeValue == null || includeValue.trim().isEmpty()) {
+            throw new IllegalArgumentException("--include requires at least one section (config,env,all).");
+        }
+
+        boolean parsedAny = false;
+        for (String rawToken : includeValue.split(",")) {
+            String token = rawToken.trim().toLowerCase(java.util.Locale.ROOT);
+            if (token.isEmpty()) {
+                continue;
+            }
+            parsedAny = true;
+
+            switch (token) {
+                case "all":
+                    includeSelection.includeAllRunSections();
+                    break;
+                case "config":
+                    includeSelection.markExplicitSelection();
+                    includeSelection.includeConfig = true;
+                    break;
+                case "env":
+                    includeSelection.markExplicitSelection();
+                    includeSelection.includeEnv = true;
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unknown --include section '" + token + "' for server run. Valid values: config,env,all.");
+            }
+        }
+
+        if (!parsedAny) {
+            throw new IllegalArgumentException("--include requires at least one section (config,env,all).");
+        }
+    }
+
+    private void appendRealizedConfigPreview(StringBuilder result,
+                                             Path projectDir,
+                                             String environment,
+                                             LuceeServerConfig.ServerConfig finalConfig) {
+        result.append("Realized lucee.json for: ").append(projectDir);
+        if (environment != null && !environment.trim().isEmpty()) {
+            result.append(" (with environment: ").append(environment).append(")");
+        }
+        result.append("\n═══════════════════════════════════════════\n");
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            mapper.enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT);
+            String jsonString = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(finalConfig);
+            result.append(jsonString).append("\n");
+        } catch (Exception e) {
+            result.append("Error serializing config: ").append(e.getMessage()).append("\n");
+        }
+        result.append("═══════════════════════════════════════════\n");
+    }
 
     private String prewarmRuntimeArtifacts(LuceeServerManager serverManager,
                                            Path projectDir,
@@ -959,6 +1105,21 @@ public class ServerCommandHandler {
                                   Path projectDir,
                                   LuceeServerManager serverManager,
                                   LuceeServerManager.AgentOverrides agentOverrides) {
+        result.append("\n🧩 Realized environment variables used to resolve lucee.json placeholders:\n");
+        result.append("─────────────────────────────────────────\n");
+        java.util.Map<String, String> realizedEnvVars = LuceeServerConfig.getRealizedEnvVariables();
+        if (realizedEnvVars.isEmpty()) {
+            result.append("No #env placeholders were resolved in lucee.json.\n");
+        } else {
+            try {
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                mapper.enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT);
+                result.append(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(realizedEnvVars)).append("\n");
+            } catch (Exception e) {
+                result.append("Error serializing realized env variables: ").append(e.getMessage()).append("\n");
+            }
+        }
+        result.append("─────────────────────────────────────────\n");
         result.append("\n🌐 Environment variables that would be passed to the runtime:\n");
         result.append("─────────────────────────────────────────\n");
 
@@ -994,10 +1155,8 @@ public class ServerCommandHandler {
             // ignore — not critical for preview
         }
 
-        // 3) User-defined envVars from lucee.json
-        if (config.envVars != null && !config.envVars.isEmpty()) {
-            envPreview.putAll(config.envVars);
-        }
+        // 3) User-defined envVars from lucee.json (null unsets keys)
+        LuceeServerConfig.applyConfigEnvVarsToProcessEnvironment(envPreview, config.envVars);
         TomcatConfigSupport.applyAdminSecurityEnvironment(envPreview, config);
 
         try {
@@ -1375,7 +1534,7 @@ public class ServerCommandHandler {
         // Apply environment overrides if specified
         if (environment != null && !environment.trim().isEmpty()) {
             try {
-                config = LuceeServerConfig.applyEnvironment(config, environment.trim(), projectDir);
+                config = LuceeServerConfig.applyEnvironment(config, environment.trim(), projectDir, cfgFile);
             } catch (IllegalArgumentException e) {
                 return formatOutput("❌ " + e.getMessage(), true);
             }
@@ -1524,7 +1683,7 @@ public class ServerCommandHandler {
         // Apply environment overrides if specified (for envVars overrides).
         if (environment != null && !environment.trim().isEmpty()) {
             try {
-                config = LuceeServerConfig.applyEnvironment(config, environment.trim(), projectDir);
+                config = LuceeServerConfig.applyEnvironment(config, environment.trim(), projectDir, cfgFile);
             } catch (IllegalArgumentException e) {
                 return formatOutput("❌ " + e.getMessage(), true);
             }
@@ -1537,9 +1696,7 @@ public class ServerCommandHandler {
         // 2) Build effective environment map (System + envFile + envVars)
         java.util.Map<String, String> effectiveEnv = new java.util.HashMap<>(System.getenv());
         LuceeServerConfig.applyLoadedEnvToProcessEnvironment(effectiveEnv);
-        if (config.envVars != null && !config.envVars.isEmpty()) {
-            effectiveEnv.putAll(config.envVars);
-        }
+        LuceeServerConfig.applyConfigEnvVarsToProcessEnvironment(effectiveEnv, config.envVars);
 
         // For non-global view, restrict to keys coming from envFile and/or envVars.
         java.util.Map<String, String> toDisplay;
@@ -1555,7 +1712,9 @@ public class ServerCommandHandler {
             }
             java.util.Map<String, String> scoped = new java.util.LinkedHashMap<>();
             for (String key : keys) {
-                scoped.put(key, effectiveEnv.get(key));
+                if (effectiveEnv.containsKey(key)) {
+                    scoped.put(key, effectiveEnv.get(key));
+                }
             }
             toDisplay = scoped;
             scopeLabel = "envFile + envVars (project-scoped)";
@@ -1852,7 +2011,7 @@ public class ServerCommandHandler {
             // Load effective config for this env
             LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(currentWorkingDirectory, cfgFile);
             if (environment != null && !environment.trim().isEmpty()) {
-                config = LuceeServerConfig.applyEnvironment(config, environment.trim(), currentWorkingDirectory);
+                config = LuceeServerConfig.applyEnvironment(config, environment.trim(), currentWorkingDirectory, cfgFile);
             }
 
             // For server lock, resolve secrets so the locked snapshot does not
@@ -2019,7 +2178,7 @@ public class ServerCommandHandler {
             // Apply environment overrides if specified
             if (environment != null && !environment.trim().isEmpty()) {
                 try {
-                    config = LuceeServerConfig.applyEnvironment(config, environment.trim(), projectDir);
+                    config = LuceeServerConfig.applyEnvironment(config, environment.trim(), projectDir, cfgFile);
                 } catch (IllegalArgumentException e) {
                     return formatOutput("❌ " + e.getMessage(), true);
                 }

@@ -440,6 +440,11 @@
         "id": {
           "type": "string",
           "description": "Extension ID for Lucee .lex extension dependencies."
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "When false, this dependency is ignored by install and runtime extension activation flows.",
+          "default": true
         }
       }
     },

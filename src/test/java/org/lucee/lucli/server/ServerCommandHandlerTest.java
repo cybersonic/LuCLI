@@ -55,6 +55,74 @@ class ServerCommandHandlerTest {
                 "Dry-run output should include overridden runtime port");
         assertTrue(after.has("dependencies"), "Dependencies block must remain intact");
     }
+    @Test
+    void serverStartDryRun_missingEnvironmentFallsBackToBaseConfig() throws Exception {
+        Path configFile = tempDir.resolve("lucee.json");
+        Files.writeString(configFile, """
+            {
+              "name": "missing-env-fallback-test",
+              "port": 8080,
+              "environments": {
+                "prod": {
+                  "port": 80
+                }
+              }
+            }
+            """);
+
+        ServerCommandHandler handler = new ServerCommandHandler(true, tempDir);
+        String output = handler.executeCommand("server", new String[] {
+                "start", "--dry-run", "--env", "nonexistent"
+        });
+
+        assertNotNull(output);
+        assertTrue(output.contains("DRY RUN: Server configuration that would be used"),
+                "Missing --env should not fail; command should still produce dry-run output");
+        assertFalse(output.contains("not found in lucee.json"),
+                "Missing --env should not surface as an error message in command output");
+    }
+
+    @Test
+    void serverRunDryRun_includeEnv_doesNotIncludeRealizedConfigSection() throws Exception {
+        Path configFile = tempDir.resolve("lucee.json");
+        Files.writeString(configFile, """
+            {
+              "name": "include-env-run-test",
+              "port": 8080
+            }
+            """);
+
+        ServerCommandHandler handler = new ServerCommandHandler(true, tempDir);
+        String output = handler.executeCommand("server", new String[] {
+                "run", "--dry-run", "--include", "env"
+        });
+
+        assertNotNull(output);
+        assertTrue(output.contains("Realized environment variables used to resolve lucee.json placeholders"),
+                "Run --dry-run --include env should include env preview");
+        assertFalse(output.contains("Realized lucee.json for:"),
+                "Run --dry-run --include env should not include realized lucee.json by default");
+    }
+
+    @Test
+    void serverRunDryRun_includeUnknownSection_returnsHelpfulError() throws Exception {
+        Path configFile = tempDir.resolve("lucee.json");
+        Files.writeString(configFile, """
+            {
+              "name": "include-invalid-run-test",
+              "port": 8080
+            }
+            """);
+
+        ServerCommandHandler handler = new ServerCommandHandler(true, tempDir);
+        String output = handler.executeCommand("server", new String[] {
+                "run", "--dry-run", "--include", "env,lucee"
+        });
+
+        assertNotNull(output);
+        assertTrue(output.contains("Unknown --include section 'lucee' for server run"),
+                "Run include parser should report invalid include sections with valid options");
+    }
 
     @Test
     void serverStartDryRun_warmupFlagAddsWarmupEnvVarAndJvmProperty() throws Exception {
@@ -110,6 +178,79 @@ class ServerCommandHandlerTest {
                 || output.contains("\"LUCEE_ADMIN_ENABLED\": \"false\"")
                 || output.contains("\"LUCEE_ADMIN_ENABLED\":\"false\""),
                 "Dry-run --include-env output should include LUCEE_ADMIN_ENABLED=false when admin.enabled=false");
+        assertFalse(output.contains("Realized lucee.json for:"),
+                "Dry-run --include-env should not implicitly include realized lucee.json");
+    }
+
+    @Test
+    void serverStartDryRun_includeEnv_showsRealizedEnvVariablesUsedForSubstitution() throws Exception {
+        Path envFile = tempDir.resolve(".env");
+        Files.writeString(envFile, """
+            PREVIEW_SERVER_NAME=resolved-env-server
+            PREVIEW_MODE=preview-dot-env
+            """);
+
+        Path configFile = tempDir.resolve("lucee.json");
+        Files.writeString(configFile, """
+            {
+              "name": "#env:PREVIEW_SERVER_NAME#",
+              "port": 8080,
+              "envVars": {
+                "APP_MODE": "#env:PREVIEW_MODE:-dev#",
+                "FALLBACK_MODE": "#env:MISSING_PREVIEW_MODE:-fallback-value#"
+              }
+            }
+            """);
+
+        ServerCommandHandler handler = new ServerCommandHandler(true, tempDir);
+        String output = handler.executeCommand("server", new String[] {
+                "start", "--dry-run", "--include-env"
+        });
+
+        assertNotNull(output);
+        assertTrue(output.contains("Realized environment variables used to resolve lucee.json placeholders"),
+                "Dry-run --include-env output should include realized substitution variables section");
+        assertTrue(output.contains("\"PREVIEW_SERVER_NAME\" : \"resolved-env-server\"")
+                || output.contains("\"PREVIEW_SERVER_NAME\": \"resolved-env-server\"")
+                || output.contains("\"PREVIEW_SERVER_NAME\":\"resolved-env-server\""),
+                "Dry-run --include-env output should include PREVIEW_SERVER_NAME from .env");
+        assertTrue(output.contains("\"PREVIEW_MODE\" : \"preview-dot-env\"")
+                || output.contains("\"PREVIEW_MODE\": \"preview-dot-env\"")
+                || output.contains("\"PREVIEW_MODE\":\"preview-dot-env\""),
+                "Dry-run --include-env output should include PREVIEW_MODE from .env");
+        assertTrue(output.contains("\"MISSING_PREVIEW_MODE\" : \"fallback-value\"")
+                || output.contains("\"MISSING_PREVIEW_MODE\": \"fallback-value\"")
+                || output.contains("\"MISSING_PREVIEW_MODE\":\"fallback-value\""),
+                "Dry-run --include-env output should include fallback value for missing env var");
+        assertFalse(output.contains("Realized lucee.json for:"),
+                "Dry-run --include-env should not implicitly include realized lucee.json");
+    }
+
+    @Test
+    void serverStartDryRun_includeEnvAndLucee_showsOnlyRequestedSections() throws Exception {
+        Path configFile = tempDir.resolve("lucee.json");
+        Files.writeString(configFile, """
+            {
+              "name": "include-sections-start-test",
+              "port": 8080,
+              "admin": {
+                "enabled": false
+              }
+            }
+            """);
+
+        ServerCommandHandler handler = new ServerCommandHandler(true, tempDir);
+        String output = handler.executeCommand("server", new String[] {
+                "start", "--dry-run", "--include", "env,lucee"
+        });
+
+        assertNotNull(output);
+        assertTrue(output.contains("Realized environment variables used to resolve lucee.json placeholders"),
+                "Dry-run --include env,lucee should include env preview");
+        assertTrue(output.contains(".CFConfig.json"),
+                "Dry-run --include env,lucee should include Lucee config preview");
+        assertFalse(output.contains("Realized lucee.json for:"),
+                "Dry-run --include env,lucee should not include default realized lucee.json section");
     }
 
     @Test

@@ -6,7 +6,7 @@
 
   <groupId>org.lucee</groupId>
   <artifactId>lucli</artifactId>
-  <version>0.3.11-SNAPSHOT</version>
+  <version>0.4.0</version>
 
   <name>LuCLI</name>
   <description>A CLI for Lucee</description>
@@ -30,6 +30,15 @@
     <jarsigner.alias>lucli</jarsigner.alias>
     <jarsigner.storepass></jarsigner.storepass>
     <jarsigner.keypass></jarsigner.keypass>
+    <branding.enabled>false</branding.enabled>
+    <branding.binaryName></branding.binaryName>
+    <branding.profileName></branding.profileName>
+    <branding.displayName></branding.displayName>
+    <branding.promptPrefix></branding.promptPrefix>
+    <branding.homeDirName></branding.homeDirName>
+    <branding.backupsDirName></branding.backupsDirName>
+    <branding.bannerText></branding.bannerText>
+    <branding.productVersion></branding.productVersion>
   </properties>
 
 
@@ -163,20 +172,38 @@
   </dependencies>
 
   <build>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+        <filtering>false</filtering>
+      </resource>
+      <resource>
+        <directory>src/main/resources-filtered</directory>
+        <filtering>true</filtering>
+      </resource>
+      <resource>
+        <directory>${project.build.directory}/modules-install</directory>
+        <targetPath>modules-install</targetPath>
+        <filtering>false</filtering>
+      </resource>
+    </resources>
     <plugins>
       <plugin>
         <groupId>org.jreleaser</groupId>
         <artifactId>jreleaser-maven-plugin</artifactId>
         <version>1.22.0</version>
         <configuration>
-          <jreleaser>
-            <release>
-              <github>
-                <!-- Owner can be inferred from the Git remote; override here if needed -->
-                <token>${env.JRELEASER_GITHUB_TOKEN}</token>
-              </github>
-            </release>
-          </jreleaser>
+          <!--
+            Read the release model (distributions, packagers) from the root
+            jreleaser.yml. An inline <jreleaser> DSL block here takes precedence
+            over the external file — that is how v0.3.18 shipped with no binaries:
+            the inline block only carried the GitHub token, so JReleaser saw zero
+            distributions ("No files configured for checksum. Skipping") and
+            published an empty release. The token does not need to be declared at
+            all; JReleaser resolves JRELEASER_GITHUB_TOKEN from the environment
+            natively.
+          -->
+          <configFile>${project.basedir}/jreleaser.yml</configFile>
         </configuration>
       </plugin>
       <plugin>
@@ -479,16 +506,16 @@
                 <configuration>
                   <headerType>console</headerType>
                   <outfile>target/lucli.exe</outfile>
-                  <jar>lucli.jar</jar>
+                  <jar>target/lucli.jar</jar>
                   <errTitle>LuCLI Error</errTitle>
                   <classPath>
                     <mainClass>org.lucee.lucli.LuCLI</mainClass>
                   </classPath>
                   <jre>
-                    <path></path>
+                    <path>%JAVA_HOME%;%PATH%</path>
                     <bundledJre64Bit>false</bundledJre64Bit>
                     <bundledJreAsFallback>false</bundledJreAsFallback>
-                    <minVersion>17.0.0</minVersion>
+                    <minVersion>21.0.0</minVersion>
                     <jdkPreference>preferJre</jdkPreference>
                     <runtimeBits>64/32</runtimeBits>
                   </jre>

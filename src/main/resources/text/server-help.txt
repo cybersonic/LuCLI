@@ -7,6 +7,18 @@ Commands:
     --version VERSION        Specify Lucee version
     --name NAME              Specify custom server name
     --force                  Replace existing server
+    --env NAME               Apply environment overrides from lucee.json
+    --dry-run                Preview resolved configuration without starting
+    --include LIST           Comma-separated sections: config,env,lucee,tomcat-web,tomcat-server,https-keystore-plan,https-redirect-rules,all
+    --include-env            Include environment preview section (same as --include env)
+    --include-all            Include all dry-run sections (same as --include all)
+    --include-lucee          Include Lucee CFConfig dry-run preview
+    --include-tomcat-web     Include generated web.xml dry-run preview
+    --include-tomcat-server  Include generated server.xml dry-run preview
+    --include-https-keystore-plan
+                             Include HTTPS keystore dry-run plan
+    --include-https-redirect-rules
+                             Include HTTPS redirect rules dry-run plan
     --disable-lucee          Start as static server (enableLucee=false for this start)
     --enable-lucee           Explicitly enable Lucee CFML engine for this start
     --warmup                 Enable Lucee warmup mode for this start
@@ -19,6 +31,10 @@ Commands:
     --version VERSION        Specify Lucee version
     --name NAME              Specify custom server name
     --force                  Replace existing server
+    --env NAME               Apply environment overrides from lucee.json
+    --dry-run                Preview resolved configuration without running
+    --include LIST           Comma-separated sections: config,env,all
+    --include-env            Include environment preview section (same as --include env)
     --disable-lucee          Run as static server (enableLucee=false for this run)
     --enable-lucee           Explicitly enable Lucee CFML engine for this run
     --warmup                 Enable Lucee warmup mode for this run

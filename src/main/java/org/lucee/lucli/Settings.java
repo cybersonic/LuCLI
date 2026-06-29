@@ -74,10 +74,8 @@ public class Settings {
      * Sync the showEmojis setting to EmojiSupport global state
      */
     private void syncEmojiPreference() {
-        JsonNode emojiNode = settings.path("showEmojis");
-        if (!emojiNode.isMissingNode()) {
-            EmojiSupport.setEnabled(emojiNode.asBoolean());
-        }
+        boolean userEnabled = showEmojis();
+        EmojiSupport.setEnabled(userEnabled && WindowsSupport.supportsEmojis());
     }
     
     /**
@@ -260,10 +258,11 @@ public class Settings {
     }
     
     /**
-     * Check if emojis are enabled
+     * Check if emojis are enabled and supported by the current platform.
+     * Returns the effective enabled state: user preference AND platform capability.
      */
     public boolean showEmojis() {
-        return getBoolean("showEmojis", true);
+        return getBoolean("showEmojis", WindowsSupport.supportsEmojis()) && WindowsSupport.supportsEmojis();
     }
     
     /**
@@ -280,7 +279,7 @@ public class Settings {
     public void setShowEmojis(boolean showEmojis) {
         setBoolean("showEmojis", showEmojis);
         // Sync to global state
-        EmojiSupport.setEnabled(showEmojis);
+        EmojiSupport.setEnabled(showEmojis && WindowsSupport.supportsEmojis());
     }
     
     /**

@@ -3,6 +3,9 @@ package org.lucee.lucli.server;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
@@ -31,6 +34,37 @@ public class LuceeServerConfigTest {
     @BeforeEach
     void setUp() {
         // Clean environment for each test
+    }
+
+    @Test
+    void reloadConfiguredEnvFile_withEnvironmentLayersBaseAndEnvironmentEnvFiles() throws IOException {
+        Files.writeString(tempDir.resolve("default.env"), "DEFAULT=from-default\nBASE_ONLY=base-only\n");
+        Files.writeString(tempDir.resolve("prod.env"), "DEFAULT=from-prod\nPROD_ONLY=prod-only\n");
+
+        String json = """
+            {
+              "name": "env-file-layering-test",
+              "envFile": "./default.env",
+              "environments": {
+                "prod": {
+                  "envFile": "./prod.env"
+                }
+              }
+            }
+            """;
+        Files.writeString(tempDir.resolve("lucee.json"), json);
+
+        LuceeServerConfig.ServerConfig base = LuceeServerConfig.loadConfig(tempDir);
+        LuceeServerConfig.ServerConfig merged = LuceeServerConfig.applyEnvironment(base, "prod", tempDir);
+
+        LuceeServerConfig.reloadConfiguredEnvFile(merged, tempDir, "lucee.json", "prod");
+
+        java.util.Map<String, String> envPreview = new java.util.HashMap<>();
+        LuceeServerConfig.applyLoadedEnvToProcessEnvironment(envPreview);
+
+        assertEquals("from-prod", envPreview.get("DEFAULT"));
+        assertEquals("base-only", envPreview.get("BASE_ONLY"));
+        assertEquals("prod-only", envPreview.get("PROD_ONLY"));
     }
 
     // ===================
@@ -65,7 +99,7 @@ public class LuceeServerConfigTest {
         assertNotNull(config.environments);
         // New lucee block should be populated by default
         assertNotNull(config.lucee);
-        assertEquals("6.2.2.91", config.lucee.version);
+        assertEquals("7.0.4.34", config.lucee.version);
         assertEquals("standard", config.lucee.variant);
         assertFalse(config.urlRewrite.enabled,
             "URL rewrite should be disabled by default unless explicitly enabled");
@@ -232,10 +266,11 @@ public class LuceeServerConfigTest {
     @Test
     void getLuceeVersion_fallsBackToDefault() {
         LuceeServerConfig.ServerConfig config = new LuceeServerConfig.ServerConfig();
+        config.version = "1.0.0";
         config.lucee = null;
         config.version = null;
 
-        assertEquals("6.2.2.91", LuceeServerConfig.getLuceeVersion(config));
+        assertEquals("7.0.4.34", LuceeServerConfig.getLuceeVersion(config));
     }
 
     @Test
@@ -260,13 +295,14 @@ public class LuceeServerConfigTest {
     }
 
     @Test
-    void setLuceeVersion_updatesBothFields() {
+    void setLuceeVersion_updatesLuceeBlockWithoutOverwritingAppVersion() {
         LuceeServerConfig.ServerConfig config = new LuceeServerConfig.ServerConfig();
         LuceeServerConfig.setLuceeVersion(config, "7.0.0.100-RC");
 
         assertNotNull(config.lucee);
         assertEquals("7.0.0.100-RC", config.lucee.version);
         assertEquals("7.0.0.100-RC", LuceeServerConfig.getLuceeVersion(config));
+        assertEquals("1.0.0", config.version);
     }
 
     // ===================
@@ -507,6 +543,286 @@ public class LuceeServerConfigTest {
         assertEquals(80, config.environments.get("prod").port);
         assertEquals(3000, config.environments.get("dev").port);
     }
+    @Test
+    void applyEnvironment_missingEnvironmentFallsBackToBaseConfig() throws IOException {
+        String json = """
+            {
+              "name": "env-fallback-test",
+              "port": 8080,
+              "webroot": "./public",
+              "environments": {
+                "prod": {
+                  "port": 80
+                }
+              }
+            }
+            """;
+        Path configFile = tempDir.resolve("lucee.json");
+        Files.writeString(configFile, json);
+
+        LuceeServerConfig.ServerConfig base = LuceeServerConfig.loadConfig(tempDir);
+        LuceeServerConfig.ServerConfig merged = LuceeServerConfig.applyEnvironment(base, "nonexistent", tempDir);
+
+        assertSame(base, merged, "Missing environment should return the base config unchanged");
+        assertEquals(8080, merged.port);
+        assertEquals("./public", merged.webroot);
+    }
+
+    @Test
+    void applyEnvironment_usesEnvironmentSpecificEnvFileForRuntimeEnvPreview() throws IOException {
+        Files.writeString(tempDir.resolve("default.env"), "DEFAULT=from-default\nBASE_ONLY=base-only\n");
+        Files.writeString(tempDir.resolve("prod.env"), "DEFAULT=from-prod\nPROD_ONLY=prod-only\n");
+
+        String json = """
+            {
+              "name": "env-file-override-test",
+              "envFile": "./default.env",
+              "envVars": {
+                "SETTING1": "from-base"
+              },
+              "environments": {
+                "prod": {
+                  "envFile": "./prod.env",
+                  "envVars": {
+                    "SETTING1": "overridden-in-prod"
+                  }
+                }
+              }
+            }
+            """;
+        Files.writeString(tempDir.resolve("lucee.json"), json);
+
+        LuceeServerConfig.ServerConfig base = LuceeServerConfig.loadConfig(tempDir);
+        LuceeServerConfig.ServerConfig merged = LuceeServerConfig.applyEnvironment(base, "prod", tempDir);
+
+        java.util.Map<String, String> envPreview = new java.util.HashMap<>();
+        LuceeServerConfig.applyLoadedEnvToProcessEnvironment(envPreview);
+
+        assertEquals("./prod.env", merged.envFile);
+        assertEquals("overridden-in-prod", merged.envVars.get("SETTING1"));
+        assertEquals("from-prod", envPreview.get("DEFAULT"));
+        assertEquals("base-only", envPreview.get("BASE_ONLY"));
+        assertEquals("prod-only", envPreview.get("PROD_ONLY"));
+    }
+
+    @Test
+    void applyConfigEnvVarsToProcessEnvironment_nullValueUnsetsExistingKey() {
+        java.util.Map<String, String> env = new java.util.HashMap<>();
+        env.put("VAR", "from-env-file");
+        env.put("KEEP", "keep-me");
+
+        java.util.Map<String, String> envVars = new java.util.HashMap<>();
+        envVars.put("VAR", null);
+
+        LuceeServerConfig.applyConfigEnvVarsToProcessEnvironment(env, envVars);
+
+        assertFalse(env.containsKey("VAR"));
+        assertEquals("keep-me", env.get("KEEP"));
+    }
+
+    @Test
+    void applyEnvironment_envVarNullUnsetsLayeredEnvFileValue() throws IOException {
+        Files.writeString(tempDir.resolve("default.env"), "VAR=2\n");
+        Files.writeString(tempDir.resolve("prod.env"), "VAR=4\n");
+
+        String json = """
+            {
+              "name": "env-var-null-unset-test",
+              "envFile": "./default.env",
+              "envVars": {
+                "VAR": "3"
+              },
+              "environments": {
+                "prod": {
+                  "envFile": "./prod.env",
+                  "envVars": {
+                    "VAR": null
+                  }
+                }
+              }
+            }
+            """;
+        Files.writeString(tempDir.resolve("lucee.json"), json);
+
+        LuceeServerConfig.ServerConfig base = LuceeServerConfig.loadConfig(tempDir);
+        LuceeServerConfig.ServerConfig merged = LuceeServerConfig.applyEnvironment(base, "prod", tempDir);
+
+        LuceeServerConfig.reloadConfiguredEnvFile(merged, tempDir, "lucee.json", "prod");
+
+        java.util.Map<String, String> effectiveEnv = new java.util.HashMap<>(System.getenv());
+        LuceeServerConfig.applyLoadedEnvToProcessEnvironment(effectiveEnv);
+        LuceeServerConfig.applyConfigEnvVarsToProcessEnvironment(effectiveEnv, merged.envVars);
+
+        assertFalse(effectiveEnv.containsKey("VAR"));
+    }
+
+    @Test
+    void applyEnvironment_usesProvidedConfigFileForRawEnvironmentOverrides() throws IOException {
+        String defaultConfigJson = """
+            {
+              "name": "default-config",
+              "port": 8080,
+              "configuration": {
+                "preserveCase": true
+              },
+              "environments": {
+                "prod": {
+                  "port": 81,
+                  "configuration": {
+                    "errorGeneralTemplate": "/wrong-from-default.cfm"
+                  }
+                }
+              }
+            }
+            """;
+        Files.writeString(tempDir.resolve("lucee.json"), defaultConfigJson);
+
+        String customConfigJson = """
+            {
+              "name": "custom-config",
+              "port": 9090,
+              "configuration": {
+                "preserveCase": true
+              },
+              "environments": {
+                "prod": {
+                  "port": 80,
+                  "configuration": {
+                    "errorGeneralTemplate": "/right-from-custom.cfm"
+                  }
+                }
+              }
+            }
+            """;
+        Files.writeString(tempDir.resolve("lucee-env.json"), customConfigJson);
+
+        LuceeServerConfig.ServerConfig base = LuceeServerConfig.loadConfig(tempDir, "lucee-env.json");
+        LuceeServerConfig.ServerConfig merged =
+            LuceeServerConfig.applyEnvironment(base, "prod", tempDir, "lucee-env.json");
+
+        assertEquals(80, merged.port);
+        assertNotNull(merged.configuration);
+        assertEquals(
+            "/right-from-custom.cfm",
+            merged.configuration.path("errorGeneralTemplate").asText()
+        );
+    }
+
+    @Test
+    void reloadConfiguredEnvFile_loadsEnvFileForMaterializedConfig() throws IOException {
+        Files.writeString(tempDir.resolve("runtime.env"), "RUNTIME_ONLY=from-env-file\n");
+
+        LuceeServerConfig.ServerConfig config = new LuceeServerConfig.ServerConfig();
+        config.envFile = "./runtime.env";
+
+        LuceeServerConfig.reloadConfiguredEnvFile(config, tempDir);
+
+        java.util.Map<String, String> envPreview = new java.util.HashMap<>();
+        LuceeServerConfig.applyLoadedEnvToProcessEnvironment(envPreview);
+
+        assertEquals("from-env-file", envPreview.get("RUNTIME_ONLY"));
+    }
+
+   
+    void reloadConfiguredEnvFile_clearsPreviouslyLoadedValues() throws IOException {
+        Files.writeString(tempDir.resolve("first.env"), "ONLY_FIRST=first\n");
+        Files.writeString(tempDir.resolve("second.env"), "ONLY_SECOND=second\n");
+
+        LuceeServerConfig.ServerConfig config = new LuceeServerConfig.ServerConfig();
+        config.envFile = "./first.env";
+        LuceeServerConfig.reloadConfiguredEnvFile(config, tempDir);
+
+        config.envFile = "./second.env";
+        LuceeServerConfig.reloadConfiguredEnvFile(config, tempDir);
+
+        java.util.Map<String, String> envPreview = new java.util.HashMap<>();
+        LuceeServerConfig.applyLoadedEnvToProcessEnvironment(envPreview);
+
+        assertFalse(envPreview.containsKey("ONLY_FIRST"));
+        assertEquals("second", envPreview.get("ONLY_SECOND"));
+    }
+
+    @Test
+    void resolveConfigurationNode_mergesExtensionsFromConfigurationFileAndInlineConfiguration() throws IOException {
+        Files.writeString(tempDir.resolve("cfconfig-base.json"), """
+            {
+              "extensions": [
+                { "id": "A", "version": "1.0.0" },
+                { "id": "B", "version": "1.0.0" }
+              ]
+            }
+            """);
+
+        Files.writeString(tempDir.resolve("lucee.json"), """
+            {
+              "name": "extension-merge-test",
+              "configurationFile": "./cfconfig-base.json",
+              "configuration": {
+                "extensions": [
+                  { "id": "B", "version": "2.0.0" },
+                  { "id": "C", "version": "1.0.0" }
+                ]
+              }
+            }
+            """);
+
+        LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(tempDir);
+        JsonNode resolved = LuceeServerConfig.resolveConfigurationNode(config, tempDir);
+
+        JsonNode extensions = resolved.path("extensions");
+        assertTrue(extensions.isArray(), "Expected extensions array in resolved CFConfig");
+        assertEquals(3, extensions.size(), "Expected base + override extension union without dropping unique base entries");
+        assertEquals("A", extensions.get(0).path("id").asText());
+        assertEquals("B", extensions.get(1).path("id").asText());
+        assertEquals("2.0.0", extensions.get(1).path("version").asText(),
+                "Expected inline configuration entry to override matching extension from configurationFile");
+        assertEquals("C", extensions.get(2).path("id").asText());
+    }
+    @Test
+    void resolveConfigurationNode_environmentConfigurationFileMergesOverBaseConfigurationFile() throws IOException {
+        Files.writeString(tempDir.resolve("cfconfig-base.json"), """
+            {
+              "baseOnly": "from-base-file",
+              "shared": {
+                "winner": "base",
+                "baseValue": true
+              }
+            }
+            """);
+
+        Files.writeString(tempDir.resolve("cfconfig-dev.json"), """
+            {
+              "envOnly": "from-env-file",
+              "shared": {
+                "winner": "env",
+                "envValue": true
+              }
+            }
+            """);
+
+        Files.writeString(tempDir.resolve("lucee.json"), """
+            {
+              "name": "env-config-file-merge-test",
+              "configurationFile": "./cfconfig-base.json",
+              "environments": {
+                "dev": {
+                  "configurationFile": "./cfconfig-dev.json"
+                }
+              }
+            }
+            """);
+
+        LuceeServerConfig.ServerConfig base = LuceeServerConfig.loadConfig(tempDir);
+        LuceeServerConfig.ServerConfig merged = LuceeServerConfig.applyEnvironment(base, "dev", tempDir);
+        JsonNode resolved = LuceeServerConfig.resolveConfigurationNode(merged, tempDir);
+
+        assertEquals("from-base-file", resolved.path("baseOnly").asText(),
+            "Environment configurationFile should layer on top of base configurationFile");
+        assertEquals("from-env-file", resolved.path("envOnly").asText());
+        assertEquals("env", resolved.path("shared").path("winner").asText());
+        assertTrue(resolved.path("shared").path("baseValue").asBoolean());
+        assertTrue(resolved.path("shared").path("envValue").asBoolean());
+    }
 
     // ===================
     // Agent Configuration Tests
@@ -560,6 +876,49 @@ public class LuceeServerConfigTest {
         LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(tempDir);
 
         assertEquals("hash-test-server", config.name);
+    }
+
+    @Test
+    void loadConfig_envPrefixVarSubstitutesInPort() throws IOException {
+        Path envFile = tempDir.resolve(".env");
+        Files.writeString(envFile, "HTTP_PORT=9090\n");
+
+        String json = """
+            {
+                "name": "port-env-test",
+                "port": "#env:HTTP_PORT#"
+            }
+            """;
+        Path configFile = tempDir.resolve("lucee.json");
+        Files.writeString(configFile, json);
+
+        LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(tempDir);
+
+        assertEquals(9090, config.port);
+    }
+
+    @Test
+    void loadConfig_envPrefixVarInvalidPortValueShowsClearError() throws IOException {
+        Path envFile = tempDir.resolve(".env");
+        Files.writeString(envFile, "HTTP_PORT=ELVIS IS THE GREATEST\n");
+
+        String json = """
+            {
+                "name": "port-env-invalid-test",
+                "port": "#env:HTTP_PORT#"
+            }
+            """;
+        Path configFile = tempDir.resolve("lucee.json");
+        Files.writeString(configFile, json);
+
+        IOException exception = assertThrows(IOException.class, () -> LuceeServerConfig.loadConfig(tempDir));
+        String message = exception.getMessage();
+
+        assertNotNull(message);
+        String normalized = message.toLowerCase();
+        assertTrue(normalized.contains("port"), "Error message should identify the port field");
+        assertTrue(normalized.contains("int"), "Error message should identify integer parsing");
+        assertTrue(normalized.contains("not a valid"), "Error message should explain why parsing failed");
     }
 
     @Test
@@ -1310,5 +1669,49 @@ public class LuceeServerConfigTest {
         String expected = "jdbc:sqlite:" + tempDir.toAbsolutePath() + "/db/test.db";
         assertEquals(expected, dsn);
         assertFalse(dsn.contains("#project:path#"), "DSN should not contain unresolved #project:path#");
+    }
+
+    // ===================
+    // Port Availability Tests
+    // ===================
+
+    /**
+     * Regression test for the IPv4-blind port check.
+     *
+     * On a dual-stack JVM (no -Djava.net.preferIPv4Stack), `new ServerSocket(port)`
+     * binds the IPv6 wildcard, which does NOT conflict with a listener bound to the
+     * IPv4 address family. Before the fix, isPortAvailable() therefore reported a
+     * port held by an IPv4-only process (e.g. python http.server, Django runserver,
+     * Postgres/Redis on 127.0.0.1) as "available", so `wheels start` would collide
+     * with it instead of picking the next free port.
+     */
+    @Test
+    void isPortAvailableReturnsFalseForPortHeldByIPv4OnlyListener() throws IOException {
+        try (ServerSocket ipv4Only = new ServerSocket()) {
+            ipv4Only.setReuseAddress(false);
+            ipv4Only.bind(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 0));
+            int port = ipv4Only.getLocalPort();
+
+            assertFalse(
+                LuceeServerConfig.isPortAvailable(port),
+                "A port held by an IPv4-only listener (127.0.0.1) must be reported unavailable");
+        }
+    }
+
+    /**
+     * Guards against an over-correction that reports every port as unavailable:
+     * a port with nothing listening must still be reported available.
+     */
+    @Test
+    void isPortAvailableReturnsTrueForFreePort() throws IOException {
+        int freePort;
+        try (ServerSocket probe = new ServerSocket()) {
+            probe.bind(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 0));
+            freePort = probe.getLocalPort();
+        } // closed here -> port is now free
+
+        assertTrue(
+            LuceeServerConfig.isPortAvailable(freePort),
+            "A port with no listener must be reported available");
     }
 }

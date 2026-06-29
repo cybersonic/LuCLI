@@ -1,6 +1,41 @@
 #!/bin/bash
 buildDockerImage=false
+buildDockerImageLocal=false
 installLocally=false
+purgeDependencies=false
+moduleSources=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    docker)
+      buildDockerImage=true
+      ;;
+    dockerlocal)
+      buildDockerImageLocal=true
+      ;;
+    install)
+      installLocally=true
+      ;;
+    clear)
+      purgeDependencies=true
+      ;;
+    --module-source)
+      if [[ -z "${2:-}" ]]; then
+        echo "Error: --module-source requires a directory path."
+        exit 1
+      fi
+      moduleSources+=("$2")
+      shift
+      ;;
+    --module-source=*)
+      moduleSources+=("${1#*=}")
+      ;;
+    *)
+      echo "Warning: unknown option '$1' ignored."
+      ;;
+  esac
+  shift
+done
 # Try to load SDKMAN! and apply .sdkmanrc, but don't hard-fail if missing
 if [ -s "$HOME/.sdkman/bin/sdkman-init.sh" ]; then
   # shellcheck source=/dev/null
@@ -15,17 +50,7 @@ else
   echo "Warning: SDKMAN! not found at \$HOME/.sdkman; using current Java:"
   java -version 2>&1 | head -n 1
 fi
-
-
-if [[ "$1" == "docker" ]]; then
-    buildDockerImage=true
-fi
-
-if [[ "$1" == "install" ]]; then
-    installLocally=true
-fi
-
-if [[ "$1" == "clear" ]]; then
+if [[ "$purgeDependencies" == true ]]; then
     mvn dependency:purge-local-repository -DreResolve=false -DactTransitively=false
 fi
 
@@ -53,6 +78,32 @@ INSTALL_TARGET=$(which lucli 2>/dev/null || echo "$HOME/.local/bin/lucli")
 # first and then create the self-executing binary ourselves below.
 echo "Building LuCLI JAR and binary..."
 rm -rf target
+
+if [[ ${#moduleSources[@]} -gt 0 ]]; then
+    mkdir -p target/modules-install
+    echo "Bundling module sources into target/modules-install:"
+    for moduleSource in "${moduleSources[@]}"; do
+        moduleSource="${moduleSource%/}"
+        if [[ ! -d "$moduleSource" ]]; then
+            echo "Error: module source directory does not exist: $moduleSource"
+            exit 1
+        fi
+        if [[ ! -f "$moduleSource/Module.cfc" ]]; then
+            echo "Error: module source '$moduleSource' is missing Module.cfc"
+            exit 1
+        fi
+        moduleName="$(basename "$moduleSource")"
+        targetModuleDir="target/modules-install/$moduleName"
+        rm -rf "$targetModuleDir"
+        mkdir -p "$targetModuleDir"
+        (
+          cd "$moduleSource" && tar --exclude='.git' -cf - .
+        ) | (
+          cd "$targetModuleDir" && tar -xf -
+        )
+        echo "  - $moduleName ($moduleSource)"
+    done
+fi
 mvn package -q -Dmaven.test.skip=true -Djreleaser.dry.run=true
 if [ $? -ne 0 ]; then
     echo "Maven build failed!"
@@ -107,7 +158,7 @@ if [ "$installLocally" = true ] ; then
     echo "Installed lucli binary to ${INSTALL_TARGET}"
 fi
 
-if [[ "$1" == "dockerlocal" ]]; then
+if [[ "$buildDockerImageLocal" == true ]]; then
     VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
     echo "Building local Docker image...'markdrew/lucli:${VERSION}'"
 

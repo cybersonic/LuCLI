@@ -3,17 +3,22 @@ package org.lucee.lucli.cli.commands.deps;
 import org.lucee.lucli.StringOutput;
 import org.lucee.lucli.config.DependencyConfig;
 import org.lucee.lucli.config.LuceeJsonEditor;
+import org.lucee.lucli.deps.DependencyShortcutRegistry;
 import org.lucee.lucli.deps.ExtensionRegistry;
 import org.lucee.lucli.modules.ModuleRepositoryIndex;
 
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
+import picocli.CommandLine.Parameters;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.concurrent.Callable;
 
 import org.jline.reader.Candidate;
@@ -29,24 +34,57 @@ import org.jline.terminal.TerminalBuilder;
  */
 @Command(
     name = "add",
-    description = "Add a dependency to lucee.json via an interactive wizard"
+    description = "Add a dependency to lucee.json via interactive wizard or shortcut"
 )
 public class AddCommand implements Callable<Integer> {
 
     private final BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
+    private final Path projectDir;
+    private final DependencyShortcutRegistry shortcutRegistry;
+
+    @Parameters(
+        index = "0",
+        arity = "0..1",
+        paramLabel = "SHORTCUT",
+        description = "Dependency shortcut to add non-interactively (for example: testbox, fw1)"
+    )
+    private String shortcut;
+
+    @Option(
+        names = {"--dev"},
+        description = "Add dependency to devDependencies"
+    )
+    private boolean devDependency;
 
     // JLine reader for extension identifier completion (slugs/IDs) in the
     // extension dependency wizard. Lazily initialized and falls back to
     // standard input if JLine cannot be created.
     private static LineReader extensionLineReader;
 
+    public AddCommand() {
+        this(Paths.get("."), DependencyShortcutRegistry.loadDefault());
+    }
+
+    AddCommand(Path projectDir, DependencyShortcutRegistry shortcutRegistry) {
+        this.projectDir = projectDir != null ? projectDir : Paths.get(".");
+        this.shortcutRegistry = shortcutRegistry != null ? shortcutRegistry : DependencyShortcutRegistry.loadDefault();
+    }
+
     @Override
     public Integer call() throws Exception {
         try {
+            if (shortcut != null && !shortcut.isBlank()) {
+                return addShortcutDependency(shortcut.trim(), devDependency);
+            }
             StringOutput.Quick.info("📦 LuCLI Dependency Wizard");
 
             // 1. Scope: dependencies vs devDependencies
-            boolean dev = askScope();
+            boolean dev = devDependency;
+            if (!devDependency) {
+                dev = askScope();
+            } else {
+                StringOutput.Quick.info("Adding to devDependencies (--dev)");
+            }
 
             // 2. What kind of dependency
             int kind = askKind();
@@ -81,6 +119,39 @@ public class AddCommand implements Callable<Integer> {
             return 0;
         } catch (IOException e) {
             StringOutput.Quick.error("❌ I/O error: " + e.getMessage());
+            return 1;
+        }
+    }
+
+    private Integer addShortcutDependency(String shortcutName, boolean dev) {
+        DependencyConfig dep = shortcutRegistry.resolveShortcut(shortcutName);
+        if (dep == null) {
+            StringOutput.Quick.error("❌ Unknown dependency shortcut: '" + shortcutName + "'");
+            String available = shortcutRegistry.listShortcuts().stream()
+                    .sorted()
+                    .collect(Collectors.joining(", "));
+            if (!available.isBlank()) {
+                StringOutput.Quick.info("Available shortcuts: " + available);
+            }
+            return 1;
+        }
+
+        String dependencyName = dep.getName() != null && !dep.getName().isBlank()
+                ? dep.getName().trim()
+                : shortcutName.trim().toLowerCase();
+        dep.setName(dependencyName);
+        dep.applyDefaults();
+
+        try {
+            LuceeJsonEditor editor = new LuceeJsonEditor(projectDir);
+            editor.addOrUpdateDependency(dependencyName, dep, dev);
+            editor.save();
+
+            String scope = dev ? "devDependencies" : "dependencies";
+            StringOutput.Quick.success("✅ Added '" + dependencyName + "' from shortcut '" + shortcutName + "' to " + scope + " in lucee.json");
+            return 0;
+        } catch (IOException e) {
+            StringOutput.Quick.error("❌ Failed to update lucee.json: " + e.getMessage());
             return 1;
         }
     }
@@ -397,7 +468,7 @@ public class AddCommand implements Callable<Integer> {
         }
 
         try {
-            LuceeJsonEditor editor = new LuceeJsonEditor(Paths.get("."));
+            LuceeJsonEditor editor = new LuceeJsonEditor(projectDir);
             editor.addOrUpdateDependency(dep.getName(), dep, dev);
             editor.save();
             String scope = dev ? "devDependencies" : "dependencies";

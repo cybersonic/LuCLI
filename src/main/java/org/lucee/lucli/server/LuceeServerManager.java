@@ -36,6 +36,16 @@ import org.lucee.lucli.ui.ProgressBar;
  * Manages Lucee server instances - downloading, configuring, starting, and stopping servers
  */
 public class LuceeServerManager {
+
+    private static class ServerPidRecord {
+        private final long pid;
+        private final int port;
+
+        private ServerPidRecord(long pid, int port) {
+            this.pid = pid;
+            this.port = port;
+        }
+    }
     
     /**
      * Runtime overrides for Java agent activation when starting a server.
@@ -129,6 +139,10 @@ public class LuceeServerManager {
     private static final String LUCEE_WARMUP_ENV_VALUE = "true";
     private static final String LUCEE_WARMUP_JVM_ARG_PREFIX = "-Dlucee.enable.warmup=";
     private static final String LUCEE_WARMUP_JVM_ARG_TRUE = "-Dlucee.enable.warmup=true";
+    private static final String LUCEE_VERSION_MARKER_FILE = ".lucee-version";
+    private static final String LUCEE_VARIANT_MARKER_FILE = ".lucee-variant";
+    private static final java.util.regex.Pattern LUCEE_JAR_FILE_PATTERN =
+            java.util.regex.Pattern.compile("^lucee(?:-(light|zero))?-(.+)\\.jar$");
 
     // Lucee engine JAR variants
     private static final String LUCEE_JAR_STANDARD_TEMPLATE = "https://cdn.lucee.org/lucee-{version}.jar";
@@ -152,6 +166,16 @@ public class LuceeServerManager {
      * Currently this is always the Lucee Express provider.
      */
     private final RuntimeProvider defaultRuntimeProvider;
+
+    static class LuceeRuntimeInfo {
+        final String version;
+        final String variant;
+
+        LuceeRuntimeInfo(String version, String variant) {
+            this.version = version;
+            this.variant = variant;
+        }
+    }
     
     public LuceeServerManager() throws IOException {
         this.lucliHome = getLucliHome();
@@ -364,6 +388,7 @@ public class LuceeServerManager {
 
         // Do not auto-open browser for sandbox foreground runs
         config.openBrowser = false;
+        LuceeServerConfig.reloadConfiguredEnvFile(config, projectDir);
 
         // Enforce LuCLI-supported version/runtime and .CFConfig cutoffs.
         LuceeServerConfig.validateLuceeVersionSupportForRuntime(config, "lucee-express");
@@ -489,6 +514,7 @@ public class LuceeServerManager {
 
         // For sandbox background servers, do not auto-open browser by default
         config.openBrowser = false;
+        LuceeServerConfig.reloadConfiguredEnvFile(config, projectDir);
 
         // Enforce LuCLI-supported version/runtime and .CFConfig cutoffs.
         LuceeServerConfig.validateLuceeVersionSupportForRuntime(config, "lucee-express");
@@ -602,17 +628,20 @@ public class LuceeServerManager {
                 System.out.println("ℹ️  Using locked server configuration for env '" + envKey + "' (lucee-lock.json)");
             }
         } else {
-            // No active lock: load configuration from lucee.json as usual
+            // No active lock: load configuration from the resolved config file
             config = LuceeServerConfig.loadConfig(projectDir, cfgFile);
 
             // Apply environment overrides if specified
             if (environment != null && !environment.trim().isEmpty()) {
-                config = LuceeServerConfig.applyEnvironment(config, environment, projectDir);
+                config = LuceeServerConfig.applyEnvironment(config, environment, projectDir, cfgFile);
             }
         }
 
         // Apply one-shot invocation overrides in memory (never persisted).
         applyStartConfigOverrides(config, startConfigOverrides);
+        // Ensure envFile variables are reloaded for the effective startup config.
+        // This is required for paths that bypass loadConfig (for example lock snapshots).
+        LuceeServerConfig.reloadConfiguredEnvFile(config, projectDir, cfgFile, environment);
         
         // Resolve secrets only for actual server startup (not for generic config reads)
         LuceeServerConfig.resolveSecretPlaceholders(config, projectDir);
@@ -631,6 +660,8 @@ public class LuceeServerManager {
         if (foreground) {
             config.openBrowser = false;
         }
+
+        LuceeServerConfig.RuntimeConfig runtimeConfig = LuceeServerConfig.getEffectiveRuntime(config);
         
         // Check if server with this name already exists
         Path existingServerDir = serversDir.resolve(config.name);
@@ -646,9 +677,15 @@ public class LuceeServerManager {
             ServerInfo existingServerInfo = getExistingServerForProject(projectDir, config.name);
             
             if (existingServerInfo != null) {
-                // This server exists and matches the current project directory, just restart it
-                System.out.println("Restarting existing server '" + config.name + "' for this project...");
-                // Don't throw an exception - continue with server startup
+                if (shouldRecreateServerForVersionChange(existingServerDir, config, runtimeConfig.type)) {
+                    System.out.println("Detected Lucee version/variant change for existing server '" + config.name
+                            + "'. Recreating server directory (prune not required).");
+                    deleteServerDirectory(existingServerDir);
+                    forceReplace = true;
+                } else {
+                    // This server exists and matches the current project directory, just restart it
+                    System.out.println("Restarting existing server '" + config.name + "' for this project...");
+                }
             } else if (!forceReplace) {
                 // Server exists but doesn't match this project directory
                 String suggestedName = LuceeServerConfig.getUniqueServerName(config.name, serversDir);
@@ -662,8 +699,6 @@ public class LuceeServerManager {
         // At this point the logical server name and environment are resolved
         // and any existing LuCLI-managed server directories have been checked.
         // Delegate the actual runtime-specific startup to a RuntimeProvider.
-
-        LuceeServerConfig.RuntimeConfig runtimeConfig = LuceeServerConfig.getEffectiveRuntime(config);
         LuceeServerConfig.validateLuceeVersionSupportForRuntime(config, runtimeConfig.type);
         LuceeServerConfig.validateCfConfigSupport(config);
         RuntimeProvider provider = getRuntimeProvider(runtimeConfig.type);
@@ -739,6 +774,127 @@ public class LuceeServerManager {
         args.add(LUCEE_WARMUP_JVM_ARG_TRUE);
         config.jvm.additionalArgs = args.toArray(new String[0]);
     }
+
+    boolean shouldRecreateServerForVersionChange(Path serverDir,
+                                                 LuceeServerConfig.ServerConfig config,
+                                                 String runtimeType) {
+        if (serverDir == null || config == null) {
+            return false;
+        }
+
+        String desiredVersion = LuceeServerConfig.getLuceeVersion(config);
+        String desiredVariant = normalizeLuceeVariant(LuceeServerConfig.getLuceeVariant(config));
+        LuceeRuntimeInfo existingRuntime = readLuceeRuntimeInfo(serverDir, runtimeType);
+
+        if (existingRuntime == null) {
+            // Legacy Lucee Express server directories don't carry Lucee version metadata.
+            // Recreate once so the directory is aligned to the requested version and
+            // future restarts can compare version markers safely.
+            return "lucee-express".equalsIgnoreCase(runtimeType);
+        }
+
+        String existingVariant = normalizeLuceeVariant(existingRuntime.variant);
+        return !desiredVersion.equals(existingRuntime.version)
+                || !desiredVariant.equals(existingVariant);
+    }
+
+    private LuceeRuntimeInfo readLuceeRuntimeInfo(Path serverDir, String runtimeType) {
+        String markerVersion = readMarkerValue(serverDir.resolve(LUCEE_VERSION_MARKER_FILE));
+        if (markerVersion != null) {
+            String markerVariant = readMarkerValue(serverDir.resolve(LUCEE_VARIANT_MARKER_FILE));
+            return new LuceeRuntimeInfo(markerVersion, normalizeLuceeVariant(markerVariant));
+        }
+        return inferLuceeRuntimeInfoFromArtifacts(serverDir, runtimeType);
+    }
+
+    private LuceeRuntimeInfo inferLuceeRuntimeInfoFromArtifacts(Path serverDir, String runtimeType) {
+        List<Path> candidateDirs = new ArrayList<>();
+        if ("tomcat".equalsIgnoreCase(runtimeType)) {
+            candidateDirs.add(serverDir.resolve("lib"));
+        } else if ("jetty".equalsIgnoreCase(runtimeType)) {
+            candidateDirs.add(serverDir.resolve("lib").resolve("ext"));
+        } else {
+            candidateDirs.add(serverDir.resolve("lib"));
+            candidateDirs.add(serverDir.resolve("lib").resolve("ext"));
+        }
+
+        for (Path dir : candidateDirs) {
+            LuceeRuntimeInfo inferred = inferLuceeRuntimeInfoFromDirectory(dir);
+            if (inferred != null) {
+                return inferred;
+            }
+        }
+        return null;
+    }
+
+    private LuceeRuntimeInfo inferLuceeRuntimeInfoFromDirectory(Path dir) {
+        if (dir == null || !Files.isDirectory(dir)) {
+            return null;
+        }
+        try (var stream = Files.list(dir)) {
+            for (Path jar : stream
+                    .filter(Files::isRegularFile)
+                    .sorted(Comparator.comparing(path -> path.getFileName().toString()))
+                    .toList()) {
+                LuceeRuntimeInfo parsed = parseLuceeRuntimeInfoFromJarName(jar.getFileName().toString());
+                if (parsed != null) {
+                    return parsed;
+                }
+            }
+        } catch (IOException ignored) {
+            return null;
+        }
+        return null;
+    }
+
+    private LuceeRuntimeInfo parseLuceeRuntimeInfoFromJarName(String fileName) {
+        if (fileName == null || fileName.isBlank()) {
+            return null;
+        }
+        java.util.regex.Matcher matcher = LUCEE_JAR_FILE_PATTERN.matcher(fileName);
+        if (!matcher.matches()) {
+            return null;
+        }
+
+        String variant = normalizeLuceeVariant(matcher.group(1));
+        String version = matcher.group(2);
+        if (version == null || version.isBlank()) {
+            return null;
+        }
+        return new LuceeRuntimeInfo(version, variant);
+    }
+
+    private String readMarkerValue(Path markerFile) {
+        if (markerFile == null || !Files.exists(markerFile)) {
+            return null;
+        }
+        try {
+            String value = Files.readString(markerFile).trim();
+            return value.isEmpty() ? null : value;
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    private static String normalizeLuceeVariant(String variant) {
+        if (variant == null || variant.trim().isEmpty()) {
+            return "standard";
+        }
+        return variant.trim().toLowerCase();
+    }
+
+    private void writeLuceeRuntimeMarkers(Path serverDir, LuceeServerConfig.ServerConfig config) {
+        if (serverDir == null || config == null) {
+            return;
+        }
+        try {
+            Files.writeString(serverDir.resolve(LUCEE_VERSION_MARKER_FILE), LuceeServerConfig.getLuceeVersion(config));
+            Files.writeString(serverDir.resolve(LUCEE_VARIANT_MARKER_FILE),
+                    normalizeLuceeVariant(LuceeServerConfig.getLuceeVariant(config)));
+        } catch (IOException e) {
+            // Metadata write failures should never block startup.
+        }
+    }
     
     /**
      * Stop a server for the given project directory
@@ -810,13 +966,24 @@ public class LuceeServerManager {
             }
         }
 
-        if (instance.getPid() <= 0) {
+        long pidToStop = instance.getPid();
+        if (pidToStop <= 0 || !isProcessRunning(pidToStop, serverDir)) {
+            ServerPidRecord pidRecord = readServerPidRecord(serverDir);
+            if (pidRecord != null) {
+                Long recoveredPid = resolveRunningPidWithCatalinaFallback(serverDir, pidRecord.pid, pidRecord.port);
+                if (recoveredPid != null) {
+                    pidToStop = recoveredPid.longValue();
+                }
+            }
+        }
+
+        if (pidToStop <= 0) {
             return false;
         }
         
         try {
             // Try graceful shutdown first
-            ProcessHandle processHandle = ProcessHandle.of(instance.getPid()).orElse(null);
+            ProcessHandle processHandle = ProcessHandle.of(pidToStop).orElse(null);
             if (processHandle != null && processHandle.isAlive()) {
                 processHandle.destroy();
                 
@@ -882,23 +1049,18 @@ public class LuceeServerManager {
             for (Path serverDir : stream.filter(Files::isDirectory).toList()) {
                 String serverName = serverDir.getFileName().toString();
                 
-                // Try to read PID file
-                Path pidFile = serverDir.resolve("server.pid");
                 long pid = -1;
                 int port = -1;
                 boolean isRunning = false;
-                
-                if (Files.exists(pidFile)) {
-                    try {
-                        String pidContent = Files.readString(pidFile).trim();
-                        String[] parts = pidContent.split(":");
-                        if (parts.length >= 2) {
-                            pid = Long.parseLong(parts[0]);
-                            port = Integer.parseInt(parts[1]);
-                            isRunning = isProcessRunning(pid, serverDir);
-                        }
-                    } catch (Exception e) {
-                        // Invalid PID file, server is not running
+
+                ServerPidRecord pidRecord = readServerPidRecord(serverDir);
+                if (pidRecord != null) {
+                    pid = pidRecord.pid;
+                    port = pidRecord.port;
+                    Long resolvedPid = resolveRunningPidWithCatalinaFallback(serverDir, pidRecord.pid, pidRecord.port);
+                    if (resolvedPid != null) {
+                        pid = resolvedPid.longValue();
+                        isRunning = true;
                     }
                 }
                 
@@ -1132,6 +1294,72 @@ public class LuceeServerManager {
             return null;
         }
     }
+
+    private ServerPidRecord readServerPidRecord(Path serverDir) {
+        Path pidFile = serverDir.resolve("server.pid");
+        if (!Files.exists(pidFile)) {
+            return null;
+        }
+
+        try {
+            String pidContent = Files.readString(pidFile).trim();
+            if (pidContent.isEmpty()) {
+                return null;
+            }
+
+            String[] parts = pidContent.split(":");
+            if (parts.length < 2) {
+                return null;
+            }
+
+            long pid = Long.parseLong(parts[0].trim());
+            int port = Integer.parseInt(parts[1].trim());
+            return new ServerPidRecord(pid, port);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private Long readCatalinaPid(Path serverDir) {
+        Path catalinaPidFile = serverDir.resolve("catalina.pid");
+        if (!Files.exists(catalinaPidFile)) {
+            return null;
+        }
+
+        try {
+            String catalinaPidContent = Files.readString(catalinaPidFile).trim();
+            if (catalinaPidContent.isEmpty()) {
+                return null;
+            }
+            return Long.parseLong(catalinaPidContent);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private Long resolveRunningPidWithCatalinaFallback(Path serverDir, long expectedPid, int port) {
+        if (isProcessRunning(expectedPid, serverDir)) {
+            return expectedPid;
+        }
+
+        Long catalinaPid = readCatalinaPid(serverDir);
+        if (catalinaPid != null && catalinaPid.longValue() > 0 && isProcessRunning(catalinaPid.longValue(), serverDir)) {
+            if (port > 0) {
+                refreshServerPid(serverDir, catalinaPid.longValue(), port);
+            }
+            return catalinaPid;
+        }
+
+        return null;
+    }
+
+    private void refreshServerPid(Path serverDir, long pid, int port) {
+        Path pidFile = serverDir.resolve("server.pid");
+        try {
+            Files.writeString(pidFile, pid + ":" + port);
+        } catch (IOException ignored) {
+        }
+    }
     
     public void checkAndReportPortConflicts(LuceeServerConfig.ServerConfig config, LuceeServerConfig.PortConflictResult portResult)
                 throws IOException {
@@ -1265,24 +1493,11 @@ public class LuceeServerManager {
      */
     private boolean isServerRunning(String serverName) {
         Path serverDir = serversDir.resolve(serverName);
-        Path pidFile = serverDir.resolve("server.pid");
-        
-        if (!Files.exists(pidFile)) {
+        ServerPidRecord pidRecord = readServerPidRecord(serverDir);
+        if (pidRecord == null) {
             return false;
         }
-        
-        try {
-            String pidContent = Files.readString(pidFile).trim();
-            String[] parts = pidContent.split(":");
-            if (parts.length >= 1) {
-                long pid = Long.parseLong(parts[0]);
-                return isProcessRunning(pid, serverDir);
-            }
-        } catch (Exception e) {
-            // Invalid PID file
-        }
-        
-        return false;
+        return resolveRunningPidWithCatalinaFallback(serverDir, pidRecord.pid, pidRecord.port) != null;
     }
     
     /**
@@ -1310,23 +1525,18 @@ public class LuceeServerManager {
             return null;
         }
         
-        // Try to read PID file
-        Path pidFile = serverDir.resolve("server.pid");
         long pid = -1;
         int port = -1;
         boolean isRunning = false;
-        
-        if (Files.exists(pidFile)) {
-            try {
-                String pidContent = Files.readString(pidFile).trim();
-                String[] parts = pidContent.split(":");
-                if (parts.length >= 2) {
-                    pid = Long.parseLong(parts[0]);
-                    port = Integer.parseInt(parts[1]);
-                    isRunning = isProcessRunning(pid, serverDir);
-                }
-            } catch (Exception e) {
-                // Invalid PID file, server is not running
+
+        ServerPidRecord pidRecord = readServerPidRecord(serverDir);
+        if (pidRecord != null) {
+            pid = pidRecord.pid;
+            port = pidRecord.port;
+            Long resolvedPid = resolveRunningPidWithCatalinaFallback(serverDir, pidRecord.pid, pidRecord.port);
+            if (resolvedPid != null) {
+                pid = resolvedPid.longValue();
+                isRunning = true;
             }
         }
 
@@ -1495,24 +1705,17 @@ public class LuceeServerManager {
         
         try (var stream = Files.list(serversDir)) {
             for (Path serverDir : stream.filter(Files::isDirectory).toList()) {
-                Path pidFile = serverDir.resolve("server.pid");
-                
-                if (Files.exists(pidFile)) {
-                    try {
-                        String pidContent = Files.readString(pidFile).trim();
-                        String[] parts = pidContent.split(":");
-                        if (parts.length >= 2) {
-                            long pid = Long.parseLong(parts[0]);
-                            int serverPort = Integer.parseInt(parts[1]);
-                            
-                            // Check if this server is using the requested port and is still running
-                            if ((serverPort == port || LuceeServerConfig.getShutdownPort(serverPort) == port) 
-                                && isProcessRunning(pid, serverDir)) {
-                                return serverDir.getFileName().toString();
-                            }
+                ServerPidRecord pidRecord = readServerPidRecord(serverDir);
+                if (pidRecord != null) {
+                    int serverPort = pidRecord.port;
+
+                    // Check if this server is using the requested port and is still running
+                    if (serverPort == port || LuceeServerConfig.getShutdownPort(serverPort) == port) {
+                        Long resolvedPid = resolveRunningPidWithCatalinaFallback(serverDir, pidRecord.pid, pidRecord.port);
+                        boolean running = resolvedPid != null || isProcessRunning(pidRecord.pid, serverDir);
+                        if (running) {
+                            return serverDir.getFileName().toString();
                         }
-                    } catch (Exception e) {
-                        // Invalid PID file, skip
                     }
                 }
             }
@@ -1866,6 +2069,14 @@ public class LuceeServerManager {
                 devDeps = depConfig.parseDevDependencies();
             }
 
+            java.util.Set<String> disabledExtensionNames = findDisabledExtensionNames(depConfig);
+            prodDeps = prodDeps.stream()
+                    .filter(org.lucee.lucli.config.DependencyConfig::isEnabled)
+                    .toList();
+            devDeps = devDeps.stream()
+                    .filter(org.lucee.lucli.config.DependencyConfig::isEnabled)
+                    .toList();
+
             if ((prodDeps == null || prodDeps.isEmpty()) && (devDeps == null || devDeps.isEmpty())) {
                 return; // Nothing to do
             }
@@ -1880,6 +2091,11 @@ public class LuceeServerManager {
                     new java.util.LinkedHashMap<>(existingLock.getDependencies());
             java.util.Map<String, org.lucee.lucli.deps.LockedDependency> newDev =
                     new java.util.LinkedHashMap<>(existingLock.getDevDependencies());
+
+            for (String name : disabledExtensionNames) {
+                newProd.remove(name);
+                newDev.remove(name);
+            }
 
             boolean materializeExtensionsOnInstall = settings.isMaterializeExtensionsOnInstallEnabled();
             ExtensionDependencyInstaller extInstaller =
@@ -1936,9 +2152,13 @@ public class LuceeServerManager {
      * Called before server startup.
      */
     public void deployExtensionsForServer(Path projectDir, Path serverInstanceDir) {
+        deployExtensionsForServer(projectDir, serverInstanceDir, null);
+    }
+
+    public void deployExtensionsForServer(Path projectDir, Path serverInstanceDir, String environment) {
         try {
             java.util.List<org.lucee.lucli.deps.LockedDependency> allExtensions =
-                resolveExtensionDependenciesForRuntime(projectDir);
+                resolveExtensionDependenciesForRuntime(projectDir, environment);
             
             if (!allExtensions.isEmpty()) {
                 // Deploy extensions that have URL or path
@@ -1997,9 +2217,13 @@ public class LuceeServerManager {
      * and entries are comma-separated.
      */
     public static String buildLuceeExtensions(Path projectDir) {
+        return buildLuceeExtensions(projectDir, null);
+    }
+
+    public static String buildLuceeExtensions(Path projectDir, String environment) {
         try {
             java.util.List<org.lucee.lucli.deps.LockedDependency> extensionDeps =
-                resolveExtensionDependenciesForRuntime(projectDir);
+                resolveExtensionDependenciesForRuntime(projectDir, environment);
             java.util.List<String> entries = new java.util.ArrayList<>();
 
             for (org.lucee.lucli.deps.LockedDependency dep : extensionDeps) {
@@ -2044,20 +2268,25 @@ public class LuceeServerManager {
      * 1) When dependencySettings.useLockFile=true: extension entries from lucee-lock.json
      * 2) Fallback: extension entries synthesized from lucee.json dependencies
      */
-    private static java.util.List<org.lucee.lucli.deps.LockedDependency> resolveExtensionDependenciesForRuntime(Path projectDir) {
+    private static java.util.List<org.lucee.lucli.deps.LockedDependency> resolveExtensionDependenciesForRuntime(Path projectDir, String environment) {
         java.util.List<org.lucee.lucli.deps.LockedDependency> fromLock = java.util.List.of();
         org.lucee.lucli.config.LuceeJsonConfig config = null;
         boolean preferLockFile = false;
+        java.util.Set<String> disabledExtensionNames = new java.util.HashSet<>();
 
         try {
             config = org.lucee.lucli.config.LuceeJsonConfig.load(projectDir);
+            if (environment != null && !environment.trim().isEmpty()) {
+                config.applyEnvironment(environment.trim());
+            }
             preferLockFile = config.getDependencySettings().isUseLockFileEnabled();
+            disabledExtensionNames = findDisabledExtensionNames(config);
         } catch (Exception ignored) {
             // If lucee.json can't be read, we'll fall back to lockfile-only behavior.
         }
 
         if (preferLockFile || config == null) {
-            fromLock = readExtensionDepsFromLockFile(projectDir);
+            fromLock = readExtensionDepsFromLockFile(projectDir, disabledExtensionNames);
             if (!fromLock.isEmpty()) {
                 return fromLock;
             }
@@ -2073,21 +2302,31 @@ public class LuceeServerManager {
 
         // Final fallback: use lock entries if present, even when not preferred.
         if (fromLock.isEmpty()) {
-            fromLock = readExtensionDepsFromLockFile(projectDir);
+            fromLock = readExtensionDepsFromLockFile(projectDir, disabledExtensionNames);
         }
         return fromLock;
     }
 
-    private static java.util.List<org.lucee.lucli.deps.LockedDependency> readExtensionDepsFromLockFile(Path projectDir) {
+    private static java.util.List<org.lucee.lucli.deps.LockedDependency> readExtensionDepsFromLockFile(
+            Path projectDir,
+            java.util.Set<String> disabledExtensionNames
+    ) {
         org.lucee.lucli.config.LuceeLockFile lockFile = org.lucee.lucli.config.LuceeLockFile.read(projectDir);
         java.util.List<org.lucee.lucli.deps.LockedDependency> allExtensions = new java.util.ArrayList<>();
-
-        for (org.lucee.lucli.deps.LockedDependency dep : lockFile.getDependencies().values()) {
+        for (java.util.Map.Entry<String, org.lucee.lucli.deps.LockedDependency> entry : lockFile.getDependencies().entrySet()) {
+            if (disabledExtensionNames.contains(entry.getKey())) {
+                continue;
+            }
+            org.lucee.lucli.deps.LockedDependency dep = entry.getValue();
             if ("extension".equals(dep.getType())) {
                 allExtensions.add(dep);
             }
         }
-        for (org.lucee.lucli.deps.LockedDependency dep : lockFile.getDevDependencies().values()) {
+        for (java.util.Map.Entry<String, org.lucee.lucli.deps.LockedDependency> entry : lockFile.getDevDependencies().entrySet()) {
+            if (disabledExtensionNames.contains(entry.getKey())) {
+                continue;
+            }
+            org.lucee.lucli.deps.LockedDependency dep = entry.getValue();
             if ("extension".equals(dep.getType())) {
                 allExtensions.add(dep);
             }
@@ -2106,6 +2345,9 @@ public class LuceeServerManager {
 
         java.util.List<org.lucee.lucli.deps.LockedDependency> out = new java.util.ArrayList<>();
         for (org.lucee.lucli.config.DependencyConfig dep : deps) {
+            if (!dep.isEnabled()) {
+                continue;
+            }
             if (!"extension".equals(dep.getType())) {
                 continue;
             }
@@ -2154,6 +2396,21 @@ public class LuceeServerManager {
         return out;
     }
 
+    private static java.util.Set<String> findDisabledExtensionNames(org.lucee.lucli.config.LuceeJsonConfig config) {
+        java.util.Set<String> out = new java.util.HashSet<>();
+        for (org.lucee.lucli.config.DependencyConfig dep : config.parseDependencies()) {
+            if ("extension".equals(dep.getType()) && !dep.isEnabled()) {
+                out.add(dep.getName());
+            }
+        }
+        for (org.lucee.lucli.config.DependencyConfig dep : config.parseDevDependencies()) {
+            if ("extension".equals(dep.getType()) && !dep.isEnabled()) {
+                out.add(dep.getName());
+            }
+        }
+        return out;
+    }
+
     private static Path resolveInstalledExtensionPath(Path projectDir, String installPath) {
         if (installPath == null || installPath.isBlank()) {
             return null;
@@ -2168,6 +2425,51 @@ public class LuceeServerManager {
         }
         Path raw = Path.of(configuredPath);
         return raw.isAbsolute() ? raw : projectDir.resolve(raw).normalize();
+    }
+
+    static boolean isWindowsOsName(String osName) {
+        return osName != null && osName.toLowerCase().contains("win");
+    }
+
+    static boolean isWindowsPlatform() {
+        return isWindowsOsName(System.getProperty("os.name", ""));
+    }
+
+    static String tomcatLaunchScriptName(boolean foreground, boolean windows) {
+        if (foreground) {
+            return windows ? "catalina.bat" : "catalina.sh";
+        }
+        return windows ? "startup.bat" : "startup.sh";
+    }
+
+    static Path resolveTomcatLaunchScript(Path catalinaHome, boolean foreground, boolean windows) {
+        String scriptName = tomcatLaunchScriptName(foreground, windows);
+        Path scriptPath = catalinaHome.resolve("bin").resolve(scriptName);
+        if (!foreground && !Files.exists(scriptPath)) {
+            // Lucee Express keeps startup scripts in the runtime root.
+            scriptPath = catalinaHome.resolve(scriptName);
+        }
+        return scriptPath;
+    }
+
+    static List<String> buildTomcatLaunchCommand(Path scriptPath, boolean foreground, boolean windows) {
+        List<String> command = new ArrayList<>();
+        if (windows) {
+            // .bat scripts must run through cmd on Windows.
+            command.add("cmd");
+            command.add("/c");
+            command.add(scriptPath.toString());
+            if (foreground) {
+                command.add("run");
+            }
+            return command;
+        }
+
+        command.add(scriptPath.toString());
+        if (foreground) {
+            command.add("run");
+        }
+        return command;
     }
     
     /**
@@ -2191,27 +2493,11 @@ public class LuceeServerManager {
                                               String environment,
                                               boolean foreground,
                                               String runtimeType) throws Exception {
-
-        boolean isWindows = System.getProperty("os.name", "").toLowerCase().contains("win");
+        boolean isWindows = isWindowsPlatform();
 
         // Build command — look for scripts in bin/ first, then root (Express compat)
-        List<String> command = new ArrayList<>();
-        Path scriptPath;
-
-        if (foreground) {
-            String scriptName = isWindows ? "catalina.bat" : "catalina.sh";
-            scriptPath = catalinaHome.resolve("bin").resolve(scriptName);
-            command.add(scriptPath.toString());
-            command.add("run");
-        } else {
-            String scriptName = isWindows ? "startup.bat" : "startup.sh";
-            scriptPath = catalinaHome.resolve("bin").resolve(scriptName);
-            // Lucee Express puts startup.sh in root; fall back
-            if (!Files.exists(scriptPath)) {
-                scriptPath = catalinaHome.resolve(scriptName);
-            }
-            command.add(scriptPath.toString());
-        }
+        Path scriptPath = resolveTomcatLaunchScript(catalinaHome, foreground, isWindows);
+        List<String> command = buildTomcatLaunchCommand(scriptPath, foreground, isWindows);
 
         if (!Files.exists(scriptPath)) {
             throw new Exception("Tomcat script not found: " + scriptPath);
@@ -2253,18 +2539,12 @@ public class LuceeServerManager {
             env.put("LUCEE_ADMIN_PASSWORD", config.admin.password);
         }
 
-        String luceeExtensions = LuceeServerManager.buildLuceeExtensions(projectDir);
+        String luceeExtensions = LuceeServerManager.buildLuceeExtensions(projectDir, environment);
         if (luceeExtensions != null && !luceeExtensions.isEmpty()) {
             env.put("LUCEE_EXTENSIONS", luceeExtensions);
         }
 
-        if (config.envVars != null) {
-            for (Map.Entry<String, String> entry : config.envVars.entrySet()) {
-                if (entry.getKey() != null && !entry.getKey().trim().isEmpty() && entry.getValue() != null) {
-                    env.put(entry.getKey(), entry.getValue());
-                }
-            }
-        }
+        LuceeServerConfig.applyConfigEnvVarsToProcessEnvironment(env, config.envVars);
         TomcatConfigSupport.applyAdminSecurityEnvironment(env, config);
 
         // Preflight: catalina.sh/startup.sh require JAVA_HOME (or JRE_HOME).
@@ -2284,6 +2564,7 @@ public class LuceeServerManager {
         if (runtimeType != null && !runtimeType.isEmpty()) {
             Files.writeString(catalinaBase.resolve(".runtime-type"), runtimeType);
         }
+        writeLuceeRuntimeMarkers(catalinaBase, config);
 
         if (foreground) {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -2423,18 +2704,12 @@ public class LuceeServerManager {
             env.put("LUCEE_ADMIN_PASSWORD", config.admin.password);
         }
 
-        String luceeExtensions = LuceeServerManager.buildLuceeExtensions(projectDir);
+        String luceeExtensions = LuceeServerManager.buildLuceeExtensions(projectDir, environment);
         if (luceeExtensions != null && !luceeExtensions.isEmpty()) {
             env.put("LUCEE_EXTENSIONS", luceeExtensions);
         }
 
-        if (config.envVars != null) {
-            for (Map.Entry<String, String> entry : config.envVars.entrySet()) {
-                if (entry.getKey() != null && !entry.getKey().trim().isEmpty() && entry.getValue() != null) {
-                    env.put(entry.getKey(), entry.getValue());
-                }
-            }
-        }
+        LuceeServerConfig.applyConfigEnvVarsToProcessEnvironment(env, config.envVars);
         TomcatConfigSupport.applyAdminSecurityEnvironment(env, config);
 
         // Marker files
@@ -2447,6 +2722,7 @@ public class LuceeServerManager {
             Files.writeString(jettyBase.resolve(".environment"), environment.trim());
         }
         Files.writeString(jettyBase.resolve(".runtime-type"), "jetty");
+        writeLuceeRuntimeMarkers(jettyBase, config);
 
         // Write Jetty stop markers so stopServer() can perform graceful shutdown
         Files.writeString(jettyBase.resolve(".jetty-stop-port"), String.valueOf(stopPort));

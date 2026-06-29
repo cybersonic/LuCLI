@@ -66,7 +66,7 @@ public class ExternalCommandProcessor {
         
         // System commands
         knownExternalCommands.addAll(Arrays.asList(
-            "ps", "top", "htop", "kill", "killall", "which", "whereis"
+            "ps", "top", "htop", "kill", "killall", "which", "whereis", "env"
         ));
     }
     
@@ -157,7 +157,15 @@ public class ExternalCommandProcessor {
      */
     private String executeExternalCommand(String[] commandParts) {
         try {
-            ProcessBuilder pb = new ProcessBuilder(commandParts);
+            String[] normalizedCommandParts = commandParts;
+            if (commandParts != null
+                && commandParts.length > 0
+                && "env".equalsIgnoreCase(commandParts[0])
+                && System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT).contains("windows")) {
+                normalizedCommandParts = new String[] { "cmd", "/c", "set" };
+            }
+
+            ProcessBuilder pb = new ProcessBuilder(normalizedCommandParts);
             pb.directory(fileSystemProcessor.getFileSystemState().getCurrentWorkingDirectory().toFile());
             pb.redirectErrorStream(true); // Merge stderr with stdout
             if (LuCLI.scriptEnvironment != null && !LuCLI.scriptEnvironment.isEmpty()) {
@@ -181,14 +189,14 @@ public class ExternalCommandProcessor {
             
             if (!finished) {
                 process.destroyForcibly();
-                return "⚠️ Command timed out after 30 seconds: " + String.join(" ", commandParts);
+                return "⚠️ Command timed out after 30 seconds: " + String.join(" ", normalizedCommandParts);
             }
             
             int exitCode = process.exitValue();
             String result = output.toString().trim();
             
             if (exitCode != 0 && result.isEmpty()) {
-                return "❌ Command failed with exit code " + exitCode + ": " + String.join(" ", commandParts);
+                return "❌ Command failed with exit code " + exitCode + ": " + String.join(" ", normalizedCommandParts);
             }
             
             return result;

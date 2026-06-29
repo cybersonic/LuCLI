@@ -40,4 +40,27 @@ component extends="modules.BaseModule" {
         return ["secret"];
     }
 
+    /**
+     * hint: Declares per-tool MCP input schemas (mcpToolSpecs convention).
+     * The greet entry's description deliberately differs from the @subject
+     * doc hint so tests can prove the DECLARED schema beat the
+     * signature-derived one.
+     */
+    public struct function mcpToolSpecs() {
+        return {
+            "greet" = {
+                "type" = "object",
+                "properties" = {
+                    "subject" = {
+                        "type" = "string",
+                        "description" = "Greeting target (declared via mcpToolSpecs)",
+                        "default" = "world"
+                    }
+                },
+                "required" = [],
+                "additionalProperties" = false
+            }
+        };
+    }
+
 }

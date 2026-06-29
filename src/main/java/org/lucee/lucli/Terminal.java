@@ -46,6 +46,24 @@ public class Terminal {
         
         startInteractiveMode();
     }
+
+    /**
+     * Treat a trailing literal "?" token as shorthand for "--help" in terminal mode.
+     */
+    private static String[] preprocessQuestionMarkHelpAlias(String[] args) {
+        if (args == null || args.length == 0) {
+            return args;
+        }
+
+        int lastIndex = args.length - 1;
+        if (!"?".equals(args[lastIndex])) {
+            return args;
+        }
+
+        String[] rewritten = Arrays.copyOf(args, args.length);
+        rewritten[lastIndex] = "--help";
+        return rewritten;
+    }
     
     /**
      * Execute a single command and exit (CLI mode)
@@ -168,7 +186,7 @@ public class Terminal {
                 // Dispatch command
                 String result = dispatchCommand(trimmed);
                 if (result != null && !result.isEmpty()) {
-                    terminal.writer().println(result);
+                    terminal.writer().println(EmojiSupport.process(result));
                 }
                 
                 terminal.writer().flush();
@@ -234,6 +252,7 @@ public class Terminal {
             if (parts.length == 0) {
                 return "";
             }
+            parts = preprocessQuestionMarkHelpAlias(parts);
             
             String command = parts[0].toLowerCase();
             

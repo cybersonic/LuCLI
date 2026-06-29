@@ -9,6 +9,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.stream.Collectors;
 
 import org.lucee.lucli.LuCLI;
 
@@ -118,7 +119,9 @@ public class InstallCommand implements Callable<Integer> {
         
         // 3. Parse dependencies
         StringOutput.Quick.info(" Resolving dependencies...");
-        List<DependencyConfig> deps = config.parseDependencies();
+        List<DependencyConfig> deps = config.parseDependencies().stream()
+            .filter(DependencyConfig::isEnabled)
+            .collect(Collectors.toList());
         
         // 4. Determine if we should install devDependencies
         boolean installDev = !production;
@@ -128,7 +131,9 @@ public class InstallCommand implements Callable<Integer> {
         boolean useLockFile = config.getDependencySettings().isUseLockFileEnabled();
         boolean materializeExtensionsOnInstall = config.getDependencySettings().isMaterializeExtensionsOnInstallEnabled();
         
-        List<DependencyConfig> devDeps = installDev ? config.parseDevDependencies() : List.of();
+        List<DependencyConfig> devDeps = installDev
+            ? config.parseDevDependencies().stream().filter(DependencyConfig::isEnabled).collect(Collectors.toList())
+            : List.of();
         
         // 5. Basic stats for supported sources (git + extensions)
         long gitCount = deps.stream().filter(d -> "git".equals(d.getSource())).count();

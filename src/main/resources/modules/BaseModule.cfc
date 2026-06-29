@@ -244,6 +244,7 @@ component {
 
         var moduleVersion = structKeyExists(cfg, "version") && len(trim(cfg.version)) ? cfg.version : "";
         var moduleDesc = structKeyExists(cfg, "description") && len(trim(cfg.description)) ? cfg.description : "";
+        var fullCommand = getFullCommandForModule(lcase(moduleName));
         var nl = chr(10);
         var buf = "";
 
@@ -260,7 +261,7 @@ component {
         }
         buf &= nl;
         buf &= static.bold & "Usage:" & static.reset & nl;
-        buf &= "  lucli " & lcase(moduleName) & " <subcommand> [options]" & nl;
+        buf &= "  " & fullCommand & " <subcommand> [options]" & nl;
         buf &= nl;
 
         // Functions from BaseModule to exclude from command listing
@@ -293,6 +294,12 @@ component {
             // Use only the first line of the hint for the command listing
             var rawHint = structKeyExists(fn, "hint") ? trim(fn.hint) : "";
             var hint = len(rawHint) ? listFirst(rawHint, chr(10) & chr(13)) : "";
+            var lucliPrefix = "lucli " & lcase(moduleName);
+            if (len(hint)) {
+                if (left(lcase(hint), len(lucliPrefix)) == lucliPrefix) {
+                    hint = fullCommand & mid(hint, len(lucliPrefix) + 1, len(hint));
+                }
+            }
             var pad = repeatString(" ", max(maxLen - len(name) + 2, 2));
 
             if (len(hint)) {
@@ -341,5 +348,29 @@ component {
         }
 
         return buf;
+    }
+
+    private string function getFullCommandForModule(required string moduleName) {
+        var binaryName = "";
+        if (structKeyExists(server, "system") && isStruct(server.system)) {
+            if (structKeyExists(server.system, "lucli.binary.name")) {
+                binaryName = lCase(trim(server.system["lucli.binary.name"]));
+            } else if (
+                structKeyExists(server.system, "properties")
+                && isStruct(server.system.properties)
+                && structKeyExists(server.system.properties, "lucli.binary.name")
+            ) {
+                binaryName = lCase(trim(server.system.properties["lucli.binary.name"]));
+            }
+        }
+        if (!len(binaryName)) {
+            binaryName = lCase(trim(createObject("java", "java.lang.System").getProperty("lucli.binary.name", "")));
+        }
+
+        if (binaryName == lcase(arguments.moduleName)) {
+            return lcase(arguments.moduleName);
+        }
+
+        return "lucli " & lcase(arguments.moduleName);
     }
 }

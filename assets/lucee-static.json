@@ -1,7 +1,8 @@
 {
   "name" : "assets",
+  "version" : "1.0.0",
   "lucee" : {
-    "version" : "6.2.2.91"
+    "version" : "7.0.4.34"
   },
   "port" : 8080,
   "shutdownPort" : 9080,

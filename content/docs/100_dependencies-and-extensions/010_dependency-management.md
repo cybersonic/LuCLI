@@ -6,6 +6,7 @@ layout: docs
 LuCLI can manage CFML libraries and Lucee extensions as dependencies for your project, using the `dependencies`, `devDependencies`, and `dependencySettings` sections in `lucee.json`. Installed dependencies are recorded in `lucee-lock.json` only when lock files are enabled (`dependencySettings.useLockFile: true`).
 
 This page focuses on how dependencies and extensions work, independent of the rest of the `lucee.json` configuration.
+For copy/paste snippets, see [Dependency Examples](./020_dependency-examples/).
 
 ## Git dependency caching
 

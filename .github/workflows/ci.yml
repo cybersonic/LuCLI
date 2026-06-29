@@ -5,6 +5,7 @@ on:
     branches: [ main, master, develop ]
   pull_request:
     branches: [ main, master ]
+  workflow_call:
 
 jobs:
   # ==================================================
@@ -191,3 +192,11 @@ jobs:
         mvn clean package -DskipTests -Pbinary
         chmod +x target/lucli
         ./target/lucli --version
+
+    - name: Build Windows executable (Launch4j)
+      if: runner.os == 'Windows'
+      run: mvn package -DskipTests -Pwindows-exe
+
+    - name: Verify Windows executable works
+      if: runner.os == 'Windows'
+      run: .\target\lucli.exe --version

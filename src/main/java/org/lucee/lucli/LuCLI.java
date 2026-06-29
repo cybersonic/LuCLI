@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.regex.Matcher;
@@ -39,6 +40,7 @@ import org.lucee.lucli.cli.commands.deps.InstallCommand;
 import org.lucee.lucli.cli.commands.logic.IfCommand;
 import org.lucee.lucli.cli.commands.logic.XSetCommand;
 import org.lucee.lucli.modules.ModuleCommand;
+import org.lucee.lucli.modules.BundledModuleInstaller;
 import org.lucee.lucli.script.LucliScriptPreprocessor;
 import org.lucee.lucli.secrets.LocalSecretStore;
 import org.lucee.lucli.secrets.SecretStore;
@@ -389,6 +391,17 @@ public class LuCLI implements Callable<Integer> {
         if (args != null && args.length > 0) {
             cmdArgs.addAll(Arrays.asList(args));
         }
+        // Re-inject root-level flags that picocli consumed at the root before the
+        // module shortcut dispatched, so the module can see them (e.g. the wheels
+        // module's `doctor --verbose` / `stats --verbose` / `test --verbose`).
+        // Appended AFTER the module args so the subcommand stays the first
+        // positional; the module's arg parser reads --verbose/--debug from there.
+        if (isVerbose()) {
+            cmdArgs.add("--verbose");
+        }
+        if (isDebug()) {
+            cmdArgs.add("--debug");
+        }
         return spec.commandLine().execute(cmdArgs.toArray(new String[0]));
     }
 
@@ -531,18 +544,28 @@ public class LuCLI implements Callable<Integer> {
         // Suppress JLine "Unable to create a system terminal" warning
         java.util.logging.Logger.getLogger("org.jline").setLevel(java.util.logging.Level.SEVERE);
 
+        // Install any modules bundled into /modules-install in the active profile home.
+        // Runs once per process and is safe to call from both CLI entry and embedded flows.
+        BundledModuleInstaller.ensureBundledModulesInstalled();
+
         // For one-shot in-process invocations, default runtime CWD to JVM user.dir
         // unless a session flow has already provided an explicit value.
         if (runtimeCwd == null) {
             setRuntimeCwd(Paths.get(System.getProperty("user.dir")));
         }
 
-        // Pre-process: if first arg is a module name and --help/-h is present,
-        // rewrite to "modules run <module> --help" so picocli routes to
-        // ModulesRunCommandImpl (which delegates to the module's showHelp())
-        // instead of showing root-level help.
+        // Pre-process: if first arg is a module name and --help/-h (or the bare
+        // `help` verb) is present, rewrite to "modules run <module> ... --help" so
+        // picocli routes to ModulesRunCommandImpl (which delegates to the module's
+        // showHelp()) instead of showing root-level help.
+        args = preprocessQuestionMarkHelpAlias(args);
         args = preprocessModuleHelp(args);
-        
+        // Pre-process: rewrite `<module> [subs...] --version=<value>` to
+        // "modules run <module> ... --version=<value>" so the root --version flag
+        // (versionHelp, boolean) doesn't short-circuit on a value-bearing
+        // `--version=<tag>` a module wants (e.g. `wheels deploy --version=v1`).
+        args = preprocessModuleVersion(args);
+
         // Create Picocli CommandLine with our main command
         CommandLine cmd = new CommandLine(new LuCLI());
         cmd.setExpandAtFiles(false);
@@ -615,7 +638,28 @@ public class LuCLI implements Callable<Integer> {
         String first = args[0];
         if (first.startsWith("-")) return args;
 
-        // Check whether --help / -h appears anywhere after the first arg
+        // Only rewrite when the first arg is an installed module (e.g. the
+        // binary-name-aliased `wheels`). Bare `lucli help` (first arg not a
+        // module) is left to LuCLI's builtin HelpCommand, unchanged.
+        if (!ModuleCommand.moduleExists(first)) return args;
+
+        // (a) `<module> help [subcommand...]` — the bare `help` verb right after
+        // the module name. Drop it and append --help so it routes to the
+        // module's showHelp instead of LuCLI's builtin HelpCommand (which would
+        // print the root/global banner — the `wheels help` brand-leak).
+        if ("help".equals(args[1])) {
+            List<String> rewritten = new ArrayList<>();
+            rewritten.add("modules");
+            rewritten.add("run");
+            rewritten.add(first);
+            for (int i = 2; i < args.length; i++) {
+                rewritten.add(args[i]);
+            }
+            rewritten.add("--help");
+            return rewritten.toArray(new String[0]);
+        }
+
+        // (b) --help / -h anywhere after the module name.
         boolean hasHelp = false;
         for (int i = 1; i < args.length; i++) {
             if ("--help".equals(args[i]) || "-h".equals(args[i])) {
@@ -625,10 +669,64 @@ public class LuCLI implements Callable<Integer> {
         }
         if (!hasHelp) return args;
 
-        // Only rewrite when the first arg is an installed module
+        // Prepend "modules run" so picocli delegates to ModulesRunCommandImpl
+        List<String> rewritten = new ArrayList<>();
+        rewritten.add("modules");
+        rewritten.add("run");
+        for (String arg : args) {
+            rewritten.add(arg);
+        }
+        return rewritten.toArray(new String[0]);
+    }
+
+    /**
+     * Treat a trailing literal {@code ?} token as help shorthand by rewriting it
+     * to {@code --help} before picocli parsing.
+     *
+     * Examples:
+     * - {@code lucli server ?} -> {@code lucli server --help}
+     * - {@code lucli server start ?} -> {@code lucli server start --help}
+     */
+    private static String[] preprocessQuestionMarkHelpAlias(String[] args) {
+        if (args == null || args.length == 0) {
+            return args;
+        }
+
+        int lastIndex = args.length - 1;
+        if (!"?".equals(args[lastIndex])) {
+            return args;
+        }
+
+        String[] rewritten = Arrays.copyOf(args, args.length);
+        rewritten[lastIndex] = "--help";
+        return rewritten;
+    }
+
+    /**
+     * Rewrite `<module> [subcommands...] --version=<value>` to
+     * "modules run <module> [subcommands...] --version=<value>" so a module that
+     * accepts a value-bearing --version (e.g. `wheels deploy --version=v1.2.3`,
+     * Kamal-compatible) is not blocked by the root's boolean versionHelp --version
+     * flag, which would short-circuit with "Invalid value for option '--version'".
+     * A bare `--version` (no value) and bare `lucli --version` (first arg not a
+     * module) are untouched, preserving the root version-banner behavior.
+     */
+    private static String[] preprocessModuleVersion(String[] args) {
+        if (args.length < 2) return args;
+
+        String first = args[0];
+        if (first.startsWith("-")) return args;
         if (!ModuleCommand.moduleExists(first)) return args;
 
-        // Prepend "modules run" so picocli delegates to ModulesRunCommandImpl
+        boolean hasVersionValue = false;
+        for (int i = 1; i < args.length; i++) {
+            if (args[i].startsWith("--version=")) {
+                hasVersionValue = true;
+                break;
+            }
+        }
+        if (!hasVersionValue) return args;
+
         List<String> rewritten = new ArrayList<>();
         rewritten.add("modules");
         rewritten.add("run");
@@ -993,7 +1091,7 @@ public class LuCLI implements Callable<Integer> {
      * 
      * Examples:
      *   getVersionInfo(false) -> "LuCLI 0.1.207-SNAPSHOT"
-     *   getVersionInfo(true)  -> "LuCLI 0.1.207-SNAPSHOT\nLucee Version: 6.2.2.91"
+     *   getVersionInfo(true)  -> "LuCLI 0.1.207-SNAPSHOT\nLucee Version: 6.2.2.91\nJava Version: openjdk 21.0.5 2024-10-15 LTS"
      */
     public static String getVersionInfo(boolean includeLucee) {
         StringBuilder info = new StringBuilder();
@@ -1001,7 +1099,12 @@ public class LuCLI implements Callable<Integer> {
         // Version information header first so tools/tests that only see the
         // first few lines can still parse the version without needing to
         // strip the ASCII art banner.
-        String ver = getVersion();
+        String ver = activeProfile.productVersionOverride();
+        if (ver == null || ver.trim().isEmpty()) {
+            ver = getVersion();
+        } else {
+            ver = ver.trim();
+        }
         info.append(activeProfile.displayName()).append(" Version: ").append(ver).append("\n");
 
         // ASCII art banner — provided by the active profile
@@ -1017,6 +1120,8 @@ public class LuCLI implements Callable<Integer> {
                 info.append("Lucee Version: Error - ").append(e.getMessage()).append("\n");
             }
         }
+
+        info.append("Java Version: ").append(getJavaVersionInfo()).append("\n");
         
         // Copyright and repository information
         info.append("\n");
@@ -1031,6 +1136,12 @@ public class LuCLI implements Callable<Integer> {
      * @return version in pom
      */
     public static String getVersion() {
+        // Preferred source: filtered build resource available in both
+        // mvn exec:java development runs and packaged JAR executions.
+        String resourceVersion = readVersionFromResource();
+        if (resourceVersion != null && !resourceVersion.isBlank()) {
+            return resourceVersion;
+        }
         // Try to read version from JAR manifest
         Package pkg = LuCLI.class.getPackage();
         if (pkg != null) {
@@ -1058,6 +1169,72 @@ public class LuCLI implements Callable<Integer> {
         // Final fallback
         return "unknown";
     }
+
+    private static String readVersionFromResource() {
+        try (java.io.InputStream in = LuCLI.class.getResourceAsStream("/lucli/version.properties")) {
+            if (in == null) {
+                return null;
+            }
+            Properties props = new Properties();
+            props.load(in);
+            String version = props.getProperty("lucli.version");
+            if (version == null) {
+                return null;
+            }
+            version = version.trim();
+            return version.isEmpty() ? null : version;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String getJavaVersionInfo() {
+        try {
+            String javaExecutable = System.getProperty("os.name", "").toLowerCase().contains("win")
+                ? Paths.get(System.getProperty("java.home"), "bin", "java.exe").toString()
+                : Paths.get(System.getProperty("java.home"), "bin", "java").toString();
+
+            Process process = new ProcessBuilder(javaExecutable, "-version")
+                .redirectErrorStream(true)
+                .start();
+            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            process.waitFor();
+            if (output != null && !output.trim().isEmpty()) {
+                String[] lines = output.split("\\R");
+                for (String line : lines) {
+                    if (line == null || line.trim().isEmpty()) {
+                        continue;
+                    }
+                    return normalizeJavaVersionLine(line);
+                }
+            }
+        } catch (Exception e) {
+            // Fall back to runtime properties
+        }
+
+        String runtimeName = System.getProperty("java.runtime.name");
+        if (runtimeName == null || runtimeName.trim().isEmpty()) {
+            runtimeName = "java";
+        }
+        String runtimeVersion = System.getProperty("java.runtime.version");
+        if (runtimeVersion == null || runtimeVersion.trim().isEmpty()) {
+            runtimeVersion = System.getProperty("java.version");
+        }
+        if (runtimeVersion == null || runtimeVersion.trim().isEmpty()) {
+            return runtimeName;
+        }
+        return runtimeName + " " + runtimeVersion;
+    }
+
+    private static String normalizeJavaVersionLine(String line) {
+        String normalized = line == null ? "" : line.trim();
+        if (normalized.isEmpty()) {
+            return normalized;
+        }
+        normalized = normalized.replaceAll("\"", "");
+        normalized = normalized.replaceFirst("(?i)\\bversion\\b\\s+", "");
+        return normalized.trim();
+    }
     
     /**
      * Execute a .lucli script file line by line.
@@ -1083,6 +1260,9 @@ public class LuCLI implements Callable<Integer> {
         String env = getCurrentEnvironment();
         if (env != null) {
             verbose("Executing with environment: " + env);
+            // Expose the resolved execution environment to script consumers
+            // through the mutable script environment map used by __env.
+            scriptEnvironment.put("LUCLI_ENV", env);
         }
 
         // Pre-load --envfile if specified (covers the RunCommand path)

@@ -7,39 +7,17 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-java@v4
-        with:
-          java-version: 21
-          distribution: temurin
-
-      - name: Cache Maven
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
-
-      - name: Build with Maven
-        run: mvn clean package -Pbinary
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: artifacts-${{ runner.os }}
-          path: target/lucli*
-          retention-days: 1
+  ci-verification:
+    name: CI Verification
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+      issues: write
 
   publish:
-    needs: build
+    needs: ci-verification
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -54,6 +32,15 @@ jobs:
           java-version: 21
           distribution: temurin
 
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-21-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-21-
+            ${{ runner.os }}-m2-
+
       - name: Get version
         id: version
         run: |
@@ -67,6 +54,7 @@ jobs:
 
       - name: Check if tag exists
         id: tag_check
+        if: steps.version.outputs.is_snapshot == 'false'
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
           if git rev-parse "v$VERSION" >/dev/null 2>&1; then
@@ -75,112 +63,35 @@ jobs:
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Download all artifacts
-        if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
-        uses: actions/download-artifact@v4
-
-      - name: Setup JAR signing keystore
+      - name: Build artifacts for JReleaser
         if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
         run: |
-          echo "${{ secrets.JARSIGNER_KEYSTORE_BASE64 }}" | base64 -d > $HOME/.lucli-keystore.jks
-          ls -la $HOME/.lucli-keystore.jks
-
-      - name: Organize release files
-        if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
-        run: |
+          mvn -DskipTests=true clean package -Pwindows-exe
+          cat src/bin/lucli.sh target/lucli.jar > target/lucli
+          chmod +x target/lucli
+          rm -f target/lucli-windows.zip
+          zip -j target/lucli-windows.zip target/lucli.exe
+          # Legacy asset names (released as files.artifacts in jreleaser.yml).
+          # Every release up to v0.3.17 shipped these names and downstream
+          # consumers (Wheels CI, Homebrew formulas, Scoop manifests, the
+          # bootstrap installer) pin them.
           VERSION="${{ steps.version.outputs.VERSION }}"
-          mkdir -p release-files
-          
-          # Find and copy artifacts from any OS build
-          for dir in artifacts-*; do
-            if [ -d "$dir" ]; then
-              echo "Processing $dir"
-              
-              # Copy JAR (once)
-              if [ -f "$dir/lucli.jar" ] && [ ! -f "release-files/lucli-$VERSION.jar" ]; then
-                cp "$dir/lucli.jar" "release-files/lucli-$VERSION.jar"
-                cp "$dir/lucli.jar" "release-files/lucli.jar"
-              fi
-              
-              # Copy Unix binary
-              if [ -f "$dir/lucli" ] && [[ "$dir" == *"ubuntu"* || "$dir" == *"Linux"* ]]; then
-                cp "$dir/lucli" "release-files/lucli-$VERSION-linux"
-                chmod +x "release-files/lucli-$VERSION-linux"
-              fi
-              
-              # Copy macOS binary
-              if [ -f "$dir/lucli" ] && [[ "$dir" == *"macos"* || "$dir" == *"macOS"* ]]; then
-                cp "$dir/lucli" "release-files/lucli-$VERSION-macos"
-                chmod +x "release-files/lucli-$VERSION-macos"
-              fi
-              
-              # Copy Windows batch
-              if [ -f "$dir/lucli.bat" ]; then
-                cp "$dir/lucli.bat" "release-files/lucli-$VERSION.bat"
-              fi
-            fi
-          done
+          cp target/lucli     "target/lucli-$VERSION-linux"
+          cp target/lucli     "target/lucli-$VERSION-macos"
+          cp target/lucli.exe "target/lucli-$VERSION.exe"
+          cp target/lucli.jar "target/lucli-$VERSION.jar"
 
-          # Include bootstrap installers
-          if [ -f "scripts/install.sh" ]; then
-            cp "scripts/install.sh" "release-files/install.sh"
-            chmod +x "release-files/install.sh"
-          fi
-          if [ -f "scripts/install.ps1" ]; then
-            cp "scripts/install.ps1" "release-files/install.ps1"
-          fi
-          
-          echo "Release files prepared:"
-          ls -lh release-files/
-
-      - name: Sign JAR files
+      - name: Publish GitHub release, Homebrew tap, and Scoop bucket with JReleaser
         if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
         env:
-          JARSIGNER_STOREPASS: ${{ secrets.JARSIGNER_STOREPASS }}
-          JARSIGNER_KEYPASS: ${{ secrets.JARSIGNER_KEYPASS }}
-        run: |
-          VERSION="${{ steps.version.outputs.VERSION }}"
-          
-          # Sign the versioned JAR
-          if [ -f "release-files/lucli-$VERSION.jar" ]; then
-            echo "Signing lucli-$VERSION.jar..."
-            jarsigner -keystore $HOME/.lucli-keystore.jks \
-              -storepass "$JARSIGNER_STOREPASS" \
-              -keypass "$JARSIGNER_KEYPASS" \
-              -tsa http://timestamp.digicert.com \
-              release-files/lucli-$VERSION.jar lucli
-            
-            # Verify signature
-            jarsigner -verify -verbose release-files/lucli-$VERSION.jar
-          fi
-          
-          # Sign the unversioned JAR
-          if [ -f "release-files/lucli.jar" ]; then
-            echo "Signing lucli.jar..."
-            jarsigner -keystore $HOME/.lucli-keystore.jks \
-              -storepass "$JARSIGNER_STOREPASS" \
-              -keypass "$JARSIGNER_KEYPASS" \
-              -tsa http://timestamp.digicert.com \
-              release-files/lucli.jar lucli
-            
-            # Verify signature
-            jarsigner -verify -verbose release-files/lucli.jar
-          fi
-          
-          echo "✅ JAR signing complete"
-
-      - name: Create git tag
-        if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
-        run: |
-          VERSION="${{ steps.version.outputs.VERSION }}"
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git tag -a "v$VERSION" -m "Release version $VERSION"
-          git push origin "v$VERSION"
+          JRELEASER_GITHUB_TOKEN: ${{ secrets.JRELEASER_GITHUB_TOKEN || secrets.HOMEBREW_TAP_TOKEN }}
+          JRELEASER_HOMEBREW_GITHUB_TOKEN: ${{ secrets.JRELEASER_HOMEBREW_GITHUB_TOKEN || secrets.HOMEBREW_TAP_TOKEN || secrets.JRELEASER_GITHUB_TOKEN }}
+          JRELEASER_SCOOP_GITHUB_TOKEN: ${{ secrets.JRELEASER_SCOOP_GITHUB_TOKEN || secrets.JRELEASER_GITHUB_TOKEN || secrets.HOMEBREW_TAP_TOKEN }}
+        run: mvn -DskipTests=true -Djreleaser.config.file=jreleaser.yml jreleaser:full-release
 
       - name: Build JAR for Docker image
         if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
-        run: mvn -q -DskipTests package
+        run: mvn -DskipTests=true package
 
       - name: Set up Docker Buildx
         if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
@@ -210,7 +121,7 @@ jobs:
 
       - name: Build JAR for Docker image (snapshot)
         if: steps.version.outputs.is_snapshot == 'true'
-        run: mvn -q -DskipTests package
+        run: mvn -o -q -DskipTests package
 
       - name: Set up Docker Buildx (snapshot)
         if: steps.version.outputs.is_snapshot == 'true'
@@ -237,23 +148,3 @@ jobs:
           tags: |
             markdrew/lucli:${{ steps.version.outputs.VERSION }}
             markdrew/lucli:snapshot
-
-      - name: Create release
-        if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.version.outputs.VERSION }}
-          name: v${{ steps.version.outputs.VERSION }}
-          body: |
-            ## LuCLI v${{ steps.version.outputs.VERSION }}
-            
-            ### Downloads
-            - **lucli-${{ steps.version.outputs.VERSION }}.jar**/**lucli.jar** - Universal JAR (Java 21+, works everywhere) ✅ Signed
-            - **lucli-${{ steps.version.outputs.VERSION }}-linux** - Shell wrapper for Linux (Java 21+ required)
-            - **lucli-${{ steps.version.outputs.VERSION }}-macos** - Shell wrapper for macOS (Java 21+ required)
-            - **lucli-${{ steps.version.outputs.VERSION }}.bat** - Windows batch launcher (Java 21+ required)
-            - **install.sh** - POSIX installer bootstrap (`curl ... | sh`)
-            - **install.ps1** - PowerShell installer bootstrap (`irm ... | iex`)
-            
-            All downloads require Java 21+. JAR files are cryptographically signed for authenticity.
-          files: release-files/*

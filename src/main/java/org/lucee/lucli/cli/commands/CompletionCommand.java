@@ -31,19 +31,30 @@ public class CompletionCommand implements Callable<Integer> {
     @Override
     public Integer call() throws Exception {
         // If no subcommand specified, show help
-        System.out.println("Usage: lucli completion <bash|zsh|md>");
+        String bin = binaryName();
+        System.out.println("Usage: " + bin + " completion <bash|zsh|md>");
         System.out.println("\nGenerate shell completion scripts or markdown documentation.");
         System.out.println("\nCommands:");
         System.out.println("  bash  Generate bash completion script");
         System.out.println("  zsh   Generate zsh completion script");
         System.out.println("  md    Generate markdown documentation");
         System.out.println("\nInstallation:");
-        System.out.println("  Bash: lucli completion bash | sudo tee /etc/bash_completion.d/lucli");
-        System.out.println("  Zsh:  lucli completion zsh > ~/.zsh/lucli_completion && echo 'source ~/.zsh/lucli_completion' >> ~/.zshrc");
-        System.out.println("  Docs: lucli completion md > docs/command-reference.md");
+        System.out.println("  Bash: " + bin + " completion bash | sudo tee /etc/bash_completion.d/" + bin);
+        System.out.println("  Zsh:  " + bin + " completion zsh > ~/.zsh/" + bin + "_completion && echo 'source ~/.zsh/" + bin + "_completion' >> ~/.zshrc");
+        System.out.println("  Docs: " + bin + " completion md > docs/command-reference.md");
         System.out.println("\nNote: The zsh script is bash-style completion with bashcompinit glue. It must be sourced from your .zshrc.");
         System.out.println("      Windows PowerShell completion is not yet supported.");
         return 0;
+    }
+
+    /**
+     * The name the CLI was invoked as — {@code lucli} by default, or the alias
+     * (e.g. {@code wheels}) passed via {@code -Dlucli.binary.name}. Usage text and
+     * generated completion/markdown reference this so an aliased binary documents
+     * and completes <em>itself</em> rather than the underlying {@code lucli} runtime.
+     */
+    private static String binaryName() {
+        return System.getProperty("lucli.binary.name", "lucli");
     }
 
     /**
@@ -65,7 +76,7 @@ public class CompletionCommand implements Callable<Integer> {
             // Use picocli's built-in AutoComplete generator so completion scripts
             // follow the standard, well-tested format understood by bash and zsh.
             CommandLine cmd = new CommandLine(new org.lucee.lucli.LuCLI());
-            String baseScript = AutoComplete.bash("lucli", cmd);
+            String baseScript = AutoComplete.bash(binaryName(), cmd);
             
             // Post-process to make version completion dynamic
             return makeDynamicVersionCompletion(baseScript);
@@ -91,7 +102,7 @@ public class CompletionCommand implements Callable<Integer> {
             // Picocli's generated bash completion script is also compatible with zsh
             // (it contains the bashcompinit glue), so we can reuse the same script.
             CommandLine cmd = new CommandLine(new org.lucee.lucli.LuCLI());
-            String baseScript = AutoComplete.bash("lucli", cmd);
+            String baseScript = AutoComplete.bash(binaryName(), cmd);
             
             // Post-process to make version completion dynamic
             return makeDynamicVersionCompletion(baseScript);
@@ -100,12 +111,12 @@ public class CompletionCommand implements Callable<Integer> {
     
     /**
      * Post-processes the generated completion script to replace hardcoded version arrays
-     * with dynamic calls to 'lucli versions-list'.
+     * with dynamic calls to the active binary's 'versions-list' command.
      */
     private static String makeDynamicVersionCompletion(String script) {
         // Create the dynamic replacement
         // Simply use the versions as-is, no quotes needed for completion
-        String dynamicArray = "local version_option_args=($(lucli versions-list 2>/dev/null))";
+        String dynamicArray = "local version_option_args=($(" + binaryName() + " versions-list 2>/dev/null))";
         
         // Replace all occurrences of version_option_args array declarations
         // This handles both the start and tart (alias) commands
@@ -146,6 +157,7 @@ public class CompletionCommand implements Callable<Integer> {
 
         private static String generateMarkdownDoc() {
             CommandLine cmd = new CommandLine(new org.lucee.lucli.LuCLI());
+            String bin = binaryName();
             StringBuilder md = new StringBuilder();
             
             // Add front matter and title
@@ -201,16 +213,16 @@ public class CompletionCommand implements Callable<Integer> {
             md.append("### Most Common Commands\n\n");
             md.append("```bash\n");
             md.append("# Start server\n");
-            md.append("lucli server start\n\n");
+            md.append(bin).append(" server start\n\n");
             md.append("# Stop server\n");
-            md.append("lucli server stop\n\n");
+            md.append(bin).append(" server stop\n\n");
             md.append("# Execute script\n");
-            md.append("lucli script.cfs\n\n");
+            md.append(bin).append(" script.cfs\n\n");
             md.append("# Interactive mode\n");
-            md.append("lucli\n\n");
+            md.append(bin).append("\n\n");
             md.append("# Get help\n");
-            md.append("lucli --help\n");
-            md.append("lucli help server\n");
+            md.append(bin).append(" --help\n");
+            md.append(bin).append(" help server\n");
             md.append("```\n");
             
             return md.toString();
@@ -238,9 +250,10 @@ public class CompletionCommand implements Callable<Integer> {
             CommandLine.Model.CommandSpec spec = cmd.getCommandSpec();
             String headerPrefix = "#".repeat(headerLevel);
             String commandPath = getCommandPath(cmd);
-            
+            String bin = binaryName();
+
             // Command name and description (use full command path like "server start")
-            md.append(headerPrefix).append(" `lucli ").append(commandPath).append("`\n\n");
+            md.append(headerPrefix).append(" `").append(bin).append(" ").append(commandPath).append("`\n\n");
             
             if (spec.usageMessage().description().length > 0) {
                 md.append(spec.usageMessage().description()[0]).append("\n\n");
@@ -249,7 +262,7 @@ public class CompletionCommand implements Callable<Integer> {
             // Usage
             md.append("**Usage:**\n");
             md.append("```bash\n");
-            md.append("lucli ").append(commandPath);
+            md.append(bin).append(" ").append(commandPath);
             if (!spec.options().isEmpty()) {
                 md.append(" [OPTIONS]");
             }
@@ -288,7 +301,7 @@ public class CompletionCommand implements Callable<Integer> {
                         ? subSpec.usageMessage().description()[0] : "";
                     String subCommandPath = getCommandPath(subcommand);
                     
-                    md.append("- **`lucli ").append(subCommandPath).append("`** - ")
+                    md.append("- **`").append(bin).append(" ").append(subCommandPath).append("`** - ")
                       .append(subDescription).append("\\n");
                 }
                 md.append("\\n");

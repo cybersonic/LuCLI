@@ -1,7 +1,10 @@
     package org.lucee.lucli.server;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
+import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -15,6 +18,7 @@ import javax.script.ScriptException;
 
 import org.lucee.lucli.LuceeScriptEngine;
 import org.lucee.lucli.secrets.LucliSecretProviderSupport;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -40,18 +44,18 @@ public class LuceeServerConfig {
         /**
          * @deprecated Top-level "version" now refers to the app/project version.
          * Lucee engine version should be specified under the "lucee" block:
-         * {@code "lucee": { "version": "6.2.2.91" }}.
+         * {@code "lucee": { "version": "7.0.4.34" }}.
          * This field is kept for backward-compatible deserialization of legacy
          * lucee.json files. Use {@link LuceeServerConfig#getLuceeVersion(ServerConfig)}
          * to obtain the effective Lucee engine version.
          */
         @Deprecated
-        public String version = "6.2.2.91";
+        public String version = "1.0.0";
 
         /**
          * Lucee engine configuration (version and variant).
          * New-format lucee.json files should use this block:
-         * {@code "lucee": { "version": "6.2.2.91", "variant": "standard" }}
+         * {@code "lucee": { "version": "7.0.4.34", "variant": "standard" }}
          */
         public LuceeEngineConfig lucee;
         /**
@@ -114,6 +118,13 @@ public class LuceeServerConfig {
          * against the project directory when starting the server.
          */
         public String configurationFile;
+
+        /**
+         * Internal-only path to the base configurationFile when environment overrides
+         * specify their own configurationFile. Used to preserve base->env layering.
+         */
+        @JsonIgnore
+        public String baseConfigurationFile;
 
         /**
          * Optional path to a project-specific environment file. When set, this
@@ -245,10 +256,10 @@ public class LuceeServerConfig {
      */
     public static class LuceeEngineConfig {
         /**
-         * Lucee engine version (e.g. "6.2.2.91", "7.0.0.346-RC").
+         * Lucee engine version (e.g. "7.0.4.34", "7.0.0.346-RC").
          * Classifiers like -RC or -SNAPSHOT are part of this string.
          */
-        public String version = "6.2.2.91";
+        public String version = "7.0.4.34";
 
         /**
          * Lucee JAR variant: "standard" (default), "light", or "zero".
@@ -282,7 +293,8 @@ public class LuceeServerConfig {
      */
     public static ServerConfig loadConfig(Path projectDir, String configFileName) throws IOException {
         // Reset any previously loaded .env variables for this new project/config load
-        envVariables.clear();
+        clearLoadedEnvFileVariables();
+        clearRealizedEnvVariables();
 
         Path configFile = projectDir.resolve(configFileName);
         
@@ -293,7 +305,16 @@ public class LuceeServerConfig {
             return defaultConfig;
         }
         
-        ServerConfig config = objectMapper.readValue(configFile.toFile(), ServerConfig.class);
+        // Parse as JsonNode first so we can preprocess placeholder-backed numeric fields
+        // (e.g. "port": "#env:HTTP_PORT#") before strict int deserialization.
+        JsonNode rawConfigNode = objectMapper.readTree(configFile.toFile());
+
+        // Load env vars early so numeric placeholder preprocessing can resolve #env values.
+        String initialEnvFileName = resolveConfiguredEnvFileName(rawConfigNode);
+        loadEnvFile(projectDir, initialEnvFileName);
+
+        JsonNode preprocessedConfigNode = preprocessNumericFieldsForDeserialization(rawConfigNode);
+        ServerConfig config = objectMapper.treeToValue(preprocessedConfigNode, ServerConfig.class);
         
         // Migrate legacy top-level "version" to the new "lucee" block
         migrateLegacyLuceeVersion(config);
@@ -328,9 +349,8 @@ public class LuceeServerConfig {
         }
 
         // Load environment variables from the configured envFile (or default .env)
-        String envFileName = (config.envFile == null || config.envFile.trim().isEmpty())
-                ? ".env"
-                : config.envFile.trim();
+        clearLoadedEnvFileVariables();
+        String envFileName = resolveConfiguredEnvFileName(config);
         loadEnvFile(projectDir, envFileName);
 
         // Perform variable substitution on string fields
@@ -376,6 +396,8 @@ public class LuceeServerConfig {
     public static final String MIN_SUPPORTED_LUCEE_VERSION = "6.1.0.0";
     private static final int MIN_SUPPORTED_LUCEE_MAJOR = 6;
     private static final int MIN_SUPPORTED_LUCEE_MINOR = 1;
+    private static final java.util.regex.Pattern INTEGER_LITERAL_PATTERN =
+            java.util.regex.Pattern.compile("^[+-]?\\d+$");
 
     // Track whether we've already shown the deprecation warning for this session
     private static boolean hasShownDeprecationWarning = false;
@@ -440,7 +462,7 @@ public class LuceeServerConfig {
      */
     public static String getLuceeVersion(ServerConfig config) {
         if (config == null) {
-            return "6.2.2.91";
+            return "7.0.4.34";
         }
         if (config.lucee != null && config.lucee.version != null
                 && !config.lucee.version.trim().isEmpty()) {
@@ -448,7 +470,10 @@ public class LuceeServerConfig {
         }
         @SuppressWarnings("deprecation")
         String legacy = config.version;
-        return (legacy != null && !legacy.trim().isEmpty()) ? legacy : "6.2.2.91";
+        if (legacy != null && !legacy.trim().isEmpty() && LUCEE_VERSION_PATTERN.matcher(legacy.trim()).matches()) {
+            return legacy.trim();
+        }
+        return "7.0.4.34";
     }
 
     /**
@@ -470,16 +495,16 @@ public class LuceeServerConfig {
 
     /**
      * Set the Lucee engine version on a configuration, writing to the new
-     * {@code lucee} block (and keeping the deprecated field in sync).
+     * {@code lucee} block.
+     *
+     * IMPORTANT: this must not overwrite the top-level {@code version} field.
+     * The top-level field is now reserved for app/project versioning.
      */
     public static void setLuceeVersion(ServerConfig config, String version) {
         if (config.lucee == null) {
             config.lucee = new LuceeEngineConfig();
         }
         config.lucee.version = version;
-        // Keep deprecated field in sync for one release cycle
-        @SuppressWarnings("deprecation")
-        String ignored = config.version = version;
     }
 
     /**
@@ -754,6 +779,75 @@ public class LuceeServerConfig {
     // Map to store environment variables loaded from .env / envFile for the current config.
     // This map is cleared at the start of each loadConfig call.
     private static final Map<String, String> envVariables = new java.util.HashMap<>();
+    // Map tracking variables that were actually realized while resolving #env:...#
+    // (or deprecated ${...}) placeholders during configuration substitution.
+    // Keys are variable names; values are the resolved values (including defaults when used).
+    private static final Map<String, String> realizedEnvVariables = new java.util.LinkedHashMap<>();
+
+    private static void clearLoadedEnvFileVariables() {
+        envVariables.clear();
+    }
+
+    private static String resolveConfiguredEnvFileName(ServerConfig config) {
+        String envFileName = (config == null || config.envFile == null || config.envFile.trim().isEmpty())
+                ? ".env"
+                : config.envFile.trim();
+        return substituteField(envFileName);
+    }
+
+    private static String resolveConfiguredEnvFileName(JsonNode configNode) {
+        String envFileName = ".env";
+        if (configNode != null && configNode.isObject()) {
+            JsonNode envFileNode = configNode.get("envFile");
+            if (envFileNode != null && envFileNode.isTextual()) {
+                String rawValue = envFileNode.asText();
+                if (rawValue != null && !rawValue.trim().isEmpty()) {
+                    envFileName = rawValue.trim();
+                }
+            }
+        }
+        return substituteField(envFileName);
+    }
+
+    private static String resolveOptionalConfiguredEnvFileName(JsonNode configNode) {
+        if (configNode == null || !configNode.isObject()) {
+            return null;
+        }
+        JsonNode envFileNode = configNode.get("envFile");
+        if (envFileNode == null || !envFileNode.isTextual()) {
+            return null;
+        }
+        String rawValue = envFileNode.asText();
+        if (rawValue == null || rawValue.trim().isEmpty()) {
+            return null;
+        }
+        return substituteField(rawValue.trim());
+    }
+
+    private static void clearRealizedEnvVariables() {
+        synchronized (realizedEnvVariables) {
+            realizedEnvVariables.clear();
+        }
+    }
+
+    private static void recordRealizedEnvVariable(String name, String value) {
+        if (name == null || name.trim().isEmpty() || value == null) {
+            return;
+        }
+        synchronized (realizedEnvVariables) {
+            realizedEnvVariables.put(name, value);
+        }
+    }
+
+    /**
+     * Returns a snapshot of environment variables that were realized while substituting
+     * placeholders in the most recent configuration load/apply flow.
+     */
+    public static Map<String, String> getRealizedEnvVariables() {
+        synchronized (realizedEnvVariables) {
+            return new java.util.LinkedHashMap<>(realizedEnvVariables);
+        }
+    }
     
     /**
      * Apply the currently loaded .env / envFile variables into a target process
@@ -776,6 +870,106 @@ public class LuceeServerConfig {
             targetEnv.putIfAbsent(key, value);
         }
     }
+
+    /**
+     * Apply {@code envVars} from config into a target environment map.
+     *
+     * Semantics:
+     * - non-null value: set/override target key
+     * - null value: explicitly unset/remove target key
+     */
+    public static void applyConfigEnvVarsToProcessEnvironment(
+            Map<String, String> targetEnv,
+            Map<String, String> configuredEnvVars
+    ) {
+        if (targetEnv == null || configuredEnvVars == null || configuredEnvVars.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, String> entry : configuredEnvVars.entrySet()) {
+            String key = entry.getKey();
+            if (key == null || key.trim().isEmpty()) {
+                continue;
+            }
+            String value = entry.getValue();
+            if (value == null) {
+                targetEnv.remove(key);
+            } else {
+                targetEnv.put(key, value);
+            }
+        }
+    }
+
+    /**
+     * Reload env variables from the currently effective {@code envFile} for an
+     * already materialized config object.
+     *
+     * This is used for startup flows that may bypass {@link #loadConfig(Path, String)}
+     * (for example locked snapshots or in-memory sandbox configs), ensuring runtime
+     * process environment is always sourced from the effective envFile/default .env.
+     */
+    public static void reloadConfiguredEnvFile(ServerConfig config, Path projectDir) {
+        clearLoadedEnvFileVariables();
+        if (projectDir == null) {
+            return;
+        }
+        String envFileName = resolveConfiguredEnvFileName(config);
+        loadEnvFile(projectDir, envFileName);
+    }
+
+    /**
+     * Reload env variables for server startup while supporting layered env files
+     * when an environment-specific override is active.
+     *
+     * Layering behavior:
+     * - Load base envFile first (or default .env)
+     * - Then load environments.{env}.envFile (if explicitly configured), allowing
+     *   keys in the environment-specific file to override matching base-file keys.
+     *
+     * If the config file cannot be read, this gracefully falls back to the
+     * effective config's envFile/default .env behavior.
+     */
+    public static void reloadConfiguredEnvFile(
+            ServerConfig config,
+            Path projectDir,
+            String configFileName,
+            String environmentName
+    ) {
+        clearLoadedEnvFileVariables();
+        if (projectDir == null) {
+            return;
+        }
+
+        String resolvedConfigFileName = (configFileName == null || configFileName.trim().isEmpty())
+                ? "lucee.json"
+                : configFileName.trim();
+
+        try {
+            Path configFilePath = projectDir.resolve(resolvedConfigFileName);
+            if (!Files.exists(configFilePath)) {
+                String envFileName = resolveConfiguredEnvFileName(config);
+                loadEnvFile(projectDir, envFileName);
+                return;
+            }
+
+            JsonNode rootNode = objectMapper.readTree(configFilePath.toFile());
+            String baseEnvFileName = resolveConfiguredEnvFileName(rootNode);
+            loadEnvFile(projectDir, baseEnvFileName);
+
+            if (environmentName != null && !environmentName.trim().isEmpty()) {
+                JsonNode environmentsNode = rootNode.get("environments");
+                if (environmentsNode != null && environmentsNode.isObject()) {
+                    JsonNode envNode = environmentsNode.get(environmentName.trim());
+                    String envOverrideEnvFileName = resolveOptionalConfiguredEnvFileName(envNode);
+                    if (envOverrideEnvFileName != null) {
+                        loadEnvFile(projectDir, envOverrideEnvFileName);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            String envFileName = resolveConfiguredEnvFileName(config);
+            loadEnvFile(projectDir, envFileName);
+        }
+    }
     
     /**
      * Get an environment variable, checking .env loaded vars first, then system env vars
@@ -783,10 +977,98 @@ public class LuceeServerConfig {
     private static String getEnvVar(String name) {
         // Check .env file variables first
         if (envVariables.containsKey(name)) {
-            return envVariables.get(name);
+            String value = envVariables.get(name);
+            if (value != null) {
+                recordRealizedEnvVariable(name, value);
+            }
+            return value;
         }
         // Fall back to system environment variables
-        return System.getenv(name);
+        String value = System.getenv(name);
+        if (value != null) {
+            recordRealizedEnvVariable(name, value);
+        }
+        return value;
+    }
+
+    /**
+     * Preprocess numeric fields that are strongly typed as integers in ServerConfig
+     * so placeholders like "#env:HTTP_PORT#" can be resolved before Jackson's strict
+     * int deserialization.
+     */
+    private static JsonNode preprocessNumericFieldsForDeserialization(JsonNode rootNode) {
+        if (rootNode == null || !rootNode.isObject()) {
+            return rootNode;
+        }
+        JsonNode copy = rootNode.deepCopy();
+        preprocessServerConfigNumericFields((com.fasterxml.jackson.databind.node.ObjectNode) copy);
+        return copy;
+    }
+
+    private static void preprocessServerConfigNumericFields(
+            com.fasterxml.jackson.databind.node.ObjectNode configNode) {
+        if (configNode == null) {
+            return;
+        }
+
+        preprocessIntegerField(configNode, "port");
+        preprocessIntegerField(configNode, "shutdownPort");
+
+        JsonNode httpsNode = configNode.get("https");
+        if (httpsNode != null && httpsNode.isObject()) {
+            preprocessIntegerField((com.fasterxml.jackson.databind.node.ObjectNode) httpsNode, "port");
+        }
+
+        JsonNode ajpNode = configNode.get("ajp");
+        if (ajpNode != null && ajpNode.isObject()) {
+            preprocessIntegerField((com.fasterxml.jackson.databind.node.ObjectNode) ajpNode, "port");
+        }
+
+        JsonNode monitoringNode = configNode.get("monitoring");
+        if (monitoringNode != null && monitoringNode.isObject()) {
+            JsonNode jmxNode = monitoringNode.get("jmx");
+            if (jmxNode != null && jmxNode.isObject()) {
+                preprocessIntegerField((com.fasterxml.jackson.databind.node.ObjectNode) jmxNode, "port");
+            }
+        }
+
+        JsonNode environmentsNode = configNode.get("environments");
+        if (environmentsNode != null && environmentsNode.isObject()) {
+            environmentsNode.fields().forEachRemaining(entry -> {
+                JsonNode envNode = entry.getValue();
+                if (envNode != null && envNode.isObject()) {
+                    preprocessServerConfigNumericFields((com.fasterxml.jackson.databind.node.ObjectNode) envNode);
+                }
+            });
+        }
+    }
+
+    private static void preprocessIntegerField(
+            com.fasterxml.jackson.databind.node.ObjectNode objectNode, String fieldName) {
+        if (objectNode == null || fieldName == null) {
+            return;
+        }
+        JsonNode valueNode = objectNode.get(fieldName);
+        if (valueNode == null || !valueNode.isTextual()) {
+            return;
+        }
+
+        String substituted = substituteField(valueNode.asText());
+        if (substituted == null) {
+            return;
+        }
+
+        String trimmed = substituted.trim();
+        if (INTEGER_LITERAL_PATTERN.matcher(trimmed).matches()) {
+            try {
+                objectNode.put(fieldName, Integer.parseInt(trimmed));
+                return;
+            } catch (NumberFormatException ignored) {
+                // Leave as string; normal Jackson validation will report invalid range.
+            }
+        }
+
+        objectNode.put(fieldName, substituted);
     }
     
     /**
@@ -1323,6 +1605,7 @@ public class LuceeServerConfig {
                 replacement = getEnvVar(varName);
                 if (replacement == null) {
                     replacement = defaultValue;
+                    recordRealizedEnvVariable(varName, defaultValue);
                 }
             } else {
                 // Just the variable name
@@ -1471,6 +1754,7 @@ public class LuceeServerConfig {
                 replacement = getEnvVar(varName);
                 if (replacement == null) {
                     replacement = defaultValue;
+                    recordRealizedEnvVariable(varName, defaultValue);
                 }
             } else {
                 // Just the variable name
@@ -1695,10 +1979,49 @@ public class LuceeServerConfig {
     }
     
     /**
-     * Check if a port is available
+     * Check if a port is available.
+     *
+     * <p>Two probes, because neither alone is sufficient on a dual-stack host:
+     * <ol>
+     *   <li><b>Connect probe</b> against both loopback families (127.0.0.1 and
+     *       ::1). A successful connect means something is actively LISTENing on
+     *       the port. This is what catches IPv4-only listeners that the bind
+     *       probe misses: on a dual-stack JVM (no -Djava.net.preferIPv4Stack)
+     *       {@code new ServerSocket(port)} binds the IPv6 wildcard, which does
+     *       not conflict with a socket bound to the IPv4 family — so an
+     *       IPv4-only listener (python http.server, Django runserver,
+     *       Postgres/Redis on 127.0.0.1, ...) would otherwise be reported as
+     *       "available" and the server would start on top of it. Connecting is
+     *       not fooled by sockets in TIME_WAIT, so it does not regress quick
+     *       restarts.</li>
+     *   <li><b>Bind probe</b> on the wildcard, preserving the original behaviour
+     *       for ports that cannot be bound even though nothing is accepting
+     *       connections there.</li>
+     * </ol>
      */
     public static boolean isPortAvailable(int port) {
+        // A listener on either loopback family means the port is already in use.
+        if (isListening("127.0.0.1", port) || isListening("::1", port)) {
+            return false;
+        }
+        // Fall back to a bind probe for ports that are reserved/bind-blocked
+        // without an accepting listener.
         try (ServerSocket socket = new ServerSocket(port)) {
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    /**
+     * True if a TCP connection to {@code host:port} succeeds quickly — i.e. some
+     * process is actively LISTENing there. Connection refused, timeout, or an
+     * unresolvable/unreachable address all mean "nothing listening on this
+     * address" and return false.
+     */
+    private static boolean isListening(String host, int port) {
+        try (Socket probe = new Socket()) {
+            probe.connect(new InetSocketAddress(InetAddress.getByName(host), port), 200);
             return true;
         } catch (IOException e) {
             return false;
@@ -1941,32 +2264,26 @@ public class LuceeServerConfig {
 
         JsonNode result = null;
 
-        // Start with external configuration file as base (if specified and exists)
-        if (config.configurationFile != null && !config.configurationFile.trim().isEmpty()) {
-            Path cfConfigPath = Paths.get(config.configurationFile);
-            if (!cfConfigPath.isAbsolute()) {
-                cfConfigPath = projectDir.resolve(cfConfigPath);
-            }
+        // Layer external configuration files (if configured):
+        //   baseConfigurationFile (set by applyEnvironment when env overrides file)
+        //   -> configurationFile (effective file after environment merge)
+        Path baseConfigurationFilePath = resolveConfigurationFilePath(projectDir, config.baseConfigurationFile);
+        Path effectiveConfigurationFilePath = resolveConfigurationFilePath(projectDir, config.configurationFile);
 
-            if (Files.exists(cfConfigPath)) {
-                result = objectMapper.readTree(cfConfigPath.toFile());
-            }
+        if (baseConfigurationFilePath != null && Files.exists(baseConfigurationFilePath)) {
+            result = objectMapper.readTree(baseConfigurationFilePath.toFile());
+        }
+        if (effectiveConfigurationFilePath != null
+                && Files.exists(effectiveConfigurationFilePath)
+                && (baseConfigurationFilePath == null
+                    || !baseConfigurationFilePath.equals(effectiveConfigurationFilePath))) {
+            JsonNode effectiveFileConfig = objectMapper.readTree(effectiveConfigurationFilePath.toFile());
+            result = mergeCfConfigNodes(result, effectiveFileConfig);
         }
 
         // Merge inline configuration (if present) as overrides
         if (config.configuration != null && !config.configuration.isNull()) {
-            if (result == null) {
-                // No base config file; use inline config directly
-                result = config.configuration;
-            } else {
-                // Merge inline config into the base; inline values override file values
-                try {
-                    result = mergeLuceeConfigSection(result, config.configuration);
-                }
-                catch (Exception e) {
-                    throw new IOException("ConfigMerge via Lucee failed: " + e.getMessage(), e);
-                }
-            }
+            result = mergeCfConfigNodes(result, config.configuration);
         }
         
         // Add dependency mappings as final layer (highest precedence)
@@ -1989,6 +2306,35 @@ public class LuceeServerConfig {
         }
 
         return result;
+    }
+
+    private static JsonNode mergeCfConfigNodes(JsonNode baseConfig, JsonNode overrideConfig) throws IOException {
+        if (overrideConfig == null || overrideConfig.isNull()) {
+            return baseConfig;
+        }
+        if (baseConfig == null || baseConfig.isNull()) {
+            return overrideConfig;
+        }
+        try {
+            return mergeLuceeConfigSection(baseConfig, overrideConfig);
+        }
+        catch (Exception e) {
+            throw new IOException("ConfigMerge via Lucee failed: " + e.getMessage(), e);
+        }
+    }
+
+    private static Path resolveConfigurationFilePath(Path projectDir, String configurationFile) {
+        if (configurationFile == null || configurationFile.trim().isEmpty()) {
+            return null;
+        }
+        Path cfConfigPath = Paths.get(configurationFile.trim());
+        if (!cfConfigPath.isAbsolute()) {
+            if (projectDir == null) {
+                return null;
+            }
+            cfConfigPath = projectDir.resolve(cfConfigPath);
+        }
+        return cfConfigPath.normalize();
     }
 
     /**
@@ -2027,10 +2373,9 @@ public class LuceeServerConfig {
      * @param base The base ServerConfig loaded from lucee.json
      * @param envName The environment name to apply (e.g., "prod", "dev", "staging")
      * @return A new ServerConfig with environment overrides deep-merged into the base
-     * @throws IllegalArgumentException if the environment name is not found
      */
     public static ServerConfig applyEnvironment(ServerConfig base, String envName) {
-        return applyEnvironment(base, envName, null);
+        return applyEnvironment(base, envName, null, "lucee.json");
     }
     
     /**
@@ -2040,33 +2385,47 @@ public class LuceeServerConfig {
      * @param envName The environment name to apply (e.g., "prod", "dev", "staging")
      * @param projectDir The project directory (used to read raw environment JSON)
      * @return A new ServerConfig with environment overrides deep-merged into the base
-     * @throws IllegalArgumentException if the environment name is not found
      */
     public static ServerConfig applyEnvironment(ServerConfig base, String envName, Path projectDir) {
+        return applyEnvironment(base, envName, projectDir, "lucee.json");
+    }
+
+    /**
+     * Apply environment-specific overrides to a base ServerConfig.
+     * 
+     * @param base The base ServerConfig loaded from the provided config file
+     * @param envName The environment name to apply (e.g., "prod", "dev", "staging")
+     * @param projectDir The project directory (used to read raw environment JSON)
+     * @param configFileName The config file name to read environment overrides from
+     * @return A new ServerConfig with environment overrides deep-merged into the base
+     */
+    public static ServerConfig applyEnvironment(
+            ServerConfig base,
+            String envName,
+            Path projectDir,
+            String configFileName) {
         if (envName == null || envName.trim().isEmpty()) {
             return base; // No environment specified
         }
+        String normalizedEnvName = envName.trim();
+        String resolvedConfigFileName = (configFileName == null || configFileName.trim().isEmpty())
+                ? "lucee.json"
+                : configFileName.trim();
         
-        if (base.environments == null || !base.environments.containsKey(envName)) {
-            // Build a helpful error message listing available environments
-            StringBuilder errorMsg = new StringBuilder();
-            errorMsg.append("Environment '").append(envName).append("' not found in lucee.json");
-            
-            if (base.environments != null && !base.environments.isEmpty()) {
-                errorMsg.append("\nAvailable environments: ");
-                errorMsg.append(String.join(", ", base.environments.keySet()));
-            } else {
-                errorMsg.append("\nNo environments are defined in lucee.json");
-            }
-            
-            throw new IllegalArgumentException(errorMsg.toString());
+        // Missing environments should be a no-op so callers can pass --env values
+        // safely and continue with already computed defaults/base config.
+        if (base.environments == null || !base.environments.containsKey(normalizedEnvName)) {
+            System.err.println(
+                "⚠️  Environment '" + normalizedEnvName + "' not found in " + resolvedConfigFileName + "; using base configuration."
+            );
+            return base;
         }
         
         // Prevent recursive environment definitions
-        ServerConfig envOverrides = base.environments.get(envName);
+        ServerConfig envOverrides = base.environments.get(normalizedEnvName);
         if (envOverrides.environments != null && !envOverrides.environments.isEmpty()) {
             throw new IllegalArgumentException(
-                "Environment '" + envName + "' cannot contain nested 'environments' definitions"
+                "Environment '" + normalizedEnvName + "' cannot contain nested 'environments' definitions"
             );
         }
         
@@ -2074,20 +2433,60 @@ public class LuceeServerConfig {
             // Try to read raw environment JSON from file to get only explicitly set fields
             JsonNode rawEnvNode = null;
             if (projectDir != null) {
-                Path configFile = projectDir.resolve("lucee.json");
+                Path configFile = projectDir.resolve(resolvedConfigFileName);
                 if (Files.exists(configFile)) {
                     JsonNode rootNode = objectMapper.readTree(configFile.toFile());
                     JsonNode envsNode = rootNode.get("environments");
-                    if (envsNode != null && envsNode.has(envName)) {
-                        rawEnvNode = envsNode.get(envName);
+                    if (envsNode != null && envsNode.has(normalizedEnvName)) {
+                        rawEnvNode = envsNode.get(normalizedEnvName);
                     }
                 }
             }
             
-            return deepMergeConfigs(base, rawEnvNode);
+            boolean hasEnvironmentConfigurationFileOverride =
+                hasExplicitEnvironmentConfigurationFileOverride(rawEnvNode);
+            ServerConfig merged = deepMergeConfigs(base, rawEnvNode);
+            if (hasEnvironmentConfigurationFileOverride) {
+                String inheritedBaseConfigurationFile =
+                    (base.baseConfigurationFile != null && !base.baseConfigurationFile.trim().isEmpty())
+                        ? base.baseConfigurationFile
+                        : base.configurationFile;
+                merged.baseConfigurationFile = inheritedBaseConfigurationFile;
+            }
+            if (projectDir != null) {
+                // Re-evaluate env files after environment overrides are applied.
+                // Layering behavior:
+                //   base envFile -> environment-specific envFile override
+                // so environment-specific keys can override matching base-file keys.
+                clearLoadedEnvFileVariables();
+                loadEnvFile(projectDir, resolveConfiguredEnvFileName(base));
+                String envOverrideEnvFileName = resolveOptionalConfiguredEnvFileName(rawEnvNode);
+                if (envOverrideEnvFileName != null) {
+                    loadEnvFile(projectDir, envOverrideEnvFileName);
+                }
+            }
+            // Re-run substitution after environment merge so placeholders introduced
+            // by environment-specific overrides are realized.
+            clearRealizedEnvVariables();
+            substituteEnvironmentVariables(merged);
+            if (projectDir != null) {
+                resolveRelativeEnvVarPaths(merged, projectDir);
+            }
+            return merged;
         } catch (IOException e) {
             throw new RuntimeException("Failed to merge environment configuration: " + e.getMessage(), e);
         }
+    }
+
+    private static boolean hasExplicitEnvironmentConfigurationFileOverride(JsonNode rawEnvNode) {
+        if (rawEnvNode == null || !rawEnvNode.isObject()) {
+            return false;
+        }
+        JsonNode configurationFileNode = rawEnvNode.get("configurationFile");
+        return configurationFileNode != null
+            && !configurationFileNode.isNull()
+            && configurationFileNode.isTextual()
+            && !configurationFileNode.asText().trim().isEmpty();
     }
     
     /**
@@ -2137,6 +2536,9 @@ public class LuceeServerConfig {
             // put merged "configuration" back into the merged node
             ((com.fasterxml.jackson.databind.node.ObjectNode) mergedNode).set("configuration", mergedConfig);
 
+            // Environment overrides may introduce placeholder-backed numeric strings
+            // (e.g. "port": "#env:HTTP_PORT#"), so preprocess before strict binding.
+            mergedNode = preprocessNumericFieldsForDeserialization(mergedNode);
             return objectMapper.treeToValue(mergedNode, ServerConfig.class);
         }
         catch (Exception e) {
@@ -2213,6 +2615,9 @@ public class LuceeServerConfig {
             
             // Process production dependencies
             for (org.lucee.lucli.config.DependencyConfig dep : config.parseDependencies()) {
+                if (!dep.isEnabled()) {
+                    continue;
+                }
                 if (dep.getMapping() != null && dep.getInstallPath() != null) {
                     addComputedMapping(mappingsNode, dep, projectDir);
                 }
@@ -2220,6 +2625,9 @@ public class LuceeServerConfig {
             
             // Process dev dependencies
             for (org.lucee.lucli.config.DependencyConfig dep : config.parseDevDependencies()) {
+                if (!dep.isEnabled()) {
+                    continue;
+                }
                 if (dep.getMapping() != null && dep.getInstallPath() != null) {
                     addComputedMapping(mappingsNode, dep, projectDir);
                 }

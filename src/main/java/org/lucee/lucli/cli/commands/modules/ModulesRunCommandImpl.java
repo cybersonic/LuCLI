@@ -3,10 +3,10 @@ package org.lucee.lucli.cli.commands.modules;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.concurrent.Callable;
 
 import org.lucee.lucli.LuceeScriptEngine;
+import org.lucee.lucli.paths.LucliPaths;
 
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -39,7 +39,20 @@ public class ModulesRunCommandImpl implements Callable<Integer> {
     public Integer call() throws Exception {
         if (helpRequested) {
             LuceeScriptEngine engine = LuceeScriptEngine.getInstance();
-            engine.executeModule(moduleName, new String[]{"showHelp"});
+            // When a subcommand was supplied (e.g. `wheels migrate --help` →
+            // `modules run wheels migrate --help`), forward it to the module's
+            // showHelp so the module can render per-subcommand help. Modules whose
+            // showHelp ignores the extra argument fall back to their global help —
+            // i.e. behavior is unchanged for them. Without this the subcommand was
+            // discarded and every `<module> <subcommand> --help` showed global help.
+            if (moduleArgs != null && !moduleArgs.isEmpty()) {
+                java.util.List<String> helpArgs = new java.util.ArrayList<>();
+                helpArgs.add("showHelp");
+                helpArgs.addAll(moduleArgs);
+                engine.executeModule(moduleName, helpArgs.toArray(new String[0]));
+            } else {
+                engine.executeModule(moduleName, new String[]{"showHelp"});
+            }
             return 0;
         }
         runModule();
@@ -79,24 +92,14 @@ public class ModulesRunCommandImpl implements Callable<Integer> {
     }
 
     /**
-     * Get the modules directory (~/.lucli/modules)
+     * Get the active profile's modules directory, creating it if needed.
+     *
+     * <p>Delegates to {@link LucliPaths#resolve()} so the path tracks the active
+     * CLI profile (e.g., {@code ~/.lucli/modules} or {@code ~/.wheels/modules}).</p>
      */
     private Path getModulesDirectory() throws IOException {
-        String lucliHomeStr = System.getProperty("lucli.home");
-        if (lucliHomeStr == null) {
-            lucliHomeStr = System.getenv("LUCLI_HOME");
-        }
-        if (lucliHomeStr == null) {
-            String userHome = System.getProperty("user.home");
-            lucliHomeStr = Paths.get(userHome, ".lucli").toString();
-        }
-        
-        Path lucliHome = Paths.get(lucliHomeStr);
-        Path modulesDir = lucliHome.resolve("modules");
-        
-        // Ensure the directories exist
+        Path modulesDir = LucliPaths.resolve().modulesDir();
         Files.createDirectories(modulesDir);
-        
         return modulesDir;
     }
 

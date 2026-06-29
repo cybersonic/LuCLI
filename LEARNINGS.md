@@ -83,3 +83,69 @@ Append new entries at the bottom under the appropriate date/session.
 ## 2026-05-07
 
 - In `.lucli` command normalization, stripping a leading `lucli` prefix must operate on the raw command string (substring after `lucli`) rather than reparsing/rejoining tokens; rebuilding from `parseCommand(...)` drops original quoting and can split values like `\"Mark Drew\"` into multiple arguments.
+
+## 2026-05-08
+
+- For `lucli --version`, the most user-friendly Java runtime line comes from the first line of `java -version` output (normalized to remove quotes and the literal `version` token), with fallback to `java.runtime.name` + `java.runtime.version` when process execution is unavailable.
+- `tests/test-bats.sh` only rebuilds `target/lucli.jar` / `target/lucli` when artifacts are missing or unrunnable; after source changes, rebuild artifacts manually before running BATS to avoid stale-binary false negatives.
+
+## 2026-05-18
+
+- Dependency descriptors in `lucee.json` now support `enabled` (default `true`); setting `enabled: false` on `type: "extension"` entries suppresses extension install/materialization and runtime activation, and environment-level dependency overrides can flip this flag via `environments.<env>.dependencies.<name>.enabled`.
+
+## 2026-05-19
+
+- To make `server start --dry-run --include-env` explain config substitution clearly, track a dedicated ordered map of realized placeholders in `LuceeServerConfig` during `#env:`/legacy `${}` resolution (including `:-default` fallbacks) and render that map separately from runtime process env vars.
+- After `applyEnvironment(...)` deep-merges `environments.<env>` overrides into base config, rerun placeholder substitution and relative env path normalization on the merged tree; env-specific overlays can introduce new placeholders and relative `envVars` paths that are not present in the base config.
+- Dry-run preview selection now uses an explicit section model: default `--dry-run` prints realized `config`, but any explicit selector (`--include ...` or alias flags like `--include-env`) disables implicit config output unless `config` is explicitly requested (for example `--include config,env`).
+
+## 2026-05-20
+
+- When applying environment overrides, reloading the realized merged `envFile` is required before building runtime env previews/process env; otherwise `--env <name>` can show/use variables from the base env file even when `envFile` is correctly overridden in `environments.<name>`.
+
+## 2026-05-27
+
+- `LuceeServerConfig` does strict Jackson binding to typed numeric fields (`port`, `shutdownPort`, `https.port`, `ajp.port`, `monitoring.jmx.port`). If those values can contain placeholders (for example `"#env:HTTP_PORT#"`), resolve them on the raw JSON tree before `treeToValue(...)`; otherwise deserialization fails before normal string substitution runs.
+
+## 2026-05-28
+
+- Runtime startup guards for distributed binaries belong in wrapper sources (`src/bin/lucli.sh`, `src/bin/lucli.bat`): `build.sh` and Maven's `binary` profile concatenate `src/bin/lucli.sh` with `target/lucli.jar` to produce `target/lucli`, so wrapper-level checks are the authoritative first gate for self-executing launches.
+
+## 2026-06-06
+
+- Current server dry-run semantics for unknown environments are intentionally non-fatal in `LuceeServerConfig.applyEnvironment(...)`: LuCLI warns and falls back to base config, so integration tests should assert success + warning text rather than expecting a non-zero exit.
+- In `release.yml`, the `publish` job can fail resolving Lucee snapshot artifacts even when the matrix build already succeeded; restoring `~/.m2` cache in `publish` and using `mvn -o` for the Docker-image JAR build avoids flaky remote snapshot lookups.
+
+## 2026-06-07
+
+- For reusable workflow calls (`jobs.<job>.uses`), the caller workflow must grant at least the same `GITHUB_TOKEN` scopes that the called workflow requests; if omitted, caller defaults can remain `contents: read` / `pull-requests: none` and GitHub rejects the workflow as invalid before it runs.
+- After introducing app-level top-level `version` defaults (for example `1.0.0`), Lucee runtime version resolution must only treat top-level `version` as a legacy engine value when it matches Lucee's `N.N.N.N`-style version pattern; otherwise fallback to `lucee.version` defaults to avoid misclassifying app versions as unsupported Lucee versions.
+
+## 2026-06-08
+
+- To gate release publishing on the exact same validation matrix as normal CI, add `workflow_call` to `.github/workflows/ci.yml` and invoke that workflow from `release.yml` via `jobs.<name>.uses`, instead of duplicating unit/integration/build jobs.
+- In this repo, release publishing with JReleaser should not use `-Pbinary` because that profile bumps `project.version` to the next `*-SNAPSHOT`; build without `-Pbinary` and assemble launcher artifacts before running `jreleaser:full-release`.
+- Markspresso's `build` command treats extra positional tokens as source path input; `lucli markspresso build clean` resolves source as `./clean` and can break Pages builds. Use `lucli markspresso build` or explicit flags like `--clean true` instead.
+
+## 2026-06-19
+
+- For LuCLI performance coverage, keep BATS perf checks as coarse smoke guards with conservative, env-overridable thresholds (for example `LUCLI_PERF_SMOKE_VERSION_MS` and `LUCLI_PERF_SMOKE_CFML_NOW_MS`) to avoid flaky CI while still catching major regressions.
+- `BATS_TEST_TIMEOUT` applies to setup/teardown hooks too; expensive one-time runtime prep should happen in the runner (`tests/test-bats.sh` / `tests/test.sh`) rather than `setup_file`, otherwise hook prewarm can be killed as a timeout failure before any test runs.
+- For BATS suites that create fresh `LUCLI_HOME` sandboxes per test, exporting a shared express cache path (for example `LUCLI_BATS_EXPRESS_CACHE_DIR`) and symlinking it in `setup_lucli_home` avoids repeated Lucee runtime downloads while preserving per-test home isolation.
+- When enforcing `admin.enabled=false` for Tomcat runtimes, environment variables alone are not sufficient; `conf/web.xml` also needs explicit enforcement (remove `/lucee/admin.cfm`/`/lucee/admin/*` servlet mappings when present and add a deny-all `security-constraint` for admin URL patterns).
+- In BATS helpers, avoid copying `~/.lucli/express` into each temporary `LUCLI_HOME` (slow and glob-fragile); symlink `${LUCLI_HOME}/express -> ${HOME}/.lucli/express` for fast local cache reuse.
+- For safe Lucee version switches without manual prune, persist server-level Lucee runtime metadata (`.lucee-version` / `.lucee-variant`) and compare it on restart; for legacy server directories, infer version from deployed Lucee JAR names when possible before deciding whether to recreate the server directory.
+- For URL rewrite regressions, validate both config artifacts and behavior: `urlRewrite.enabled=true` must inject `org.apache.catalina.valves.rewrite.RewriteValve` into `conf/server.xml` and `/hello` must route through `index.cfm` (with direct `.cfm` passthrough still intact).
+- For issue-level contract fixes, keep behavior and docs in lockstep: direct `.cfc` execution is intentionally blocked on both `lucli run file.cfc` and shortcut `lucli file.cfc`, so regression coverage and user-facing docs/help must all point to module entrypoints instead.
+- For Lucee Express startup on Windows, launching `.bat` scripts should go through `cmd /c` and script-name selection (`startup.*` vs `catalina.*`) should be isolated behind small helper methods so platform detection and command construction can be regression-tested without spawning real processes.
+- For Java 24+ on Windows, LuCLI startup noise from terminally deprecated `sun.misc.Unsafe` access can be reduced at launcher level by conditionally adding `--sun-misc-unsafe-memory-access=allow` in `src/bin/lucli.bat`, but only when no explicit mode is already provided via `LUCLI_JAVA_ARGS`, `JDK_JAVA_OPTIONS`, or `JAVA_TOOL_OPTIONS`.
+- For CFConfig layering, keep explicit regression coverage around `configurationFile` + inline `configuration.extensions` behavior (base extensions retained, inline duplicates overriding by identity) so future ConfigMerge changes do not silently drop base extensions.
+- For server lifecycle/state resolution, treat `server.pid` as potentially stale and use a shared recovery path that can fall back to `catalina.pid` and then refresh `server.pid`; otherwise `status`, `stop`, `prune`, and port-conflict checks can disagree about whether the same server is running.
+
+## 2026-06-24
+
+- `applyEnvironment(...)` can overwrite top-level `configurationFile` when an environment sets `environments.<env>.configurationFile`; to preserve documented layering, keep the original base file reference and have `resolveConfigurationNode(...)` merge base file -> environment file -> inline `configuration`.
+## 2026-06-26
+
+- Launch4j `windows-exe` packaging in this repo requires an explicit application JAR path of `target/lucli.jar` and a non-empty JRE lookup path (`%JAVA_HOME%;%PATH%`) in `pom.xml`; using `lucli.jar` without `target/` or leaving `<jre><path>` empty causes launch4j build failures during `mvn ... -Pwindows-exe`.
+- Keep a Windows executable smoke check in CI (`.github/workflows/ci.yml`) by building with `-Pwindows-exe` and running `.\target\lucli.exe --version` so release/installer changes to Windows packaging are validated before publish.
