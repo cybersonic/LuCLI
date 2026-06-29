@@ -150,24 +150,28 @@ class JavaRuntimeCheckTest {
 
     @Test
     void findJavaRuntimeErrorInMapAllowsJavaFromPathWhenHomesUnset(@TempDir Path tmp) throws IOException {
+        String osName = System.getProperty("os.name", "");
+        boolean isWindows = osName.toLowerCase().contains("win");
+        String javaBinary = isWindows ? "java.exe" : "java";
         Path javaOnPathDir = Files.createDirectories(tmp.resolve("bin-on-path"));
-        Files.createFile(javaOnPathDir.resolve("java"));
+        Files.createFile(javaOnPathDir.resolve(javaBinary));
 
         Map<String, String> childEnv = new HashMap<>();
         childEnv.put("PATH", javaOnPathDir.toString());
 
-        assertNull(JavaRuntimeCheck.findJavaRuntimeErrorInMap(childEnv, LINUX),
+        assertNull(JavaRuntimeCheck.findJavaRuntimeErrorInMap(childEnv, osName),
                 "java on PATH should satisfy runtime preflight when JAVA_HOME/JRE_HOME are unset");
     }
 
     @Test
     void findJavaRuntimeErrorInMapFailsWhenHomesUnsetAndPathHasNoJava(@TempDir Path tmp) throws IOException {
+        String osName = System.getProperty("os.name", "");
         Path emptyPathDir = Files.createDirectories(tmp.resolve("empty-path"));
 
         Map<String, String> childEnv = new HashMap<>();
         childEnv.put("PATH", emptyPathDir.toString());
 
-        assertNotNull(JavaRuntimeCheck.findJavaRuntimeErrorInMap(childEnv, LINUX),
+        assertNotNull(JavaRuntimeCheck.findJavaRuntimeErrorInMap(childEnv, osName),
                 "Missing JAVA_HOME/JRE_HOME with no java on PATH should still error");
     }
 
