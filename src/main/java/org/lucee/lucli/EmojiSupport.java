@@ -1,6 +1,9 @@
 package org.lucee.lucli;
 
 import java.util.LinkedHashMap;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -13,9 +16,11 @@ import java.util.Map;
 public class EmojiSupport {
     
     private static boolean enabled = true;
+    private static final String GENERIC_EMOJI_FALLBACK = "[EMOJI]";
     
     // Emoji to text fallback mappings (order matters - longer sequences first)
     private static final Map<String, String> EMOJI_FALLBACKS = new LinkedHashMap<>();
+    private static final List<String> SORTED_FALLBACK_KEYS = new ArrayList<>();
     
     static {
         // Multi-character emojis first (ZWJ sequences, etc.)
@@ -99,6 +104,7 @@ public class EmojiSupport {
         EMOJI_FALLBACKS.put("⚡", "[ZAP]");
         EMOJI_FALLBACKS.put("✨", "*");
         EMOJI_FALLBACKS.put("🔥", "[FIRE]");
+        EMOJI_FALLBACKS.put("🌈", "[PROMPT]");
         EMOJI_FALLBACKS.put("💧", "[DROP]");
         EMOJI_FALLBACKS.put("🍃", "[LEAF]");
         EMOJI_FALLBACKS.put("🌳", "[TREE]");
@@ -171,6 +177,7 @@ public class EmojiSupport {
         EMOJI_FALLBACKS.put("🎭", "[MASK]");
         EMOJI_FALLBACKS.put("🛡️", "[SHIELD]");
         EMOJI_FALLBACKS.put("🔋", "[BAT]");
+        rebuildSortedFallbackKeys();
     }
     
     /**
@@ -194,17 +201,29 @@ public class EmojiSupport {
         if (text == null || text.isEmpty() || enabled) {
             return text;
         }
-        
-        String result = text;
-        for (Map.Entry<String, String> entry : EMOJI_FALLBACKS.entrySet()) {
-            result = result.replace(entry.getKey(), entry.getValue());
+
+        StringBuilder out = new StringBuilder(text.length());
+        int index = 0;
+        while (index < text.length()) {
+            String explicitMatch = findExplicitFallbackMatch(text, index);
+            if (explicitMatch != null) {
+                out.append(EMOJI_FALLBACKS.get(explicitMatch));
+                index += explicitMatch.length();
+                continue;
+            }
+
+            int emojiEnd = findGenericEmojiSequenceEnd(text, index);
+            if (emojiEnd > index) {
+                out.append(GENERIC_EMOJI_FALLBACK);
+                index = emojiEnd;
+                continue;
+            }
+
+            int cp = text.codePointAt(index);
+            out.appendCodePoint(cp);
+            index += Character.charCount(cp);
         }
-        
-        // Clean up variation selectors and zero-width joiners that might be left over
-        result = result.replaceAll("[\uFE00-\uFE0F]", "");  // Variation selectors
-        result = result.replace("\u200D", "");              // Zero-width joiner
-        
-        return result;
+        return out.toString();
     }
     
     /**
@@ -219,5 +238,155 @@ public class EmojiSupport {
      */
     public static void addFallback(String emoji, String fallback) {
         EMOJI_FALLBACKS.put(emoji, fallback);
+        rebuildSortedFallbackKeys();
+    }
+
+    private static void rebuildSortedFallbackKeys() {
+        SORTED_FALLBACK_KEYS.clear();
+        SORTED_FALLBACK_KEYS.addAll(EMOJI_FALLBACKS.keySet());
+        SORTED_FALLBACK_KEYS.sort(Comparator.comparingInt(String::length).reversed());
+    }
+
+    private static String findExplicitFallbackMatch(String text, int index) {
+        for (String key : SORTED_FALLBACK_KEYS) {
+            if (text.startsWith(key, index)) {
+                return key;
+            }
+        }
+        return null;
+    }
+
+    private static int findGenericEmojiSequenceEnd(String text, int index) {
+        int cp = text.codePointAt(index);
+
+        if (isKeycapBase(cp)) {
+            int next = index + Character.charCount(cp);
+            if (next < text.length()) {
+                int nextCp = text.codePointAt(next);
+                if (isVariationSelector(nextCp)) {
+                    next += Character.charCount(nextCp);
+                }
+            }
+            if (next < text.length()) {
+                int nextCp = text.codePointAt(next);
+                if (isCombiningEnclosingKeycap(nextCp)) {
+                    return next + Character.charCount(nextCp);
+                }
+            }
+            return -1;
+        }
+
+        if (isRegionalIndicator(cp)) {
+            int next = index + Character.charCount(cp);
+            if (next < text.length()) {
+                int nextCp = text.codePointAt(next);
+                if (isRegionalIndicator(nextCp)) {
+                    return next + Character.charCount(nextCp);
+                }
+            }
+            return -1;
+        }
+
+        if (!isLikelyEmojiBase(cp)) {
+            return -1;
+        }
+
+        int current = index + Character.charCount(cp);
+
+        if (current < text.length()) {
+            int maybeVs = text.codePointAt(current);
+            if (isVariationSelector(maybeVs)) {
+                current += Character.charCount(maybeVs);
+            }
+        }
+
+        if (current < text.length()) {
+            int maybeModifier = text.codePointAt(current);
+            if (isEmojiModifier(maybeModifier)) {
+                current += Character.charCount(maybeModifier);
+            }
+        }
+
+        if (cp == 0x1F3F4) {
+            int tagCursor = current;
+            boolean sawTag = false;
+            while (tagCursor < text.length()) {
+                int tagCp = text.codePointAt(tagCursor);
+                if (isTagCharacter(tagCp)) {
+                    sawTag = true;
+                    tagCursor += Character.charCount(tagCp);
+                    continue;
+                }
+                if (tagCp == 0xE007F && sawTag) {
+                    current = tagCursor + Character.charCount(tagCp);
+                }
+                break;
+            }
+        }
+
+        while (current < text.length()) {
+            int zwj = text.codePointAt(current);
+            if (!isZeroWidthJoiner(zwj)) {
+                break;
+            }
+            int nextBaseIndex = current + Character.charCount(zwj);
+            if (nextBaseIndex >= text.length()) {
+                break;
+            }
+            int nextBase = text.codePointAt(nextBaseIndex);
+            if (!isLikelyEmojiBase(nextBase)) {
+                break;
+            }
+
+            current = nextBaseIndex + Character.charCount(nextBase);
+            if (current < text.length()) {
+                int maybeVs = text.codePointAt(current);
+                if (isVariationSelector(maybeVs)) {
+                    current += Character.charCount(maybeVs);
+                }
+            }
+            if (current < text.length()) {
+                int maybeModifier = text.codePointAt(current);
+                if (isEmojiModifier(maybeModifier)) {
+                    current += Character.charCount(maybeModifier);
+                }
+            }
+        }
+
+        return current;
+    }
+
+    private static boolean isLikelyEmojiBase(int cp) {
+        return (cp >= 0x1F000 && cp <= 0x1FAFF)
+            || (cp >= 0x2600 && cp <= 0x27BF)
+            || (cp >= 0x2300 && cp <= 0x23FF);
+    }
+
+    private static boolean isRegionalIndicator(int cp) {
+        return cp >= 0x1F1E6 && cp <= 0x1F1FF;
+    }
+
+    private static boolean isEmojiModifier(int cp) {
+        return cp >= 0x1F3FB && cp <= 0x1F3FF;
+    }
+
+    private static boolean isVariationSelector(int cp) {
+        return cp == 0xFE0F || cp == 0xFE0E;
+    }
+
+    private static boolean isZeroWidthJoiner(int cp) {
+        return cp == 0x200D;
+    }
+
+    private static boolean isKeycapBase(int cp) {
+        return (cp >= '0' && cp <= '9') || cp == '#' || cp == '*';
+    }
+
+    private static boolean isCombiningEnclosingKeycap(int cp) {
+        return cp == 0x20E3;
+    }
+
+    private static boolean isTagCharacter(int cp) {
+        return cp >= 0xE0020 && cp <= 0xE007E;
     }
 }

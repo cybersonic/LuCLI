@@ -135,7 +135,8 @@ public class CommandProcessor {
                     result = cflintCommand(commandLine);
                     break;
                 default:
-                    result = "❌ Unknown command: " + command + "\n💡 Type 'help' for available commands.";
+                    result = WindowsSupport.getEmoji("❌", "[ERROR]") + " Unknown command: " + command
+                           + "\n" + WindowsSupport.getEmoji("💡", "[TIP]") + " Type 'help' for available commands.";
             }
             Timer.stop(command + " command");
             Timer.stop("Command Execution");
