@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Stable Release Publishing Now Manual-Only (`workflow_dispatch`):** `release.yml` non-snapshot publish steps (tag check, JReleaser publishing, and stable Docker image push) now require manual workflow dispatch, ensuring automatic push/merge runs to `main` only drive snapshot (`beta-snapshot`) publishing paths.
 - **Rolling Snapshot Binary Publishing on `main` (`beta-snapshot`):** `release.yml` now builds snapshot binaries (Linux/macOS launcher, Windows `lucli.exe`, and JAR) on `main` pushes when `project.version` is `-SNAPSHOT`, then publishes them to a rolling GitHub prerelease tag `beta-snapshot` with both commit-specific (`...-<shortsha>...`) and stable (`lucli-snapshot-*`) asset names. README now links to the snapshot prerelease and marks these builds as beta/unstable.
 - **Release Script: Changelog-Based Bump Suggestion (`suggest-bump`):** Added `./scripts/release.sh suggest-bump` to scan `CHANGELOG.md` `## Unreleased` entries and recommend a SemVer bump (`major`, `minor`, or `patch`) with a matching `bump` command hint.
 - **Fix: Environment `configurationFile` Overrides Now Layer over Base CFConfig (`#64`):** `environments.<env>.configurationFile` now preserves base CFConfig and deep-merges environment file values on top (with environment values winning on conflicts), instead of replacing the base configuration entirely. Added regression coverage in `LuceeServerConfigTest#resolveConfigurationNode_environmentConfigurationFileMergesOverBaseConfigurationFile`.
