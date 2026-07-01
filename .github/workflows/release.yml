@@ -117,7 +117,6 @@ jobs:
           tags: |
             markdrew/lucli:${{ steps.version.outputs.VERSION }}
             markdrew/lucli:latest
-
       - name: Build JAR for Docker image (snapshot)
         if: steps.version.outputs.is_snapshot == 'true'
         run: mvn -o -q -DskipTests clean package -Pwindows-exe
@@ -166,6 +165,7 @@ jobs:
             "target/lucli-snapshot.exe" \
             "target/lucli-snapshot.jar" \
             --clobber
+
 
       - name: Set up Docker Buildx (snapshot)
         if: steps.version.outputs.is_snapshot == 'true'
