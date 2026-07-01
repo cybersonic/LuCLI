@@ -3,7 +3,6 @@ name: Release
 on:
   push:
     branches: [main]
-    paths: ['pom.xml', 'src/**']
   workflow_dispatch:
 
 jobs:
@@ -54,7 +53,7 @@ jobs:
 
       - name: Check if tag exists
         id: tag_check
-        if: steps.version.outputs.is_snapshot == 'false'
+        if: steps.version.outputs.is_snapshot == 'false' && github.event_name == 'workflow_dispatch'
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
           if git rev-parse "v$VERSION" >/dev/null 2>&1; then
@@ -64,7 +63,7 @@ jobs:
           fi
 
       - name: Build artifacts for JReleaser
-        if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
+        if: steps.version.outputs.is_snapshot == 'false' && github.event_name == 'workflow_dispatch' && steps.tag_check.outputs.exists == 'false'
         run: |
           mvn -DskipTests=true clean package -Pwindows-exe
           cat src/bin/lucli.sh target/lucli.jar > target/lucli
@@ -82,7 +81,7 @@ jobs:
           cp target/lucli.jar "target/lucli-$VERSION.jar"
 
       - name: Publish GitHub release, Homebrew tap, and Scoop bucket with JReleaser
-        if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
+        if: steps.version.outputs.is_snapshot == 'false' && github.event_name == 'workflow_dispatch' && steps.tag_check.outputs.exists == 'false'
         env:
           JRELEASER_GITHUB_TOKEN: ${{ secrets.JRELEASER_GITHUB_TOKEN || secrets.HOMEBREW_TAP_TOKEN }}
           JRELEASER_HOMEBREW_GITHUB_TOKEN: ${{ secrets.JRELEASER_HOMEBREW_GITHUB_TOKEN || secrets.HOMEBREW_TAP_TOKEN || secrets.JRELEASER_GITHUB_TOKEN }}
@@ -90,22 +89,22 @@ jobs:
         run: mvn -DskipTests=true -Djreleaser.config.file=jreleaser.yml jreleaser:full-release
 
       - name: Build JAR for Docker image
-        if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
+        if: steps.version.outputs.is_snapshot == 'false' && github.event_name == 'workflow_dispatch' && steps.tag_check.outputs.exists == 'false'
         run: mvn -DskipTests=true package
 
       - name: Set up Docker Buildx
-        if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
+        if: steps.version.outputs.is_snapshot == 'false' && github.event_name == 'workflow_dispatch' && steps.tag_check.outputs.exists == 'false'
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Docker Hub
-        if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
+        if: steps.version.outputs.is_snapshot == 'false' && github.event_name == 'workflow_dispatch' && steps.tag_check.outputs.exists == 'false'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push Docker image
-        if: steps.version.outputs.is_snapshot == 'false' && steps.tag_check.outputs.exists == 'false'
+        if: steps.version.outputs.is_snapshot == 'false' && github.event_name == 'workflow_dispatch' && steps.tag_check.outputs.exists == 'false'
         uses: docker/build-push-action@v5
         with:
           context: .
