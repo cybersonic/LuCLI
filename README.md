@@ -18,6 +18,7 @@ A modern, feature-rich command line interface for Lucee CFML that brings the pow
 - [📚 Documentation](#-documentation)
 - [🤝 Contributing](CONTRIBUTING.md)
 - [📦 Releases](https://github.com/cybersonic/LuCLI/releases)
+- [🧪 Snapshot Binaries (Beta)](https://github.com/cybersonic/LuCLI/releases/tag/beta-snapshot)
 
 ## ✨ Key Features
 
@@ -68,6 +69,12 @@ Visit the [Releases Page](https://github.com/cybersonic/LuCLI/releases) to downl
 - **install.sh** - Automated installation script
 
 Also available as a [Docker image](https://hub.docker.com/r/markdrew/lucli)
+
+### Snapshot Binaries (Beta)
+Latest main-branch preview builds are published as a rolling prerelease:
+- [LuCLI Snapshot (main)](https://github.com/cybersonic/LuCLI/releases/tag/beta-snapshot)
+
+⚠️ Snapshot binaries are beta builds and may be unstable. Prefer stable releases for production usage.
 
 ### Binary Installation (Recommended)
 ```bash

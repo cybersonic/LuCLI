@@ -149,3 +149,7 @@ Append new entries at the bottom under the appropriate date/session.
 
 - Launch4j `windows-exe` packaging in this repo requires an explicit application JAR path of `target/lucli.jar` and a non-empty JRE lookup path (`%JAVA_HOME%;%PATH%`) in `pom.xml`; using `lucli.jar` without `target/` or leaving `<jre><path>` empty causes launch4j build failures during `mvn ... -Pwindows-exe`.
 - Keep a Windows executable smoke check in CI (`.github/workflows/ci.yml`) by building with `-Pwindows-exe` and running `.\target\lucli.exe --version` so release/installer changes to Windows packaging are validated before publish.
+
+## 2026-06-30
+
+- For SNAPSHOT builds on `main`, a rolling prerelease tag (`beta-snapshot`) is an effective binary distribution pattern: keep a stable set of `lucli-snapshot-*` asset names for easy download URLs, and also publish commit-specific assets (`...-<shortsha>...`) for traceability/audit.

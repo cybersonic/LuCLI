@@ -83,5 +83,6 @@ If you already know what you’re looking for:
 
 - [Command Reference](reference-and-examples/command-reference/)
 - [Contributing to Documentation](reference-and-examples/contributing-to-documentation/)
+- [Site Changelog](/changelog)
 
 You can always return to this page from the "Docs" home link in the navigation, and use the left sidebar to jump directly to any topic.
