@@ -1,0 +1,85 @@
+name: Publish Beta Snapshot
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  ci-verification:
+    name: CI Verification
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+      issues: write
+
+  publish-beta:
+    needs: ci-verification
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: temurin
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-21-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-21-
+            ${{ runner.os }}-m2-
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build snapshot binary artifacts
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          mvn -o -q -DskipTests clean package -Pwindows-exe
+          cat src/bin/lucli.sh target/lucli.jar > target/lucli
+          chmod +x target/lucli
+
+          cp target/lucli     "target/lucli-snapshot-${SHORT_SHA}-linux"
+          cp target/lucli     "target/lucli-snapshot-${SHORT_SHA}-macos"
+          cp target/lucli.exe "target/lucli-snapshot-${SHORT_SHA}.exe"
+          cp target/lucli.jar "target/lucli-snapshot-${SHORT_SHA}.jar"
+
+          cp target/lucli     "target/lucli-snapshot-linux"
+          cp target/lucli     "target/lucli-snapshot-macos"
+          cp target/lucli.exe "target/lucli-snapshot.exe"
+          cp target/lucli.jar "target/lucli-snapshot.jar"
+
+      - name: Publish rolling beta snapshot prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="beta-snapshot"
+          TITLE="LuCLI Snapshot (main)"
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          NOTES="Automated snapshot binaries from main.\n\nVersion: ${VERSION}\nCommit: ${GITHUB_SHA}\n\nThese assets are beta/snapshot builds and may be unstable."
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --target "$GITHUB_SHA" --title "$TITLE" --prerelease --notes "$NOTES"
+          else
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "$TITLE" --prerelease --notes "$NOTES"
+          fi
+
+          gh release upload "$TAG" \
+            target/lucli-snapshot-*-linux \
+            target/lucli-snapshot-*-macos \
+            target/lucli-snapshot-*.exe \
+            target/lucli-snapshot-*.jar \
+            --clobber

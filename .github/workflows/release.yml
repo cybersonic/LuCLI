@@ -117,55 +117,10 @@ jobs:
           tags: |
             markdrew/lucli:${{ steps.version.outputs.VERSION }}
             markdrew/lucli:latest
-
       - name: Build JAR for Docker image (snapshot)
         if: steps.version.outputs.is_snapshot == 'true'
-        run: mvn -o -q -DskipTests clean package -Pwindows-exe
+        run: mvn -o -q -DskipTests package
 
-      - name: Prepare snapshot binary artifacts
-        if: steps.version.outputs.is_snapshot == 'true'
-        run: |
-          SHORT_SHA="${GITHUB_SHA::7}"
-          cat src/bin/lucli.sh target/lucli.jar > target/lucli
-          chmod +x target/lucli
-
-          cp target/lucli     "target/lucli-snapshot-${SHORT_SHA}-linux"
-          cp target/lucli     "target/lucli-snapshot-${SHORT_SHA}-macos"
-          cp target/lucli.exe "target/lucli-snapshot-${SHORT_SHA}.exe"
-          cp target/lucli.jar "target/lucli-snapshot-${SHORT_SHA}.jar"
-
-          cp target/lucli     "target/lucli-snapshot-linux"
-          cp target/lucli     "target/lucli-snapshot-macos"
-          cp target/lucli.exe "target/lucli-snapshot.exe"
-          cp target/lucli.jar "target/lucli-snapshot.jar"
-
-      - name: Publish rolling snapshot prerelease binaries
-        if: steps.version.outputs.is_snapshot == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          TAG="beta-snapshot"
-          TITLE="LuCLI Snapshot (main)"
-          SHORT_SHA="${GITHUB_SHA::7}"
-          VERSION="${{ steps.version.outputs.VERSION }}"
-          NOTES="Automated snapshot binaries from main.\n\nVersion: ${VERSION}\nCommit: ${GITHUB_SHA}\n\nThese assets are beta/snapshot builds and may be unstable."
-
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --target "$GITHUB_SHA" --title "$TITLE" --prerelease --notes "$NOTES"
-          else
-            gh release create "$TAG" --target "$GITHUB_SHA" --title "$TITLE" --prerelease --notes "$NOTES"
-          fi
-
-          gh release upload "$TAG" \
-            "target/lucli-snapshot-${SHORT_SHA}-linux" \
-            "target/lucli-snapshot-${SHORT_SHA}-macos" \
-            "target/lucli-snapshot-${SHORT_SHA}.exe" \
-            "target/lucli-snapshot-${SHORT_SHA}.jar" \
-            "target/lucli-snapshot-linux" \
-            "target/lucli-snapshot-macos" \
-            "target/lucli-snapshot.exe" \
-            "target/lucli-snapshot.jar" \
-            --clobber
 
       - name: Set up Docker Buildx (snapshot)
         if: steps.version.outputs.is_snapshot == 'true'
