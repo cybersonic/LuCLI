@@ -48,7 +48,7 @@ jobs:
       - name: Build snapshot binary artifacts
         run: |
           SHORT_SHA="${GITHUB_SHA::7}"
-          mvn -o -q -DskipTests clean package -Pwindows-exe
+          mvn -q -DskipTests clean package -Pwindows-exe
           cat src/bin/lucli.sh target/lucli.jar > target/lucli
           chmod +x target/lucli
 

@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Fix: `publish-beta` Workflow Launch4j Resolution on Fresh Runners:** `.github/workflows/publish-beta.yml` no longer uses Maven offline mode for the snapshot binary build step, so `launch4j-maven-plugin` can resolve on runners where that plugin is not already cached.
 - **Dedicated `publish-beta` Workflow for Snapshot Binaries:** Snapshot binary prerelease publishing (`beta-snapshot`) is now handled in a separate `.github/workflows/publish-beta.yml` flow that runs on `main` pushes (and manual dispatch), while `release.yml` keeps stable release publishing manual-only and retains snapshot Docker image publishing.
 - **Stable Release Publishing Now Manual-Only (`workflow_dispatch`):** `release.yml` non-snapshot publish steps (tag check, JReleaser publishing, and stable Docker image push) now require manual workflow dispatch, ensuring automatic push/merge runs to `main` only drive snapshot (`beta-snapshot`) publishing paths.
 - **Rolling Snapshot Binary Publishing on `main` (`beta-snapshot`):** `release.yml` now builds snapshot binaries (Linux/macOS launcher, Windows `lucli.exe`, and JAR) on `main` pushes when `project.version` is `-SNAPSHOT`, then publishes them to a rolling GitHub prerelease tag `beta-snapshot` with both commit-specific (`...-<shortsha>...`) and stable (`lucli-snapshot-*`) asset names. README now links to the snapshot prerelease and marks these builds as beta/unstable.
