@@ -853,9 +853,10 @@ public class LuceeServerConfig {
      * Apply the currently loaded .env / envFile variables into a target process
      * environment map (e.g. ProcessBuilder.environment()).
      *
-     * This only sets variables that are not already present in the target
-     * environment, so explicit OS environment variables and values provided via
-     * envVars in lucee.json take precedence.
+     * Values from envFile override any existing entries in {@code targetEnv}
+     * (including empty strings set by the parent shell). Explicit
+     * {@code envVars} from lucee.json are applied afterward and take final
+     * precedence.
      */
     public static void applyLoadedEnvToProcessEnvironment(Map<String, String> targetEnv) {
         if (targetEnv == null) {
@@ -867,7 +868,7 @@ public class LuceeServerConfig {
             if (key == null || key.isEmpty() || value == null) {
                 continue;
             }
-            targetEnv.putIfAbsent(key, value);
+            targetEnv.put(key, value);
         }
     }
 

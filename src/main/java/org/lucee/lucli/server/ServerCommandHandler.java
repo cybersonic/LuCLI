@@ -1123,13 +1123,12 @@ public class ServerCommandHandler {
         result.append("\n🌐 Environment variables that would be passed to the runtime:\n");
         result.append("─────────────────────────────────────────\n");
 
-        // Use a LinkedHashMap to preserve insertion order for readability
-        java.util.Map<String, String> envPreview = new java.util.LinkedHashMap<>();
+        // Use a LinkedHashMap seeded from the current process environment so dry-run
+        // preview matches Tomcat/Jetty startup (ProcessBuilder.environment()).
+        java.util.Map<String, String> envPreview = new java.util.LinkedHashMap<>(System.getenv());
 
         // 1) Variables from .env / envFile (already loaded by loadConfig)
-        java.util.Map<String, String> envFileVars = new java.util.LinkedHashMap<>();
-        LuceeServerConfig.applyLoadedEnvToProcessEnvironment(envFileVars);
-        envPreview.putAll(envFileVars);
+        LuceeServerConfig.applyLoadedEnvToProcessEnvironment(envPreview);
 
         // 2) LuCLI-added runtime variables
         Path serverInstanceDir = serverManager.getServersDir().resolve(config.name);

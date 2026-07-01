@@ -233,9 +233,9 @@ public final class DockerRuntimeProvider implements RuntimeProvider {
 
         // Build the effective environment with the same precedence used by
         // Tomcat/Jetty startup:
-        //   envFile/.env (defaults) < LuCLI runtime env < config.envVars
+        //   inherited shell < envFile/.env < LuCLI runtime env < config.envVars
         // where later entries override earlier entries.
-        Map<String, String> runtimeEnv = new java.util.LinkedHashMap<>();
+        Map<String, String> runtimeEnv = new java.util.LinkedHashMap<>(System.getenv());
         LuceeServerConfig.applyLoadedEnvToProcessEnvironment(runtimeEnv);
 
         // LUCEE_ADMIN_PASSWORD from admin.password, when present.
