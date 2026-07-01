@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Fix: Beta Snapshot Release Notes Newline Rendering:** `.github/workflows/publish-beta.yml` now builds release notes via heredoc multiline text so GitHub release content renders with real line breaks instead of escaped `\\n` sequences.
 - **Fix: `publish-beta` Workflow Launch4j Resolution on Fresh Runners:** `.github/workflows/publish-beta.yml` no longer uses Maven offline mode for the snapshot binary build step, so `launch4j-maven-plugin` can resolve on runners where that plugin is not already cached.
 - **Dedicated `publish-beta` Workflow for Snapshot Binaries:** Snapshot binary prerelease publishing (`beta-snapshot`) is now handled in a separate `.github/workflows/publish-beta.yml` flow that runs on `main` pushes (and manual dispatch), while `release.yml` keeps stable release publishing manual-only and retains snapshot Docker image publishing.
 - **Stable Release Publishing Now Manual-Only (`workflow_dispatch`):** `release.yml` non-snapshot publish steps (tag check, JReleaser publishing, and stable Docker image push) now require manual workflow dispatch, ensuring automatic push/merge runs to `main` only drive snapshot (`beta-snapshot`) publishing paths.
