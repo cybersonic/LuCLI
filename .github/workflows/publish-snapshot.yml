@@ -1,4 +1,4 @@
-name: Publish Beta Snapshot
+name: Publish Snapshot
 
 on:
   push:
@@ -15,7 +15,7 @@ jobs:
       pull-requests: write
       issues: write
 
-  publish-beta:
+  publish-snapshot:
     needs: ci-verification
     runs-on: ubuntu-latest
     permissions:
@@ -62,11 +62,11 @@ jobs:
           cp target/lucli.exe "target/lucli-snapshot.exe"
           cp target/lucli.jar "target/lucli-snapshot.jar"
 
-      - name: Publish rolling beta snapshot prerelease
+      - name: Publish rolling snapshot prerelease
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="beta-snapshot"
+          TAG="snapshot"
           TITLE="LuCLI Snapshot (main)"
           VERSION="${{ steps.version.outputs.VERSION }}"
           NOTES=$(cat <<EOF
@@ -91,3 +91,29 @@ EOF
             target/lucli-snapshot-*.exe \
             target/lucli-snapshot-*.jar \
             --clobber
+
+      - name: Build JAR for Docker image (snapshot)
+        run: mvn -DskipTests=true package
+
+      - name: Set up Docker Buildx (snapshot)
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub (snapshot)
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image (snapshot)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          platforms: |
+            linux/amd64
+            linux/arm64
+            linux/arm64/v8
+          tags: |
+            markdrew/lucli:${{ steps.version.outputs.VERSION }}
+            markdrew/lucli:snapshot
