@@ -157,3 +157,7 @@ Append new entries at the bottom under the appropriate date/session.
 ## 2026-07-01
 
 - `applyLoadedEnvToProcessEnvironment` must use `put`, not `putIfAbsent`, when merging loaded `envFile` values into the process environment; deploy shells often export empty or placeholder values (for example `CONFIG_PATH=''`) that would otherwise block layered `envFile` / `environments.<env>.envFile` overrides at runtime. `lucee.json envVars` still win last.
+
+## 2026-07-02
+
+- In GitHub Actions workflow `run: |` blocks, unindented heredoc body lines (`cat <<EOF ... EOF`) can terminate YAML block indentation and break workflow parsing; prefer indentation-safe multiline construction (for example `printf` assignment, or otherwise ensure all heredoc lines remain correctly indented for YAML).

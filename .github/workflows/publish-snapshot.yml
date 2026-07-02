@@ -69,15 +69,10 @@ jobs:
           TAG="snapshot"
           TITLE="LuCLI Snapshot (main)"
           VERSION="${{ steps.version.outputs.VERSION }}"
-          NOTES=$(cat <<EOF
-Automated snapshot binaries from main.
-
-Version: ${VERSION}
-Commit: ${GITHUB_SHA}
-
-These assets are beta/snapshot builds and may be unstable.
-EOF
-)
+          NOTES=$(
+            printf 'Automated snapshot binaries from main.\n\nVersion: %s\nCommit: %s\n\nThese assets are beta/snapshot builds and may be unstable.\n' \
+              "$VERSION" "$GITHUB_SHA"
+          )
 
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release edit "$TAG" --target "$GITHUB_SHA" --title "$TITLE" --prerelease --notes "$NOTES"
