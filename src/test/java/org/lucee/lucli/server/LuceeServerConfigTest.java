@@ -67,6 +67,56 @@ public class LuceeServerConfigTest {
         assertEquals("prod-only", envPreview.get("PROD_ONLY"));
     }
 
+    @Test
+    void applyLoadedEnvToProcessEnvironment_overridesExistingShellValues() throws IOException {
+        Files.writeString(tempDir.resolve("app.env"), "CONFIG_PATH=from-envfile\n");
+
+        LuceeServerConfig.ServerConfig config = new LuceeServerConfig.ServerConfig();
+        config.envFile = "./app.env";
+        LuceeServerConfig.reloadConfiguredEnvFile(config, tempDir);
+
+        java.util.Map<String, String> effectiveEnv = new java.util.HashMap<>();
+        effectiveEnv.put("CONFIG_PATH", "from-shell");
+
+        LuceeServerConfig.applyLoadedEnvToProcessEnvironment(effectiveEnv);
+
+        assertEquals("from-envfile", effectiveEnv.get("CONFIG_PATH"));
+    }
+
+    @Test
+    void applyLoadedEnvToProcessEnvironment_overridesEmptyShellValues() throws IOException {
+        Files.writeString(tempDir.resolve("app.env"), "CONFIG_PATH=from-envfile\n");
+
+        LuceeServerConfig.ServerConfig config = new LuceeServerConfig.ServerConfig();
+        config.envFile = "./app.env";
+        LuceeServerConfig.reloadConfiguredEnvFile(config, tempDir);
+
+        java.util.Map<String, String> effectiveEnv = new java.util.HashMap<>();
+        effectiveEnv.put("CONFIG_PATH", "");
+
+        LuceeServerConfig.applyLoadedEnvToProcessEnvironment(effectiveEnv);
+
+        assertEquals("from-envfile", effectiveEnv.get("CONFIG_PATH"));
+    }
+
+    @Test
+    void applyLoadedEnvToProcessEnvironment_envVarsStillOverrideEnvFileAfterShellMerge() throws IOException {
+        Files.writeString(tempDir.resolve("app.env"), "CONFIG_PATH=from-envfile\n");
+
+        LuceeServerConfig.ServerConfig config = new LuceeServerConfig.ServerConfig();
+        config.envFile = "./app.env";
+        config.envVars.put("CONFIG_PATH", "from-envvars");
+        LuceeServerConfig.reloadConfiguredEnvFile(config, tempDir);
+
+        java.util.Map<String, String> effectiveEnv = new java.util.HashMap<>();
+        effectiveEnv.put("CONFIG_PATH", "from-shell");
+
+        LuceeServerConfig.applyLoadedEnvToProcessEnvironment(effectiveEnv);
+        LuceeServerConfig.applyConfigEnvVarsToProcessEnvironment(effectiveEnv, config.envVars);
+
+        assertEquals("from-envvars", effectiveEnv.get("CONFIG_PATH"));
+    }
+
     // ===================
     // Default Configuration Tests
     // ===================

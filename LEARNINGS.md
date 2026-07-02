@@ -153,3 +153,7 @@ Append new entries at the bottom under the appropriate date/session.
 ## 2026-06-30
 
 - For SNAPSHOT builds on `main`, a rolling prerelease tag (`snapshot`) in `.github/workflows/publish-snapshot.yml` is an effective binary distribution pattern: keep a stable set of `lucli-snapshot-*` asset names for easy download URLs, and also publish commit-specific assets (`...-<shortsha>...`) for traceability/audit.
+
+## 2026-07-01
+
+- `applyLoadedEnvToProcessEnvironment` must use `put`, not `putIfAbsent`, when merging loaded `envFile` values into the process environment; deploy shells often export empty or placeholder values (for example `CONFIG_PATH=''`) that would otherwise block layered `envFile` / `environments.<env>.envFile` overrides at runtime. `lucee.json envVars` still win last.
