@@ -102,11 +102,11 @@ class TimerTest {
     @Test
     void testMultipleOperations() {
         Timer.start("op1");
-        try { Thread.sleep(10); } catch (InterruptedException e) {}
+        try { Thread.sleep(50); } catch (InterruptedException e) {}
         Timer.stop("op1");
         
         Timer.start("op2");
-        try { Thread.sleep(10); } catch (InterruptedException e) {}
+        try { Thread.sleep(50); } catch (InterruptedException e) {}
         Timer.stop("op2");
         
         Duration d1 = Timer.getDuration("op1");
