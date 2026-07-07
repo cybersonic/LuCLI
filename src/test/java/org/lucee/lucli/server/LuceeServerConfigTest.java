@@ -707,6 +707,58 @@ public class LuceeServerConfigTest {
     }
 
     @Test
+    void resolveSecretPlaceholders_envVarsHashSecretPlaceholderRequiresSecretStore() {
+        String originalLucliHome = System.getProperty("lucli.home");
+        try {
+            System.setProperty("lucli.home", tempDir.resolve(".lucli-home-missing-store").toString());
+
+            LuceeServerConfig.ServerConfig config = new LuceeServerConfig.ServerConfig();
+            config.envVars.put("API_TOKEN", "#secret:api.token#");
+
+            IOException ex = assertThrows(
+                IOException.class,
+                () -> LuceeServerConfig.resolveSecretPlaceholders(config, tempDir)
+            );
+            assertTrue(
+                ex.getMessage().contains("local secret store does not exist"),
+                "Expected envVars #secret placeholder to trigger local store preflight"
+            );
+        } finally {
+            if (originalLucliHome == null) {
+                System.clearProperty("lucli.home");
+            } else {
+                System.setProperty("lucli.home", originalLucliHome);
+            }
+        }
+    }
+
+    @Test
+    void resolveSecretPlaceholders_envVarsDollarSecretPlaceholderRequiresSecretStore() {
+        String originalLucliHome = System.getProperty("lucli.home");
+        try {
+            System.setProperty("lucli.home", tempDir.resolve(".lucli-home-missing-store-legacy").toString());
+
+            LuceeServerConfig.ServerConfig config = new LuceeServerConfig.ServerConfig();
+            config.envVars.put("API_TOKEN", "${secret:api.token}");
+
+            IOException ex = assertThrows(
+                IOException.class,
+                () -> LuceeServerConfig.resolveSecretPlaceholders(config, tempDir)
+            );
+            assertTrue(
+                ex.getMessage().contains("local secret store does not exist"),
+                "Expected envVars ${secret:...} placeholder to trigger local store preflight"
+            );
+        } finally {
+            if (originalLucliHome == null) {
+                System.clearProperty("lucli.home");
+            } else {
+                System.setProperty("lucli.home", originalLucliHome);
+            }
+        }
+    }
+
+    @Test
     void applyEnvironment_usesProvidedConfigFileForRawEnvironmentOverrides() throws IOException {
         String defaultConfigJson = """
             {

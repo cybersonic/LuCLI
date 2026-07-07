@@ -161,3 +161,7 @@ Append new entries at the bottom under the appropriate date/session.
 ## 2026-07-02
 
 - In GitHub Actions workflow `run: |` blocks, unindented heredoc body lines (`cat <<EOF ... EOF`) can terminate YAML block indentation and break workflow parsing; prefer indentation-safe multiline construction (for example `printf` assignment, or otherwise ensure all heredoc lines remain correctly indented for YAML).
+
+## 2026-07-07
+
+- Secret substitution in `LuceeServerConfig` is split across two stages: placeholder detection (`hasSecretPlaceholders`) gates passphrase/store preflight, and replacement (`resolveSecretPlaceholders`) does the actual field mutation. Adding a new secret-capable field (for example `envVars`) must update both stages; updating only replacement leaves startup on a silent no-op path when detection never triggers.
