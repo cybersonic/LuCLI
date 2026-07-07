@@ -1367,6 +1367,16 @@ public class LuceeServerConfig {
                 return true;
             }
         }
+        if (config.envVars != null && !config.envVars.isEmpty()) {
+            for (String value : config.envVars.values()) {
+                if (value == null) {
+                    continue;
+                }
+                if (hashPattern.matcher(value).find() || dollarPattern.matcher(value).find()) {
+                    return true;
+                }
+            }
+        }
         if (config.configuration != null) {
             return jsonNodeHasSecretPlaceholders(config.configuration, hashPattern) ||
                    jsonNodeHasSecretPlaceholders(config.configuration, dollarPattern);
@@ -1450,6 +1460,20 @@ public class LuceeServerConfig {
                     providerName,
                     localPassphrase
                 );
+            }
+            // envVars values: supports both syntaxes (not a protected zone)
+            if (config.envVars != null && !config.envVars.isEmpty()) {
+                Map<String, String> resolvedEnvVars = new HashMap<>();
+                for (Map.Entry<String, String> entry : config.envVars.entrySet()) {
+                    String value = entry.getValue();
+                    resolvedEnvVars.put(
+                        entry.getKey(),
+                        value != null
+                            ? replaceSecretPlaceholders(value, providerName, localPassphrase)
+                            : null
+                    );
+                }
+                config.envVars = resolvedEnvVars;
             }
             // PROTECTED ZONE: configuration block — only #secret:NAME# is resolved.
             // ${secret:NAME} is left intact for Lucee runtime.
