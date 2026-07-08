@@ -64,7 +64,18 @@ else
         -DnewVersion='${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.nextIncrementalVersion}-SNAPSHOT' \
         -DgenerateBackupPoms=false
 fi
-INSTALL_TARGET=$(which lucli 2>/dev/null || echo "$HOME/.local/bin/lucli")
+if [[ -z "${LUCLI_INSTALL_TARGET:-}" ]]; then
+    ACTIVE_LUCLI="$(command -v lucli 2>/dev/null || true)"
+    if [[ -n "$ACTIVE_LUCLI" ]]; then
+        ACTIVE_LUCLI_DIR="$(dirname "$ACTIVE_LUCLI")"
+        if [[ -w "$ACTIVE_LUCLI_DIR" ]]; then
+            LUCLI_INSTALL_TARGET="$ACTIVE_LUCLI"
+        else
+            echo "Warning: active lucli binary is at $ACTIVE_LUCLI but install dir is not writable ($ACTIVE_LUCLI_DIR); defaulting to $HOME/.local/bin/lucli (override with LUCLI_INSTALL_TARGET=...)"
+        fi
+    fi
+fi
+INSTALL_TARGET="${LUCLI_INSTALL_TARGET:-$HOME/.local/bin/lucli}"
 
 # Build the JAR and binary
 # Use -Dmaven.test.skip=true so Maven does not compile or run tests during this
@@ -154,7 +165,17 @@ echo "----------------"
 
 if [ "$installLocally" = true ] ; then
     echo "Installing lucli binary to ${INSTALL_TARGET}..."
+    INSTALL_DIR=$(dirname "$INSTALL_TARGET")
+    mkdir -p "$INSTALL_DIR"
+    if [[ ! -w "$INSTALL_DIR" ]]; then
+        echo "Error: install directory is not writable: $INSTALL_DIR"
+        exit 1
+    fi
     cp target/lucli "$INSTALL_TARGET"
+    if [ $? -ne 0 ]; then
+        echo "Error: failed to install lucli binary to ${INSTALL_TARGET}"
+        exit 1
+    fi
     echo "Installed lucli binary to ${INSTALL_TARGET}"
 fi
 

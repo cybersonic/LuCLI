@@ -56,8 +56,8 @@ EOF
     assert_output_contains "SUBCOMMAND_HELP:migrate"
 }
 
-@test "issue #44: build.sh install target resolves active lucli path first" {
-    run grep -E '^INSTALL_TARGET=\$\(which lucli 2>/dev/null \|\| echo "\$HOME/\.local/bin/lucli"\)$' "${LUCLI_ROOT_DIR}/build.sh"
+@test "issue #44: build.sh install target defaults to ~/.local/bin with override support" {
+    run grep -F 'INSTALL_TARGET="${LUCLI_INSTALL_TARGET:-$HOME/.local/bin/lucli}"' "${LUCLI_ROOT_DIR}/build.sh"
     assert_success
 }
 
