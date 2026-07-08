@@ -70,6 +70,8 @@ if(
 
 // Control whitespace handling in script output
 config["cfmlWriter"] = LuCLI.preserveWhitespace ? "white-space" : "regular";
+// Preserve original key casing when using dot notation in LuCLI runtime-created structs
+config["dotNotationUpperCase"] = false;
 
 
 if(LuCLI.verbose){
