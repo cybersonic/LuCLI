@@ -64,6 +64,17 @@ else
         -DnewVersion='${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.nextIncrementalVersion}-SNAPSHOT' \
         -DgenerateBackupPoms=false
 fi
+if [[ -z "${LUCLI_INSTALL_TARGET:-}" ]]; then
+    ACTIVE_LUCLI="$(command -v lucli 2>/dev/null || true)"
+    if [[ -n "$ACTIVE_LUCLI" ]]; then
+        ACTIVE_LUCLI_DIR="$(dirname "$ACTIVE_LUCLI")"
+        if [[ -w "$ACTIVE_LUCLI_DIR" ]]; then
+            LUCLI_INSTALL_TARGET="$ACTIVE_LUCLI"
+        else
+            echo "Warning: active lucli binary is at $ACTIVE_LUCLI but install dir is not writable ($ACTIVE_LUCLI_DIR); defaulting to $HOME/.local/bin/lucli (override with LUCLI_INSTALL_TARGET=...)"
+        fi
+    fi
+fi
 INSTALL_TARGET="${LUCLI_INSTALL_TARGET:-$HOME/.local/bin/lucli}"
 
 # Build the JAR and binary
