@@ -165,3 +165,6 @@ Append new entries at the bottom under the appropriate date/session.
 ## 2026-07-08
 
 - In BATS assertions that wrap `grep -E` patterns in single quotes, over-escaping (`\\\\$`, `\\\"`, etc.) can make regex checks silently fail even when the target line is correct; for literal shell-assignment checks, `grep -F` is usually safer and more maintainable than heavily escaped regex.
+## 2026-07-07
+
+- Secret substitution in `LuceeServerConfig` is split across two stages: placeholder detection (`hasSecretPlaceholders`) gates passphrase/store preflight, and replacement (`resolveSecretPlaceholders`) does the actual field mutation. Adding a new secret-capable field (for example `envVars`) must update both stages; updating only replacement leaves startup on a silent no-op path when detection never triggers.
