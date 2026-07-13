@@ -1402,8 +1402,13 @@ public class ServerCommandHandler {
             } else if ((args[i].equals("--env") || args[i].equals("--environment")) && i + 1 < args.length) {
                 environment = args[i + 1];
                 i++;
+            } else if (args[i].startsWith("--env=")) {
+                environment = args[i].substring("--env=".length());
+            } else if (args[i].startsWith("--environment=")) {
+                environment = args[i].substring("--environment=".length());
             }
         }
+        environment = resolveEnvironment(environment);
 
         Path lifecycleProjectDir = currentWorkingDirectory;
         LuceeServerConfig.ServerConfig lifecycleConfig = null;

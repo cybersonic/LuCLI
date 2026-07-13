@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -229,6 +231,257 @@ class LuceeServerManagerLifecycleTest {
             manager.runServerStartFailureLifecycleHooks(config, projectDir);
 
             assertTrue(Files.exists(projectDir.resolve("start-failure.txt")));
+        } finally {
+            if (previousLucliHome == null) {
+                System.clearProperty("lucli.home");
+            } else {
+                System.setProperty("lucli.home", previousLucliHome);
+            }
+        }
+    }
+
+    @Test
+    void loadLifecycleConfigForServer_usesPersistedConfigFileMarkerForStopHooks() throws Exception {
+        Path lucliHome = tempDir.resolve(".lucli-home-config-marker");
+        String previousLucliHome = System.getProperty("lucli.home");
+        System.setProperty("lucli.home", lucliHome.toString());
+        try {
+            LuceeServerManager manager = new LuceeServerManager();
+            Path projectDir = tempDir.resolve("project-config-marker");
+            Files.createDirectories(projectDir);
+
+            Files.writeString(projectDir.resolve("lucee.json"), """
+                    {
+                      "name": "config-marker-server",
+                      "events": {
+                        "before": {
+                          "serverStop": [
+                            "echo default-stop > stop.txt"
+                          ]
+                        }
+                      }
+                    }
+                    """);
+
+            Files.writeString(projectDir.resolve("lucee-static.json"), """
+                    {
+                      "name": "config-marker-server",
+                      "events": {
+                        "before": {
+                          "serverStop": [
+                            "echo static-stop-base > stop.txt"
+                          ]
+                        }
+                      },
+                      "environments": {
+                        "prod": {
+                          "events": {
+                            "before": {
+                              "serverStop": [
+                                "echo static-stop-prod > stop.txt"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                    """);
+
+            Path serverDir = lucliHome.resolve("servers").resolve("config-marker-server");
+            Files.createDirectories(serverDir);
+            Files.writeString(serverDir.resolve(".config-file"), "lucee-static.json");
+            Files.writeString(serverDir.resolve(".environment"), "prod");
+
+            Method method = LuceeServerManager.class
+                    .getDeclaredMethod("loadLifecycleConfigForServer", Path.class, Path.class);
+            method.setAccessible(true);
+            LuceeServerConfig.ServerConfig config =
+                    (LuceeServerConfig.ServerConfig) method.invoke(manager, projectDir, serverDir);
+
+            assertNotNull(config, "Lifecycle config should load when persisted config marker exists");
+            assertNotNull(config.events);
+            assertNotNull(config.events.before);
+            assertNotNull(config.events.before.serverStop);
+            assertEquals("echo static-stop-prod > stop.txt", config.events.before.serverStop.get(0),
+                    "Stop hooks should come from persisted config file with environment overrides");
+        } finally {
+            if (previousLucliHome == null) {
+                System.clearProperty("lucli.home");
+            } else {
+                System.setProperty("lucli.home", previousLucliHome);
+            }
+        }
+    }
+
+    @Test
+    void autoInstallExtensionDependenciesIfEnabled_propagatesBeforeDepsHookFailure() throws Exception {
+        Path lucliHome = tempDir.resolve(".lucli-home-before-deps-fail");
+        String previousLucliHome = System.getProperty("lucli.home");
+        System.setProperty("lucli.home", lucliHome.toString());
+        try {
+            LuceeServerManager manager = new LuceeServerManager();
+            Path projectDir = tempDir.resolve("project-before-deps-fail");
+            Files.createDirectories(projectDir);
+
+            Files.writeString(projectDir.resolve("lucee.json"), """
+                    {
+                      "name": "before-deps-fail-server",
+                      "dependencySettings": {
+                        "autoInstallOnServerStart": true
+                      },
+                      "events": {
+                        "before": {
+                          "depsInstall": [
+                            "exit 9"
+                          ]
+                        }
+                      }
+                    }
+                    """);
+
+            LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(projectDir);
+            Method method = LuceeServerManager.class.getDeclaredMethod(
+                    "autoInstallExtensionDependenciesIfEnabled",
+                    Path.class,
+                    String.class,
+                    LuceeServerConfig.ServerConfig.class
+            );
+            method.setAccessible(true);
+
+            IllegalStateException ex = assertThrows(IllegalStateException.class, () -> {
+                try {
+                    method.invoke(manager, projectDir, null, config);
+                } catch (InvocationTargetException ite) {
+                    Throwable cause = ite.getCause();
+                    if (cause instanceof IllegalStateException) {
+                        throw (IllegalStateException) cause;
+                    }
+                    throw new RuntimeException(cause);
+                }
+            });
+            assertTrue(ex.getMessage().contains("events.before.depsInstall"),
+                    "before.depsInstall hook failures should propagate as startup errors");
+        } finally {
+            if (previousLucliHome == null) {
+                System.clearProperty("lucli.home");
+            } else {
+                System.setProperty("lucli.home", previousLucliHome);
+            }
+        }
+    }
+
+    @Test
+    void autoInstallExtensionDependenciesIfEnabled_propagatesAfterDepsHookFailure() throws Exception {
+        Path lucliHome = tempDir.resolve(".lucli-home-after-deps-fail");
+        String previousLucliHome = System.getProperty("lucli.home");
+        System.setProperty("lucli.home", lucliHome.toString());
+        try {
+            LuceeServerManager manager = new LuceeServerManager();
+            Path projectDir = tempDir.resolve("project-after-deps-fail");
+            Files.createDirectories(projectDir);
+
+            Files.writeString(projectDir.resolve("lucee.json"), """
+                    {
+                      "name": "after-deps-fail-server",
+                      "dependencySettings": {
+                        "autoInstallOnServerStart": true
+                      },
+                      "events": {
+                        "after": {
+                          "depsInstall": [
+                            "exit 11"
+                          ]
+                        }
+                      }
+                    }
+                    """);
+
+            LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(projectDir);
+            Method method = LuceeServerManager.class.getDeclaredMethod(
+                    "autoInstallExtensionDependenciesIfEnabled",
+                    Path.class,
+                    String.class,
+                    LuceeServerConfig.ServerConfig.class
+            );
+            method.setAccessible(true);
+
+            IllegalStateException ex = assertThrows(IllegalStateException.class, () -> {
+                try {
+                    method.invoke(manager, projectDir, null, config);
+                } catch (InvocationTargetException ite) {
+                    Throwable cause = ite.getCause();
+                    if (cause instanceof IllegalStateException) {
+                        throw (IllegalStateException) cause;
+                    }
+                    throw new RuntimeException(cause);
+                }
+            });
+            assertTrue(ex.getMessage().contains("events.after.depsInstall"),
+                    "after.depsInstall hook failures should propagate as startup errors");
+        } finally {
+            if (previousLucliHome == null) {
+                System.clearProperty("lucli.home");
+            } else {
+                System.setProperty("lucli.home", previousLucliHome);
+            }
+        }
+    }
+
+    @Test
+    void startServerInternal_runsStartFailureHooksForPreProviderValidationErrors() throws Exception {
+        Path lucliHome = tempDir.resolve(".lucli-home-start-failure-pre-provider");
+        String previousLucliHome = System.getProperty("lucli.home");
+        System.setProperty("lucli.home", lucliHome.toString());
+        try {
+            LuceeServerManager manager = new LuceeServerManager();
+            Path projectDir = tempDir.resolve("project-start-failure-pre-provider");
+            Files.createDirectories(projectDir);
+
+            Files.writeString(projectDir.resolve("lucee.json"), """
+                    {
+                      "name": "start-failure-pre-provider-server",
+                      "lucee": {
+                        "version": "5.0.0.1"
+                      },
+                      "events": {
+                        "on": {
+                          "serverStartFailure": [
+                            "echo pre-provider-failure-hook > start-failure-pre-provider.txt"
+                          ]
+                        }
+                      }
+                    }
+                    """);
+
+            Method method = LuceeServerManager.class.getDeclaredMethod(
+                    "startServerInternal",
+                    Path.class,
+                    String.class,
+                    boolean.class,
+                    String.class,
+                    LuceeServerManager.AgentOverrides.class,
+                    String.class,
+                    String.class,
+                    boolean.class,
+                    LuceeServerManager.StartConfigOverrides.class
+            );
+            method.setAccessible(true);
+
+            IllegalStateException ex = assertThrows(IllegalStateException.class, () -> {
+                try {
+                    method.invoke(manager, projectDir, null, false, null, null, null, null, false, null);
+                } catch (InvocationTargetException ite) {
+                    Throwable cause = ite.getCause();
+                    if (cause instanceof IllegalStateException) {
+                        throw (IllegalStateException) cause;
+                    }
+                    throw new RuntimeException(cause);
+                }
+            });
+            assertTrue(ex.getMessage().contains("below LuCLI's supported cutoff"),
+                    "Pre-provider version validation should still fail startup");
+            assertTrue(Files.exists(projectDir.resolve("start-failure-pre-provider.txt")),
+                    "events.on.serverStartFailure should run even when startup fails before provider.start");
         } finally {
             if (previousLucliHome == null) {
                 System.clearProperty("lucli.home");
