@@ -3,7 +3,7 @@ title: Lifecycle Hooks
 layout: docs
 ---
 
-LuCLI supports lifecycle hooks in `lucee.json` so you can run commands before/after key server events, as well as  when startup fails.
+LuCLI supports lifecycle hooks in `lucee.json` so you can run commands before/after key server events, as well as when startup fails.
 
 ## Example hooks
 
@@ -62,6 +62,7 @@ The events that you can hook into are:
 | `events.before.depsInstall` | Before startup auto-installs dependencies (only when `dependencySettings.autoInstallOnServerStart` is enabled). |
 | `events.after.depsInstall` | After startup auto-installs dependencies (only when `dependencySettings.autoInstallOnServerStart` is enabled). |
 | `events.on.serverStartFailure` | If startup fails and throws an error during server start/run. |
+
 `server start` and `server run` both use the same `serverStart` hook keys.
 
 All hook values can be either:
