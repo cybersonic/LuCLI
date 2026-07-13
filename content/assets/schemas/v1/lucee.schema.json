@@ -258,6 +258,10 @@
       "x-ui-tab": "Environment",
       "x-ui-order": 20
     },
+    "events": {
+      "$ref": "#/definitions/lifecycleEvents",
+      "description": "Optional lifecycle hooks keyed by timing and event name (for example events.before.serverStart)."
+    },
     "runtime": {
       "type": "object",
       "description": "Runtime backend that runs your Lucee app (lucee-express, tomcat, docker). When omitted, LuCLI defaults to a Lucee Express runtime managed under ~/.lucli.",
@@ -510,8 +514,77 @@
         "runtime": {
           "$ref": "#/properties/runtime",
           "description": "Environment-specific runtime overrides (e.g. switch to docker in dev or tomcat in prod)."
+        },
+        "events": {
+          "$ref": "#/definitions/lifecycleEvents",
+          "description": "Environment-specific lifecycle hook overrides."
         }
       }
+    },
+    "lifecycleEventCommands": {
+      "description": "Single shell command or ordered list of shell commands.",
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        }
+      ]
+    },
+    "lifecycleTimingEvents": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "serverStart": {
+          "$ref": "#/definitions/lifecycleEventCommands",
+          "description": "Commands executed around server startup."
+        },
+        "serverStop": {
+          "$ref": "#/definitions/lifecycleEventCommands",
+          "description": "Commands executed around server stop."
+        },
+        "serverRestart": {
+          "$ref": "#/definitions/lifecycleEventCommands",
+          "description": "Commands executed around server restart."
+        },
+        "depsInstall": {
+          "$ref": "#/definitions/lifecycleEventCommands",
+          "description": "Commands executed around dependency auto-install during server startup."
+        }
+      },
+      "default": {}
+    },
+    "lifecycleOnEvents": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "serverStartFailure": {
+          "$ref": "#/definitions/lifecycleEventCommands",
+          "description": "Commands executed when server startup fails."
+        }
+      },
+      "default": {}
+    },
+    "lifecycleEvents": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "before": {
+          "$ref": "#/definitions/lifecycleTimingEvents"
+        },
+        "after": {
+          "$ref": "#/definitions/lifecycleTimingEvents"
+        },
+        "on": {
+          "$ref": "#/definitions/lifecycleOnEvents"
+        }
+      },
+      "default": {}
     }
   }
 }

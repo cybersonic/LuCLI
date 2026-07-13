@@ -1388,9 +1388,48 @@ public class ServerCommandHandler {
     }
     
     private String handleServerRestart(LuceeServerManager serverManager, String[] args) throws Exception {
+        String serverName = null;
+        String configFileName = null;
+        String environment = null;
+
+        for (int i = 1; i < args.length; i++) {
+            if ((args[i].equals("--name") || args[i].equals("-n")) && i + 1 < args.length) {
+                serverName = args[i + 1];
+                i++;
+            } else if ((args[i].equals("--config") || args[i].equals("-c")) && i + 1 < args.length) {
+                configFileName = args[i + 1];
+                i++;
+            } else if ((args[i].equals("--env") || args[i].equals("--environment")) && i + 1 < args.length) {
+                environment = args[i + 1];
+                i++;
+            }
+        }
+
+        Path lifecycleProjectDir = currentWorkingDirectory;
+        LuceeServerConfig.ServerConfig lifecycleConfig = null;
+        if (configFileName != null && !configFileName.trim().isEmpty()) {
+            lifecycleConfig = LuceeServerConfig.loadConfig(currentWorkingDirectory, configFileName.trim());
+        } else if (serverName != null && !serverName.trim().isEmpty()) {
+            LuceeServerManager.ServerInfo serverInfo = serverManager.getServerInfoByName(serverName.trim());
+            if (serverInfo != null && serverInfo.getProjectDir() != null) {
+                lifecycleProjectDir = serverInfo.getProjectDir();
+                lifecycleConfig = LuceeServerConfig.loadConfig(lifecycleProjectDir);
+            }
+        } else {
+            Path defaultConfig = currentWorkingDirectory.resolve("lucee.json");
+            if (java.nio.file.Files.exists(defaultConfig)) {
+                lifecycleConfig = LuceeServerConfig.loadConfig(currentWorkingDirectory);
+            }
+        }
+        if (lifecycleConfig != null && environment != null && !environment.trim().isEmpty()) {
+            lifecycleConfig = LuceeServerConfig.applyEnvironment(lifecycleConfig, environment.trim(), lifecycleProjectDir);
+        }
+
+        serverManager.runServerRestartLifecycleHooks(lifecycleConfig, lifecycleProjectDir, true);
 
         handleServerStop(serverManager, args);
         handleServerStart(serverManager, args);
+        serverManager.runServerRestartLifecycleHooks(lifecycleConfig, lifecycleProjectDir, false);
         return "";
     }
     

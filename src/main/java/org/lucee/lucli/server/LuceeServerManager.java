@@ -596,11 +596,6 @@ public class LuceeServerManager {
                 ? "_default"
                 : environment.trim();
 
-        // Optionally auto-install extension dependencies based on
-        // dependencySettings.autoInstallOnServerStart before starting the
-        // server, so that moved/updated extensions are reflected in the lock
-        // file without requiring an explicit `lucli deps install`.
-        autoInstallExtensionDependenciesIfEnabled(projectDir, environment);
 
         // Load configuration, applying server lock when present (lenient behaviour)
         LuceeServerConfig.ServerConfig config;
@@ -636,6 +631,12 @@ public class LuceeServerManager {
                 config = LuceeServerConfig.applyEnvironment(config, environment, projectDir, cfgFile);
             }
         }
+
+        // Optionally auto-install extension dependencies based on
+        // dependencySettings.autoInstallOnServerStart before starting the
+        // server, so that moved/updated extensions are reflected in the lock
+        // file without requiring an explicit `lucli deps install`.
+        autoInstallExtensionDependenciesIfEnabled(projectDir, environment, config);
 
         // Apply one-shot invocation overrides in memory (never persisted).
         applyStartConfigOverrides(config, startConfigOverrides);
@@ -702,7 +703,16 @@ public class LuceeServerManager {
         LuceeServerConfig.validateLuceeVersionSupportForRuntime(config, runtimeConfig.type);
         LuceeServerConfig.validateCfConfigSupport(config);
         RuntimeProvider provider = getRuntimeProvider(runtimeConfig.type);
-        return provider.start(this, config, projectDir, environment, agentOverrides, foreground, forceReplace);
+        try {
+            return provider.start(this, config, projectDir, environment, agentOverrides, foreground, forceReplace);
+        } catch (Exception startupFailure) {
+            try {
+                runServerStartFailureLifecycleHooks(config, projectDir);
+            } catch (Exception hookError) {
+                startupFailure.addSuppressed(hookError);
+            }
+            throw startupFailure;
+        }
     }
 
     /**
@@ -773,6 +783,188 @@ public class LuceeServerManager {
         }
         args.add(LUCEE_WARMUP_JVM_ARG_TRUE);
         config.jvm.additionalArgs = args.toArray(new String[0]);
+    }
+
+    /**
+     * Execute configured server-start lifecycle hooks.
+     * Supported keys:
+     * - events.before.serverStart
+     * - events.after.serverStart
+     */
+    public void runServerStartLifecycleHooks(
+            LuceeServerConfig.ServerConfig config,
+            Path projectDir,
+            boolean before
+    ) throws Exception {
+        List<String> commands = getLifecycleTimingCommands(config, before ? "before" : "after", "serverStart");
+        if (commands.isEmpty()) {
+            return;
+        }
+        runLifecycleCommands("events." + (before ? "before" : "after") + ".serverStart", commands, projectDir, config);
+    }
+
+    public void runServerStopLifecycleHooks(
+            LuceeServerConfig.ServerConfig config,
+            Path projectDir,
+            boolean before
+    ) throws Exception {
+        List<String> commands = getLifecycleTimingCommands(config, before ? "before" : "after", "serverStop");
+        if (commands.isEmpty()) {
+            return;
+        }
+        runLifecycleCommands("events." + (before ? "before" : "after") + ".serverStop", commands, projectDir, config);
+    }
+
+    public void runServerRestartLifecycleHooks(
+            LuceeServerConfig.ServerConfig config,
+            Path projectDir,
+            boolean before
+    ) throws Exception {
+        List<String> commands = getLifecycleTimingCommands(config, before ? "before" : "after", "serverRestart");
+        if (commands.isEmpty()) {
+            return;
+        }
+        runLifecycleCommands("events." + (before ? "before" : "after") + ".serverRestart", commands, projectDir, config);
+    }
+
+    public void runDepsInstallLifecycleHooks(
+            LuceeServerConfig.ServerConfig config,
+            Path projectDir,
+            boolean before
+    ) throws Exception {
+        List<String> commands = getLifecycleTimingCommands(config, before ? "before" : "after", "depsInstall");
+        if (commands.isEmpty()) {
+            return;
+        }
+        runLifecycleCommands("events." + (before ? "before" : "after") + ".depsInstall", commands, projectDir, config);
+    }
+
+    public void runServerStartFailureLifecycleHooks(
+            LuceeServerConfig.ServerConfig config,
+            Path projectDir
+    ) throws Exception {
+        List<String> commands = getLifecycleOnCommands(config, "serverStartFailure");
+        if (commands.isEmpty()) {
+            return;
+        }
+        runLifecycleCommands("events.on.serverStartFailure", commands, projectDir, config);
+    }
+
+    private List<String> getLifecycleTimingCommands(
+            LuceeServerConfig.ServerConfig config,
+            String timing,
+            String eventName
+    ) {
+        if (config == null || config.events == null) {
+            return java.util.Collections.emptyList();
+        }
+        LuceeServerConfig.LifecycleTimingConfig timingConfig =
+                "before".equals(timing) ? config.events.before : config.events.after;
+        if (timingConfig == null) {
+            return java.util.Collections.emptyList();
+        }
+        List<String> commands;
+        switch (eventName) {
+            case "serverStop":
+                commands = timingConfig.serverStop;
+                break;
+            case "serverRestart":
+                commands = timingConfig.serverRestart;
+                break;
+            case "depsInstall":
+                commands = timingConfig.depsInstall;
+                break;
+            case "serverStart":
+            default:
+                commands = timingConfig.serverStart;
+                break;
+        }
+        if (commands == null || commands.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return commands;
+    }
+
+    private List<String> getLifecycleOnCommands(
+            LuceeServerConfig.ServerConfig config,
+            String eventName
+    ) {
+        if (config == null || config.events == null || config.events.on == null) {
+            return java.util.Collections.emptyList();
+        }
+        List<String> commands;
+        switch (eventName) {
+            case "serverStartFailure":
+                commands = config.events.on.serverStartFailure;
+                break;
+            default:
+                commands = java.util.Collections.emptyList();
+                break;
+        }
+        if (commands == null || commands.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return commands;
+    }
+
+    private void runLifecycleCommands(
+            String hookKey,
+            List<String> commands,
+            Path projectDir,
+            LuceeServerConfig.ServerConfig config
+    ) throws Exception {
+        System.out.println("Running " + hookKey + " hooks (" + commands.size() + " command(s))...");
+        int hookIndex = 0;
+        for (String command : commands) {
+            if (command == null || command.trim().isEmpty()) {
+                continue;
+            }
+            hookIndex++;
+            String trimmedCommand = command.trim();
+            System.out.println("  [" + hookIndex + "/" + commands.size() + "] " + trimmedCommand);
+            runLifecycleHookCommand(trimmedCommand, projectDir, config);
+        }
+    }
+
+    private void runLifecycleHookCommand(
+            String command,
+            Path projectDir,
+            LuceeServerConfig.ServerConfig config
+    ) throws Exception {
+        List<String> shellCommand = new ArrayList<>();
+        if (isWindowsPlatform()) {
+            shellCommand.add("cmd");
+            shellCommand.add("/c");
+            shellCommand.add(command);
+        } else {
+            shellCommand.add("/bin/sh");
+            shellCommand.add("-lc");
+            shellCommand.add(command);
+        }
+
+        ProcessBuilder pb = new ProcessBuilder(shellCommand);
+        pb.directory(projectDir.toFile());
+        pb.inheritIO();
+
+        Map<String, String> env = pb.environment();
+        LuceeServerConfig.applyLoadedEnvToProcessEnvironment(env);
+        LuceeServerConfig.applyConfigEnvVarsToProcessEnvironment(env, config != null ? config.envVars : null);
+
+        Process process = pb.start();
+        boolean finished = process.waitFor(15, TimeUnit.MINUTES);
+        if (!finished) {
+            process.destroyForcibly();
+            throw new IllegalStateException("Lifecycle hook command timed out: " + command);
+        }
+
+        if (process.exitValue() != 0) {
+            throw new IllegalStateException(
+                    "Lifecycle hook command failed with exit code "
+                            + process.exitValue()
+                            + ": "
+                            + command
+            );
+        }
     }
 
     boolean shouldRecreateServerForVersionChange(Path serverDir,
@@ -912,6 +1104,27 @@ public class LuceeServerManager {
      * Stop a specific server instance
      */
     public boolean stopServer(ServerInstance instance) throws IOException {
+        LuceeServerConfig.ServerConfig lifecycleConfig =
+                loadLifecycleConfigForServer(instance != null ? instance.getProjectDir() : null, instance != null ? instance.getServerDir() : null);
+        Path projectDir = instance != null ? instance.getProjectDir() : null;
+        try {
+            runServerStopLifecycleHooks(lifecycleConfig, projectDir, true);
+        } catch (Exception e) {
+            throw new IOException("Failed to run events.before.serverStop hooks: " + e.getMessage(), e);
+        }
+
+        boolean stopped = stopServerInternal(instance);
+        if (stopped) {
+            try {
+                runServerStopLifecycleHooks(lifecycleConfig, projectDir, false);
+            } catch (Exception e) {
+                throw new IOException("Failed to run events.after.serverStop hooks: " + e.getMessage(), e);
+            }
+        }
+        return stopped;
+    }
+
+    private boolean stopServerInternal(ServerInstance instance) throws IOException {
         Path serverDir = instance.getServerDir();
         Path pidFile = serverDir.resolve("server.pid");
         Path sandboxMarker = serverDir.resolve(".sandbox");
@@ -1015,6 +1228,26 @@ public class LuceeServerManager {
         }
         
         return false;
+    }
+
+    private LuceeServerConfig.ServerConfig loadLifecycleConfigForServer(Path projectDir, Path serverDir) {
+        if (projectDir == null) {
+            return null;
+        }
+        try {
+            Path configPath = projectDir.resolve("lucee.json");
+            if (!Files.exists(configPath)) {
+                return null;
+            }
+            LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(projectDir);
+            String environment = serverDir != null ? readEnvironment(serverDir) : null;
+            if (environment != null && !environment.trim().isEmpty()) {
+                config = LuceeServerConfig.applyEnvironment(config, environment.trim(), projectDir);
+            }
+            return config;
+        } catch (Exception ignored) {
+            return null;
+        }
     }
     
     /**
@@ -2037,7 +2270,12 @@ public class LuceeServerManager {
      * moved or updated .lex files are reflected automatically when starting
      * a server.
      */
-    private void autoInstallExtensionDependenciesIfEnabled(Path projectDir, String environment) {
+    private void autoInstallExtensionDependenciesIfEnabled(
+            Path projectDir,
+            String environment,
+            LuceeServerConfig.ServerConfig serverConfig
+    ) {
+        boolean hooksStarted = false;
         try {
             org.lucee.lucli.config.LuceeJsonConfig depConfig =
                     org.lucee.lucli.config.LuceeJsonConfig.load(projectDir);
@@ -2058,6 +2296,8 @@ public class LuceeServerManager {
             if (settings == null || !settings.isAutoInstallOnServerStart()) {
                 return; // Feature disabled
             }
+            runDepsInstallLifecycleHooks(serverConfig, projectDir, true);
+            hooksStarted = true;
             boolean useLockFile = settings.isUseLockFileEnabled();
 
             java.util.List<org.lucee.lucli.config.DependencyConfig> prodDeps = depConfig.parseDependencies();
@@ -2144,6 +2384,14 @@ public class LuceeServerManager {
             }
         } catch (Exception e) {
             System.err.println("Warning: Failed to auto-install extension dependencies: " + e.getMessage());
+        } finally {
+            if (hooksStarted) {
+                try {
+                    runDepsInstallLifecycleHooks(serverConfig, projectDir, false);
+                } catch (Exception hookError) {
+                    System.err.println("Warning: Failed to run events.after.depsInstall hooks: " + hookError.getMessage());
+                }
+            }
         }
     }
     

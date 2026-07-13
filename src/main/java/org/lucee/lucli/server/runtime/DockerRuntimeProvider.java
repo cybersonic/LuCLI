@@ -76,6 +76,8 @@ public final class DockerRuntimeProvider implements RuntimeProvider {
                 (rt.containerName != null && !rt.containerName.trim().isEmpty())
                         ? rt.containerName.trim()
                         : "lucli-" + config.name;
+        // Run pre-start hooks before launching the runtime process.
+        manager.runServerStartLifecycleHooks(config, projectDir, true);
 
         // Remove any stale container with the same name (stopped or otherwise)
         // so that `docker run --name` doesn't conflict.
@@ -142,6 +144,7 @@ public final class DockerRuntimeProvider implements RuntimeProvider {
 
         // Reuse existing startup wait + browser behaviour.
         manager.waitForServerStartup(instance, 30);
+        manager.runServerStartLifecycleHooks(config, projectDir, false);
         manager.openBrowserForServer(instance, config);
 
         return instance;

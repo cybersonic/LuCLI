@@ -62,6 +62,7 @@ If `lucee.json` is missing, LuCLI:
 This makes `lucli server start` safe to run in a new folder: you always end up with a concrete, persisted configuration you can inspect and edit later.
 
 For more detail on available settings, see [Server Configuration](../050_server-configuration/010_lucee-json-basics/).
+For lifecycle command hooks, see [Lifecycle Hooks](../060_server-lifecycle/050_lifecycle-hooks/).
 
 ## Inline configuration overrides (`key=value`)
 

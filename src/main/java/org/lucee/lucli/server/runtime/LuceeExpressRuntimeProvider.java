@@ -60,6 +60,8 @@ public final class LuceeExpressRuntimeProvider implements RuntimeProvider {
 
         // Deploy extension dependencies to lucee-server/deploy folder
         manager.deployExtensionsForServer(projectDir, catalinaBase);
+        // Run pre-start hooks before launching the runtime process.
+        manager.runServerStartLifecycleHooks(config, projectDir, true);
 
         // Launch using unified method (CATALINA_HOME != CATALINA_BASE)
         LuceeServerManager.ServerInstance instance = manager.launchTomcatProcess(
@@ -69,6 +71,7 @@ public final class LuceeExpressRuntimeProvider implements RuntimeProvider {
         // For background mode only: wait for startup and open browser
         if (!foreground && instance != null) {
             manager.waitForServerStartup(instance, 30);
+            manager.runServerStartLifecycleHooks(config, projectDir, false);
             manager.openBrowserForServer(instance, config);
         }
 
