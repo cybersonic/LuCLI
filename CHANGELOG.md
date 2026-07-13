@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Chore: Patch Version Bump to `0.5.3-SNAPSHOT`:** Incremented project version in `pom.xml` from `0.5.2-SNAPSHOT` to `0.5.3-SNAPSHOT`.
 - **Feature: Nested Lifecycle Hooks (Server + Dependency Install):** Added nested lifecycle hook support in `lucee.json` (including environment overrides): `events.before/after.serverStart`, `events.before/after.serverStop`, `events.before/after.serverRestart`, `events.before/after.depsInstall`, and `events.on.serverStartFailure`. Hooks run in project context with merged env loading (`envFile` + `envVars`), are integrated across Lucee Express/Tomcat/Jetty/Docker runtime startup, and startup failures now trigger `events.on.serverStartFailure`.
 - **Fix: BATS Issue #44 Install-Target Assertion Escaping:** Corrected `tests/bats/14_confirmed_issue_regressions.bats` so the `build.sh` `INSTALL_TARGET` check matches the literal shell assignment reliably (using fixed-string matching), eliminating a false failure caused by over-escaped regex content in the test assertion.
 - **Fix: `envVars` Secret Placeholders Resolve During Server Startup:** `LuceeServerConfig.resolveSecretPlaceholders(...)` now includes `envVars` in both secret placeholder detection and replacement. This aligns `envVars` behavior with `admin.password`/`configuration` secret resolution so `#secret:NAME#` (and legacy `${secret:NAME}` outside protected zones) are no longer passed through as literal values at runtime.
