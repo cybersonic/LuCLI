@@ -634,21 +634,19 @@ public class LuceeServerManager {
         }
 
         try {
-            // Optionally auto-install extension dependencies based on
-            // dependencySettings.autoInstallOnServerStart before starting the
-            // server, so that moved/updated extensions are reflected in the lock
-            // file without requiring an explicit `lucli deps install`.
-            autoInstallExtensionDependenciesIfEnabled(projectDir, environment, config);
 
             // Apply one-shot invocation overrides in memory (never persisted).
             applyStartConfigOverrides(config, startConfigOverrides);
             // Ensure envFile variables are reloaded for the effective startup config.
             // This is required for paths that bypass loadConfig (for example lock snapshots).
             LuceeServerConfig.reloadConfiguredEnvFile(config, projectDir, cfgFile, environment);
-            
             // Resolve secrets only for actual server startup (not for generic config reads)
             LuceeServerConfig.resolveSecretPlaceholders(config, projectDir);
-            
+            // Optionally auto-install extension dependencies based on
+            // dependencySettings.autoInstallOnServerStart before starting the
+            // server, so that moved/updated extensions are reflected in the lock
+            // file without requiring an explicit `lucli deps install`.
+            autoInstallExtensionDependenciesIfEnabled(projectDir, environment, config);
             // Override version if specified
             if (versionOverride != null && !versionOverride.trim().isEmpty()) {
                 LuceeServerConfig.setLuceeVersion(config, versionOverride);
@@ -855,6 +853,44 @@ public class LuceeServerManager {
         runLifecycleCommands("events.on.serverStartFailure", commands, projectDir, config);
     }
 
+    /**
+     * Run events.after.serverStart hooks and roll back the just-started server
+     * if those hooks fail.
+     */
+    public void runAfterServerStartLifecycleHooksOrRollback(
+            ServerInstance instance,
+            LuceeServerConfig.ServerConfig config,
+            Path projectDir
+    ) throws Exception {
+        try {
+            runServerStartLifecycleHooks(config, projectDir, false);
+        } catch (Exception hookError) {
+            boolean stopped = false;
+            Exception stopError = null;
+            if (instance != null) {
+                try {
+                    stopped = stopServerWithoutLifecycleHooks(instance);
+                } catch (Exception e) {
+                    stopError = e;
+                }
+            }
+
+            IllegalStateException wrapped = new IllegalStateException(
+                    "Failed to run events.after.serverStart hooks: " + hookError.getMessage(),
+                    hookError
+            );
+            if (instance != null && !stopped) {
+                wrapped.addSuppressed(new IllegalStateException(
+                        "Server may still be running after events.after.serverStart hook failure."
+                ));
+            }
+            if (stopError != null) {
+                wrapped.addSuppressed(stopError);
+            }
+            throw wrapped;
+        }
+    }
+
     private List<String> getLifecycleTimingCommands(
             LuceeServerConfig.ServerConfig config,
             String timing,
@@ -926,12 +962,15 @@ public class LuceeServerManager {
             }
             hookIndex++;
             String trimmedCommand = command.trim();
-            System.out.println("  [" + hookIndex + "/" + commands.size() + "] " + trimmedCommand);
-            runLifecycleHookCommand(trimmedCommand, projectDir, config);
+            System.out.println("  [" + hookIndex + "/" + commands.size() + "] executing command");
+            runLifecycleHookCommand(hookKey, hookIndex, commands.size(), trimmedCommand, projectDir, config);
         }
     }
 
     private void runLifecycleHookCommand(
+            String hookKey,
+            int hookIndex,
+            int totalHooks,
             String command,
             Path projectDir,
             LuceeServerConfig.ServerConfig config
@@ -959,15 +998,22 @@ public class LuceeServerManager {
         boolean finished = process.waitFor(15, TimeUnit.MINUTES);
         if (!finished) {
             process.destroyForcibly();
-            throw new IllegalStateException("Lifecycle hook command timed out: " + command);
+            throw new IllegalStateException(
+                    "Lifecycle hook command timed out for " + hookKey + " [" + hookIndex + "/" + totalHooks + "]"
+            );
         }
 
         if (process.exitValue() != 0) {
             throw new IllegalStateException(
                     "Lifecycle hook command failed with exit code "
                             + process.exitValue()
-                            + ": "
-                            + command
+                            + " for "
+                            + hookKey
+                            + " ["
+                            + hookIndex
+                            + "/"
+                            + totalHooks
+                            + "]"
             );
         }
     }
@@ -1146,7 +1192,7 @@ public class LuceeServerManager {
             throw new IOException("Failed to run events.before.serverStop hooks: " + e.getMessage(), e);
         }
 
-        boolean stopped = stopServerInternal(instance);
+        boolean stopped = stopServerWithoutLifecycleHooks(instance);
         if (stopped) {
             try {
                 runServerStopLifecycleHooks(lifecycleConfig, projectDir, false);
@@ -1261,6 +1307,14 @@ public class LuceeServerManager {
         }
         
         return false;
+    }
+
+    /**
+     * Stop a server instance without executing lifecycle hooks.
+     * Intended for rollback paths where lifecycle hooks have already failed.
+     */
+    public boolean stopServerWithoutLifecycleHooks(ServerInstance instance) throws IOException {
+        return stopServerInternal(instance);
     }
 
     private LuceeServerConfig.ServerConfig loadLifecycleConfigForServer(Path projectDir, Path serverDir) {

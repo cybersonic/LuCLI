@@ -106,7 +106,7 @@ public final class TomcatRuntimeProvider implements RuntimeProvider {
         // For background mode: wait for startup and open browser
         if (!foreground && instance != null) {
             manager.waitForServerStartup(instance, 30);
-            manager.runServerStartLifecycleHooks(config, projectDir, false);
+            manager.runAfterServerStartLifecycleHooksOrRollback(instance, config, projectDir);
             manager.openBrowserForServer(instance, config);
         }
 

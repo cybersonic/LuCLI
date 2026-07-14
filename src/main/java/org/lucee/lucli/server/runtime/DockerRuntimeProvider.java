@@ -144,7 +144,7 @@ public final class DockerRuntimeProvider implements RuntimeProvider {
 
         // Reuse existing startup wait + browser behaviour.
         manager.waitForServerStartup(instance, 30);
-        manager.runServerStartLifecycleHooks(config, projectDir, false);
+        manager.runAfterServerStartLifecycleHooksOrRollback(instance, config, projectDir);
         manager.openBrowserForServer(instance, config);
 
         return instance;

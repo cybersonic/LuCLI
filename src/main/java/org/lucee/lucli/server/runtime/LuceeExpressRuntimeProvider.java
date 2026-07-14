@@ -71,7 +71,7 @@ public final class LuceeExpressRuntimeProvider implements RuntimeProvider {
         // For background mode only: wait for startup and open browser
         if (!foreground && instance != null) {
             manager.waitForServerStartup(instance, 30);
-            manager.runServerStartLifecycleHooks(config, projectDir, false);
+            manager.runAfterServerStartLifecycleHooksOrRollback(instance, config, projectDir);
             manager.openBrowserForServer(instance, config);
         }
 
