@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Fix: Persist First-Run Overrides in New Configs:** New `lucee.json` files now persist first-run overrides (for example `--port`) and derived `shutdownPort` values.
 - **Fix: Lifecycle Hook Reliability Follow-ups (Restart Env, Config File Tracking, and Failure Propagation):** Server restart now parses `--env=` / `--environment=` consistently with start/run fallback resolution, server stop hooks now load from the persisted config file used at startup (instead of always assuming `lucee.json`), and `depsInstall` lifecycle hook failures (`before`/`after`) plus pre-provider startup failures now correctly trigger startup failure behavior (`events.on.serverStartFailure`) rather than being downgraded to warnings.
 - **Chore: Patch Version Bump to `0.5.3-SNAPSHOT`:** Incremented project version in `pom.xml` from `0.5.2-SNAPSHOT` to `0.5.3-SNAPSHOT`.
 - **Feature: Nested Lifecycle Hooks (Server + Dependency Install):** Added nested lifecycle hook support in `lucee.json` (including environment overrides): `events.before/after.serverStart`, `events.before/after.serverStop`, `events.before/after.serverRestart`, `events.before/after.depsInstall`, and `events.on.serverStartFailure`. Hooks run in project context with merged env loading (`envFile` + `envVars`), are integrated across Lucee Express/Tomcat/Jetty/Docker runtime startup, and startup failures now trigger `events.on.serverStartFailure`.

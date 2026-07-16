@@ -46,6 +46,60 @@ public class LuceeServerManager {
             this.port = port;
         }
     }
+
+    private void persistBootstrapOverridesForNewConfig(Path projectDir,
+                                                       String cfgFile,
+                                                       boolean configFileCreatedFromDefaults,
+                                                       StartConfigOverrides startConfigOverrides,
+                                                       String versionOverride) {
+        if (!configFileCreatedFromDefaults) {
+            return;
+        }
+
+        boolean hasPersistableOverride = (startConfigOverrides != null
+                && (startConfigOverrides.portOverride != null
+                || (startConfigOverrides.webrootOverride != null && !startConfigOverrides.webrootOverride.trim().isEmpty())
+                || startConfigOverrides.enableLuceeOverride != null))
+                || (versionOverride != null && !versionOverride.trim().isEmpty());
+
+        if (!hasPersistableOverride) {
+            return;
+        }
+
+        Path cfgPath = projectDir.resolve(cfgFile);
+        try {
+            LuceeServerConfig.ServerConfig persistedConfig = LuceeServerConfig.loadConfig(projectDir, cfgFile);
+
+            if (startConfigOverrides != null) {
+                if (startConfigOverrides.portOverride != null) {
+                    int originalPort = persistedConfig.port;
+                    Integer originalShutdownPort = persistedConfig.shutdownPort;
+                    int requestedPort = startConfigOverrides.portOverride.intValue();
+                    persistedConfig.port = requestedPort;
+
+                    if (originalShutdownPort != null
+                            && originalShutdownPort.intValue() == LuceeServerConfig.getShutdownPort(originalPort)) {
+                        persistedConfig.shutdownPort = LuceeServerConfig.getShutdownPort(requestedPort);
+                    }
+                }
+                if (startConfigOverrides.webrootOverride != null
+                        && !startConfigOverrides.webrootOverride.trim().isEmpty()) {
+                    persistedConfig.webroot = startConfigOverrides.webrootOverride.trim();
+                }
+                if (startConfigOverrides.enableLuceeOverride != null) {
+                    persistedConfig.enableLucee = startConfigOverrides.enableLuceeOverride.booleanValue();
+                }
+            }
+
+            if (versionOverride != null && !versionOverride.trim().isEmpty()) {
+                LuceeServerConfig.setLuceeVersion(persistedConfig, versionOverride.trim());
+            }
+
+            LuceeServerConfig.saveConfig(persistedConfig, cfgPath);
+        } catch (Exception e) {
+            System.err.println("Warning: Failed to persist bootstrap overrides to " + cfgPath + ": " + e.getMessage());
+        }
+    }
     
     /**
      * Runtime overrides for Java agent activation when starting a server.
@@ -600,6 +654,7 @@ public class LuceeServerManager {
 
         // Load configuration, applying server lock when present (lenient behaviour)
         LuceeServerConfig.ServerConfig config;
+        boolean configFileCreatedFromDefaults = false;
         org.lucee.lucli.config.LuceeLockFile lockFile = org.lucee.lucli.config.LuceeLockFile.read(projectDir);
         org.lucee.lucli.config.LuceeLockFile.ServerLock envLock = lockFile.getServerLock(envKey);
 
@@ -625,7 +680,10 @@ public class LuceeServerManager {
             }
         } else {
             // No active lock: load configuration from the resolved config file
+            Path cfgPath = projectDir.resolve(cfgFile);
+            boolean configFileExisted = java.nio.file.Files.exists(cfgPath);
             config = LuceeServerConfig.loadConfig(projectDir, cfgFile);
+            configFileCreatedFromDefaults = !configFileExisted;
 
             // Apply environment overrides if specified
             if (environment != null && !environment.trim().isEmpty()) {
@@ -637,6 +695,7 @@ public class LuceeServerManager {
 
             // Apply one-shot invocation overrides in memory (never persisted).
             applyStartConfigOverrides(config, startConfigOverrides);
+            persistBootstrapOverridesForNewConfig(projectDir, cfgFile, configFileCreatedFromDefaults, startConfigOverrides, versionOverride);
             // Ensure envFile variables are reloaded for the effective startup config.
             // This is required for paths that bypass loadConfig (for example lock snapshots).
             LuceeServerConfig.reloadConfiguredEnvFile(config, projectDir, cfgFile, environment);

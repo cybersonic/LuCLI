@@ -314,6 +314,47 @@ class LuceeServerManagerLifecycleTest {
     }
 
     @Test
+    void persistBootstrapOverridesForNewConfig_appliesPortOverrideAndDerivedShutdownPort() throws Exception {
+        Path lucliHome = tempDir.resolve(".lucli-home-bootstrap-overrides");
+        String previousLucliHome = System.getProperty("lucli.home");
+        System.setProperty("lucli.home", lucliHome.toString());
+        try {
+            LuceeServerManager manager = new LuceeServerManager();
+            Path projectDir = tempDir.resolve("bootstrap-overrides-project");
+            Files.createDirectories(projectDir);
+
+            // Simulate first run where loadConfig creates default lucee.json.
+            LuceeServerConfig.loadConfig(projectDir, "lucee.json");
+
+            LuceeServerManager.StartConfigOverrides overrides = new LuceeServerManager.StartConfigOverrides();
+            overrides.portOverride = 8123;
+
+            Method persistMethod = LuceeServerManager.class.getDeclaredMethod(
+                    "persistBootstrapOverridesForNewConfig",
+                    Path.class,
+                    String.class,
+                    boolean.class,
+                    LuceeServerManager.StartConfigOverrides.class,
+                    String.class
+            );
+            persistMethod.setAccessible(true);
+            persistMethod.invoke(manager, projectDir, "lucee.json", true, overrides, null);
+
+            LuceeServerConfig.ServerConfig persisted = LuceeServerConfig.loadConfig(projectDir, "lucee.json");
+            assertEquals(8123, persisted.port,
+                    "Newly created lucee.json should persist the first-run --port override");
+            assertEquals(9123, persisted.shutdownPort,
+                    "Shutdown port should track the derived HTTP+1000 value when default-derived");
+        } finally {
+            if (previousLucliHome == null) {
+                System.clearProperty("lucli.home");
+            } else {
+                System.setProperty("lucli.home", previousLucliHome);
+            }
+        }
+    }
+
+    @Test
     void autoInstallExtensionDependenciesIfEnabled_propagatesBeforeDepsHookFailure() throws Exception {
         Path lucliHome = tempDir.resolve(".lucli-home-before-deps-fail");
         String previousLucliHome = System.getProperty("lucli.home");
