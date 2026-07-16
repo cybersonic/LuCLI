@@ -707,6 +707,87 @@ public class LuceeServerConfigTest {
     }
 
     @Test
+    void loadConfig_parsesLifecycleEvents_singleStringAndArrayForms() throws IOException {
+        String json = """
+            {
+              "name": "lifecycle-events-parse-test",
+              "events": {
+                "before": {
+                  "serverStart": "echo before",
+                  "serverStop": ["echo stop-before"],
+                  "depsInstall": "echo deps-before"
+                },
+                "after": {
+                  "serverStart": ["echo after one", "echo after two"],
+                  "serverRestart": "echo restart-after"
+                },
+                "on": {
+                  "serverStartFailure": "echo start-failed"
+                }
+              }
+            }
+            """;
+        Files.writeString(tempDir.resolve("lucee.json"), json);
+
+        LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(tempDir);
+
+        assertNotNull(config.events);
+        assertNotNull(config.events.before);
+        assertNotNull(config.events.after);
+        assertNotNull(config.events.on);
+        assertEquals(List.of("echo before"), config.events.before.serverStart);
+        assertEquals(List.of("echo stop-before"), config.events.before.serverStop);
+        assertEquals(List.of("echo deps-before"), config.events.before.depsInstall);
+        assertEquals(List.of("echo after one", "echo after two"), config.events.after.serverStart);
+        assertEquals(List.of("echo restart-after"), config.events.after.serverRestart);
+        assertEquals(List.of("echo start-failed"), config.events.on.serverStartFailure);
+    }
+
+    @Test
+    void applyEnvironment_mergesLifecycleEventsWithNestedOverrides() throws IOException {
+        String json = """
+            {
+              "name": "lifecycle-events-env-merge-test",
+              "events": {
+                "before": {
+                  "serverStart": ["echo base-before"],
+                  "serverRestart": ["echo base-restart-before"]
+                },
+                "after": {
+                  "serverStart": ["echo base-after"]
+                },
+                "on": {
+                  "serverStartFailure": ["echo base-failure"]
+                }
+              },
+              "environments": {
+                "prod": {
+                  "events": {
+                    "before": {
+                      "serverStart": ["echo prod-before"],
+                      "depsInstall": ["echo prod-deps-before"]
+                    },
+                    "on": {
+                      "serverStartFailure": ["echo prod-failure"]
+                    }
+                  }
+                }
+              }
+            }
+            """;
+        Files.writeString(tempDir.resolve("lucee.json"), json);
+
+        LuceeServerConfig.ServerConfig base = LuceeServerConfig.loadConfig(tempDir);
+        LuceeServerConfig.ServerConfig merged = LuceeServerConfig.applyEnvironment(base, "prod", tempDir);
+
+        assertEquals(List.of("echo prod-before"), merged.events.before.serverStart);
+        assertEquals(List.of("echo base-restart-before"), merged.events.before.serverRestart);
+        assertEquals(List.of("echo prod-deps-before"), merged.events.before.depsInstall);
+        assertEquals(List.of("echo base-after"), merged.events.after.serverStart);
+        assertEquals(List.of("echo prod-failure"), merged.events.on.serverStartFailure);
+    }
+
+    @Test
     void resolveSecretPlaceholders_envVarsHashSecretPlaceholderRequiresSecretStore() {
         String originalLucliHome = System.getProperty("lucli.home");
         try {
@@ -748,6 +829,32 @@ public class LuceeServerConfigTest {
             assertTrue(
                 ex.getMessage().contains("local secret store does not exist"),
                 "Expected envVars ${secret:...} placeholder to trigger local store preflight"
+            );
+        } finally {
+            if (originalLucliHome == null) {
+                System.clearProperty("lucli.home");
+            } else {
+                System.setProperty("lucli.home", originalLucliHome);
+            }
+        }
+    }
+
+    @Test
+    void resolveSecretPlaceholders_lifecycleHooksSecretPlaceholderRequiresSecretStore() {
+        String originalLucliHome = System.getProperty("lucli.home");
+        try {
+            System.setProperty("lucli.home", tempDir.resolve(".lucli-home-missing-store-lifecycle").toString());
+
+            LuceeServerConfig.ServerConfig config = new LuceeServerConfig.ServerConfig();
+            config.events.before.serverStart = java.util.List.of("echo #secret:api.token# > hook.txt");
+
+            IOException ex = assertThrows(
+                IOException.class,
+                () -> LuceeServerConfig.resolveSecretPlaceholders(config, tempDir)
+            );
+            assertTrue(
+                ex.getMessage().contains("local secret store does not exist"),
+                "Expected lifecycle-hook #secret placeholder to trigger local store preflight"
             );
         } finally {
             if (originalLucliHome == null) {

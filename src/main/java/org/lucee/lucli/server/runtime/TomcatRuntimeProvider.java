@@ -95,6 +95,8 @@ public final class TomcatRuntimeProvider implements RuntimeProvider {
 
         // Deploy extension dependencies
         manager.deployExtensionsForServer(projectDir, serverInstanceDir);
+        // Run pre-start hooks before launching the runtime process.
+        manager.runServerStartLifecycleHooks(config, projectDir, true);
 
         // Launch the server process using unified launch method
         LuceeServerManager.ServerInstance instance = manager.launchTomcatProcess(
@@ -104,6 +106,7 @@ public final class TomcatRuntimeProvider implements RuntimeProvider {
         // For background mode: wait for startup and open browser
         if (!foreground && instance != null) {
             manager.waitForServerStartup(instance, 30);
+            manager.runAfterServerStartLifecycleHooksOrRollback(instance, config, projectDir);
             manager.openBrowserForServer(instance, config);
         }
 

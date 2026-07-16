@@ -1388,9 +1388,92 @@ public class ServerCommandHandler {
     }
     
     private String handleServerRestart(LuceeServerManager serverManager, String[] args) throws Exception {
+        String serverName = null;
+        String configFileName = null;
+        String environment = null;
+
+        for (int i = 1; i < args.length; i++) {
+            if ((args[i].equals("--name") || args[i].equals("-n")) && i + 1 < args.length) {
+                serverName = args[i + 1];
+                i++;
+            } else if ((args[i].equals("--config") || args[i].equals("-c")) && i + 1 < args.length) {
+                configFileName = args[i + 1];
+                i++;
+            } else if ((args[i].equals("--env") || args[i].equals("--environment")) && i + 1 < args.length) {
+                environment = args[i + 1];
+                i++;
+            } else if (args[i].startsWith("--env=")) {
+                environment = args[i].substring("--env=".length());
+            } else if (args[i].startsWith("--environment=")) {
+                environment = args[i].substring("--environment=".length());
+            }
+        }
+        String explicitEnvironment = environment;
+        environment = resolveEnvironment(environment);
+
+        Path lifecycleProjectDir = currentWorkingDirectory;
+        LuceeServerConfig.ServerConfig lifecycleConfig = null;
+        String lifecycleConfigFileName = (configFileName != null && !configFileName.trim().isEmpty())
+                ? configFileName.trim()
+                : "lucee.json";
+        String persistedEnvironment = null;
+        if (configFileName != null && !configFileName.trim().isEmpty()) {
+            lifecycleConfig = LuceeServerConfig.loadConfig(currentWorkingDirectory, lifecycleConfigFileName);
+        } else if (serverName != null && !serverName.trim().isEmpty()) {
+            LuceeServerManager.ServerInfo serverInfo = serverManager.getServerInfoByName(serverName.trim());
+            if (serverInfo != null && serverInfo.getProjectDir() != null) {
+                lifecycleProjectDir = serverInfo.getProjectDir();
+                LuceeServerManager.LifecycleConfigContext lifecycleContext =
+                        serverManager.loadLifecycleConfigContext(lifecycleProjectDir, serverInfo.getServerDir());
+                if (lifecycleContext != null) {
+                    lifecycleConfig = lifecycleContext.getConfig();
+                    if (lifecycleContext.getProjectDir() != null) {
+                        lifecycleProjectDir = lifecycleContext.getProjectDir();
+                    }
+                    if (lifecycleContext.getConfigFileName() != null
+                            && !lifecycleContext.getConfigFileName().trim().isEmpty()) {
+                        lifecycleConfigFileName = lifecycleContext.getConfigFileName().trim();
+                    }
+                    persistedEnvironment = lifecycleContext.getEnvironment();
+                }
+            }
+            if (lifecycleConfig == null) {
+                Path defaultConfig = lifecycleProjectDir.resolve("lucee.json");
+                if (java.nio.file.Files.exists(defaultConfig)) {
+                    lifecycleConfig = LuceeServerConfig.loadConfig(lifecycleProjectDir);
+                    lifecycleConfigFileName = "lucee.json";
+                }
+            }
+        } else {
+            Path defaultConfig = currentWorkingDirectory.resolve("lucee.json");
+            if (java.nio.file.Files.exists(defaultConfig)) {
+                lifecycleConfig = LuceeServerConfig.loadConfig(currentWorkingDirectory);
+            }
+        }
+        String effectiveEnvironment = environment;
+        if ((effectiveEnvironment == null || effectiveEnvironment.trim().isEmpty())
+                && (explicitEnvironment == null || explicitEnvironment.trim().isEmpty())
+                && persistedEnvironment != null
+                && !persistedEnvironment.trim().isEmpty()) {
+            effectiveEnvironment = persistedEnvironment.trim();
+        }
+        if (lifecycleConfig != null && effectiveEnvironment != null && !effectiveEnvironment.trim().isEmpty()) {
+            lifecycleConfig = LuceeServerConfig.applyEnvironment(
+                    lifecycleConfig,
+                    effectiveEnvironment.trim(),
+                    lifecycleProjectDir,
+                    lifecycleConfigFileName
+            );
+        }
+        if (lifecycleConfig != null) {
+            LuceeServerConfig.resolveSecretPlaceholders(lifecycleConfig, lifecycleProjectDir);
+        }
+
+        serverManager.runServerRestartLifecycleHooks(lifecycleConfig, lifecycleProjectDir, true);
 
         handleServerStop(serverManager, args);
         handleServerStart(serverManager, args);
+        serverManager.runServerRestartLifecycleHooks(lifecycleConfig, lifecycleProjectDir, false);
         return "";
     }
     

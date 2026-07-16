@@ -132,6 +132,7 @@ lucli server restart
 ```
 
 Under the hood this is equivalent to a `stop` followed by a `start`, with the same configuration.
+If lifecycle hooks are configured, restart also runs `events.before.serverRestart` and `events.after.serverRestart`.
 
 ### Pruning stopped servers
 
@@ -149,3 +150,5 @@ lucli server prune --all
 ```
 
 Pruning permanently deletes the server instance directories under `~/.lucli/servers/` but does not touch your project files or `lucee.json`.
+
+For hook configuration details, see [Lifecycle Hooks](../060_server-lifecycle/050_lifecycle-hooks/).

@@ -118,6 +118,8 @@ public final class JettyRuntimeProvider implements RuntimeProvider {
 
         // Deploy extension dependencies
         manager.deployExtensionsForServer(projectDir, jettyBase);
+        // Run pre-start hooks before launching the runtime process.
+        manager.runServerStartLifecycleHooks(config, projectDir, true);
 
         // Launch the Jetty server process
         LuceeServerManager.ServerInstance instance = manager.launchJettyProcess(
@@ -128,6 +130,7 @@ public final class JettyRuntimeProvider implements RuntimeProvider {
         // For background mode: wait for startup and open browser
         if (!foreground && instance != null) {
             manager.waitForServerStartup(instance, 30);
+            manager.runAfterServerStartLifecycleHooksOrRollback(instance, config, projectDir);
             manager.openBrowserForServer(instance, config);
         }
 

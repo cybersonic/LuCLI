@@ -1,0 +1,48 @@
+{
+  "name" : "lifecycle-events",
+  "version" : "1.0.0",
+  "lucee" : {
+    "version" : "7.0.4.34",
+    "variant" : "standard"
+  },
+  "port" : 8123,
+  "shutdownPort" : 9123,
+  "webroot" : "./webroot",
+  "events" : {
+    "before" : {
+      "serverStart" : [ 
+        "echo 'Before server start'",
+        "npm install",
+        "npm run build"
+      ],
+      "serverStop" : [ 
+        "echo 'Before server stop'"
+      ],
+      "serverRestart" : [ 
+        "echo 'Before server restart'"
+      ],
+      "depsInstall" : [ 
+        "echo 'Before dependencies install'"
+      ]
+    },
+    "after" : {
+      "serverStart" : [ 
+        "echo 'After server start'"
+      ],
+      "serverStop" : [
+        "echo 'After server stop'"
+       ],
+      "serverRestart" : [
+        "echo 'After server restart'"
+       ],
+      "depsInstall" : [
+        "echo 'After dependencies install'"
+       ]
+    },
+    "on" : {
+      "serverStartFailure" : [ 
+        "echo 'Server start failed'"
+      ]
+    }
+  }
+}
