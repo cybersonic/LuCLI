@@ -47,6 +47,44 @@ public class LuceeServerManager {
         }
     }
 
+    public static class LifecycleConfigContext {
+        private final LuceeServerConfig.ServerConfig config;
+        private final Path projectDir;
+        private final String configFileName;
+        private final String environment;
+
+        public LifecycleConfigContext(LuceeServerConfig.ServerConfig config,
+                                      Path projectDir,
+                                      String configFileName,
+                                      String environment) {
+            this.config = config;
+            this.projectDir = projectDir;
+            this.configFileName = configFileName;
+            this.environment = environment;
+        }
+
+        public LuceeServerConfig.ServerConfig getConfig() { return config; }
+        public Path getProjectDir() { return projectDir; }
+        public String getConfigFileName() { return configFileName; }
+        public String getEnvironment() { return environment; }
+    }
+
+    public void writeEnvironmentMarker(Path serverDir, String environment) {
+        if (serverDir == null) {
+            return;
+        }
+        Path envFile = serverDir.resolve(ENVIRONMENT_MARKER);
+        try {
+            if (environment != null && !environment.trim().isEmpty()) {
+                Files.writeString(envFile, environment.trim());
+            } else {
+                Files.deleteIfExists(envFile);
+            }
+        } catch (IOException ignored) {
+            // Marker writes should never block startup.
+        }
+    }
+
     private void persistBootstrapOverridesForNewConfig(Path projectDir,
                                                        String cfgFile,
                                                        boolean configFileCreatedFromDefaults,
@@ -196,6 +234,7 @@ public class LuceeServerManager {
     private static final String LUCEE_VERSION_MARKER_FILE = ".lucee-version";
     private static final String LUCEE_VARIANT_MARKER_FILE = ".lucee-variant";
     private static final String CONFIG_FILE_MARKER = ".config-file";
+    private static final String ENVIRONMENT_MARKER = ".environment";
     private static final java.util.regex.Pattern LUCEE_JAR_FILE_PATTERN =
             java.util.regex.Pattern.compile("^lucee(?:-(light|zero))?-(.+)\\.jar$");
 
@@ -762,9 +801,14 @@ public class LuceeServerManager {
             LuceeServerConfig.validateLuceeVersionSupportForRuntime(config, runtimeConfig.type);
             LuceeServerConfig.validateCfConfigSupport(config);
             RuntimeProvider provider = getRuntimeProvider(runtimeConfig.type);
+            Path expectedServerDir = serversDir.resolve(config.name);
+            Files.createDirectories(expectedServerDir);
+            writeConfigFileMarker(expectedServerDir, cfgFile);
+            writeEnvironmentMarker(expectedServerDir, environment);
             ServerInstance startedInstance = provider.start(this, config, projectDir, environment, agentOverrides, foreground, forceReplace);
             if (startedInstance != null) {
                 writeConfigFileMarker(startedInstance.getServerDir(), cfgFile);
+                writeEnvironmentMarker(startedInstance.getServerDir(), environment);
             }
             return startedInstance;
         } catch (Exception startupFailure) {
@@ -1129,7 +1173,7 @@ public class LuceeServerManager {
         return null;
     }
 
-    private void writeConfigFileMarker(Path serverDir, String configFileName) {
+    public void writeConfigFileMarker(Path serverDir, String configFileName) {
         if (serverDir == null || configFileName == null || configFileName.trim().isEmpty()) {
             return;
         }
@@ -1245,6 +1289,9 @@ public class LuceeServerManager {
         LuceeServerConfig.ServerConfig lifecycleConfig =
                 loadLifecycleConfigForServer(instance != null ? instance.getProjectDir() : null, instance != null ? instance.getServerDir() : null);
         Path projectDir = instance != null ? instance.getProjectDir() : null;
+        if (lifecycleConfig != null && projectDir != null) {
+            LuceeServerConfig.resolveSecretPlaceholders(lifecycleConfig, projectDir);
+        }
         try {
             runServerStopLifecycleHooks(lifecycleConfig, projectDir, true);
         } catch (Exception e) {
@@ -1377,21 +1424,40 @@ public class LuceeServerManager {
     }
 
     private LuceeServerConfig.ServerConfig loadLifecycleConfigForServer(Path projectDir, Path serverDir) {
+        LifecycleConfigContext context = loadLifecycleConfigContext(projectDir, serverDir);
+        if (context == null || context.getConfig() == null || context.getProjectDir() == null) {
+            return null;
+        }
+        try {
+            LuceeServerConfig.ServerConfig config = context.getConfig();
+            String environment = context.getEnvironment();
+            if (environment != null && !environment.trim().isEmpty()) {
+                config = LuceeServerConfig.applyEnvironment(
+                        config,
+                        environment.trim(),
+                        context.getProjectDir(),
+                        context.getConfigFileName()
+                );
+            }
+            return config;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    public LifecycleConfigContext loadLifecycleConfigContext(Path projectDir, Path serverDir) {
         if (projectDir == null) {
             return null;
         }
         try {
             String configFileName = readConfigFileName(serverDir);
+            String environment = serverDir != null ? readEnvironment(serverDir) : null;
             Path configPath = projectDir.resolve(configFileName);
             if (!Files.exists(configPath)) {
-                return null;
+                return new LifecycleConfigContext(null, projectDir, configFileName, environment);
             }
             LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(projectDir, configFileName);
-            String environment = serverDir != null ? readEnvironment(serverDir) : null;
-            if (environment != null && !environment.trim().isEmpty()) {
-                config = LuceeServerConfig.applyEnvironment(config, environment.trim(), projectDir, configFileName);
-            }
-            return config;
+            return new LifecycleConfigContext(config, projectDir, configFileName, environment);
         } catch (Exception ignored) {
             return null;
         }
@@ -1648,7 +1714,7 @@ public class LuceeServerManager {
      * Read environment name from .environment file in server directory
      */
     private String readEnvironment(Path serverDir) {
-        Path envFile = serverDir.resolve(".environment");
+        Path envFile = serverDir.resolve(ENVIRONMENT_MARKER);
         if (Files.exists(envFile)) {
             try {
                 return Files.readString(envFile).trim();
@@ -2971,9 +3037,7 @@ public class LuceeServerManager {
         if (normalizedProjectDir != null) {
             Files.writeString(catalinaBase.resolve(".project-path"), normalizedProjectDir.toString());
         }
-        if (environment != null && !environment.trim().isEmpty()) {
-            Files.writeString(catalinaBase.resolve(".environment"), environment.trim());
-        }
+        writeEnvironmentMarker(catalinaBase, environment);
         if (runtimeType != null && !runtimeType.isEmpty()) {
             Files.writeString(catalinaBase.resolve(".runtime-type"), runtimeType);
         }
@@ -3131,9 +3195,7 @@ public class LuceeServerManager {
         if (normalizedProjectDir != null) {
             Files.writeString(jettyBase.resolve(".project-path"), normalizedProjectDir.toString());
         }
-        if (environment != null && !environment.trim().isEmpty()) {
-            Files.writeString(jettyBase.resolve(".environment"), environment.trim());
-        }
+        writeEnvironmentMarker(jettyBase, environment);
         Files.writeString(jettyBase.resolve(".runtime-type"), "jetty");
         writeLuceeRuntimeMarkers(jettyBase, config);
 

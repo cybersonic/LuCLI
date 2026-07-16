@@ -172,3 +172,7 @@ Append new entries at the bottom under the appropriate date/session.
 ## 2026-07-13
 
 - For nested lifecycle hooks in `lucee.json`, adding defaults in the `ServerConfig` field initializer is not enough on its own; always re-initialize nested nodes (`events`, `events.before`, `events.after`, command lists) in `loadConfig(...)` for backward compatibility with existing configs and edge-case deserialization paths.
+
+## 2026-07-16
+
+- Server lifecycle marker updates should always go through centralized helpers (`writeConfigFileMarker`, `writeEnvironmentMarker`) so default-environment launches reliably clear stale `.environment` values and lifecycle hook loaders stay aligned with persisted startup context.

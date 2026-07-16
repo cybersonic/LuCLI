@@ -114,9 +114,7 @@ public final class DockerRuntimeProvider implements RuntimeProvider {
         // Persist project and environment markers similar to other runtimes.
         Files.writeString(serverInstanceDir.resolve(".project-path"),
                 projectDir.toAbsolutePath().toString());
-        if (environment != null && !environment.trim().isEmpty()) {
-            Files.writeString(serverInstanceDir.resolve(".environment"), environment.trim());
-        }
+        manager.writeEnvironmentMarker(serverInstanceDir, environment);
 
         // Write container name marker so stop/status can manage the container.
         Files.writeString(serverInstanceDir.resolve(".docker-container"), containerName);

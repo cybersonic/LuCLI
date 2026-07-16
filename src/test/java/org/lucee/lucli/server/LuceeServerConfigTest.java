@@ -840,6 +840,32 @@ public class LuceeServerConfigTest {
     }
 
     @Test
+    void resolveSecretPlaceholders_lifecycleHooksSecretPlaceholderRequiresSecretStore() {
+        String originalLucliHome = System.getProperty("lucli.home");
+        try {
+            System.setProperty("lucli.home", tempDir.resolve(".lucli-home-missing-store-lifecycle").toString());
+
+            LuceeServerConfig.ServerConfig config = new LuceeServerConfig.ServerConfig();
+            config.events.before.serverStart = java.util.List.of("echo #secret:api.token# > hook.txt");
+
+            IOException ex = assertThrows(
+                IOException.class,
+                () -> LuceeServerConfig.resolveSecretPlaceholders(config, tempDir)
+            );
+            assertTrue(
+                ex.getMessage().contains("local secret store does not exist"),
+                "Expected lifecycle-hook #secret placeholder to trigger local store preflight"
+            );
+        } finally {
+            if (originalLucliHome == null) {
+                System.clearProperty("lucli.home");
+            } else {
+                System.setProperty("lucli.home", originalLucliHome);
+            }
+        }
+    }
+
+    @Test
     void applyEnvironment_usesProvidedConfigFileForRawEnvironmentOverrides() throws IOException {
         String defaultConfigJson = """
             {

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
@@ -51,6 +52,79 @@ class LuceeServerManagerLifecycleTest {
             String refreshedServerPid = Files.readString(serverDir.resolve("server.pid")).trim();
             assertEquals(livePid + ":" + serverPort, refreshedServerPid,
                     "server.pid should be refreshed to the recovered live PID for future stop/status calls");
+        } finally {
+            if (previousLucliHome == null) {
+                System.clearProperty("lucli.home");
+            } else {
+                System.setProperty("lucli.home", previousLucliHome);
+            }
+        }
+    }
+
+    @Test
+    void stopServer_failsWhenStopHookSecretsCannotBeResolved() throws Exception {
+        Path lucliHome = tempDir.resolve(".lucli-home-stop-secret");
+        String previousLucliHome = System.getProperty("lucli.home");
+        System.setProperty("lucli.home", lucliHome.toString());
+        try {
+            LuceeServerManager manager = new LuceeServerManager();
+            Path projectDir = tempDir.resolve("project-stop-secret");
+            Files.createDirectories(projectDir);
+
+            Files.writeString(projectDir.resolve("lucee.json"), """
+                    {
+                      "name": "stop-secret-server",
+                      "events": {
+                        "before": {
+                          "serverStop": [
+                            "echo #secret:api.token# > stop-secret.txt"
+                          ]
+                        }
+                      }
+                    }
+                    """);
+
+            Path serverDir = lucliHome.resolve("servers").resolve("stop-secret-server");
+            Files.createDirectories(serverDir);
+            Files.writeString(serverDir.resolve(".project-path"), projectDir.toAbsolutePath().toString());
+            Files.writeString(serverDir.resolve("server.pid"), "-1:8080");
+
+            LuceeServerManager.ServerInstance instance = new LuceeServerManager.ServerInstance(
+                    "stop-secret-server",
+                    -1L,
+                    8080,
+                    serverDir,
+                    projectDir
+            );
+
+            IOException ex = assertThrows(IOException.class, () -> manager.stopServer(instance));
+            assertTrue(ex.getMessage().contains("local secret store does not exist"),
+                    "Stop lifecycle should resolve hook secret placeholders before executing hooks");
+        } finally {
+            if (previousLucliHome == null) {
+                System.clearProperty("lucli.home");
+            } else {
+                System.setProperty("lucli.home", previousLucliHome);
+            }
+        }
+    }
+
+    @Test
+    void writeEnvironmentMarker_clearsMarkerWhenEnvironmentIsDefault() throws Exception {
+        Path lucliHome = tempDir.resolve(".lucli-home-env-marker");
+        String previousLucliHome = System.getProperty("lucli.home");
+        System.setProperty("lucli.home", lucliHome.toString());
+        try {
+            LuceeServerManager manager = new LuceeServerManager();
+            Path serverDir = lucliHome.resolve("servers").resolve("env-marker-server");
+            Files.createDirectories(serverDir);
+            Path envMarker = serverDir.resolve(".environment");
+            Files.writeString(envMarker, "prod");
+
+            manager.writeEnvironmentMarker(serverDir, null);
+
+            assertTrue(Files.notExists(envMarker),
+                    "Default environment launches should remove stale .environment markers");
         } finally {
             if (previousLucliHome == null) {
                 System.clearProperty("lucli.home");

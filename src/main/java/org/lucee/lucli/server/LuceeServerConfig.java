@@ -1493,8 +1493,52 @@ public class LuceeServerConfig {
             }
         }
         if (config.configuration != null) {
-            return jsonNodeHasSecretPlaceholders(config.configuration, hashPattern) ||
-                   jsonNodeHasSecretPlaceholders(config.configuration, dollarPattern);
+            if (jsonNodeHasSecretPlaceholders(config.configuration, hashPattern) ||
+                jsonNodeHasSecretPlaceholders(config.configuration, dollarPattern)) {
+                return true;
+            }
+        }
+        if (lifecycleEventsHaveSecretPlaceholders(config.events, hashPattern, dollarPattern)) {
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean lifecycleEventsHaveSecretPlaceholders(
+            LifecycleEventsConfig events,
+            java.util.regex.Pattern hashPattern,
+            java.util.regex.Pattern dollarPattern
+    ) {
+        if (events == null) {
+            return false;
+        }
+        if (lifecycleCommandsHaveSecretPlaceholders(events.before != null ? events.before.serverStart : null, hashPattern, dollarPattern)) return true;
+        if (lifecycleCommandsHaveSecretPlaceholders(events.before != null ? events.before.serverStop : null, hashPattern, dollarPattern)) return true;
+        if (lifecycleCommandsHaveSecretPlaceholders(events.before != null ? events.before.serverRestart : null, hashPattern, dollarPattern)) return true;
+        if (lifecycleCommandsHaveSecretPlaceholders(events.before != null ? events.before.depsInstall : null, hashPattern, dollarPattern)) return true;
+        if (lifecycleCommandsHaveSecretPlaceholders(events.after != null ? events.after.serverStart : null, hashPattern, dollarPattern)) return true;
+        if (lifecycleCommandsHaveSecretPlaceholders(events.after != null ? events.after.serverStop : null, hashPattern, dollarPattern)) return true;
+        if (lifecycleCommandsHaveSecretPlaceholders(events.after != null ? events.after.serverRestart : null, hashPattern, dollarPattern)) return true;
+        if (lifecycleCommandsHaveSecretPlaceholders(events.after != null ? events.after.depsInstall : null, hashPattern, dollarPattern)) return true;
+        if (lifecycleCommandsHaveSecretPlaceholders(events.on != null ? events.on.serverStartFailure : null, hashPattern, dollarPattern)) return true;
+        return false;
+    }
+
+    private static boolean lifecycleCommandsHaveSecretPlaceholders(
+            java.util.List<String> commands,
+            java.util.regex.Pattern hashPattern,
+            java.util.regex.Pattern dollarPattern
+    ) {
+        if (commands == null || commands.isEmpty()) {
+            return false;
+        }
+        for (String command : commands) {
+            if (command == null) {
+                continue;
+            }
+            if (hashPattern.matcher(command).find() || dollarPattern.matcher(command).find()) {
+                return true;
+            }
         }
         return false;
     }
@@ -1599,8 +1643,51 @@ public class LuceeServerConfig {
                     localPassphrase
                 );
             }
+            resolveLifecycleEventSecrets(config.events, providerName, localPassphrase);
         } catch (Exception e) {
             throw new IOException(e.getMessage(), e);
+        }
+    }
+
+    private static void resolveLifecycleEventSecrets(
+            LifecycleEventsConfig events,
+            String providerName,
+            char[] localPassphrase
+    ) throws Exception {
+        if (events == null) {
+            return;
+        }
+        if (events.before != null) {
+            resolveLifecycleCommandSecrets(events.before.serverStart, providerName, localPassphrase);
+            resolveLifecycleCommandSecrets(events.before.serverStop, providerName, localPassphrase);
+            resolveLifecycleCommandSecrets(events.before.serverRestart, providerName, localPassphrase);
+            resolveLifecycleCommandSecrets(events.before.depsInstall, providerName, localPassphrase);
+        }
+        if (events.after != null) {
+            resolveLifecycleCommandSecrets(events.after.serverStart, providerName, localPassphrase);
+            resolveLifecycleCommandSecrets(events.after.serverStop, providerName, localPassphrase);
+            resolveLifecycleCommandSecrets(events.after.serverRestart, providerName, localPassphrase);
+            resolveLifecycleCommandSecrets(events.after.depsInstall, providerName, localPassphrase);
+        }
+        if (events.on != null) {
+            resolveLifecycleCommandSecrets(events.on.serverStartFailure, providerName, localPassphrase);
+        }
+    }
+
+    private static void resolveLifecycleCommandSecrets(
+            java.util.List<String> commands,
+            String providerName,
+            char[] localPassphrase
+    ) throws Exception {
+        if (commands == null || commands.isEmpty()) {
+            return;
+        }
+        for (int i = 0; i < commands.size(); i++) {
+            String command = commands.get(i);
+            if (command == null) {
+                continue;
+            }
+            commands.set(i, replaceSecretPlaceholders(command, providerName, localPassphrase));
         }
     }
 
