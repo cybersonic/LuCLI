@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Chore: GitHub Actions Runtime Compatibility Bumps:** Updated workflow action pins across CI/release/docs pipelines (`actions/checkout`, `actions/setup-java`, and `peter-evans/create-pull-request`) to newer major versions to remove Node 20 deprecation warnings in GitHub-hosted runners.
 - **Fix: `deps install` Now Runs `depsInstall` Lifecycle Hooks:** Direct `lucli deps install` now executes `events.before.depsInstall` and `events.after.depsInstall` (non-dry-run), with regression coverage and updated lifecycle-hook docs.
 - **Release Friday Train Automation:** Added `.github/workflows/release-friday.yml` to schedule a weekly release-prep PR (Fridays 14:00 UTC, plus manual dispatch), with guardrails that skip when the version is not `-SNAPSHOT` or when `CHANGELOG.md` has no `## Unreleased` bullet entries.
 - **Fix: Restart Lifecycle Hook Context + Marker/Secret Handling:** `server restart --name` now reuses persisted server config/environment markers for lifecycle hooks, custom `--config` restart env overrides are resolved from the selected config file, default-environment starts clear stale `.environment` markers, foreground starts persist `.config-file` markers before launch, and stop/restart lifecycle hook execution now resolves secret placeholders before commands run.
