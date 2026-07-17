@@ -45,16 +45,17 @@ LUCLI_VERSION=0.2.1 curl -LsSf https://lucli.dev/install.sh | sh
 ```
 
 ### APT (Debian/Ubuntu)
-Once the APT repository workflow is enabled for this repository, install LuCLI with:
+Install LuCLI from the apt repository published under `lucli.dev/apt`:
 
 ```bash
-curl -fsSL https://cybersonic.github.io/LuCLI/lucli-keyring.gpg | sudo tee /usr/share/keyrings/lucli-keyring.gpg >/dev/null
-echo "deb [arch=amd64 signed-by=/usr/share/keyrings/lucli-keyring.gpg] https://cybersonic.github.io/LuCLI stable main" | sudo tee /etc/apt/sources.list.d/lucli.list >/dev/null
+curl -fsSL https://lucli.dev/apt/gpg.key | sudo tee /usr/share/keyrings/lucli-archive-keyring.asc >/dev/null
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/lucli-archive-keyring.asc] https://lucli.dev/apt stable main" | sudo tee /etc/apt/sources.list.d/lucli.list >/dev/null
 sudo apt update
 sudo apt install -y lucli
 ```
+APT repository generation is integrated into `.github/workflows/static.yml` and published alongside the Markspresso site.
 
-APT repository publishing is handled by `.github/workflows/publish-apt-repo.yml`.
+### JAR Download
 ```bash
 # Download the latest JAR release
 wget https://github.com/cybersonic/LuCLI/releases/latest/download/lucli.jar

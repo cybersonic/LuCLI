@@ -5,6 +5,8 @@ on:
   # Runs on pushes targeting the default branch
   push:
     branches: ["main"]
+  release:
+    types: [published]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -22,7 +24,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  build-site:
     name: Build Site and Docs
     runs-on: ubuntu-latest
     container:
@@ -37,6 +39,111 @@ jobs:
       - name: Build Markspresso site
         run: |
           lucli markspresso build
+      - name: Upload site artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-public
+          path: public
+          retention-days: 1
+
+  build-apt-repo:
+    name: Build APT repository payload
+    runs-on: ubuntu-latest
+    outputs:
+      apt_enabled: ${{ steps.signing-key-check.outputs.apt_enabled }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Detect apt signing key availability
+        id: signing-key-check
+        run: |
+          if [ -n "${{ secrets.APT_GPG_PRIVATE_KEY }}" ]; then
+            echo "apt_enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "apt_enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip apt repository build (missing signing key)
+        if: ${{ steps.signing-key-check.outputs.apt_enabled != 'true' }}
+        run: echo "APT_GPG_PRIVATE_KEY is not configured; skipping apt repository payload generation."
+
+      - name: Resolve latest stable release tag
+        if: ${{ steps.signing-key-check.outputs.apt_enabled == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=$(gh release list \
+            --repo "${{ github.repository }}" \
+            --exclude-drafts \
+            --exclude-pre-releases \
+            --limit 1 \
+            --json tagName \
+            --jq '.[0].tagName')
+          if [ -z "$TAG" ] || [ "$TAG" = "null" ]; then
+            echo "No stable release found to source .deb assets."
+            exit 1
+          fi
+          echo "LATEST_RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
+
+      - name: Download Debian assets from latest stable release
+        if: ${{ steps.signing-key-check.outputs.apt_enabled == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p dist/deb
+          gh release download "${LATEST_RELEASE_TAG}" \
+            --repo "${{ github.repository }}" \
+            --pattern "*.deb" \
+            --dir dist/deb
+          test -n "$(ls -A dist/deb)"
+
+      - name: Build APT repository payload
+        if: ${{ steps.signing-key-check.outputs.apt_enabled == 'true' }}
+        id: create_repo
+        uses: morph027/apt-repo-action@v3
+        with:
+          repo-name: lucli
+          scan-dir: dist/deb
+          codename: stable
+          components: main
+          architectures: amd64
+          signing-key: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+          signing-key-passphrase: ${{ secrets.APT_GPG_PASSPHRASE }}
+
+      - name: Stage apt repository under public/apt
+        if: ${{ steps.signing-key-check.outputs.apt_enabled == 'true' }}
+        run: |
+          mkdir -p public/apt
+          cp -R "${{ steps.create_repo.outputs.dir }}/." public/apt/
+
+      - name: Upload apt artifact
+        if: ${{ steps.signing-key-check.outputs.apt_enabled == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: apt-public
+          path: public/apt
+          retention-days: 1
+
+  assemble-pages:
+    name: Assemble unified Pages payload
+    needs:
+      - build-site
+      - build-apt-repo
+    if: ${{ always() && needs.build-site.result == 'success' && (needs['build-apt-repo'].result == 'success' || needs['build-apt-repo'].result == 'skipped') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download site artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: site-public
+          path: public
+
+      - name: Download apt artifact
+        if: ${{ needs['build-apt-repo'].outputs.apt_enabled == 'true' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: apt-public
+          path: public/apt
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
@@ -45,7 +152,7 @@ jobs:
   # Single deploy job since we're just deploying
   deploy:
     name: Deploy to GitHub Pages
-    needs: build
+    needs: assemble-pages
     runs-on: ubuntu-latest
 
     environment:
