@@ -23,6 +23,7 @@ import org.lucee.lucli.deps.ForgeBoxDependencyInstaller;
 import org.lucee.lucli.deps.GitDependencyInstaller;
 import org.lucee.lucli.deps.LockedDependency;
 import org.lucee.lucli.server.LuceeServerManager;
+import org.lucee.lucli.server.LuceeServerConfig;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -63,15 +64,51 @@ public class InstallCommand implements Callable<Integer> {
     
     @Override
     public Integer call() throws Exception {
+        Path rootProjectDir = Paths.get(".");
+        LuceeServerManager lifecycleServerManager = null;
+        LuceeServerConfig.ServerConfig lifecycleConfig = null;
+        boolean beforeHooksRan = false;
+        int exitCode = 1;
         try {
+            if (!dryRun) {
+                lifecycleConfig = loadDepsLifecycleConfig(rootProjectDir, environment);
+                lifecycleServerManager = new LuceeServerManager();
+                lifecycleServerManager.runDepsInstallLifecycleHooks(lifecycleConfig, rootProjectDir, true);
+                beforeHooksRan = true;
+            }
             // Delegate to project-root aware helper so this can be reused for nested projects later.
             Set<Path> visited = new HashSet<>();
-            return installDependenciesForProject(Paths.get("."), environment, production, force, dryRun, includeNestedDeps, 0, visited);
+            exitCode = installDependenciesForProject(rootProjectDir, environment, production, force, dryRun, includeNestedDeps, 0, visited);
         } catch (Exception e) {
             StringOutput.Quick.error("❌ Error: " + e.getMessage());
             e.printStackTrace();
-            return 1;
+            exitCode = 1;
         }
+
+        if (beforeHooksRan && lifecycleServerManager != null) {
+            try {
+                lifecycleServerManager.runDepsInstallLifecycleHooks(lifecycleConfig, rootProjectDir, false);
+            } catch (Exception hookError) {
+                StringOutput.Quick.error("❌ Error: Failed to run events.after.depsInstall hooks: " + hookError.getMessage());
+                if (LuCLI.verbose || LuCLI.debug) {
+                    hookError.printStackTrace();
+                }
+                exitCode = 1;
+            }
+        }
+        return exitCode;
+    }
+
+    private LuceeServerConfig.ServerConfig loadDepsLifecycleConfig(Path projectDir, String environment) throws Exception {
+if (!Files.exists(projectDir.resolve("lucee.json"))) {
+            throw new java.io.IOException("lucee.json not found in " + projectDir);
+        }
+        LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(projectDir);
+        if (environment != null && !environment.trim().isEmpty()) {
+            config = LuceeServerConfig.applyEnvironment(config, environment.trim(), projectDir, "lucee.json");
+        }
+        LuceeServerConfig.resolveSecretPlaceholders(config, projectDir);
+        return config;
     }
 
     /**
