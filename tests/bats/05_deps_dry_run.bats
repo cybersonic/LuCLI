@@ -94,6 +94,32 @@ EOF
     printf '%s\n' "${root_project}"
 }
 
+create_deps_hooks_project() {
+    local project_dir
+    project_dir="$(mktemp -d "${BATS_TEST_TMPDIR}/deps-hooks-project.XXXXXX")"
+
+    cat > "${project_dir}/lucee.json" << 'EOF'
+{
+  "name": "deps-hooks-project",
+  "dependencies": {},
+  "events": {
+    "before": {
+      "depsInstall": [
+        "touch .before-deps-install-hook"
+      ]
+    },
+    "after": {
+      "depsInstall": [
+        "touch .after-deps-install-hook"
+      ]
+    }
+  }
+}
+EOF
+
+    printf '%s\n' "${project_dir}"
+}
+
 @test "deps dry-run shows root install plan without nested blocks" {
     local root_project
     root_project="$(create_nested_deps_project)"
@@ -130,4 +156,25 @@ EOF
     run bash -c 'cd "$1" && java -jar "$2" deps install --dry-run --include-nested-deps' _ "${root_project}" "${LUCLI_JAR}"
     assert_success
     assert_output_contains "maximum nested dependency depth"
+}
+
+@test "deps install runs before/after depsInstall lifecycle hooks" {
+    local project_dir
+    project_dir="$(create_deps_hooks_project)"
+
+    run bash -c 'cd "$1" && java -jar "$2" deps install' _ "${project_dir}" "${LUCLI_JAR}"
+    assert_success
+    assert_output_contains "No git or extension dependencies to install"
+    [[ -f "${project_dir}/.before-deps-install-hook" ]]
+    [[ -f "${project_dir}/.after-deps-install-hook" ]]
+}
+
+@test "deps install --dry-run does not run depsInstall lifecycle hooks" {
+    local project_dir
+    project_dir="$(create_deps_hooks_project)"
+
+    run bash -c 'cd "$1" && java -jar "$2" deps install --dry-run' _ "${project_dir}" "${LUCLI_JAR}"
+    assert_success
+    [[ ! -f "${project_dir}/.before-deps-install-hook" ]]
+    [[ ! -f "${project_dir}/.after-deps-install-hook" ]]
 }

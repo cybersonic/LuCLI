@@ -176,3 +176,7 @@ Append new entries at the bottom under the appropriate date/session.
 ## 2026-07-16
 
 - Server lifecycle marker updates should always go through centralized helpers (`writeConfigFileMarker`, `writeEnvironmentMarker`) so default-environment launches reliably clear stale `.environment` values and lifecycle hook loaders stay aligned with persisted startup context.
+
+## 2026-07-17
+
+- For `deps install` lifecycle behavior, hook execution should be wired at `InstallCommand.call()` (root command scope), not inside recursive project install helpers; this ensures `events.before/after.depsInstall` run exactly once per direct command invocation and avoids accidental re-execution during nested dependency installs.
