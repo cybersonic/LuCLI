@@ -59,8 +59,8 @@ The events that you can hook into are:
 | `events.after.serverStop` | After LuCLI successfully stops a running server. |
 | `events.before.serverRestart` | Right before restart begins (before the stop/start sequence). |
 | `events.after.serverRestart` | After restart finishes (after stop + start complete). |
-| `events.before.depsInstall` | Before startup auto-installs dependencies (only when `dependencySettings.autoInstallOnServerStart` is enabled). |
-| `events.after.depsInstall` | After startup auto-installs dependencies (only when `dependencySettings.autoInstallOnServerStart` is enabled). |
+| `events.before.depsInstall` | Before `lucli deps install` runs, and before startup auto-installs dependencies when `dependencySettings.autoInstallOnServerStart` is enabled. |
+| `events.after.depsInstall` | After `lucli deps install` runs, and after startup auto-installs dependencies when `dependencySettings.autoInstallOnServerStart` is enabled. |
 | `events.on.serverStartFailure` | If startup fails and throws an error during server start/run. |
 
 `server start` and `server run` both use the same `serverStart` hook keys.
@@ -93,7 +93,7 @@ If your script file is directly executable in your shell, you can also run it di
 
 ### `depsInstall`
 
-`events.before.depsInstall` and `events.after.depsInstall` run only when dependency auto-install at startup is enabled (`dependencySettings.autoInstallOnServerStart`).
+`events.before.depsInstall` and `events.after.depsInstall` run for direct `lucli deps install`, and also during startup auto-install when `dependencySettings.autoInstallOnServerStart` is enabled.
 
 ## Environment-specific hooks
 

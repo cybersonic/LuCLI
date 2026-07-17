@@ -8,6 +8,7 @@
   <artifactId>lucli</artifactId>
   <version>0.7.0</version>
 
+
   <name>LuCLI</name>
   <description>A CLI for Lucee</description>
   <url>https://lucli.dev</url>
@@ -19,6 +20,7 @@
     <maven.compiler.source>21</maven.compiler.source>
     <maven.compiler.target>21</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.build.timestamp.format>yyyy-MM-dd'T'HH:mm:ssXXX</maven.build.timestamp.format>
     <jline.version>3.26.3</jline.version>
     <lucee.version>7.0.4.18-SNAPSHOT</lucee.version>
     <!-- <lucee.classifier></lucee.classifier> -->
@@ -188,6 +190,28 @@
       </resource>
     </resources>
     <plugins>
+      <plugin>
+        <groupId>io.github.git-commit-id</groupId>
+        <artifactId>git-commit-id-maven-plugin</artifactId>
+        <version>9.0.1</version>
+        <executions>
+          <execution>
+            <id>create-build-metadata</id>
+            <phase>initialize</phase>
+            <goals>
+              <goal>revision</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <failOnNoGitDirectory>false</failOnNoGitDirectory>
+          <generateGitPropertiesFile>false</generateGitPropertiesFile>
+          <includeOnlyProperties>
+            <includeOnlyProperty>git.branch</includeOnlyProperty>
+            <includeOnlyProperty>git.commit.id.abbrev</includeOnlyProperty>
+          </includeOnlyProperties>
+        </configuration>
+      </plugin>
       <plugin>
         <groupId>org.jreleaser</groupId>
         <artifactId>jreleaser-maven-plugin</artifactId>

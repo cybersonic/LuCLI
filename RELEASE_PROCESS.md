@@ -2,10 +2,11 @@
 This document describes how releases are created and how contributors should apply version bumps.
 
 ## Overview
-LuCLI uses automated releases driven by the version in `pom.xml`:
+LuCLI uses automated workflows plus a weekly release-train PR:
 - versions ending in `-SNAPSHOT` are development versions
 - non-snapshot versions are release versions
-- releases are created by GitHub Actions when a new release version is pushed
+- a weekly `Release Friday` workflow prepares a release PR from `main` when `CHANGELOG.md` has Unreleased entries
+- stable publishing is executed from the `Release` workflow via `workflow_dispatch` after that PR is merged
 
 ## Versioning Policy
 LuCLI uses `MAJOR.MINOR.PATCH[-SNAPSHOT]`.
@@ -21,10 +22,11 @@ When in doubt:
 - if users/scripts must change, use **major**
 
 ## Snapshot and Release Flow
-1. Keep development on a `-SNAPSHOT` version.
-2. Prepare a release by removing `-SNAPSHOT`.
-3. Commit and push the version change.
-4. After release completes, bump to the next `-SNAPSHOT`.
+1. Keep development on a `-SNAPSHOT` version on `main`.
+2. Let `Release Friday` create a release PR (or trigger it manually) when `## Unreleased` has entries.
+3. Merge the release PR (this removes `-SNAPSHOT`).
+4. Run the stable `Release` workflow manually (`workflow_dispatch`) to publish artifacts.
+5. Set next development version with `next-snapshot` in a follow-up PR.
 
 Using the helper script:
 ```bash
@@ -38,21 +40,36 @@ Using the helper script:
 ```bash
 # Check current status
 ./scripts/release.sh status
+# Option A: Let Release Friday create the PR automatically
+# (scheduled Fridays, or manually run workflow "Release Friday")
+git push
 
-# Prepare release (remove -SNAPSHOT)
+# Option B: Manual equivalent of release-train prep
 ./scripts/release.sh release
 git add pom.xml
 git commit -m "Prepare release X.Y.Z"
 git push
 
-# After release automation completes, move to next dev version
+# After release PR merge, run workflow "Release" manually to publish
+
+# Then move to next dev version
 ./scripts/release.sh next-snapshot
 git add pom.xml
 git commit -m "Prepare next development iteration"
 git push
 ```
 
+## Release Friday Behavior
+- Workflow file: `.github/workflows/release-friday.yml`
+- Schedule: Fridays at 14:00 UTC
+- Guardrails:
+  - skips when current version is not `-SNAPSHOT`
+  - skips when there are no bullet entries under `CHANGELOG.md` `## Unreleased`
+- Output:
+  - opens/updates PR `release/friday-<version>` that removes `-SNAPSHOT`
+
 ## Troubleshooting
-- No release created: confirm `pom.xml` version does not end with `-SNAPSHOT`.
+- No Release Friday PR created: check that `## Unreleased` has at least one bullet and `pom.xml` is a `-SNAPSHOT` version.
+- Stable release not published: run workflow `Release` via `workflow_dispatch` after merge.
 - Duplicate version: confirm a tag/release for that version does not already exist.
 - Build failure: run `mvn test` locally and check workflow logs.
