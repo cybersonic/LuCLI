@@ -180,3 +180,4 @@ Append new entries at the bottom under the appropriate date/session.
 ## 2026-07-17
 
 - For `deps install` lifecycle behavior, hook execution should be wired at `InstallCommand.call()` (root command scope), not inside recursive project install helpers; this ensures `events.before/after.depsInstall` run exactly once per direct command invocation and avoids accidental re-execution during nested dependency installs.
+- For Debian distribution support in this repo, the most maintainable path is: build the self-executing `target/lucli` binary in `release.yml`, wrap it into `target/lucli_<version>_amd64.deb` via `scripts/build-deb.sh`, publish the `.deb` with JReleaser `files.artifacts`, then generate/publish APT metadata from release `.deb` assets in a dedicated Pages workflow (`.github/workflows/publish-apt-repo.yml`).
