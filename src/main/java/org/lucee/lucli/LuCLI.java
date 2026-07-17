@@ -92,6 +92,7 @@ import picocli.CommandLine.Spec;
         "",
         "Examples:",
         "  lucli                           # Start interactive terminal",
+        "  lucli --version-short           # Show raw version only",
         "  lucli --version                 # Show version details (without build metadata)",
         "  lucli --version-long            # Show version details including build metadata",
         "  lucli --build-info              # Show build metadata only",
@@ -139,6 +140,10 @@ public class LuCLI implements Callable<Integer> {
             description = "Show application version",
             versionHelp = true)
     private boolean versionRequested = false;
+
+    @Option(names = {"--version-short"},
+            description = "Show raw LuCLI version only")
+    private boolean versionShortRequested = false;
     @Option(names = {"--version-long"},
             description = "Show full version details including build metadata")
     private boolean versionLongRequested = false;
@@ -271,6 +276,10 @@ public class LuCLI implements Callable<Integer> {
         Timer.start("Total Execution");
 
         try {
+            if (versionShortRequested) {
+                System.out.println(getVersion());
+                return 0;
+            }
             if (versionLongRequested) {
                 StringOutput.Quick.info(getVersionLongInfo(true));
                 return 0;
