@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Version Output Split + Build Metadata (Maven + `build.sh`):** `lucli --version` is now concise, `lucli --full-version` shows full runtime/build details, and `lucli --build-info` shows build metadata only (`Build Timestamp`, `Build Commit`, `Build Branch`, `Build JDK`). Metadata is sourced from filtered `lucli/version.properties` with commit/branch populated during Maven builds, so it is available in both direct `mvn` builds and `./build.sh` builds.
 - **Fix: `deps install` Now Runs `depsInstall` Lifecycle Hooks:** Direct `lucli deps install` now executes `events.before.depsInstall` and `events.after.depsInstall` (non-dry-run), with regression coverage and updated lifecycle-hook docs.
 - **Release Friday Train Automation:** Added `.github/workflows/release-friday.yml` to schedule a weekly release-prep PR (Fridays 14:00 UTC, plus manual dispatch), with guardrails that skip when the version is not `-SNAPSHOT` or when `CHANGELOG.md` has no `## Unreleased` bullet entries.
 - **Fix: Restart Lifecycle Hook Context + Marker/Secret Handling:** `server restart --name` now reuses persisted server config/environment markers for lifecycle hooks, custom `--config` restart env overrides are resolved from the selected config file, default-environment starts clear stale `.environment` markers, foreground starts persist `.config-file` markers before launch, and stop/restart lifecycle hook execution now resolves secret placeholders before commands run.

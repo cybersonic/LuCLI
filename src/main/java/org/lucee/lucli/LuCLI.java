@@ -92,7 +92,9 @@ import picocli.CommandLine.Spec;
         "",
         "Examples:",
         "  lucli                           # Start interactive terminal",
-        "  lucli --verbose --version       # Show version with verbose output", 
+        "  lucli --version                 # Show concise version",
+        "  lucli --full-version            # Show full runtime/build version details",
+        "  lucli --build-info              # Show build metadata only",
         "  lucli --timing script.cfs       # Execute script with timing analysis",
         "  lucli script.cfs arg1 arg2      # Execute CFML script with arguments",
         "  lucli myscript.lucli            # Execute a LuCLI command script",
@@ -137,6 +139,13 @@ public class LuCLI implements Callable<Integer> {
             description = "Show application version",
             versionHelp = true)
     private boolean versionRequested = false;
+    @Option(names = {"--full-version"},
+            description = "Show full version details (LuCLI, Lucee, Java, and build metadata)")
+    private boolean fullVersionRequested = false;
+
+    @Option(names = {"--build-info"},
+            description = "Show build metadata only")
+    private boolean buildInfoRequested = false;
 
     @Option(names = {"--lucee-version"}, 
             description = "Show Lucee version")
@@ -262,6 +271,15 @@ public class LuCLI implements Callable<Integer> {
         Timer.start("Total Execution");
 
         try {
+            if (fullVersionRequested) {
+                StringOutput.Quick.info(getVersionInfo(true));
+                return 0;
+            }
+
+            if (buildInfoRequested) {
+                StringOutput.Quick.info(getBuildInfo());
+                return 0;
+            }
             // Handle special version command
             if (luceeVersionRequested) {
                 String luceeVersion = LuceeScriptEngine.getInstance().getVersion();
@@ -1083,6 +1101,20 @@ public class LuCLI implements Callable<Integer> {
     private static boolean isFileSystemStyleCommand(String command) {
         return internalFileSystemCommands.contains(command);
     }
+
+    /**
+     * Get concise version information.
+     * @return Single-line LuCLI version string
+     */
+    public static String getCompactVersionInfo() {
+        String ver = activeProfile.productVersionOverride();
+        if (ver == null || ver.trim().isEmpty()) {
+            ver = getVersion();
+        } else {
+            ver = ver.trim();
+        }
+        return activeProfile.displayName() + " Version: " + ver;
+    }
     
     /**
      * Get formatted version information
@@ -1099,13 +1131,7 @@ public class LuCLI implements Callable<Integer> {
         // Version information header first so tools/tests that only see the
         // first few lines can still parse the version without needing to
         // strip the ASCII art banner.
-        String ver = activeProfile.productVersionOverride();
-        if (ver == null || ver.trim().isEmpty()) {
-            ver = getVersion();
-        } else {
-            ver = ver.trim();
-        }
-        info.append(activeProfile.displayName()).append(" Version: ").append(ver).append("\n");
+        info.append(getCompactVersionInfo()).append("\n");
 
         // ASCII art banner — provided by the active profile
         info.append("\n");
@@ -1122,12 +1148,34 @@ public class LuCLI implements Callable<Integer> {
         }
 
         info.append("Java Version: ").append(getJavaVersionInfo()).append("\n");
+        info.append(getBuildInfo()).append("\n");
         
         // Copyright and repository information
         info.append("\n");
         info.append("Copyright (c) Mark Drew https://github.com/cybersonic\n");
         info.append("Repository: https://github.com/cybersonic/lucli\n");
         
+        return info.toString();
+    }
+
+    /**
+     * Get build metadata only.
+     * @return Build metadata formatted as labeled lines
+     */
+    public static String getBuildInfo() {
+        Properties versionProperties = readVersionProperties();
+        StringBuilder info = new StringBuilder();
+        info.append("Build Timestamp: ")
+            .append(resolveBuildMetadataValue(getVersionProperty(versionProperties, "lucli.build.timestamp"), "unknown"))
+            .append("\n");
+        info.append("Build Commit: ")
+            .append(resolveBuildMetadataValue(getVersionProperty(versionProperties, "lucli.build.commit"), "unknown"))
+            .append("\n");
+        info.append("Build Branch: ")
+            .append(resolveBuildMetadataValue(getVersionProperty(versionProperties, "lucli.build.branch"), "unknown"))
+            .append("\n");
+        info.append("Build JDK: ")
+            .append(resolveBuildMetadataValue(getVersionProperty(versionProperties, "lucli.build.jdk"), System.getProperty("java.version", "unknown")));
         return info.toString();
     }
     
@@ -1138,7 +1186,7 @@ public class LuCLI implements Callable<Integer> {
     public static String getVersion() {
         // Preferred source: filtered build resource available in both
         // mvn exec:java development runs and packaged JAR executions.
-        String resourceVersion = readVersionFromResource();
+        String resourceVersion = getVersionProperty(readVersionProperties(), "lucli.version");
         if (resourceVersion != null && !resourceVersion.isBlank()) {
             return resourceVersion;
         }
@@ -1170,22 +1218,42 @@ public class LuCLI implements Callable<Integer> {
         return "unknown";
     }
 
-    private static String readVersionFromResource() {
+    private static Properties readVersionProperties() {
+        Properties props = new Properties();
         try (java.io.InputStream in = LuCLI.class.getResourceAsStream("/lucli/version.properties")) {
             if (in == null) {
-                return null;
+                return props;
             }
-            Properties props = new Properties();
             props.load(in);
-            String version = props.getProperty("lucli.version");
-            if (version == null) {
-                return null;
-            }
-            version = version.trim();
-            return version.isEmpty() ? null : version;
         } catch (Exception e) {
+            return props;
+        }
+        return props;
+    }
+
+    private static String getVersionProperty(Properties properties, String key) {
+        if (properties == null || key == null || key.isBlank()) {
             return null;
         }
+        String value = properties.getProperty(key);
+        if (value == null) {
+            return null;
+        }
+        value = value.trim();
+        if (value.isEmpty() || value.startsWith("${")) {
+            return null;
+        }
+        return value;
+    }
+
+    private static String resolveBuildMetadataValue(String value, String fallback) {
+        if (value != null && !value.trim().isEmpty()) {
+            return value.trim();
+        }
+        if (fallback == null || fallback.trim().isEmpty()) {
+            return "unknown";
+        }
+        return fallback.trim();
     }
 
     private static String getJavaVersionInfo() {
