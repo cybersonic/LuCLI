@@ -2,7 +2,6 @@ package org.lucee.lucli;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 
@@ -19,17 +18,19 @@ class LuCLIVersionInfoTest {
         String versionInfo = LuCLI.getVersionInfo(false);
 
         assertTrue(versionInfo.contains("Java Version: "));
-        assertTrue(versionInfo.contains("Build Timestamp: "));
-        assertTrue(versionInfo.contains("Build Commit: "));
-        assertTrue(versionInfo.contains("Build Branch: "));
-        assertTrue(versionInfo.contains("Build JDK: "));
+        assertFalse(versionInfo.contains("Build Timestamp: "));
+        assertFalse(versionInfo.contains("Build Commit: "));
+        assertFalse(versionInfo.contains("Build Branch: "));
+        assertFalse(versionInfo.contains("Build JDK: "));
     }
 
     @Test
-    void getCompactVersionInfo_returnsSingleLineVersion() {
-        String compactVersion = LuCLI.getCompactVersionInfo();
-        assertTrue(compactVersion.startsWith("LuCLI Version: "));
-        assertEquals(1, compactVersion.split("\\R").length);
+    void getVersionLongInfo_includesBuildMetadataLines() {
+        String versionLongInfo = LuCLI.getVersionLongInfo(true);
+        assertTrue(versionLongInfo.contains("Build Timestamp: "));
+        assertTrue(versionLongInfo.contains("Build Commit: "));
+        assertTrue(versionLongInfo.contains("Build Branch: "));
+        assertTrue(versionLongInfo.contains("Build JDK: "));
     }
 
     @Test

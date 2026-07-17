@@ -92,8 +92,8 @@ import picocli.CommandLine.Spec;
         "",
         "Examples:",
         "  lucli                           # Start interactive terminal",
-        "  lucli --version                 # Show concise version",
-        "  lucli --full-version            # Show full runtime/build version details",
+        "  lucli --version                 # Show version details (without build metadata)",
+        "  lucli --version-long            # Show version details including build metadata",
         "  lucli --build-info              # Show build metadata only",
         "  lucli --timing script.cfs       # Execute script with timing analysis",
         "  lucli script.cfs arg1 arg2      # Execute CFML script with arguments",
@@ -139,9 +139,9 @@ public class LuCLI implements Callable<Integer> {
             description = "Show application version",
             versionHelp = true)
     private boolean versionRequested = false;
-    @Option(names = {"--full-version"},
-            description = "Show full version details (LuCLI, Lucee, Java, and build metadata)")
-    private boolean fullVersionRequested = false;
+    @Option(names = {"--version-long"},
+            description = "Show full version details including build metadata")
+    private boolean versionLongRequested = false;
 
     @Option(names = {"--build-info"},
             description = "Show build metadata only")
@@ -271,8 +271,8 @@ public class LuCLI implements Callable<Integer> {
         Timer.start("Total Execution");
 
         try {
-            if (fullVersionRequested) {
-                StringOutput.Quick.info(getVersionInfo(true));
+            if (versionLongRequested) {
+                StringOutput.Quick.info(getVersionLongInfo(true));
                 return 0;
             }
 
@@ -1103,20 +1103,6 @@ public class LuCLI implements Callable<Integer> {
     }
 
     /**
-     * Get concise version information.
-     * @return Single-line LuCLI version string
-     */
-    public static String getCompactVersionInfo() {
-        String ver = activeProfile.productVersionOverride();
-        if (ver == null || ver.trim().isEmpty()) {
-            ver = getVersion();
-        } else {
-            ver = ver.trim();
-        }
-        return activeProfile.displayName() + " Version: " + ver;
-    }
-    
-    /**
      * Get formatted version information
      * @param includeLucee Whether to include Lucee version
      * @return Formatted version string with labels
@@ -1131,7 +1117,13 @@ public class LuCLI implements Callable<Integer> {
         // Version information header first so tools/tests that only see the
         // first few lines can still parse the version without needing to
         // strip the ASCII art banner.
-        info.append(getCompactVersionInfo()).append("\n");
+        String ver = activeProfile.productVersionOverride();
+        if (ver == null || ver.trim().isEmpty()) {
+            ver = getVersion();
+        } else {
+            ver = ver.trim();
+        }
+        info.append(activeProfile.displayName()).append(" Version: ").append(ver).append("\n");
 
         // ASCII art banner — provided by the active profile
         info.append("\n");
@@ -1148,13 +1140,24 @@ public class LuCLI implements Callable<Integer> {
         }
 
         info.append("Java Version: ").append(getJavaVersionInfo()).append("\n");
-        info.append(getBuildInfo()).append("\n");
         
         // Copyright and repository information
         info.append("\n");
         info.append("Copyright (c) Mark Drew https://github.com/cybersonic\n");
         info.append("Repository: https://github.com/cybersonic/lucli\n");
         
+        return info.toString();
+    }
+
+    /**
+     * Get extended version information including build metadata.
+     * @param includeLucee Whether to include Lucee version
+     * @return Formatted version string with runtime and build metadata details
+     */
+    public static String getVersionLongInfo(boolean includeLucee) {
+        StringBuilder info = new StringBuilder(getVersionInfo(includeLucee));
+        info.append("\n");
+        info.append(getBuildInfo()).append("\n");
         return info.toString();
     }
 

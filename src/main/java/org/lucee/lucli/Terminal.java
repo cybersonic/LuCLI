@@ -265,11 +265,11 @@ public class Terminal {
                     
                 case "version":
                 case "--version":
-                    return LuCLI.getCompactVersionInfo();
-
-                case "full-version":
-                case "--full-version":
                     return LuCLI.getVersionInfo(true);
+
+                case "version-long":
+                case "--version-long":
+                    return LuCLI.getVersionLongInfo(true);
 
                 case "build-info":
                 case "--build-info":
@@ -523,8 +523,8 @@ public class Terminal {
         
         help.append("Terminal:\n");
         help.append("  help                Show this help\n");
-        help.append("  version             Show concise version\n");
-        help.append("  full-version        Show full runtime/build version details\n");
+        help.append("  version             Show version details (without build metadata)\n");
+        help.append("  version-long        Show full runtime/build version details\n");
         help.append("  build-info          Show build metadata only\n");
         help.append("  exit, quit          Exit terminal\n");
         help.append("  Ctrl-C              Interrupt command\n");
