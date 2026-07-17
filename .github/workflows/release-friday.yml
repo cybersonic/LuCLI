@@ -1,0 +1,86 @@
+name: Release Friday
+
+on:
+  schedule:
+    # Fridays at 14:00 UTC
+    - cron: "0 14 * * 5"
+  workflow_dispatch:
+
+jobs:
+  prepare-release-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: temurin
+
+      - name: Prepare release train branch
+        id: prepare
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          CURRENT_VERSION="$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)"
+          echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+
+          if [[ "$CURRENT_VERSION" != *"-SNAPSHOT" ]]; then
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "reason=Current version is not a SNAPSHOT; skipping Release Friday PR." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          UNRELEASED_COUNT="$(./scripts/release.sh unreleased-count)"
+          echo "unreleased_count=$UNRELEASED_COUNT" >> "$GITHUB_OUTPUT"
+
+          if [[ "$UNRELEASED_COUNT" -eq 0 ]]; then
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "reason=No CHANGELOG Unreleased entries found; nothing to release this week." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          SUGGESTED_BUMP="$(./scripts/release.sh suggest-bump-value)"
+          RELEASE_VERSION="${CURRENT_VERSION%-SNAPSHOT}"
+          BRANCH_NAME="release/friday-${RELEASE_VERSION}"
+
+          ./scripts/release.sh release
+
+          echo "should_release=true" >> "$GITHUB_OUTPUT"
+          echo "release_version=$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "suggested_bump=$SUGGESTED_BUMP" >> "$GITHUB_OUTPUT"
+          echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Create release PR
+        if: steps.prepare.outputs.should_release == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ github.token }}
+          base: main
+          branch: ${{ steps.prepare.outputs.branch_name }}
+          commit-message: "chore(release): prepare ${{ steps.prepare.outputs.release_version }}"
+          title: "chore(release): release ${{ steps.prepare.outputs.release_version }} (Release Friday)"
+          body: |
+            ## Release Friday
+            This automated PR prepares the weekly release train.
+
+            - Release version: `${{ steps.prepare.outputs.release_version }}`
+            - Current snapshot before cut: `${{ steps.prepare.outputs.current_version }}`
+            - Unreleased changelog entries: `${{ steps.prepare.outputs.unreleased_count }}`
+            - Suggested bump from changelog content: `${{ steps.prepare.outputs.suggested_bump }}`
+
+            ### After merge
+            1. Run the stable release workflow (`Release`) via `workflow_dispatch`.
+            2. Run `./scripts/release.sh next-snapshot` and open a follow-up PR for the next dev cycle.
+
+      - name: Skip summary
+        if: steps.prepare.outputs.should_release != 'true'
+        run: |
+          echo "Release Friday skipped."
+          echo "${{ steps.prepare.outputs.reason }}"

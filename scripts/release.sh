@@ -106,6 +106,64 @@ suggest_bump_from_changelog() {
     log_info "Suggested command: $0 bump $suggestion"
 }
 
+get_suggested_bump_value() {
+    local changelog_file="$PROJECT_ROOT/CHANGELOG.md"
+    local entries
+
+    if [ ! -f "$changelog_file" ]; then
+        log_error "CHANGELOG.md not found at $changelog_file"
+        exit 1
+    fi
+
+    entries=$(get_unreleased_changelog_entries)
+
+    if [ -z "$entries" ]; then
+        echo "patch"
+        return 0
+    fi
+
+    local major_count=0
+    local minor_count=0
+
+    while IFS= read -r entry; do
+        [ -z "$entry" ] && continue
+        local normalized_entry
+        normalized_entry=$(printf '%s\n' "$entry" | tr '[:upper:]' '[:lower:]')
+
+        if printf '%s\n' "$normalized_entry" | grep -Eq '\[(major|breaking)\]|breaking[[:space:]-]?change|(^|[^a-z])breaking([^a-z]|$)|incompatible|removed'; then
+            major_count=$((major_count + 1))
+        elif ! printf '%s\n' "$normalized_entry" | grep -Eq '\[patch\]|^[[:space:]]*-[[:space:]]+\*\*(fix|docs?|documentation|test|tests|regression|chore|ci|refactor|cleanup|contract clarification|hotfix)[: ]'; then
+            minor_count=$((minor_count + 1))
+        fi
+    done <<< "$entries"
+
+    if [ "$major_count" -gt 0 ]; then
+        echo "major"
+    elif [ "$minor_count" -gt 0 ]; then
+        echo "minor"
+    else
+        echo "patch"
+    fi
+}
+
+print_unreleased_count() {
+    local entries
+    local count=0
+
+    entries=$(get_unreleased_changelog_entries || true)
+    if [ -z "$entries" ]; then
+        echo "0"
+        return 0
+    fi
+
+    while IFS= read -r entry; do
+        [ -z "$entry" ] && continue
+        count=$((count + 1))
+    done <<< "$entries"
+
+    echo "$count"
+}
+
 bump_version() {
     local version_type=$1
     cd "$PROJECT_ROOT"
@@ -251,6 +309,8 @@ Usage: $0 <command>
 Commands:
     status                  Show current version and git status
     suggest-bump            Suggest major/minor/patch from CHANGELOG.md Unreleased entries
+    suggest-bump-value      Output only suggested major/minor/patch value
+    unreleased-count        Output number of bullets under CHANGELOG.md ## Unreleased
     bump <type>             Bump version (major, minor, patch)
     release                 Prepare release version (remove SNAPSHOT)
     next-snapshot           Set next development version (after release)
@@ -293,6 +353,12 @@ case "${1:-}" in
         ;;
     suggest-bump)
         suggest_bump_from_changelog
+        ;;
+    suggest-bump-value)
+        get_suggested_bump_value
+        ;;
+    unreleased-count)
+        print_unreleased_count
         ;;
     bump)
         if [ -z "$2" ]; then
