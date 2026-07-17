@@ -100,6 +100,9 @@ public class InstallCommand implements Callable<Integer> {
     }
 
     private LuceeServerConfig.ServerConfig loadDepsLifecycleConfig(Path projectDir, String environment) throws Exception {
+if (!Files.exists(projectDir.resolve("lucee.json"))) {
+            throw new java.io.IOException("lucee.json not found in " + projectDir);
+        }
         LuceeServerConfig.ServerConfig config = LuceeServerConfig.loadConfig(projectDir);
         if (environment != null && !environment.trim().isEmpty()) {
             config = LuceeServerConfig.applyEnvironment(config, environment.trim(), projectDir, "lucee.json");
