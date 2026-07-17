@@ -68,6 +68,7 @@ jobs:
           mvn -DskipTests=true clean package -Pwindows-exe
           cat src/bin/lucli.sh target/lucli.jar > target/lucli
           chmod +x target/lucli
+          ./scripts/build-deb.sh target/lucli "${{ steps.version.outputs.VERSION }}"
           rm -f target/lucli-windows.zip
           zip -j target/lucli-windows.zip target/lucli.exe
           # Legacy asset names (released as files.artifacts in jreleaser.yml).

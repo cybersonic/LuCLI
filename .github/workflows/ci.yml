@@ -200,3 +200,27 @@ jobs:
     - name: Verify Windows executable works
       if: runner.os == 'Windows'
       run: .\target\lucli.exe --version
+
+  # ==================================================
+  # Published APT Repository Smoke Test
+  # ==================================================
+  apt-install-smoke:
+    name: APT Install Smoke (Ubuntu)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    steps:
+    - name: Install apt prerequisites
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y curl ca-certificates gnupg
+
+    - name: Configure LuCLI apt source
+      run: |
+        curl -fsSL https://cybersonic.github.io/LuCLI/lucli-keyring.gpg | sudo tee /usr/share/keyrings/lucli-keyring.gpg >/dev/null
+        echo "deb [arch=amd64 signed-by=/usr/share/keyrings/lucli-keyring.gpg] https://cybersonic.github.io/LuCLI stable main" | sudo tee /etc/apt/sources.list.d/lucli.list >/dev/null
+        sudo apt-get update
+
+    - name: Install and verify lucli from apt
+      run: |
+        sudo apt-get install -y lucli
+        lucli --version

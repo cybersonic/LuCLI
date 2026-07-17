@@ -42,6 +42,7 @@ files:
     - path: target/lucli-{{projectVersion}}-macos
     - path: target/lucli-{{projectVersion}}.exe
     - path: target/lucli-{{projectVersion}}.jar
+    - path: target/lucli_{{projectVersion}}_amd64.deb
     - path: target/lucli.jar
 
 packagers:
