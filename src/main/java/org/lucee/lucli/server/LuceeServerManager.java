@@ -3269,9 +3269,13 @@ public class LuceeServerManager {
     public List<String> buildCatalinaOpts(LuceeServerConfig.ServerConfig config, AgentOverrides overrides, Path projectDir) {
         List<String> opts = new ArrayList<>();
         
-        // Base memory settings
-        opts.add("-Xms" + config.jvm.minMemory);
-        opts.add("-Xmx" + config.jvm.maxMemory);
+        // Base memory settings (only when explicitly configured; omitting lets JVM ergonomics apply)
+        if (config.jvm.minMemory != null) {
+            opts.add("-Xms" + config.jvm.minMemory);
+        }
+        if (config.jvm.maxMemory != null) {
+            opts.add("-Xmx" + config.jvm.maxMemory);
+        }
         
         // JMX configuration if monitoring is enabled
         if (config.monitoring != null && config.monitoring.enabled && config.monitoring.jmx != null) {

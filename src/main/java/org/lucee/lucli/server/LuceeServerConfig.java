@@ -246,8 +246,8 @@ public class LuceeServerConfig {
     }
     
     public static class JvmConfig {
-        public String maxMemory = "512m";
-        public String minMemory = "128m";
+        public String maxMemory = null;
+        public String minMemory = null;
         public String[] additionalArgs = new String[0];
     }
     

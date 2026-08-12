@@ -149,6 +149,32 @@ public class LuceeServerManagerAgentsTest {
     }
 
     @Test
+    void buildCatalinaOpts_unsetMemory_omitsXmsXmxFlags() throws Exception {
+        LuceeServerConfig.ServerConfig config = new LuceeServerConfig.ServerConfig();
+        // Leave jvm.maxMemory and jvm.minMemory as null (default after our change)
+
+        List<String> opts = invokeBuildCatalinaOpts(config, null);
+
+        assertTrue(opts.stream().noneMatch(o -> o.startsWith("-Xms")),
+                "Should not include -Xms when jvm.minMemory is unset");
+        assertTrue(opts.stream().noneMatch(o -> o.startsWith("-Xmx")),
+                "Should not include -Xmx when jvm.maxMemory is unset");
+    }
+
+    @Test
+    void buildCatalinaOpts_partialMemory_onlySetFlagEmitted() throws Exception {
+        LuceeServerConfig.ServerConfig config = new LuceeServerConfig.ServerConfig();
+        config.jvm.maxMemory = "2g";
+        // minMemory left null
+
+        List<String> opts = invokeBuildCatalinaOpts(config, null);
+
+        assertTrue(opts.contains("-Xmx2g"), "Should include -Xmx when jvm.maxMemory is set");
+        assertTrue(opts.stream().noneMatch(o -> o.startsWith("-Xms")),
+                "Should not include -Xms when jvm.minMemory is unset");
+    }
+
+    @Test
     void applyStartConfigOverrides_warmupSetsEnvVarAndJvmProperty() throws Exception {
         LuceeServerConfig.ServerConfig config = baseConfig();
         config.envVars.put("APP_ENV", "test");
