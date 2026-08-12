@@ -208,7 +208,7 @@ lucli server start --disable-agent prometheus
 
 The JVM options for a server are built in this order:
 
-1. Memory settings (`-Xms`, `-Xmx`) from `jvm.minMemory` / `jvm.maxMemory`.
+1. Memory settings (`-Xms`, `-Xmx`) from `jvm.minMemory` / `jvm.maxMemory` when those values are set.
 2. JMX system properties (when `monitoring.enabled` is true).
 3. `jvmArgs` from each **active agent** (per the rules above).
 4. Any `jvm.additionalArgs` from `lucee.json`.

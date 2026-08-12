@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+- **Fix: Unset `jvm.maxMemory` / `jvm.minMemory` No Longer Force `-Xmx512m` / `-Xms128m` (`#120`):** Omitting (or blanking) heap size settings in `lucee.json` no longer applies hard-coded `512m`/`128m` defaults. LuCLI only emits `-Xmx` / `-Xms` when those values are explicitly set, so JVM ergonomics and flags like `-XX:MaxRAMPercentage` (via `jvm.additionalArgs`) can take effect. Explicit sizes (e.g. `"4g"`) still work as before. Updated schema/docs/default assets and added regression coverage in `LuceeServerManagerAgentsTest`.
+
 ## 0.7.0
 - **Version Short Flag:** Added `lucli --version-short` to print only the raw LuCLI version value (for scripts/automation that need just the version string).
 - **Version Output Split + Build Metadata (Maven + `build.sh`):** `lucli --version` keeps baseline runtime details (without build metadata), `lucli --version-long` adds build metadata, and `lucli --build-info` shows build metadata only (`Build Timestamp`, `Build Commit`, `Build Branch`, `Build JDK`). Metadata is sourced from filtered `lucli/version.properties` with commit/branch populated during Maven builds, so it is available in both direct `mvn` builds and `./build.sh` builds.
