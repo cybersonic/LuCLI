@@ -6,7 +6,7 @@
 
   <groupId>org.lucee</groupId>
   <artifactId>lucli</artifactId>
-  <version>0.7.0</version>
+  <version>7.0.4.34</version>
 
 
   <name>LuCLI</name>
@@ -22,7 +22,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.build.timestamp.format>yyyy-MM-dd'T'HH:mm:ssXXX</maven.build.timestamp.format>
     <jline.version>3.26.3</jline.version>
-    <lucee.version>7.0.4.18-SNAPSHOT</lucee.version>
+    <lucee.version>7.0.4.34</lucee.version>
     <!-- <lucee.classifier></lucee.classifier> -->
     <lucee.classifier>zero</lucee.classifier>
     
@@ -97,8 +97,8 @@
         <enabled>true</enabled>
       </releases>
     </repository>
-    
-          
+
+
   </repositories>
 
   <dependencies>
@@ -132,21 +132,21 @@
       <artifactId>jakarta.servlet-api</artifactId>
       <version>5.0.0</version>
     </dependency>
-    
+
     <!-- Jackson JSON library for settings management -->
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
       <version>2.15.2</version>
     </dependency>
-    
+
     <!-- Picocli for command-line argument parsing -->
     <dependency>
       <groupId>info.picocli</groupId>
       <artifactId>picocli</artifactId>
       <version>4.7.5</version>
     </dependency>
-    
+
     <!-- Picocli-JLine3 integration for interactive shell -->
     <dependency>
       <groupId>info.picocli</groupId>
@@ -168,7 +168,7 @@
       <version>5.11.0</version>
       <scope>test</scope>
     </dependency>
-    
+
     <!-- Note: CFLint is loaded dynamically when needed -->
     <!-- No dependency required - CFLint JAR is downloaded automatically -->
   </dependencies>
@@ -322,15 +322,18 @@
                     <exclude>extensions/17AB52DE-B300-A94B-E058BD978511E39E-2.0.2.21.lex</exclude>
                     <!-- ESAPI Security Extension (3.4 MB) - Web security not needed for CLI -->
                     <exclude>extensions/37C61C0A-5D7E-4256-8572639BE0CF5838-2.6.0.1.lex</exclude>
-                    
+
                     <!-- Exclude database drivers to save additional ~4.6 MB -->
-                    <exclude>extensions/7E673D15-D87C-41A6-8B5F1956528C605F-9.4.0.lex</exclude>  <!-- MySQL (2.3 MB) -->
-                    <exclude>extensions/99A4EF8D-F2FD-40C8-8FB8C2E67A4EEEB6-12.6.3.jre11.lex</exclude>  <!-- MS SQL (1.3 MB) -->
-                    <exclude>extensions/671B01B8-B3B3-42B9-AC055A356BED5281-42.7.7.lex</exclude>  <!-- PostgreSQL (1.0 MB) -->
-                    
+                    <exclude>extensions/7E673D15-D87C-41A6-8B5F1956528C605F-9.4.0.lex</exclude>  <!--
+                    MySQL (2.3 MB) -->
+                    <exclude>extensions/99A4EF8D-F2FD-40C8-8FB8C2E67A4EEEB6-12.6.3.jre11.lex</exclude>  <!--
+                    MS SQL (1.3 MB) -->
+                    <exclude>extensions/671B01B8-B3B3-42B9-AC055A356BED5281-42.7.7.lex</exclude>  <!--
+                    PostgreSQL (1.0 MB) -->
+
                     <!-- Exclude Apache Ant build tool classes (6.7 MB) - not needed at runtime -->
                     <exclude>org/apache/tools/ant/**</exclude>
-                    
+
                     <!-- Exclude documentation and metadata -->
                     <exclude>META-INF/maven/**</exclude>
                     <exclude>META-INF/*.txt</exclude>
@@ -374,7 +377,7 @@
                   </manifestEntries>
                 </transformer>
                 <transformer
-                  implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                  implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
               </transformers>
             </configuration>
           </execution>
@@ -401,7 +404,7 @@
           <keypass>${jarsigner.keypass}</keypass>
         </configuration>
       </plugin>
-      
+
     </plugins>
 
   </build>
@@ -436,7 +439,8 @@
                   <goal>set</goal>
                 </goals>
                 <configuration>
-                  <newVersion>${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.nextIncrementalVersion}-SNAPSHOT</newVersion>
+                  <newVersion>
+                    ${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.nextIncrementalVersion}-SNAPSHOT</newVersion>
                   <generateBackupPoms>false</generateBackupPoms>
                 </configuration>
               </execution>
@@ -501,7 +505,8 @@
                     <mkdir dir="${user.home}/bin" />
                     <copy file="target/lucli" tofile="${user.home}/bin/lucli" overwrite="true" />
                     <chmod file="${user.home}/bin/lucli" perm="755" />
-                    <echo message="✅ Copied lucli binary v${project.version} to ${user.home}/bin/lucli" />
+                    <echo
+                      message="✅ Copied lucli binary v${project.version} to ${user.home}/bin/lucli" />
                   </target>
                 </configuration>
               </execution>
@@ -510,7 +515,7 @@
         </plugins>
       </build>
     </profile>
-    
+
     <!-- Windows Executable Profile using Launch4j -->
     <profile>
       <id>windows-exe</id>
@@ -561,7 +566,7 @@
         </plugins>
       </build>
     </profile>
-    
+
     <!-- Windows Batch + JAR Single File (Alternative approach) -->
     <profile>
       <id>windows-binary</id>
@@ -593,7 +598,8 @@
                   <goal>set</goal>
                 </goals>
                 <configuration>
-                  <newVersion>${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.nextIncrementalVersion}-SNAPSHOT</newVersion>
+                  <newVersion>
+                    ${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.nextIncrementalVersion}-SNAPSHOT</newVersion>
                   <generateBackupPoms>false</generateBackupPoms>
                 </configuration>
               </execution>
@@ -617,7 +623,8 @@
                       <fileset file="src/bin/lucli.bat" />
                       <fileset file="target/lucli.jar" />
                     </concat>
-                    <echo message="${WindowsSupport.Symbols.SUCCESS} Created Windows binary: target/lucli.cmd" />
+                    <echo
+                      message="${WindowsSupport.Symbols.SUCCESS} Created Windows binary: target/lucli.cmd" />
                   </target>
                 </configuration>
               </execution>
@@ -630,8 +637,10 @@
                 <configuration>
                   <target>
                     <mkdir dir="${user.home}/bin" />
-                    <copy file="target/lucli.cmd" tofile="${user.home}/bin/lucli.cmd" overwrite="true" />
-                    <echo message="${WindowsSupport.Symbols.SUCCESS} Copied Windows binary to ${user.home}/bin/lucli.cmd" />
+                    <copy file="target/lucli.cmd" tofile="${user.home}/bin/lucli.cmd"
+                      overwrite="true" />
+                    <echo
+                      message="${WindowsSupport.Symbols.SUCCESS} Copied Windows binary to ${user.home}/bin/lucli.cmd" />
                   </target>
                 </configuration>
               </execution>
