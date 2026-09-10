@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Fix: Reserved Subcommand Tokens in Module Positional Args:** A bare positional token matching a root subcommand name (e.g. `wheels generate controller StaticPages help`, or `server`/`run`/`modules` in any non-leading position) was hijacked by picocli and routed to that root subcommand instead of the module, so the module was never invoked. `preprocessModuleHelp` now rewrites these non-leading reserved tokens through `modules run` (which treats everything after the module name as unmatched args), so a module subcommand's positional arguments that collide with a root subcommand name are passed through unchanged. Leading reserved tokens (e.g. `wheels server start`) still invoke the root subcommand directly. Adds unit coverage in `LuCLIModuleHelpPreprocessTest`.
 
 ## 0.7.0
 - **Version Short Flag:** Added `lucli --version-short` to print only the raw LuCLI version value (for scripts/automation that need just the version string).

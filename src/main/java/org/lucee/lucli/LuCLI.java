@@ -655,9 +655,44 @@ public class LuCLI implements Callable<Integer> {
     }
 
     /**
+     * Root picocli subcommand names (plus aliases) declared on the
+     * {@code @Command(subcommands = {...})} annotation. A bare positional token
+     * matching one of these — when passed as a positional arg to a module's
+     * subcommand (e.g. {@code wheels generate controller StaticPages help}) —
+     * is hijacked by picocli and routed to that root subcommand instead of the
+     * module. Keep this set in sync with the {@code subcommands} list on the
+     * {@code LuCLI} class.
+     */
+    static final Set<String> RESERVED_ROOT_SUBCOMMANDS = Set.of(
+        "server", "servers",
+        "modules", "module",
+        "deps", "dependencies",
+        "install",
+        "cfml",
+        "repl",
+        "completion",
+        "versions-list",
+        "parrot",
+        "secrets", "secret",
+        "system",
+        "help",
+        "run",
+        "daemon",
+        "mcp",
+        "ai",
+        "xml", "xset", "if"
+    );
+
+    /**
      * If the CLI args look like {@code <module-name> [subcommand...] --help},
      * rewrite them to {@code modules run <module-name> [subcommand...] --help}
      * so picocli routes to ModulesRunCommandImpl instead of showing root help.
+     *
+     * <p>Also rewrites when a bare reserved root-subcommand token appears in a
+     * NON-leading position (a positional arg of the module's subcommand) — e.g.
+     * {@code wheels generate controller StaticPages help} — because picocli
+     * otherwise matches that token to its root subcommand ({@code help},
+     * {@code server}, {@code run}, …) and the module is never invoked.</p>
      */
     private static String[] preprocessModuleHelp(String[] args) {
         if (args.length < 2) return args;
@@ -669,6 +704,18 @@ public class LuCLI implements Callable<Integer> {
         // binary-name-aliased `wheels`). Bare `lucli help` (first arg not a
         // module) is left to LuCLI's builtin HelpCommand, unchanged.
         if (!ModuleCommand.moduleExists(first)) return args;
+
+        return rewriteModuleHelpOrReserved(args);
+    }
+
+    /**
+     * Rewrite a module invocation whose args would otherwise be intercepted by
+     * picocli's root subcommands. Assumes {@code args[0]} is already an
+     * installed module. Package-private so unit tests can drive it without
+     * touching the module-registry filesystem.
+     */
+    static String[] rewriteModuleHelpOrReserved(String[] args) {
+        String first = args[0];
 
         // (a) `<module> help [subcommand...]` — the bare `help` verb right after
         // the module name. Drop it and append --help so it routes to the
@@ -694,9 +741,26 @@ public class LuCLI implements Callable<Integer> {
                 break;
             }
         }
-        if (!hasHelp) return args;
 
-        // Prepend "modules run" so picocli delegates to ModulesRunCommandImpl
+        // (c) A bare reserved root-subcommand token in a NON-leading position.
+        // args[1] is the module's subcommand (or a LuCLI root subcommand the
+        // user invoked directly, e.g. `wheels server`) — only positionals at
+        // args[2..] belong to the module, so a reserved token there means
+        // picocli would hijack it to a root subcommand.
+        boolean hasReservedPositional = false;
+        if (!RESERVED_ROOT_SUBCOMMANDS.contains(args[1])) {
+            for (int i = 2; i < args.length; i++) {
+                if (RESERVED_ROOT_SUBCOMMANDS.contains(args[i])) {
+                    hasReservedPositional = true;
+                    break;
+                }
+            }
+        }
+
+        if (!hasHelp && !hasReservedPositional) return args;
+
+        // Prepend "modules run" so picocli delegates to ModulesRunCommandImpl,
+        // which treats everything after the module name as unmatched args.
         List<String> rewritten = new ArrayList<>();
         rewritten.add("modules");
         rewritten.add("run");
