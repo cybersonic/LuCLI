@@ -689,7 +689,8 @@ public class LuCLI implements Callable<Integer> {
         // (b) --help / -h anywhere after the module name.
         boolean hasHelp = false;
         for (int i = 1; i < args.length; i++) {
-            if ("--help".equals(args[i]) || "-h".equals(args[i])) {
+            if ("--help".equals(args[i]) || "-h".equals(args[i])
+                    || args[i].startsWith("--help=") || args[i].startsWith("-h=")) {
                 hasHelp = true;
                 break;
             }
@@ -701,7 +702,11 @@ public class LuCLI implements Callable<Integer> {
         rewritten.add("modules");
         rewritten.add("run");
         for (String arg : args) {
-            rewritten.add(arg);
+            // Leave value-bearing help controls to module dispatch, whose
+            // boolean syntax also accepts false/0 from MCP and CLI callers.
+            if (arg.startsWith("--help=")) rewritten.add(arg.substring(2));
+            else if (arg.startsWith("-h=")) rewritten.add(arg.substring(1));
+            else rewritten.add(arg);
         }
         return rewritten.toArray(new String[0]);
     }

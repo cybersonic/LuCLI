@@ -1,4 +1,9 @@
 component extends="modules.BaseModule" {
+    public string function showHelp() {
+        out("fixture help");
+        return "";
+    }
+
 
 	/**
 	 * hint: Report which typed params were populated and with what values.

@@ -92,6 +92,22 @@ class ModuleArgBindingTest {
                 "expected named args to override positional. Got: " + output);
     }
 
+    @Test
+    void falseHelpFlagsRunTheRequestedCommand() throws Exception {
+        for (String flag : List.of("--help=false", "-h=false", "--help=0", "--no-help")) {
+            String output = runCli("typedbind", "report", "hello", flag);
+            assertTrue(output.contains("first=hello second=default-second"), flag + ": " + output);
+        }
+    }
+
+    @Test
+    void enabledHelpFlagsStillShowModuleHelp() throws Exception {
+        for (String flag : List.of("--help", "-h", "--help=true", "-h=true")) {
+            String output = runCli("typedbind", "report", "hello", flag);
+            assertTrue(output.contains("fixture help"), flag + ": " + output);
+        }
+    }
+
     private String runCli(String... args) throws IOException, InterruptedException {
         List<String> cmd = new ArrayList<>();
         cmd.add("/bin/bash");
