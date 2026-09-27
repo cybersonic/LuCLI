@@ -114,6 +114,17 @@ class ModuleArgBindingTest {
         assertTrue(invalid.contains("Invalid value for option '--timeout'"), invalid);
     }
 
+    @Test
+    void clusteredRootFlagsAndAttachedValuesPreserveModuleTimeout() throws Exception {
+        for (String[] prefix : List.of(new String[]{"-vd"}, new String[]{"-veprod"},
+                new String[]{"-ve", "prod"}, new String[]{"-eprod"})) {
+            List<String> argv = new ArrayList<>(List.of(prefix));
+            argv.addAll(List.of("typedbind", "deadline", "--timeout=5"));
+            String output = runCli(argv.toArray(new String[0]));
+            assertTrue(output.contains("module timeout=5"), output);
+        }
+    }
+
     private String runCli(String... args) throws IOException, InterruptedException {
         List<String> cmd = new ArrayList<>();
         cmd.add("/bin/bash");

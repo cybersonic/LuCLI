@@ -667,8 +667,25 @@ public class LuCLI implements Callable<Integer> {
             int equals = token.indexOf('=');
             String name = equals < 0 ? token : token.substring(0, equals);
             CommandLine.Model.OptionSpec option = root.findOption(name);
-            if (option == null) return args; // Let picocli diagnose unknown options.
-            moduleIndex += 1 + (equals < 0 ? option.arity().min() : 0);
+            if (option != null) {
+                moduleIndex += 1 + (equals < 0 ? option.arity().min() : 0);
+            } else if (!token.startsWith("--") && token.length() > 2) {
+                // Picocli accepts -vd and value-taking forms such as -veprod
+                // or -ve prod. After a value-taking option, the rest of the
+                // token is its value, not more short option names.
+                int consumed = 1;
+                for (int c = 1; c < token.length(); c++) {
+                    CommandLine.Model.OptionSpec shortOption = root.findOption("-" + token.charAt(c));
+                    if (shortOption == null) return args;
+                    if (shortOption.arity().min() > 0) {
+                        if (c == token.length() - 1) consumed += shortOption.arity().min();
+                        break;
+                    }
+                }
+                moduleIndex += consumed;
+            } else {
+                return args; // Let picocli diagnose unknown options.
+            }
         }
         if (moduleIndex >= args.length || root.subcommands().containsKey(args[moduleIndex])
                 || !ModuleCommand.moduleExists(args[moduleIndex])) return args;
