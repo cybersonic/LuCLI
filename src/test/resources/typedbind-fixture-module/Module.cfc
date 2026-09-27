@@ -4,6 +4,11 @@ component extends="modules.BaseModule" {
         return "";
     }
 
+    public string function showHelp() {
+        out("fixture help");
+        return "";
+    }
+
 
 	/**
 	 * hint: Report which typed params were populated and with what values.
