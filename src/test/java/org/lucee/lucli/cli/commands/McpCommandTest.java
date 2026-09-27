@@ -223,6 +223,36 @@ class McpCommandTest {
                 "echo must fall back to the signature-derived schema");
     }
 
+    @Test
+    void failedToolPreservesReportAndRestoresCaptureForNextCall() throws Exception {
+        List<JsonNode> responses = runMcpSession(List.of(
+            "{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"initialize\",\"params\":{}}",
+            "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"failreport\",\"arguments\":{}}}",
+            "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"failreport\",\"arguments\":{\"printReport\":false}}}",
+            "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"echo\",\"arguments\":{}}}"
+        ));
+        JsonNode failed = responses.stream().filter(n -> n.path("id").asInt() == 1)
+                .findFirst().orElseThrow().path("result");
+        assertTrue(failed.path("isError").asBoolean(), failed.toString());
+        String text = failed.path("content").get(0).path("text").asText();
+        assertTrue(text.contains("report: three failures"), text);
+        assertTrue(text.contains("stderr: failure details"), text);
+        assertTrue(text.contains("unicode output: café"), text);
+        assertTrue(text.indexOf("fixture failure sentinel") > text.indexOf("unicode output: café"), text);
+
+        JsonNode quiet = responses.stream().filter(n -> n.path("id").asInt() == 2)
+                .findFirst().orElseThrow().path("result");
+        assertTrue(quiet.path("isError").asBoolean());
+        assertTrue(quiet.path("content").get(0).path("text").asText().contains("fixture failure sentinel"));
+        assertFalse(quiet.path("content").get(0).path("text").asText().contains("report: three failures"));
+
+        JsonNode success = responses.stream().filter(n -> n.path("id").asInt() == 3)
+                .findFirst().orElseThrow().path("result");
+        assertFalse(success.path("isError").asBoolean());
+        assertTrue(success.path("content").get(0).path("text").asText().contains("hello from echo"));
+        assertFalse(success.path("content").get(0).path("text").asText().contains("fixture failure sentinel"));
+    }
+
     // Send the given JSON-RPC lines to `dev-lucli.sh mcp mcpfixture` as a
     // subprocess. Returns each parsed response as a JsonNode.
     private List<JsonNode> runMcpSession(List<String> requests) throws Exception {
