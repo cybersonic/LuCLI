@@ -1,5 +1,15 @@
 component extends="modules.BaseModule" {
 
+    public string function failreport(boolean printReport = true) {
+        if (arguments.printReport) {
+            out("report: three failures");
+            err("stderr: failure details");
+            out("unicode output: café");
+        }
+        throw(message="fixture failure sentinel");
+    }
+
+
     /**
      * hint: Emit a known string via out() — used to test MCP output capture.
      */

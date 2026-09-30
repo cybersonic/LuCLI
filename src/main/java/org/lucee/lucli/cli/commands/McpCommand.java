@@ -547,12 +547,18 @@ public class McpCommand implements Callable<Integer> {
         }
 
         String output;
+        // Keep the buffer in the error handler's scope: modules may print a
+        // failure report before throwing to signal a non-zero exit.
+        ByteArrayOutputStream captured = new ByteArrayOutputStream();
         boolean isError = false;
         try {
-            output = executeModuleTool(mod, toolName, args);
+            output = executeModuleTool(mod, toolName, args, captured);
         } catch (Exception e) {
             isError = true;
-            output = (e.getMessage() != null ? e.getMessage() : e.toString());
+            String message = e.getMessage() != null ? e.getMessage() : e.toString();
+            String report = captured.toString(StandardCharsets.UTF_8);
+            output = report.isEmpty() ? message
+                : report + (report.endsWith("\n") ? "" : "\n") + message;
         }
 
         Map<String, Object> contentItem = new LinkedHashMap<>();
@@ -571,7 +577,8 @@ public class McpCommand implements Callable<Integer> {
         return result;
     }
 
-    private String executeModuleTool(String mod, String toolName, Map<String, Object> args) throws Exception {
+    private String executeModuleTool(String mod, String toolName, Map<String, Object> args,
+            ByteArrayOutputStream baos) throws Exception {
         List<String> argv = new ArrayList<>();
         argv.add(toolName);
         for (Map.Entry<String, Object> entry : args.entrySet()) {
@@ -603,7 +610,6 @@ public class McpCommand implements Callable<Integer> {
         PrintStream originalStringOut = stringOutput.getOutputStream();
         PrintStream originalStringErr = stringOutput.getErrorStream();
 
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try {
             PrintStream capture = new PrintStream(baos, true, StandardCharsets.UTF_8);
             System.setOut(capture);
