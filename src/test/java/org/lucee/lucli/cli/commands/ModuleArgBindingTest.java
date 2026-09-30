@@ -92,6 +92,39 @@ class ModuleArgBindingTest {
                 "expected named args to override positional. Got: " + output);
     }
 
+    @Test
+    void moduleTimeoutValuesReachTheModuleInsteadOfTheRootParser() throws Exception {
+        for (String value : List.of("5", "x", "0")) {
+            String output = runCli("typedbind", "deadline", "--timeout=" + value);
+            assertTrue(output.contains("module timeout=" + value), output);
+        }
+        String split = runCli("typedbind", "deadline", "--timeout", "7");
+        assertTrue(split.contains("module timeout=7"), split);
+        String prefixed = runCli("--verbose", "--timeout=40", "typedbind", "deadline", "--timeout=9");
+        assertTrue(prefixed.contains("module timeout=9"), prefixed);
+        String explicit = runCli("modules", "run", "typedbind", "deadline", "--timeout=11");
+        assertTrue(explicit.contains("module timeout=11"), explicit);
+    }
+
+    @Test
+    void timeoutBeforeTheModuleRemainsARootOption() throws Exception {
+        String output = runCli("--timeout", "5", "typedbind", "deadline");
+        assertTrue(output.contains("module timeout=900"), output);
+        String invalid = runCli("--timeout=x", "typedbind", "deadline");
+        assertTrue(invalid.contains("Invalid value for option '--timeout'"), invalid);
+    }
+
+    @Test
+    void clusteredRootFlagsAndAttachedValuesPreserveModuleTimeout() throws Exception {
+        for (String[] prefix : List.of(new String[]{"-vd"}, new String[]{"-veprod"},
+                new String[]{"-ve", "prod"}, new String[]{"-eprod"})) {
+            List<String> argv = new ArrayList<>(List.of(prefix));
+            argv.addAll(List.of("typedbind", "deadline", "--timeout=5"));
+            String output = runCli(argv.toArray(new String[0]));
+            assertTrue(output.contains("module timeout=5"), output);
+        }
+    }
+
     private String runCli(String... args) throws IOException, InterruptedException {
         List<String> cmd = new ArrayList<>();
         cmd.add("/bin/bash");

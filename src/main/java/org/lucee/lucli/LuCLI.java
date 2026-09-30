@@ -585,6 +585,8 @@ public class LuCLI implements Callable<Integer> {
         // `help` verb) is present, rewrite to "modules run <module> ... --help" so
         // picocli routes to ModulesRunCommandImpl (which delegates to the module's
         // showHelp()) instead of showing root-level help.
+        CommandLine cmd = new CommandLine(new LuCLI());
+        args = forwardModuleTimeout(args, cmd.getCommandSpec());
         args = preprocessQuestionMarkHelpAlias(args);
         args = preprocessModuleHelp(args);
         // Pre-process: rewrite `<module> [subs...] --version=<value>` to
@@ -593,8 +595,6 @@ public class LuCLI implements Callable<Integer> {
         // `--version=<tag>` a module wants (e.g. `wheels deploy --version=v1`).
         args = preprocessModuleVersion(args);
 
-        // Create Picocli CommandLine with our main command
-        CommandLine cmd = new CommandLine(new LuCLI());
         cmd.setExpandAtFiles(false);
         
         // Configure output streams
@@ -652,6 +652,61 @@ public class LuCLI implements Callable<Integer> {
         newArgs[0] = binaryName;
         System.arraycopy(args, 0, newArgs, 1, args.length);
         return newArgs;
+    }
+
+    /**
+     * Root options precede the module name. A timeout after that boundary is
+     * module data: use its named-argument form so picocli cannot consume it.
+     * Consult the root option arities rather than mistaking an option's value
+     * (for example --env <name>) for the module name.
+     */
+    private static String[] forwardModuleTimeout(String[] args, CommandSpec root) {
+        int moduleIndex = 0;
+        while (moduleIndex < args.length && args[moduleIndex].startsWith("-")) {
+            String token = args[moduleIndex];
+            int equals = token.indexOf('=');
+            String name = equals < 0 ? token : token.substring(0, equals);
+            CommandLine.Model.OptionSpec option = root.findOption(name);
+            if (option != null) {
+                moduleIndex += 1 + (equals < 0 ? option.arity().min() : 0);
+            } else if (!token.startsWith("--") && token.length() > 2) {
+                // Picocli accepts -vd and value-taking forms such as -veprod
+                // or -ve prod. After a value-taking option, the rest of the
+                // token is its value, not more short option names.
+                int consumed = 1;
+                for (int c = 1; c < token.length(); c++) {
+                    CommandLine.Model.OptionSpec shortOption = root.findOption("-" + token.charAt(c));
+                    if (shortOption == null) return args;
+                    if (shortOption.arity().min() > 0) {
+                        if (c == token.length() - 1) consumed += shortOption.arity().min();
+                        break;
+                    }
+                }
+                moduleIndex += consumed;
+            } else {
+                return args; // Let picocli diagnose unknown options.
+            }
+        }
+        if (moduleIndex >= args.length || root.subcommands().containsKey(args[moduleIndex])
+                || !ModuleCommand.moduleExists(args[moduleIndex])) return args;
+
+        List<String> forwarded = new ArrayList<>();
+        for (int i = 0; i <= moduleIndex; i++) forwarded.add(args[i]);
+        for (int i = moduleIndex + 1; i < args.length; i++) {
+            String token = args[i];
+            if ("--".equals(token)) {
+                forwarded.addAll(Arrays.asList(args).subList(i, args.length));
+                break;
+            } else if (token.startsWith("--timeout=")) {
+                forwarded.add(token.substring(2));
+            } else if ("--timeout".equals(token) && i + 1 < args.length
+                    && !args[i + 1].startsWith("--")) {
+                forwarded.add("timeout=" + args[++i]);
+            } else {
+                forwarded.add(token);
+            }
+        }
+        return forwarded.toArray(new String[0]);
     }
 
     /**

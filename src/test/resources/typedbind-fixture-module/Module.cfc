@@ -1,4 +1,9 @@
 component extends="modules.BaseModule" {
+    public string function deadline(string timeout = "900") {
+        out("module timeout=" & arguments.timeout);
+        return "";
+    }
+
 
 	/**
 	 * hint: Report which typed params were populated and with what values.
