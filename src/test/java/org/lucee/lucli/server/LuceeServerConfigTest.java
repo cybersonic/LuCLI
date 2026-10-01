@@ -1923,4 +1923,29 @@ public class LuceeServerConfigTest {
             LuceeServerConfig.isPortAvailable(freePort),
             "A port with no listener must be reported available");
     }
+
+    @Test
+    void bindAddress_defaultsToLoopbackAndIsReadFromLuceeJson() throws IOException {
+        LuceeServerConfig.ServerConfig unset = new LuceeServerConfig.ServerConfig();
+        assertEquals("127.0.0.1", LuceeServerConfig.getEffectiveBindAddress(unset));
+        assertFalse(LuceeServerConfig.isBindAllInterfaces(unset));
+
+        Files.writeString(tempDir.resolve("lucee.json"), "{\"name\":\"bind-test\",\"port\":8123,\"bindAddress\":\"0.0.0.0\"}");
+        LuceeServerConfig.ServerConfig loaded = LuceeServerConfig.loadConfig(tempDir);
+        assertEquals("0.0.0.0", LuceeServerConfig.getEffectiveBindAddress(loaded));
+        assertTrue(LuceeServerConfig.isBindAllInterfaces(loaded));
+    }
+
+    @Test
+    void isBindAllInterfaces_recognizesEveryWildcardForm() {
+        LuceeServerConfig.ServerConfig config = new LuceeServerConfig.ServerConfig();
+        for (String all : new String[] {"0.0.0.0", "::", "[::]", "*"}) {
+            config.bindAddress = all;
+            assertTrue(LuceeServerConfig.isBindAllInterfaces(config), all);
+        }
+        for (String one : new String[] {"127.0.0.1", "::1", "192.168.1.10", " "}) {
+            config.bindAddress = one;
+            assertFalse(LuceeServerConfig.isBindAllInterfaces(config), one);
+        }
+    }
 }

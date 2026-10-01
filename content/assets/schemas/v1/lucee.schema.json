@@ -45,6 +45,13 @@
       "x-ui-tab": "General",
       "x-ui-order": 30
     },
+    "bindAddress": {
+      "type": "string",
+      "description": "Address the server listens on. Defaults to 127.0.0.1, so the dev server is only reachable from this machine. Set '0.0.0.0' to accept connections from other machines on the network (for example to test from a phone or a VM); LuCLI prints a warning when it does. Applies to every Tomcat connector without its own address (HTTP, HTTPS, AJP), Jetty, and the host side of Docker port publishing. Override for one run with `server start --host <address>`.",
+      "default": "127.0.0.1",
+      "x-ui-tab": "General",
+      "x-ui-order": 31
+    },
     "port": {
       "type": "integer",
       "description": "HTTP port for the server.",

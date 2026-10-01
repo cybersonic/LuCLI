@@ -45,6 +45,15 @@ public class LuceeServerConfig {
         public String host;
 
         /**
+         * Address the HTTP/HTTPS connectors listen on. Defaults to 127.0.0.1, so
+         * a dev server is only reachable from this machine. Set "0.0.0.0" (or
+         * pass {@code --host 0.0.0.0}) to listen on every interface, e.g. to
+         * test from a phone or a VM. Unlike {@link #host}, this changes the
+         * listening socket, not the URL or the certificate name.
+         */
+        public String bindAddress;
+
+        /**
          * @deprecated Top-level "version" now refers to the app/project version.
          * Lucee engine version should be specified under the "lucee" block:
          * {@code "lucee": { "version": "7.0.4.34" }}.
@@ -718,6 +727,29 @@ public class LuceeServerConfig {
         return config.host.trim();
     }
 
+    /** Default listen address: loopback only. */
+    public static final String DEFAULT_BIND_ADDRESS = "127.0.0.1";
+
+    /**
+     * Effective listen address for the server's connectors (defaults to
+     * {@link #DEFAULT_BIND_ADDRESS}).
+     */
+    public static String getEffectiveBindAddress(ServerConfig config) {
+        if (config == null || config.bindAddress == null || config.bindAddress.trim().isEmpty()) {
+            return DEFAULT_BIND_ADDRESS;
+        }
+        return config.bindAddress.trim();
+    }
+
+    /**
+     * True when the effective listen address accepts connections on every
+     * interface (0.0.0.0, ::, or *), so callers can warn about it.
+     */
+    public static boolean isBindAllInterfaces(ServerConfig config) {
+        String addr = getEffectiveBindAddress(config);
+        return "0.0.0.0".equals(addr) || "::".equals(addr) || "[::]".equals(addr) || "*".equals(addr);
+    }
+
     /**
      * Resolve the effective runtime configuration for a server.
      *
@@ -1183,6 +1215,9 @@ public class LuceeServerConfig {
         }
         if (config.host != null) {
             config.host = substituteField(config.host);
+        }
+        if (config.bindAddress != null) {
+            config.bindAddress = substituteField(config.bindAddress);
         }
         if (config.webroot != null) {
             config.webroot = substituteField(config.webroot);

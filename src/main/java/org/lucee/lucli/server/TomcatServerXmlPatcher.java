@@ -131,6 +131,15 @@ public class TomcatServerXmlPatcher {
                 "]",
                 "port",
                 String.valueOf(config.port));
+            // Listen address: loopback unless the config opts in to more.
+            setAttribute(document,
+                "//Connector[" +
+                "@protocol='HTTP/1.1' or " +
+                "not(@protocol) or " +
+                "@protocol='org.apache.coyote.http11.Http11NioProtocol'" +
+                "]",
+                "address",
+                tomcatBindAddress(config));
 
 
         } catch (XPathExpressionException e) {
@@ -499,6 +508,7 @@ public class TomcatServerXmlPatcher {
 
         httpsConnector.setAttribute("protocol", "org.apache.coyote.http11.Http11NioProtocol");
         httpsConnector.setAttribute("port", String.valueOf(httpsPort));
+        httpsConnector.setAttribute("address", tomcatBindAddress(config));
         httpsConnector.setAttribute("scheme", "https");
         httpsConnector.setAttribute("secure", "true");
         httpsConnector.setAttribute("SSLEnabled", "true");
@@ -677,6 +687,32 @@ public class TomcatServerXmlPatcher {
         if (config.ajp == null || !config.ajp.enabled) {
             removeAjpConnectors(document);
         }
+        applyRemainingConnectorAddresses(document, config);
+    }
+
+    /**
+     * Fail-safe for the listen address: every Connector still without an
+     * address (any protocol: AJP, Nio2, APR, ...) listens on the bind address.
+     * The main HTTP and HTTPS connectors already got it; an address the
+     * server.xml sets on another connector is kept.
+     */
+    private void applyRemainingConnectorAddresses(Document document, LuceeServerConfig.ServerConfig config) {
+        NodeList connectors = document.getElementsByTagName("Connector");
+        for (int i = 0; i < connectors.getLength(); i++) {
+            if (!(connectors.item(i) instanceof Element)) {
+                continue;
+            }
+            Element connector = (Element) connectors.item(i);
+            if (connector.getAttribute("address").isEmpty()) {
+                connector.setAttribute("address", tomcatBindAddress(config));
+            }
+        }
+    }
+
+    /** Tomcat has no "*" wildcard; 0.0.0.0 means every IPv4 interface. */
+    private static String tomcatBindAddress(LuceeServerConfig.ServerConfig config) {
+        String addr = LuceeServerConfig.getEffectiveBindAddress(config);
+        return "*".equals(addr) ? "0.0.0.0" : addr;
     }
     
     /**

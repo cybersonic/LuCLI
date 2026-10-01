@@ -93,6 +93,10 @@ public class ServerCommand implements Callable<Integer> {
                 description = "Port number for the server (e.g., 8080)")
         private Integer port;
 
+        @Option(names = "--host",
+                description = "Address to listen on (default 127.0.0.1, this machine only). Use 0.0.0.0 to accept connections from other machines on your network.")
+        private String host;
+
         @Option(names = {"-f", "--force"}, 
                 description = "Force replace existing server with same name")
         private boolean force = false;
@@ -269,6 +273,10 @@ public class ServerCommand implements Callable<Integer> {
                 args.add("--port");
                 args.add(port.toString());
             }
+            if (host != null) {
+                args.add("--host");
+                args.add(host);
+            }
             if (force) {
                 args.add("--force");
             }
@@ -412,6 +420,10 @@ public class ServerCommand implements Callable<Integer> {
                 description = "Port number for the server (e.g., 8080)")
         private Integer port;
 
+        @Option(names = "--host",
+                description = "Address to listen on (default 127.0.0.1, this machine only). Use 0.0.0.0 to accept connections from other machines on your network.")
+        private String host;
+
         @Option(names = {"-f", "--force"}, 
                 description = "Force replace existing server with same name")
         private boolean force = false;
@@ -507,6 +519,10 @@ public class ServerCommand implements Callable<Integer> {
             if (port != null) {
                 args.add("--port");
                 args.add(port.toString());
+            }
+            if (host != null) {
+                args.add("--host");
+                args.add(host);
             }
             if (force) {
                 args.add("--force");

@@ -199,6 +199,12 @@ public class ServerCommandHandler {
                 i++; // Skip next argument
             } else if (args[i].startsWith("--webroot=")) {
                 webrootOverride = args[i].substring("--webroot=".length());
+            } else if (args[i].equals("--host") && i + 1 < args.length) {
+                // Listen address for this run (maps to lucee.json bindAddress).
+                configOverrides.add("bindAddress=" + args[i + 1]);
+                i++; // Skip next argument
+            } else if (args[i].startsWith("--host=")) {
+                configOverrides.add("bindAddress=" + args[i].substring("--host=".length()));
             } else if ((args[i].equals("--port") || args[i].equals("-p")) && i + 1 < args.length) {
                 try {
                     portOverride = Integer.parseInt(args[i + 1]);
@@ -729,6 +735,11 @@ public class ServerCommandHandler {
                 environment = arg.substring("--env=".length());
             } else if (arg.startsWith("--environment=")) {
                 environment = arg.substring("--environment=".length());
+            } else if ("--host".equals(arg) && i + 1 < args.length) {
+                // Listen address for this run (maps to lucee.json bindAddress).
+                configOverrides.add("bindAddress=" + args[++i]);
+            } else if (arg.startsWith("--host=")) {
+                configOverrides.add("bindAddress=" + arg.substring("--host=".length()));
             } else if (("--port".equals(arg) || "-p".equals(arg)) && i + 1 < args.length) {
                 try {
                     portOverride = Integer.parseInt(args[++i]);
