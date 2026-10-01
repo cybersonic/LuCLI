@@ -102,6 +102,26 @@ Optional custom hostname (used for default URLs and certificate SANs):
 }
 ```
 
+## Listening on other interfaces
+
+By default the server listens on `127.0.0.1`, so only this machine can reach it. To test from a phone, a VM or another computer on your network, opt in:
+
+```json
+{
+  "bindAddress": "0.0.0.0"
+}
+```
+
+or for a single run:
+
+```bash
+lucli server start --host 0.0.0.0
+```
+
+LuCLI prints a warning when the server listens on all interfaces. `host` is unrelated: it sets the hostname used in URLs and in the HTTPS certificate, not the listening address.
+
+Clients that resolve `localhost` only to IPv6 (`::1`) won't reach a server on `127.0.0.1`. Browsers and curl fall back to IPv4. If a tool doesn't, use `http://127.0.0.1:<port>/`, or set `"bindAddress": "::1"`.
+
 ## Environment-Based Configuration
 
 LuCLI supports environment-specific configuration overrides, allowing you to define different settings for production, development, staging, etc. within a single `lucee.json` file.
@@ -250,6 +270,7 @@ This section expands on the basic configuration reference and documents every av
 | `shutdownPort`      | integer | `port + 1000`                             | Tomcat shutdown port. When omitted, LuCLI derives this from `port`.                                                                                                             |
 | `webroot`           | string  | `"./"`                                    | Webroot/docBase for the Tomcat context. May be relative to the project directory or absolute.                                                                                   |
 | `host`              | string  | `localhost`                               | Hostname used when constructing default URLs and (when HTTPS is enabled) generating a self-signed cert SAN.                                                                     |
+| `bindAddress`       | string  | `127.0.0.1`                               | Address the server listens on. `0.0.0.0` accepts connections from other machines (LuCLI warns); also `server start --host <address>`.
 | `openBrowser`       | boolean | `true`                                    | When `true`, LuCLI tries to open a browser after the server starts.                                                                                                             |
 | `openBrowserURL`    | string  | (computed)                                | Optional custom URL to open instead of the default computed URL. Empty string means "use the default".                                                                         |
 | `enableLucee`       | boolean | `true`                                    | When `false`, Lucee servlets and CFML mappings are removed from `web.xml` and Tomcat acts as a static HTTP file server (HTML/HTM, assets, etc.).                                |

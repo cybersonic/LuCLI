@@ -49,6 +49,39 @@ public class DockerRuntimeProviderTest {
                 "Docker runtime command should include env vars sourced from envFile/.env");
     }
 
+    private List<String> dockerCommandFor(String bindAddress) throws Exception {
+        LuceeServerConfig.ServerConfig config = new LuceeServerConfig.ServerConfig();
+        config.name = "docker-bind-test";
+        config.port = 8080;
+        config.bindAddress = bindAddress;
+        config.runtime = new LuceeServerConfig.RuntimeConfig();
+        config.runtime.type = "docker";
+        return invokeBuildDockerRunCommand(config, config.runtime, tempDir, tempDir.resolve("server-instance"), "lucli-bind-test");
+    }
+
+    private static String publishArg(List<String> command) {
+        int i = command.indexOf("-p");
+        assertTrue(i >= 0 && i + 1 < command.size(), "docker run must publish a port: " + command);
+        return command.get(i + 1);
+    }
+
+    @Test
+    void buildDockerRunCommand_publishesOnLoopbackByDefault() throws Exception {
+        assertTrue(publishArg(dockerCommandFor(null)).startsWith("127.0.0.1:8080:"),
+                "default publish must be loopback-only");
+    }
+
+    @Test
+    void buildDockerRunCommand_publishesOnAllInterfacesWhenOptedIn() throws Exception {
+        assertTrue(publishArg(dockerCommandFor("0.0.0.0")).startsWith("8080:"),
+                "0.0.0.0 publishes on every host interface");
+    }
+
+    @Test
+    void buildDockerRunCommand_bracketsAnIpv6BindAddress() throws Exception {
+        assertTrue(publishArg(dockerCommandFor("::1")).startsWith("[::1]:8080:"));
+    }
+
     @Test
     void buildDockerRunCommand_envVarsOverrideEnvFileValues() throws Exception {
         Files.writeString(tempDir.resolve(".env"), "APP_MODE=from-env-file\n");

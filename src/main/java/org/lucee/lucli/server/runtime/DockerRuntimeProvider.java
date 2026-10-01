@@ -223,8 +223,13 @@ public final class DockerRuntimeProvider implements RuntimeProvider {
 
         // Port mapping: host HTTP port (config.port) -> container's HTTP port.
         int containerHttpPort = DEFAULT_CONTAINER_HTTP_PORT;
+        // Publish on the configured listen address (loopback by default), so
+        // the container is only reachable from this machine unless the config
+        // opts in. Inside the container the server still listens everywhere.
+        String bind = LuceeServerConfig.getEffectiveBindAddress(config);
+        boolean allInterfaces = LuceeServerConfig.isBindAllInterfaces(config);
         cmd.add("-p");
-        cmd.add(config.port + ":" + containerHttpPort);
+        cmd.add((allInterfaces ? "" : dockerPublishHost(bind) + ":") + config.port + ":" + containerHttpPort);
 
         // Volume: project directory mounted as the Lucee webroot.
         // The default lucee/lucee image serves from /var/www — mount there.
@@ -277,4 +282,12 @@ public final class DockerRuntimeProvider implements RuntimeProvider {
         return cmd;
     }
 
+
+    /** An IPv6 literal needs brackets in docker's -p host part. */
+    static String dockerPublishHost(String bind) {
+        if (bind.indexOf(':') >= 0 && !bind.startsWith("[")) {
+            return "[" + bind + "]";
+        }
+        return bind;
+    }
 }

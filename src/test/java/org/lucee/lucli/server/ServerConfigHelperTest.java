@@ -43,4 +43,13 @@ class ServerConfigHelperTest {
         assertTrue(fromNull.isEmpty());
         assertTrue(fromEmpty.isEmpty());
     }
+
+    @Test
+    void bindAddress_isAConfigKeyForOneShotOverrides() {
+        ServerConfigHelper helper = new ServerConfigHelper();
+        LuceeServerConfig.ServerConfig config = new LuceeServerConfig.ServerConfig();
+        helper.setConfigValue(config, "bindAddress", "0.0.0.0");
+        assertEquals("0.0.0.0", config.bindAddress);
+        assertEquals("0.0.0.0", helper.getConfigValue(config, "bindAddress"));
+    }
 }

@@ -69,6 +69,7 @@ public final class TomcatConfigSupport {
         } else {
             portInfo.append("Starting server '").append(config.name).append("'" + label + " on:");
         }
+        portInfo.append("\n  Listening on:  ").append(LuceeServerConfig.getEffectiveBindAddress(config));
         portInfo.append("\n  HTTP port:     ").append(config.port);
         portInfo.append("\n  Shutdown port: ").append(LuceeServerConfig.getEffectiveShutdownPort(config));
         if (config.monitoring != null && config.monitoring.enabled && config.monitoring.jmx != null) {
@@ -78,6 +79,10 @@ public final class TomcatConfigSupport {
             portInfo.append("\n  HTTPS port:    ").append(LuceeServerConfig.getEffectiveHttpsPort(config));
             portInfo.append("\n  HTTPS redirect:")
                     .append(LuceeServerConfig.isHttpsRedirectEnabled(config) ? " enabled" : " disabled");
+        }
+        if (LuceeServerConfig.isBindAllInterfaces(config)) {
+            portInfo.append("\n\n\u26a0\ufe0f  Listening on all network interfaces: other machines on your network can reach this server.");
+            portInfo.append("\n   Drop bindAddress from lucee.json (or --host) to listen on 127.0.0.1 only.");
         }
         if (foreground) {
             portInfo.append("\n\nPress Ctrl+C to stop the server\n");

@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Change: Dev Servers Listen on `127.0.0.1` by Default:** Servers used to listen on every network interface (Tomcat connectors had no `address`, Jetty no `jetty.http.host`, Docker published the port on all host interfaces), so a `lucli server start` was reachable from the whole local network. A new `lucee.json` key `bindAddress` (default `127.0.0.1`) now sets the HTTP and HTTPS connectors' `address` and that of every other connector (AJP, Nio2, APR, ...) that server.xml leaves without one, Jetty's `jetty.http.host`, and the host side of Docker's `-p`. Opt in to other interfaces with `"bindAddress": "0.0.0.0"`, `server start|run --host 0.0.0.0`, or the one-shot `bindAddress=0.0.0.0` override; the startup output shows the listen address and warns when it is all interfaces. `host` keeps its meaning (URL and certificate hostname). Adds coverage in `TomcatServerXmlPatcherTest`, `DockerRuntimeProviderTest`, `JettyBaseConfigGeneratorTest`, `LuceeServerConfigTest` and `ServerConfigHelperTest`.
 
 ## 0.7.0
 - **Version Short Flag:** Added `lucli --version-short` to print only the raw LuCLI version value (for scripts/automation that need just the version string).

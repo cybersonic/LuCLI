@@ -60,6 +60,7 @@ public class ServerConfigHelper {
         keys.add("shutdownPort");
         keys.add("name");
         keys.add("host");
+        keys.add("bindAddress");
         keys.add("webroot");
         keys.add("jvm.maxMemory");
         keys.add("jvm.minMemory");
@@ -207,6 +208,8 @@ public class ServerConfigHelper {
                     return config.name;
                 case "host":
                     return config.host;
+                case "bindAddress":
+                    return config.bindAddress;
                 case "webroot":
                     return config.webroot;
                 case "enableLucee":
@@ -284,6 +287,9 @@ public class ServerConfigHelper {
                     break;
                 case "host":
                     config.host = value;
+                    break;
+                case "bindAddress":
+                    config.bindAddress = value;
                     break;
                 case "webroot":
                     config.webroot = value;
