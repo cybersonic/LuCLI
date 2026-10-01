@@ -76,6 +76,37 @@ EOF
     assert_output_contains "Hello from ${module_name} module"
 }
 
+@test "aliased binary routes to module when a same-named directory exists in cwd" {
+    local module_name="bats_alias_${BATS_TEST_NUMBER}"
+    local module_dir="${LUCLI_HOME}/modules/${module_name}"
+
+    run_lucli modules init "${module_name}" --no-git
+    assert_success
+
+    cat > "${module_dir}/Module.cfc" << EOF
+component {
+    function main() {
+        writeOutput("routed-to-module-${module_name}");
+    }
+}
+EOF
+
+    # Reproduce the aliased-binary path (`wheels <cmd>`): the binary name is
+    # prepended as the first arg, and routeCommand() used to treat that bare
+    # word as a file path. A same-named directory in cwd (a Wheels checkout,
+    # say) made file.exists() true, so module routing was skipped and LuCLI
+    # threw "Unknown command, file, or module: '<name>'".
+    local workdir
+    workdir="$(mktemp -d "${BATS_TEST_TMPDIR}/alias-cwd.XXXXXX")"
+    mkdir -p "${workdir}/${module_name}"
+
+    run bash -c 'cd "$1" && java -Dlucli.binary.name="$2" -jar "$3"' \
+        _ "${workdir}" "${module_name}" "${LUCLI_JAR}"
+
+    assert_success
+    assert_output_contains "routed-to-module-${module_name}"
+}
+
 @test "run command executes cfm script" {
     run_lucli run "${LUCLI_ROOT_DIR}/tests/cfml/run.cfm"
     assert_success

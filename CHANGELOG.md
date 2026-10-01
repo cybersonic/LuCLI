@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+- **Fix: Aliased-Binary Module Routing Ignored When a Same-Named File/Directory Exists in cwd:** `routeCommand()` no longer requires `file.exists()` to be false before checking `ModuleCommand.moduleExists()`. Previously, running an aliased binary (e.g. `wheels routes`) from a directory containing a same-named entry (a Wheels checkout, say) treated the prepended binary name as a file path, skipped module routing, and threw `Unknown command, file, or module: 'wheels'`. Module names are restricted to letters, numbers, hyphens, and underscores (no dots), so they can never collide with the script/CFML file extensions handled earlier.
+
 ## 0.7.0
 - **Version Short Flag:** Added `lucli --version-short` to print only the raw LuCLI version value (for scripts/automation that need just the version string).
 - **Version Output Split + Build Metadata (Maven + `build.sh`):** `lucli --version` keeps baseline runtime details (without build metadata), `lucli --version-long` adds build metadata, and `lucli --build-info` shows build metadata only (`Build Timestamp`, `Build Commit`, `Build Branch`, `Build JDK`). Metadata is sourced from filtered `lucli/version.properties` with commit/branch populated during Maven builds, so it is available in both direct `mvn` builds and `./build.sh` builds.
