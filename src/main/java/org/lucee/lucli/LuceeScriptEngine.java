@@ -382,6 +382,13 @@ public class LuceeScriptEngine {
     }
 
 
+    private static boolean isHelpEnabled(String value) {
+        return value != null && !value.isBlank()
+            && !"false".equalsIgnoreCase(value.trim())
+            && !"0".equals(value.trim())
+            && !"no".equalsIgnoreCase(value.trim());
+    }
+
     /**
      * Execute a module function and return its result. The result is whatever
      * the invoked function returned (or null). Callers that want the legacy
@@ -402,11 +409,12 @@ public class LuceeScriptEngine {
             subCommand = parsedArgs.subCommand;
             Map<String, String> argsMap = parsedArgs.argsMap;
 
-            // If --help or -h was passed, route to showHelp()
-            if (argsMap.containsKey("help") || argsMap.containsKey("h")) {
+            // Help keys are dispatch controls, not module parameters. Explicit
+            // false values (including MCP boolean defaults) must run the tool.
+            String help = argsMap.remove("help");
+            String shortHelp = argsMap.remove("h");
+            if (isHelpEnabled(help) || isHelpEnabled(shortHelp)) {
                 subCommand = "showHelp";
-                argsMap.remove("help");
-                argsMap.remove("h");
             }
 
             Timer.start("Module Execution: " + moduleName);

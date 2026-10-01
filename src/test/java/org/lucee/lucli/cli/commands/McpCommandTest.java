@@ -88,6 +88,27 @@ class McpCommandTest {
     }
 
     @Test
+    void falseHelpArgumentsDoNotHijackMcpToolCalls() throws Exception {
+        List<String> requests = new ArrayList<>();
+        requests.add("{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"initialize\",\"params\":{}}");
+        String[] arguments = {"{\"help\":false}", "{\"h\":false}",
+            "{\"help\":\"false\"}", "{\"h\":0}", "{\"help\":false,\"h\":false}"};
+        for (int i = 0; i < arguments.length; i++) {
+            requests.add("{\"jsonrpc\":\"2.0\",\"id\":" + (i + 1)
+                + ",\"method\":\"tools/call\",\"params\":{\"name\":\"echo\",\"arguments\":" + arguments[i] + "}}");
+        }
+        List<JsonNode> responses = runMcpSession(requests);
+        for (int i = 1; i <= arguments.length; i++) {
+            final int id = i;
+            JsonNode response = responses.stream().filter(n -> n.path("id").asInt() == id)
+                .findFirst().orElseThrow();
+            JsonNode result = response.path("result");
+            assertFalse(result.path("isError").asBoolean(), response.toString());
+            assertTrue(result.path("content").get(0).path("text").asText().contains("hello from echo"), response.toString());
+        }
+    }
+
+    @Test
     void toolCallCapturesOutStreamIntoResponseBody() throws Exception {
         List<JsonNode> responses = runMcpSession(List.of(
             "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"test\",\"version\":\"1.0\"}}}",
