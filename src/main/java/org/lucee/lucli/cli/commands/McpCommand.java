@@ -617,7 +617,9 @@ public class McpCommand implements Callable<Integer> {
             stringOutput.setOutputStream(capture);
             stringOutput.setErrorStream(capture);
 
-            LuceeScriptEngine.getInstance().executeModule(mod, argv.toArray(new String[0]));
+            // viaMcp: the module sees __lucliMcpCall=true (runtime-owned; a
+            // client-supplied argument of that name is dropped by the engine).
+            LuceeScriptEngine.getInstance().executeModule(mod, argv.toArray(new String[0]), true);
         } finally {
             System.setOut(originalOut);
             System.setErr(originalErr);

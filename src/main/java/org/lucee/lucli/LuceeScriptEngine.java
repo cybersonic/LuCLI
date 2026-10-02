@@ -394,7 +394,24 @@ public class LuceeScriptEngine {
      * the invoked function returned (or null). Callers that want the legacy
      * "print-if-non-null" CLI behavior should use {@link #executeModule}.
      */
+    /**
+     * Reserved module argument the runtime sets to "true" when a module function
+     * runs for an MCP {@code tools/call}. It is runtime-owned: any argument of this
+     * name (any case) that arrives from a terminal invocation or an MCP client is
+     * removed before the module runs, so the signal can't be forged or suppressed.
+     * Modules must not declare it in an MCP {@code inputSchema}.
+     */
+    public static final String MCP_CALL_MARKER = "__lucliMcpCall";
+
     public Object executeModuleAndReturn(String moduleName, String[] scriptArgs) throws Exception {
+        return executeModuleAndReturn(moduleName, scriptArgs, false);
+    }
+
+    /**
+     * @param viaMcp true only for an MCP {@code tools/call}: the module then sees
+     *               {@link #MCP_CALL_MARKER}=true among its arguments.
+     */
+    public Object executeModuleAndReturn(String moduleName, String[] scriptArgs, boolean viaMcp) throws Exception {
         
             // Ensure shared BaseModule.cfc in ~/.lucli/modules matches this LuCLI version
             ensureBaseModuleUpToDate();
@@ -415,6 +432,14 @@ public class LuceeScriptEngine {
             String shortHelp = argsMap.remove("h");
             if (isHelpEnabled(help) || isHelpEnabled(shortHelp)) {
                 subCommand = "showHelp";
+            }
+
+            // The MCP marker is runtime-owned: drop any caller-supplied copy
+            // (CFML argument names are case-insensitive), then set it only for
+            // a tools/call.
+            argsMap.keySet().removeIf(key -> key != null && key.equalsIgnoreCase(MCP_CALL_MARKER));
+            if (viaMcp) {
+                argsMap.put(MCP_CALL_MARKER, "true");
             }
 
             Timer.start("Module Execution: " + moduleName);
@@ -465,7 +490,12 @@ public class LuceeScriptEngine {
      * StringOutput (legacy CLI behavior).
      */
     public void executeModule(String moduleName, String[] scriptArgs) throws Exception {
-        Object results = executeModuleAndReturn(moduleName, scriptArgs);
+        executeModule(moduleName, scriptArgs, false);
+    }
+
+    /** @param viaMcp see {@link #executeModuleAndReturn(String, String[], boolean)}. */
+    public void executeModule(String moduleName, String[] scriptArgs, boolean viaMcp) throws Exception {
+        Object results = executeModuleAndReturn(moduleName, scriptArgs, viaMcp);
         if (results != null) {
             StringOutput.getInstance().println(results.toString());
         }
