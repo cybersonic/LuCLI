@@ -390,11 +390,6 @@ public class LuceeScriptEngine {
     }
 
     /**
-     * Execute a module function and return its result. The result is whatever
-     * the invoked function returned (or null). Callers that want the legacy
-     * "print-if-non-null" CLI behavior should use {@link #executeModule}.
-     */
-    /**
      * Reserved module argument the runtime sets to "true" when a module function
      * runs for an MCP {@code tools/call}. It is runtime-owned: any argument of this
      * name (any case) that arrives from a terminal invocation or an MCP client is
@@ -403,6 +398,11 @@ public class LuceeScriptEngine {
      */
     public static final String MCP_CALL_MARKER = "__lucliMcpCall";
 
+    /**
+     * Execute a module function and return its result. The result is whatever
+     * the invoked function returned (or null). Callers that want the legacy
+     * "print-if-non-null" CLI behavior should use {@link #executeModule}.
+     */
     public Object executeModuleAndReturn(String moduleName, String[] scriptArgs) throws Exception {
         return executeModuleAndReturn(moduleName, scriptArgs, false);
     }

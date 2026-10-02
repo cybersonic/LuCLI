@@ -24,6 +24,15 @@ component extends="modules.BaseModule" {
     }
 
     /**
+     * hint: Declares the reserved marker as a parameter (in a different case)
+     * to prove the runtime never fills it from a terminal positional.
+     */
+    public string function declaredmarker(string __LuCliMcpCall = "absent") {
+        out("declared=" & arguments.__LuCliMcpCall);
+        return "";
+    }
+
+    /**
      * hint: Emit a known string via out() — used to test MCP output capture.
      */
     public string function echo() {

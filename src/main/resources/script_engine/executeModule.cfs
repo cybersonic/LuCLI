@@ -75,12 +75,17 @@ if (structKeyExists(moduleComponent, "init")) {
 // typed params are preserved — positional binding only fills gaps. Excess
 // positional args beyond the function's declared param count are left in
 // argCollection for modules that want variadic access.
+// The runtime-owned MCP marker (__lucliMcpCall) is never bound from a
+// positional: a module that declares it must not get it from a terminal arg.
 if (structKeyExists(componentMeta, "functions")) {
     for (fn in componentMeta.functions) {
         if (lcase(fn.name) == lcase(subcommand) && structKeyExists(fn, "parameters")) {
             for (i = 1; i <= arrayLen(fn.parameters); i++) {
                 paramName = fn.parameters[i].name;
                 argKey = "arg" & i;
+                if (compareNoCase(paramName, "__lucliMcpCall") == 0) {
+                    continue;
+                }
                 if (!structKeyExists(argCollection, paramName)
                     && structKeyExists(argCollection, argKey)) {
                     argCollection[paramName] = argCollection[argKey];

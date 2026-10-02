@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
-- **Feature: Modules Can Tell an MCP `tools/call` From a Terminal Call:** During `tools/call`, the module function now receives a reserved `__lucliMcpCall=true` argument, so a module can apply a different policy to MCP clients (for example refusing a command meant for a person at the terminal). The argument is runtime-owned: any argument of that name (any case, with or without `--`) supplied by an MCP client or on the command line is removed before the module runs, so it can't be forged or suppressed, and a terminal invocation never carries it. Documented in the MCP module servers guide. Adds coverage in `McpCommandTest` (`toolsCallCarriesARuntimeOwnedMcpMarker`, `terminalInvocationNeverCarriesTheMcpMarker`).
+- **Feature: Modules Can Tell an MCP `tools/call` From a Terminal Call:** During `tools/call`, the module function now receives a reserved `__lucliMcpCall=true` argument, so a module can apply a different policy to MCP clients (for example refusing a command meant for a person at the terminal). The argument is runtime-owned: any argument of that name (any case, with or without `--`) supplied by an MCP client or on the command line is removed before the module runs, so it can't be forged or suppressed, and a terminal invocation never carries it. The positional binder never fills a declared parameter of that name from a terminal `argN`. Documented in the MCP module servers guide. Adds coverage in `McpCommandTest` (`toolsCallCarriesARuntimeOwnedMcpMarker`, `terminalInvocationNeverCarriesTheMcpMarker`, `declaredMarkerParameterIsNeverBoundFromATerminalPositional`).
 
 
 ## 0.7.0

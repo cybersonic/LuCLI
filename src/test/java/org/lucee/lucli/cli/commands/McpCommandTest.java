@@ -321,6 +321,27 @@ class McpCommandTest {
         }
     }
 
+    @Test
+    void declaredMarkerParameterIsNeverBoundFromATerminalPositional() throws Exception {
+        // The fixture declares `__LuCliMcpCall` (a case variant): a positional must not fill it.
+        ProcessBuilder pb = new ProcessBuilder("/bin/bash", lucliBin, FIXTURE_MODULE_NAME, "declaredmarker", "yes");
+        pb.redirectErrorStream(true);
+        Process proc = pb.start();
+        String output = new String(proc.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        proc.waitFor(120, TimeUnit.SECONDS);
+        assertTrue(output.contains("declared=absent"), output);
+        assertFalse(output.contains("declared=yes"), output);
+
+        // Over MCP the runtime still delivers it to the declared parameter.
+        List<JsonNode> responses = runMcpSession(List.of(
+            "{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"initialize\",\"params\":{}}",
+            "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"declaredmarker\",\"arguments\":{\"__LuCliMcpCall\":\"false\"}}}"
+        ));
+        String text = responses.stream().filter(n -> n.path("id").asInt() == 1).findFirst().orElseThrow()
+            .path("result").path("content").get(0).path("text").asText();
+        assertTrue(text.contains("declared=true"), text);
+    }
+
     // Send the given JSON-RPC lines to `dev-lucli.sh mcp mcpfixture` as a
     // subprocess. Returns each parsed response as a JsonNode.
     private List<JsonNode> runMcpSession(List<String> requests) throws Exception {
