@@ -11,6 +11,28 @@ component extends="modules.BaseModule" {
 
 
     /**
+     * hint: Report whether the runtime marked this call as an MCP tools/call
+     * (the reserved __lucliMcpCall argument) and how many keys carry that name.
+     */
+    public string function whocalled() {
+        var count = 0;
+        for (var key in arguments) {
+            if (compareNoCase(key, "__lucliMcpCall") == 0) count++;
+        }
+        out("mcpCall=" & (structKeyExists(arguments, "__lucliMcpCall") ? arguments.__lucliMcpCall : "absent") & " markerKeys=" & count);
+        return "";
+    }
+
+    /**
+     * hint: Declares the reserved marker as a parameter (in a different case)
+     * to prove the runtime never fills it from a terminal positional.
+     */
+    public string function declaredmarker(string __LuCliMcpCall = "absent") {
+        out("declared=" & arguments.__LuCliMcpCall);
+        return "";
+    }
+
+    /**
      * hint: Emit a known string via out() — used to test MCP output capture.
      */
     public string function echo() {

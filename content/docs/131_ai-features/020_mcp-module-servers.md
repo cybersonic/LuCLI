@@ -148,6 +148,21 @@ LuCLI maps common CFML argument types to JSON Schema types (`string`, `number`, 
 
 If execution fails, the result is returned with `isError: true`.
 
+### Telling an MCP call from a terminal call
+
+During `tools/call`, the module function also receives a reserved argument, `__lucliMcpCall`, set to `"true"`. A terminal invocation never carries it. A module can use it to apply a different policy to MCP clients, for example refusing a command that should only be run by a person:
+
+```cfscript
+public string function generate(string type = "") {
+    if (structKeyExists(arguments, "__lucliMcpCall") && arguments.type == "app") {
+        throw(message = "Creating a new application isn't available over MCP; run it from a terminal.");
+    }
+    // ...
+}
+```
+
+The argument is owned by the runtime. Any argument with that name (in any case, with or without a `--` prefix) that comes from an MCP client or from the command line is dropped before the module runs, so it can't be forged or suppressed. Don't declare `__lucliMcpCall` in a function signature or in an `mcpToolSpecs()` input schema. A module that validates its arguments against a fixed list should accept (or remove) it.
+
 ## Example flow (conceptual)
 
 1. client sends `initialize`

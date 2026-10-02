@@ -274,6 +274,74 @@ class McpCommandTest {
         assertFalse(success.path("content").get(0).path("text").asText().contains("fixture failure sentinel"));
     }
 
+    @Test
+    void toolsCallCarriesARuntimeOwnedMcpMarker() throws Exception {
+        String[] arguments = {
+            "{}",
+            "{\"__lucliMcpCall\":\"false\"}",
+            "{\"__LUCLIMCPCALL\":false}",
+            "{\"--__lucliMcpCall\":\"nope\"}"
+        };
+        List<String> requests = new ArrayList<>();
+        requests.add("{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"initialize\",\"params\":{}}");
+        for (int i = 0; i < arguments.length; i++) {
+            requests.add("{\"jsonrpc\":\"2.0\",\"id\":" + (i + 1)
+                + ",\"method\":\"tools/call\",\"params\":{\"name\":\"whocalled\",\"arguments\":" + arguments[i] + "}}");
+        }
+        List<JsonNode> responses = runMcpSession(requests);
+        for (int i = 1; i <= arguments.length; i++) {
+            final int id = i;
+            JsonNode result = responses.stream().filter(n -> n.path("id").asInt() == id)
+                .findFirst().orElseThrow(() -> new AssertionError("no response for id=" + id + ": " + responses))
+                .path("result");
+            assertFalse(result.path("isError").asBoolean(), result.toString());
+            String text = result.path("content").get(0).path("text").asText();
+            // Exactly one marker, set by the runtime: a client can neither forge nor suppress it.
+            assertTrue(text.contains("mcpCall=true markerKeys=1"), "arguments " + arguments[id - 1] + ": " + text);
+        }
+    }
+
+    @Test
+    void terminalInvocationNeverCarriesTheMcpMarker() throws Exception {
+        String[][] invocations = {
+            {"whocalled"},
+            {"whocalled", "__lucliMcpCall=true"},
+            {"whocalled", "--__lucliMcpCall=true"},
+            {"whocalled", "--__LUCLIMCPCALL"}
+        };
+        for (String[] invocation : invocations) {
+            List<String> cmd = new ArrayList<>(List.of("/bin/bash", lucliBin, FIXTURE_MODULE_NAME));
+            cmd.addAll(List.of(invocation));
+            ProcessBuilder pb = new ProcessBuilder(cmd);
+            pb.redirectErrorStream(true);
+            Process proc = pb.start();
+            String output = new String(proc.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            proc.waitFor(120, TimeUnit.SECONDS);
+            assertTrue(output.contains("mcpCall=absent markerKeys=0"), String.join(" ", invocation) + ": " + output);
+        }
+    }
+
+    @Test
+    void declaredMarkerParameterIsNeverBoundFromATerminalPositional() throws Exception {
+        // The fixture declares `__LuCliMcpCall` (a case variant): a positional must not fill it.
+        ProcessBuilder pb = new ProcessBuilder("/bin/bash", lucliBin, FIXTURE_MODULE_NAME, "declaredmarker", "yes");
+        pb.redirectErrorStream(true);
+        Process proc = pb.start();
+        String output = new String(proc.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        proc.waitFor(120, TimeUnit.SECONDS);
+        assertTrue(output.contains("declared=absent"), output);
+        assertFalse(output.contains("declared=yes"), output);
+
+        // Over MCP the runtime still delivers it to the declared parameter.
+        List<JsonNode> responses = runMcpSession(List.of(
+            "{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"initialize\",\"params\":{}}",
+            "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"declaredmarker\",\"arguments\":{\"__LuCliMcpCall\":\"false\"}}}"
+        ));
+        String text = responses.stream().filter(n -> n.path("id").asInt() == 1).findFirst().orElseThrow()
+            .path("result").path("content").get(0).path("text").asText();
+        assertTrue(text.contains("declared=true"), text);
+    }
+
     // Send the given JSON-RPC lines to `dev-lucli.sh mcp mcpfixture` as a
     // subprocess. Returns each parsed response as a JsonNode.
     private List<JsonNode> runMcpSession(List<String> requests) throws Exception {
