@@ -630,12 +630,26 @@ public class LuceeScriptEngine {
             StringOutput.getInstance().println("${EMOJI_INFO} Arguments: " + Arrays.toString(scriptArgs));
         }
         
-        // For CFS scripts, inject built-in variables directly into the script content
-        // so they are available as CFML variables, not just engine bindings
-        String scriptWithVariables = injectBuiltinVariables(scriptContent, scriptFile, scriptArgs);
+        // A .cfm is a template: text outside <cfscript> is output. The built-in
+        // variables setup is script, so it must run inside <cfscript>; prepending it
+        // as plain text printed it before the template's output (upstream
+        // cybersonic/LuCLI#137).
+        String scriptWithVariables = scriptContent;
+        Timer.start("injectBuiltinVariables");
+        try {
+            BuiltinVariableManager variableManager = BuiltinVariableManager.getInstance(isVerboseMode(), isDebugMode());
+            scriptWithVariables = wrapBuiltinSetupForTemplate(
+                variableManager.createVariableSetupScript(scriptFile, scriptArgs), scriptContent);
+        } catch (IOException e) {
+            if (isDebugMode()) {
+                System.err.println("Warning: Failed to inject built-in variables: " + e.getMessage());
+            }
+        } finally {
+            Timer.stop("injectBuiltinVariables");
+        }
         
         if (isVerboseMode() || isDebugMode()) {
-            System.out.println("=== CFS Script with Built-in Variables ===");
+            System.out.println("=== CFM Template with Built-in Variables ===");
             System.out.println(scriptWithVariables);
             System.out.println("=== End Script ===");
         }
@@ -645,6 +659,18 @@ public class LuceeScriptEngine {
         executeWrappedScript(scriptWithVariables, scriptFile, scriptArgs);
     }
     
+
+    /**
+     * Prefix a template (.cfm) with the built-in variables setup, run as script:
+     * {@code <cfscript>setup</cfscript>} then the template unchanged. No other text is
+     * added before the template, so its output is exactly what it renders.
+     */
+    static String wrapBuiltinSetupForTemplate(String variableSetup, String templateContent) {
+        if (variableSetup == null || variableSetup.isBlank()) {
+            return templateContent;
+        }
+        return "<cfscript>\n" + variableSetup + "\n</cfscript>" + templateContent;
+    }
 
     private void executeWrappedScript(String scriptContent, String scriptFile, String[] scriptArgs) throws Exception {
         

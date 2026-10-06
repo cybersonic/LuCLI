@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Fix: `lucli run <file>.cfm` No Longer Prints the Built-in Variables Setup:** For a `.cfm` (a template, where text outside `<cfscript>` is output), the built-in variables setup was prepended as plain text, so about 20 lines of setup code and an `// === Original Script Content ===` marker were printed before the template's output. The setup now runs inside `<cfscript>` ahead of the unchanged template, so the output is exactly what the template renders, and the built-in variables (`__scriptPath`, `ARGS`, …) are still available. `.cfs` scripts were not affected. (#137) Adds `TemplatePreludeTest`.
 
 ## 0.7.0
 - **Version Short Flag:** Added `lucli --version-short` to print only the raw LuCLI version value (for scripts/automation that need just the version string).
