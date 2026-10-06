@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Fix: Bundled `lang` Module Compiles Again:** Eight help strings in `modules/lang/Module.cfc` contained an unescaped `#` (`# e.g., …`), which CFML reads as the start of an expression, so `lucli lang …` / `modules run lang …` failed with `Invalid identifier, at [121:56]`. The literal `#` is now escaped as `##`. (#146)
 
 ## 0.7.0
 - **Version Short Flag:** Added `lucli --version-short` to print only the raw LuCLI version value (for scripts/automation that need just the version string).
