@@ -411,25 +411,45 @@ public class LuCLI implements Callable<Integer> {
         verbose("Executing module shortcut: " + moduleName + 
             " (equivalent to 'lucli modules run " + moduleName + " " + String.join(" ", args) + "')");
         
+        List<String> cmdArgs = moduleShortcutArgs(moduleName, args, isVerbose(), isDebug(), envOption, envFileOption);
+        return spec.commandLine().execute(cmdArgs.toArray(new String[0]));
+    }
+
+    /**
+     * The argument list the module shortcut re-executes on the root command:
+     * {@code [--env=<env>] [--envfile=<path>] modules run <module> <args...> [--verbose] [--debug]}.
+     *
+     * Re-executing resets the root's options, so root-level flags the module must
+     * still see are re-injected. {@code --env} / {@code --envfile} go BEFORE
+     * {@code modules}, at the root position, where the execution strategy reads them
+     * into {@link #currentEnvironment} / {@link #envFilePath}; without them the
+     * module saw a null environment (#136).
+     * {@code --verbose} / {@code --debug} go after the module args, where the
+     * module's own arg parser reads them (e.g. the wheels module's
+     * {@code doctor --verbose}), and the subcommand stays the first positional.
+     */
+    static List<String> moduleShortcutArgs(String moduleName, String[] args, boolean verbose, boolean debug,
+            String env, String envFile) {
         List<String> cmdArgs = new ArrayList<>();
+        if (env != null && !env.isEmpty()) {
+            cmdArgs.add("--env=" + env);
+        }
+        if (envFile != null && !envFile.isEmpty()) {
+            cmdArgs.add("--envfile=" + envFile);
+        }
         cmdArgs.add("modules");
         cmdArgs.add("run");
         cmdArgs.add(moduleName);
         if (args != null && args.length > 0) {
             cmdArgs.addAll(Arrays.asList(args));
         }
-        // Re-inject root-level flags that picocli consumed at the root before the
-        // module shortcut dispatched, so the module can see them (e.g. the wheels
-        // module's `doctor --verbose` / `stats --verbose` / `test --verbose`).
-        // Appended AFTER the module args so the subcommand stays the first
-        // positional; the module's arg parser reads --verbose/--debug from there.
-        if (isVerbose()) {
+        if (verbose) {
             cmdArgs.add("--verbose");
         }
-        if (isDebug()) {
+        if (debug) {
             cmdArgs.add("--debug");
         }
-        return spec.commandLine().execute(cmdArgs.toArray(new String[0]));
+        return cmdArgs;
     }
 
     /**

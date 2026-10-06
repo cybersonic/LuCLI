@@ -3,6 +3,8 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Fix: `--env` / `--envfile` Reach Modules Run Through the Module Shortcut:** `lucli <module> … --env=x`, `lucli --env=x <module> …` and an aliased binary (`-Dlucli.binary.name=<module>`, e.g. `wheels start --env=prod`) re-execute `modules run …` on the root command, which reset the root's options, so the module saw `LuCLI.getCurrentEnvironment() == null` (only `LUCLI_ENV` worked). The shortcut now re-injects `--env` / `--envfile` at the root position, as it already did for `--verbose` / `--debug` (after the module args). (#136) Adds `ModuleShortcutArgsTest`.
+
 
 ## 0.7.0
 - **Version Short Flag:** Added `lucli --version-short` to print only the raw LuCLI version value (for scripts/automation that need just the version string).
