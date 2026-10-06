@@ -138,9 +138,9 @@ public class Terminal {
             return 0; // Don't exit terminal
         });
         
-        // Set up history file
-        Path homeDir = Paths.get(System.getProperty("user.home"));
-        Path historyFile = homeDir.resolve(".lucli").resolve("history");
+        // History lives in the active LuCLI home (it used to be user.home/.lucli
+        // regardless of LUCLI_HOME; upstream cybersonic/LuCLI#140).
+        Path historyFile = org.lucee.lucli.paths.LucliPaths.resolve().home().resolve("history");
         
         LineReader reader = LineReaderBuilder.builder()
                 .terminal(terminal)

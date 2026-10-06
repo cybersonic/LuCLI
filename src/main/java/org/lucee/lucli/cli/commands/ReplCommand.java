@@ -54,9 +54,7 @@ public class ReplCommand implements Callable<Integer> {
                 .name("CFML REPL")
                 .build();
             
-            // Set up history file using profile-aware home directory
-            Path homeDir = Paths.get(System.getProperty("user.home"));
-            Path historyFile = homeDir.resolve(LuCLI.getActiveProfile().homeDirName()).resolve("repl_history");
+            Path historyFile = historyFile();
             
             LineReader reader = LineReaderBuilder.builder()
                 .terminal(terminal)
@@ -161,5 +159,14 @@ public class ReplCommand implements Callable<Integer> {
         terminal.writer().println("    arrayAppend([1,2,3], 4)");
         terminal.writer().println("    structNew()");
         terminal.writer().println();
+    }
+
+    /**
+     * REPL history lives in the active LuCLI home (-Dlucli.home, LUCLI_HOME, else
+     * ~/<profile home>). It used to be user.home/<profile home> regardless of
+     * LUCLI_HOME (upstream cybersonic/LuCLI#140).
+     */
+    static Path historyFile() {
+        return org.lucee.lucli.paths.LucliPaths.resolve().home().resolve("repl_history");
     }
 }

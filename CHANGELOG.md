@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Fix: REPL History and Settings Follow `LUCLI_HOME`:** `lucli repl` history, the interactive terminal's history and `Settings` (`settings.json`, used e.g. by `secrets provider use`) were written under `user.home` (`~/.lucli` or `~/<profile home>`) even when `LUCLI_HOME` / `-Dlucli.home` pointed elsewhere, so an isolated LuCLI home still wrote into the real home, and `settings.json` was not the file `system paths` reports. They now use the active LuCLI home (`LucliPaths`). Settings saved under the old location (`~/.lucli/settings.json`) are read once and copied to the active home when it has none; the old file is left as it is. (#140) Adds `SettingsTest` cases and `ReplCommandHistoryTest`.
 
 ## 0.7.0
 - **Version Short Flag:** Added `lucli --version-short` to print only the raw LuCLI version value (for scripts/automation that need just the version string).
