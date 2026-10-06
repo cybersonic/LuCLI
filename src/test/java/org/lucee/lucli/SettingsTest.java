@@ -38,6 +38,46 @@ class SettingsTest {
     }
 
     // ============================================
+    // LuCLI home (upstream cybersonic/LuCLI#140)
+    // ============================================
+
+    @Test
+    void settingsFollowTheLucliHomeProperty() throws IOException {
+        Path custom = tempDir.resolve("custom-home");
+        String previous = System.getProperty("lucli.home");
+        System.setProperty("lucli.home", custom.toString());
+        try {
+            Settings settings = new Settings();
+            settings.setSelectedSecretProvider("probe-provider");
+            assertEquals(custom, settings.getSettingsDir());
+            assertTrue(Files.exists(custom.resolve("settings.json")));
+            assertFalse(Files.exists(tempDir.resolve(".lucli").resolve("settings.json")),
+                "nothing may be written under user.home when lucli.home is set");
+        } finally {
+            if (previous == null) System.clearProperty("lucli.home"); else System.setProperty("lucli.home", previous);
+        }
+    }
+
+    @Test
+    void legacySettingsAreReadOnceAndCopiedToTheActiveHome() throws IOException {
+        Path legacyDir = tempDir.resolve(".lucli");
+        Files.createDirectories(legacyDir);
+        String legacyJson = "{\"secretProvider\": \"legacy-provider\"}";
+        Files.writeString(legacyDir.resolve("settings.json"), legacyJson);
+        Path custom = tempDir.resolve("custom-home");
+        String previous = System.getProperty("lucli.home");
+        System.setProperty("lucli.home", custom.toString());
+        try {
+            Settings settings = new Settings();
+            assertEquals("legacy-provider", settings.getString("secretProvider", "missing"));
+            assertTrue(Files.exists(custom.resolve("settings.json")), "copied to the active home");
+            assertEquals(legacyJson, Files.readString(legacyDir.resolve("settings.json")), "legacy file left as it is");
+        } finally {
+            if (previous == null) System.clearProperty("lucli.home"); else System.setProperty("lucli.home", previous);
+        }
+    }
+
+    // ============================================
     // Initialization Tests
     // ============================================
 

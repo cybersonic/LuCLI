@@ -1,5 +1,7 @@
 package org.lucee.lucli;
 
+import org.lucee.lucli.paths.LucliPaths;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -27,8 +29,10 @@ public class Settings {
     private JsonNode settings;
     
     public Settings() {
-        Path homeDir = Paths.get(System.getProperty("user.home"));
-        this.settingsDir = homeDir.resolve(SETTINGS_DIR);
+        // The active LuCLI home (-Dlucli.home, LUCLI_HOME, else ~/<profile home>), the same
+        // file `system paths` reports. It used to be user.home/.lucli regardless of
+        // LUCLI_HOME (upstream cybersonic/LuCLI#140).
+        this.settingsDir = LucliPaths.resolve().home();
         this.settingsFile = settingsDir.resolve(SETTINGS_FILE);
         this.promptsDir = settingsDir.resolve(PROMPTS_DIR);
         this.objectMapper = new ObjectMapper();
@@ -37,6 +41,11 @@ public class Settings {
         loadSettings();
     }
     
+    /** Where settings were stored before they followed the active LuCLI home. */
+    static Path legacySettingsFile() {
+        return Paths.get(System.getProperty("user.home"), SETTINGS_DIR, SETTINGS_FILE).toAbsolutePath().normalize();
+    }
+
     /**
      * Create necessary directories if they don't exist
      */
@@ -54,8 +63,15 @@ public class Settings {
      */
     private void loadSettings() {
         try {
+            Path legacyFile = legacySettingsFile();
             if (Files.exists(settingsFile)) {
                 settings = objectMapper.readTree(settingsFile.toFile());
+            } else if (!legacyFile.equals(settingsFile) && Files.exists(legacyFile)) {
+                // Settings written before LuCLI honoured LUCLI_HOME / the profile home live in
+                // user.home/.lucli/settings.json. Read them once and save a copy to the active
+                // home; the legacy file is left as it is.
+                settings = objectMapper.readTree(legacyFile.toFile());
+                saveSettings();
             } else {
                 // Create default settings
                 settings = createDefaultSettings();
