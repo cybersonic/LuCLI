@@ -19,7 +19,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.lucee.lucli.paths.LucliPaths;
+import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -39,6 +39,12 @@ class ModuleArgBindingTest {
     private static Path fixtureInstalledPath;
     private static String lucliBin;
 
+    // The LuCLI home for this class: the fixture is installed here and the
+    // dev-lucli.sh child gets it as LUCLI_HOME, so the suite never touches the
+    // developer's own home and passes in a clean one.
+    @TempDir
+    static Path lucliHome;
+
     @BeforeAll
     static void setUp() throws Exception {
         Assumptions.assumeFalse(
@@ -50,7 +56,7 @@ class ModuleArgBindingTest {
         assertTrue(Files.isDirectory(fixtureSrc),
                 "fixture source not found at " + fixtureSrc);
 
-        Path modulesDir = LucliPaths.resolve().modulesDir();
+        Path modulesDir = lucliHome.resolve("modules");
         Files.createDirectories(modulesDir);
         fixtureInstalledPath = modulesDir.resolve(FIXTURE_MODULE_NAME);
 
@@ -141,13 +147,21 @@ class ModuleArgBindingTest {
         }
     }
 
+    @Test
+    void childRunsInTheTemporaryLucliHome() throws Exception {
+        String output = runCli("typedbind", "report", "hello");
+        assertTrue(Files.isDirectory(lucliHome.resolve("lucee-server")),
+                "the child must create its Lucee context under LUCLI_HOME, not the developer's home");
+        assertTrue(output.contains("first=hello"), output);
+    }
+
     private String runCli(String... args) throws IOException, InterruptedException {
         List<String> cmd = new ArrayList<>();
         cmd.add("/bin/bash");
         cmd.add(lucliBin);
         for (String a : args) cmd.add(a);
 
-        ProcessBuilder pb = new ProcessBuilder(cmd);
+        ProcessBuilder pb = lucliProcess(cmd);
         pb.redirectErrorStream(true);
         Process proc = pb.start();
 
@@ -178,5 +192,12 @@ class ModuleArgBindingTest {
             stream.sorted(Comparator.reverseOrder())
                   .forEach(p -> { try { Files.delete(p); } catch (IOException e) { throw new RuntimeException(e); } });
         }
+    }
+
+    // Every child gets this class's LuCLI home.
+    private static ProcessBuilder lucliProcess(List<String> command) {
+        ProcessBuilder pb = new ProcessBuilder(command);
+        pb.environment().put("LUCLI_HOME", lucliHome.toString());
+        return pb;
     }
 }

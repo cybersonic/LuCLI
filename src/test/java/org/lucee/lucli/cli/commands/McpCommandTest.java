@@ -23,7 +23,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.lucee.lucli.paths.LucliPaths;
+import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Integration tests for {@link McpCommand}.
  *
  * Copies a small fixture module (src/test/resources/mcp-fixture-module) into
- * the real LuCLI modules directory, spawns `dev-lucli.sh mcp mcpfixture` as a
+ * a temporary LuCLI home, spawns `dev-lucli.sh mcp mcpfixture` with that home as a
  * subprocess, and asserts on the JSON-RPC responses emitted on stdout.
  *
  * The fixture is removed in {@link #tearDown()}.
@@ -51,6 +51,12 @@ class McpCommandTest {
     private static Path fixtureInstalledPath;
     private static String lucliBin;
 
+    // The LuCLI home for this class: the fixture is installed here and the
+    // dev-lucli.sh child gets it as LUCLI_HOME, so the suite never touches the
+    // developer's own home and passes in a clean one.
+    @TempDir
+    static Path lucliHome;
+
     @BeforeAll
     static void setUp() throws Exception {
         // Subprocess-based tests need bash + dev-lucli.sh. Windows runners
@@ -65,7 +71,7 @@ class McpCommandTest {
         assertTrue(Files.isDirectory(fixtureSrc),
                 "fixture source not found at " + fixtureSrc);
 
-        Path modulesDir = LucliPaths.resolve().modulesDir();
+        Path modulesDir = lucliHome.resolve("modules");
         Files.createDirectories(modulesDir);
         fixtureInstalledPath = modulesDir.resolve(FIXTURE_MODULE_NAME);
 
@@ -277,7 +283,7 @@ class McpCommandTest {
     // Send the given JSON-RPC lines to `dev-lucli.sh mcp mcpfixture` as a
     // subprocess. Returns each parsed response as a JsonNode.
     private List<JsonNode> runMcpSession(List<String> requests) throws Exception {
-        ProcessBuilder pb = new ProcessBuilder(
+        ProcessBuilder pb = lucliProcess(
                 "/bin/bash", lucliBin, "mcp", FIXTURE_MODULE_NAME);
         pb.redirectErrorStream(false);
         Process proc = pb.start();
@@ -337,4 +343,15 @@ class McpCommandTest {
         }
     }
 
+
+    // Every child gets this class's LuCLI home.
+    private static ProcessBuilder lucliProcess(String... command) {
+        return lucliProcess(List.of(command));
+    }
+
+    private static ProcessBuilder lucliProcess(List<String> command) {
+        ProcessBuilder pb = new ProcessBuilder(command);
+        pb.environment().put("LUCLI_HOME", lucliHome.toString());
+        return pb;
+    }
 }
