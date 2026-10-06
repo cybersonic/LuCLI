@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Fix: `server start --dry-run` Writes Nothing and Shows `--name`:** In a folder without `lucee.json`, the dry run wrote a default `lucee.json` into the project, and its preview showed the folder name even when `--name` was given. A dry run now loads the configuration without persisting the default (`LuceeServerConfig.loadConfig(projectDir, file, persistDefault)`), and the preview applies `--name` as a real start does. (#139) Adds two `ServerCommandHandlerTest` cases.
 
 ## 0.7.0
 - **Version Short Flag:** Added `lucli --version-short` to print only the raw LuCLI version value (for scripts/automation that need just the version string).

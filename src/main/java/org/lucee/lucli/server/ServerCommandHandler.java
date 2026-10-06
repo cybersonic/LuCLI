@@ -326,7 +326,8 @@ public class ServerCommandHandler {
         String cfgFile = configFileName != null ? configFileName : "lucee.json";
         Path cfgPath = projectDir.resolve(cfgFile);
         boolean configFileExisted = Files.exists(cfgPath);
-        LuceeServerConfig.ServerConfig finalConfig = LuceeServerConfig.loadConfig(projectDir, cfgFile);
+        // A dry run is a preview: it must not write a default lucee.json into the project.
+        LuceeServerConfig.ServerConfig finalConfig = LuceeServerConfig.loadConfig(projectDir, cfgFile, !dryRun);
         
         // Apply environment overrides if --env flag was provided
         if (environment != null && !environment.trim().isEmpty()) {
@@ -403,6 +404,11 @@ public class ServerCommandHandler {
 
         // If dry-run, show what would happen and exit
         if (dryRun) {
+            // --name applies to the started server (LuceeServerManager.startServerInternal);
+            // show it in the preview too.
+            if (customName != null && !customName.trim().isEmpty()) {
+                finalConfig.name = customName.trim();
+            }
             StringBuilder result = new StringBuilder();
             result.append("📋 DRY RUN: Server configuration that would be used:\n\n");
             if (includeSelection.includeConfig) {
