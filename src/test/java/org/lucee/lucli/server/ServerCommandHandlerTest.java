@@ -23,6 +23,43 @@ class ServerCommandHandlerTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    // upstream cybersonic/LuCLI#139: a dry run is a preview and must not write to the project
+    @Test
+    void serverStartDryRun_withoutLuceeJson_writesNothing() throws Exception {
+        Files.writeString(tempDir.resolve("index.cfm"), "hi");
+
+        ServerCommandHandler handler = new ServerCommandHandler(true, tempDir);
+        String output = handler.executeCommand("server", new String[] {
+                "start", "--dry-run", "--port", "63301"
+        });
+
+        assertNotNull(output);
+        assertTrue(output.contains("DRY RUN"), "a preview is still printed");
+        assertFalse(Files.exists(tempDir.resolve("lucee.json")), "start --dry-run must not create lucee.json");
+    }
+
+    // upstream cybersonic/LuCLI#139: --name applies to the started server, so the preview shows it
+    @Test
+    void serverStartDryRun_previewShowsTheNameOverride() throws Exception {
+        Files.writeString(tempDir.resolve("lucee.json"), """
+            {
+              "name": "from-config",
+              "port": 8080
+            }
+            """);
+
+        ServerCommandHandler handler = new ServerCommandHandler(true, tempDir);
+        String output = handler.executeCommand("server", new String[] {
+                "start", "--dry-run", "--name", "foo"
+        });
+
+        assertNotNull(output);
+        assertTrue(output.contains("\"name\" : \"foo\"") || output.contains("\"name\": \"foo\""),
+                "Dry-run output should show the --name override");
+        assertTrue(Files.readString(tempDir.resolve("lucee.json")).contains("from-config"),
+                "lucee.json is not modified");
+    }
+
     @Test
     void serverStartDryRun_portOverrideDoesNotMutateLuceeJson() throws Exception {
         Path configFile = tempDir.resolve("lucee.json");

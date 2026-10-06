@@ -329,6 +329,16 @@ public class LuceeServerConfig {
      * @param configFileName The configuration file name (e.g., "lucee.json", "lucee-simple.json")
      */
     public static ServerConfig loadConfig(Path projectDir, String configFileName) throws IOException {
+        return loadConfig(projectDir, configFileName, true);
+    }
+
+    /**
+     * Load configuration from a specified file in the directory.
+     * @param persistDefault when the file doesn't exist, whether to write the default
+     *        configuration to it. A preview ({@code server start --dry-run}) passes false so
+     *        it never writes to the project (upstream cybersonic/LuCLI#139).
+     */
+    public static ServerConfig loadConfig(Path projectDir, String configFileName, boolean persistDefault) throws IOException {
         // Reset any previously loaded .env variables for this new project/config load
         clearLoadedEnvFileVariables();
         clearRealizedEnvVariables();
@@ -338,7 +348,9 @@ public class LuceeServerConfig {
         if (!Files.exists(configFile)) {
             // Create default configuration
             ServerConfig defaultConfig = createDefaultConfig(projectDir);
-            saveConfig(defaultConfig, configFile);
+            if (persistDefault) {
+                saveConfig(defaultConfig, configFile);
+            }
             return defaultConfig;
         }
         
