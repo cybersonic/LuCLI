@@ -225,6 +225,11 @@ public class LuceeServerManager {
         }
     }
     
+    // Lucee Express zips: GitHub Releases first (tag == version, incl. -RC/-BETA), cdn.lucee.org as fallback.
+    // cdn.lucee.org is being retired in March 2027; the fallback covers versions that only exist there
+    // (6.1.x, some RCs, snapshots) until then.
+    private static final String LUCEE_EXPRESS_GITHUB_URL_TEMPLATE =
+            "https://github.com/lucee/Lucee/releases/download/{version}/lucee-express-{version}.zip";
     private static final String LUCEE_CDN_URL_TEMPLATE = "https://cdn.lucee.org/lucee-express-{version}.zip";
     private static final String DEFAULT_VERSION = "6.2.2.91";
     private static final String LUCEE_WARMUP_ENV_KEY = "LUCEE_ENABLE_WARMUP";
@@ -238,7 +243,10 @@ public class LuceeServerManager {
     private static final java.util.regex.Pattern LUCEE_JAR_FILE_PATTERN =
             java.util.regex.Pattern.compile("^lucee(?:-(light|zero))?-(.+)\\.jar$");
 
-    // Lucee engine JAR variants
+    // Lucee engine JAR variants: Maven Central first ({classifier} is "", "-light" or "-zero"),
+    // cdn.lucee.org as fallback (snapshots, ALPHAs and anything not published to Central).
+    private static final String LUCEE_JAR_MAVEN_CENTRAL_TEMPLATE =
+            "https://repo1.maven.org/maven2/org/lucee/lucee/{version}/lucee-{version}{classifier}.jar";
     private static final String LUCEE_JAR_STANDARD_TEMPLATE = "https://cdn.lucee.org/lucee-{version}.jar";
     private static final String LUCEE_JAR_LIGHT_TEMPLATE = "https://cdn.lucee.org/lucee-light-{version}.jar";
     private static final String LUCEE_JAR_ZERO_TEMPLATE = "https://cdn.lucee.org/lucee-zero-{version}.jar";
@@ -2291,6 +2299,41 @@ public class LuceeServerManager {
 
 
     /**
+     * Pick the download source: returns the first candidate that answers a HEAD
+     * request (redirects followed) with 2xx. Candidates that answer 404 or any
+     * other non-2xx status, or can't be reached, are skipped. The last candidate
+     * is returned without probing, so the download itself reports the error when
+     * no source has the file.
+     */
+    static String resolveDownloadUrl(String... candidates) {
+        for (int i = 0; i < candidates.length - 1; i++) {
+            if (isAvailable(candidates[i])) {
+                return candidates[i];
+            }
+        }
+        return candidates[candidates.length - 1];
+    }
+
+    private static boolean isAvailable(String urlString) {
+        java.net.HttpURLConnection connection = null;
+        try {
+            connection = (java.net.HttpURLConnection) new URL(urlString).openConnection();
+            connection.setRequestMethod("HEAD");
+            connection.setInstanceFollowRedirects(true);
+            connection.setConnectTimeout(15_000);
+            connection.setReadTimeout(15_000);
+            int status = connection.getResponseCode();
+            return status >= 200 && status < 300;
+        } catch (IOException | ClassCastException e) {
+            return false;
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
+    /**
      * Ensure Lucee Express for the specified version is available
      */
     public Path ensureLuceeExpress(String version) throws Exception {
@@ -2303,7 +2346,9 @@ public class LuceeServerManager {
         }
         
         // Download and extract Lucee Express
-        String downloadUrl = LUCEE_CDN_URL_TEMPLATE.replace("{version}", version);
+        String downloadUrl = resolveDownloadUrl(
+                LUCEE_EXPRESS_GITHUB_URL_TEMPLATE.replace("{version}", version),
+                LUCEE_CDN_URL_TEMPLATE.replace("{version}", version));
         Path zipFile = expressDir.resolve("lucee-express-" + version + ".zip");
         
         System.out.println("Downloading Lucee Express " + version + "...");
@@ -2337,20 +2382,24 @@ public class LuceeServerManager {
                 ? "standard"
                 : variant.trim().toLowerCase();
 
-        String downloadUrl;
+        String cdnUrl;
+        String classifier;
         String jarFileName;
 
         switch (effectiveVariant) {
             case "standard":
-                downloadUrl = LUCEE_JAR_STANDARD_TEMPLATE.replace("{version}", effectiveVersion);
+                cdnUrl = LUCEE_JAR_STANDARD_TEMPLATE.replace("{version}", effectiveVersion);
+                classifier = "";
                 jarFileName = "lucee-" + effectiveVersion + ".jar";
                 break;
             case "light":
-                downloadUrl = LUCEE_JAR_LIGHT_TEMPLATE.replace("{version}", effectiveVersion);
+                cdnUrl = LUCEE_JAR_LIGHT_TEMPLATE.replace("{version}", effectiveVersion);
+                classifier = "-light";
                 jarFileName = "lucee-light-" + effectiveVersion + ".jar";
                 break;
             case "zero":
-                downloadUrl = LUCEE_JAR_ZERO_TEMPLATE.replace("{version}", effectiveVersion);
+                cdnUrl = LUCEE_JAR_ZERO_TEMPLATE.replace("{version}", effectiveVersion);
+                classifier = "-zero";
                 jarFileName = "lucee-zero-" + effectiveVersion + ".jar";
                 break;
             default:
@@ -2363,6 +2412,12 @@ public class LuceeServerManager {
             // Already downloaded
             return jarPath;
         }
+
+        String downloadUrl = resolveDownloadUrl(
+                LUCEE_JAR_MAVEN_CENTRAL_TEMPLATE
+                        .replace("{version}", effectiveVersion)
+                        .replace("{classifier}", classifier),
+                cdnUrl);
 
         System.out.println("Downloading Lucee " + effectiveVariant + " JAR " + effectiveVersion + "...");
         downloadFile(downloadUrl, jarPath);

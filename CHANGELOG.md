@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Lucee Downloads Move Off `cdn.lucee.org`:** `cdn.lucee.org` is being retired in March 2027. Lucee Express zips now download from GitHub Releases (`github.com/lucee/Lucee/releases/download/<version>/lucee-express-<version>.zip`) and engine JARs from Maven Central (`org/lucee/lucee/<version>/lucee-<version>[-light|-zero].jar`). When the primary source doesn't have the file (HEAD probe, redirects followed), LuCLI falls back to the previous `cdn.lucee.org` URL, which still covers 6.1.x Express, CDN-only RCs and snapshots. Cached file names under `~/.lucli` are unchanged. Added `LuceeServerManagerDownloadSourceTest`.
 
 ## 0.7.0
 - **Version Short Flag:** Added `lucli --version-short` to print only the raw LuCLI version value (for scripts/automation that need just the version string).
