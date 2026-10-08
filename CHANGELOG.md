@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Fix: Failed Lucee Express/JAR Downloads No Longer Look Cached:** `LuceeServerManager.downloadFile` now checks the final HTTP status (after redirects) and fails on non-2xx responses (404 reports as not found), writes to a `.part` file that is only moved into place once the body is complete (byte count checked against `Content-Length` when present), and removes partial files on failure. A failed Express extraction removes the half-extracted version directory. Previously an interrupted download could leave a truncated `~/.lucli/jars/lucee-*.jar` or Express directory that was reused as if it were cached. Added `LuceeServerManagerDownloadTest`.
 
 ## 0.7.0
 - **Version Short Flag:** Added `lucli --version-short` to print only the raw LuCLI version value (for scripts/automation that need just the version string).

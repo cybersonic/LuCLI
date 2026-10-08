@@ -1,13 +1,18 @@
 package org.lucee.lucli.server;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLConnection;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -2310,13 +2315,23 @@ public class LuceeServerManager {
         downloadFile(downloadUrl, zipFile);
         
         System.out.println("Extracting Lucee Express...");
-        extractZipFile(zipFile, versionDir);
-        
-        // Set execute permissions on shell scripts
-        setExecutePermissions(versionDir);
-        
-        // Clean up zip file
-        Files.deleteIfExists(zipFile);
+        try {
+            extractZipFile(zipFile, versionDir);
+            
+            // Set execute permissions on shell scripts
+            setExecutePermissions(versionDir);
+        } catch (IOException | RuntimeException e) {
+            // Don't leave a half-extracted directory behind; it would be treated as cached
+            try {
+                deleteServerDirectory(versionDir);
+            } catch (IOException cleanupError) {
+                e.addSuppressed(cleanupError);
+            }
+            throw e;
+        } finally {
+            // Clean up zip file
+            Files.deleteIfExists(zipFile);
+        }
         
         return versionDir;
     }
@@ -2371,42 +2386,67 @@ public class LuceeServerManager {
     }
     
     /**
-     * Download a file from URL with progress bar
+     * Download a file from URL with progress bar.
+     *
+     * The body is written to a sibling {@code .part} file and only moved to
+     * {@code destinationFile} once the download completed, so an interrupted
+     * or failed download never leaves a file behind that later looks cached.
+     * Redirects are followed (default for http(s) URL connections).
+     *
+     * @throws FileNotFoundException when the server answers 404
+     * @throws IOException on any other non-2xx status, a truncated body or I/O error
      */
-    private void downloadFile(String urlString, Path destinationFile) throws IOException {
-        Files.createDirectories(destinationFile.getParent());
-        
-        URL url = new URL(urlString);
+    static void downloadFile(String urlString, Path destinationFile) throws IOException {
+        Files.createDirectories(destinationFile.toAbsolutePath().getParent());
+        Path partFile = destinationFile.resolveSibling(destinationFile.getFileName() + ".part");
+
+        URLConnection connection = new URL(urlString).openConnection();
+        connection.setConnectTimeout(30_000);
+        connection.setReadTimeout(60_000);
+        if (connection instanceof HttpURLConnection) {
+            HttpURLConnection http = (HttpURLConnection) connection;
+            http.setInstanceFollowRedirects(true);
+            int status = http.getResponseCode(); // status of the final response, after redirects
+            if (status == HttpURLConnection.HTTP_NOT_FOUND) {
+                http.disconnect();
+                throw new FileNotFoundException("Not found (HTTP 404): " + urlString);
+            }
+            if (status < 200 || status >= 300) {
+                http.disconnect();
+                throw new IOException("Download failed (HTTP " + status + "): " + urlString);
+            }
+        }
+        long contentLength = connection.getContentLengthLong();
+
+        boolean complete = false;
         try {
-            var connection = url.openConnection();
-            long contentLength = connection.getContentLengthLong();
-            
+            long totalBytesRead = 0;
             try (InputStream in = connection.getInputStream();
-                 OutputStream out = Files.newOutputStream(destinationFile)) {
-                
+                 OutputStream out = Files.newOutputStream(partFile)) {
                 byte[] buffer = new byte[8192];
-                long totalBytesRead = 0;
                 int bytesRead;
                 ProgressBar progressBar = new ProgressBar("Downloading", contentLength > 0 ? contentLength : -1L);
-                
                 while ((bytesRead = in.read(buffer)) != -1) {
                     out.write(buffer, 0, bytesRead);
                     totalBytesRead += bytesRead;
                     progressBar.update(totalBytesRead);
                 }
+                if (contentLength > 0 && totalBytesRead != contentLength) {
+                    throw new IOException("Incomplete download: received " + totalBytesRead
+                            + " of " + contentLength + " bytes from " + urlString);
+                }
                 progressBar.complete("Download complete!");
             }
-        } catch (IOException e) {
-            // Fallback to simple download if progress fails
-            System.out.println("\nProgress display failed, continuing with simple download...");
-            try (InputStream in = url.openStream();
-                 OutputStream out = Files.newOutputStream(destinationFile)) {
-                
-                byte[] buffer = new byte[8192];
-                int bytesRead;
-                while ((bytesRead = in.read(buffer)) != -1) {
-                    out.write(buffer, 0, bytesRead);
-                }
+            try {
+                Files.move(partFile, destinationFile, StandardCopyOption.REPLACE_EXISTING,
+                        StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(partFile, destinationFile, StandardCopyOption.REPLACE_EXISTING);
+            }
+            complete = true;
+        } finally {
+            if (!complete) {
+                Files.deleteIfExists(partFile);
             }
         }
     }
