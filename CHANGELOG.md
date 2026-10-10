@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Fix: Bundled `lang` Module Compiles Again (`#146`):** Escaped literal `#` as `##` in help/example strings in `src/main/resources/modules/lang/Module.cfc` so CFML no longer treats shell-style comments as expression delimiters (`Invalid identifier` at compile time).
 
 ## 0.7.0
 - **Version Short Flag:** Added `lucli --version-short` to print only the raw LuCLI version value (for scripts/automation that need just the version string).
