@@ -75,3 +75,12 @@ EOF
     run grep -F 'mvn -DskipTests=true -Djreleaser.config.file=jreleaser.yml jreleaser:full-release' "${LUCLI_ROOT_DIR}/.github/workflows/release.yml"
     assert_success
 }
+
+@test "issue #146: lang Module.cfc escapes literal # in writeOutput strings" {
+    local file leftover
+    file="${LUCLI_ROOT_DIR}/src/main/resources/modules/lang/Module.cfc"
+    # CFML treats lone # as expression start; ## is the literal escape.
+    # Collapse escaped hashes, then ensure no lone # remains on writeOutput lines.
+    leftover=$(grep 'writeOutput' "${file}" | sed 's/##//g' | grep -c '#' || true)
+    [ "${leftover}" -eq 0 ]
+}
