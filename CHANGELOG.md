@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Security: Maven dependency CVE remediation (`#156`):** Upgraded direct `jackson-databind` to `2.18.11` (aligned `jackson-core`/`jackson-annotations`), JLine to `3.30.15`, and forced transitive `tomcat-embed-core` to `9.0.121` and `commons-lang3` to `3.18.0` via `dependencyManagement`. Skipped Lucee-rebundled OSGi log4j artifacts (not safe to override in-tree).
 
 ## 0.7.0
 - **Version Short Flag:** Added `lucli --version-short` to print only the raw LuCLI version value (for scripts/automation that need just the version string).
