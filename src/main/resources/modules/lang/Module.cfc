@@ -118,8 +118,8 @@ component {
         
         writeOutput(chr(10));
         writeOutput("💡 To switch language:" & chr(10));
-        writeOutput("   lucli lang set <code>    # e.g., lucli lang set es" & chr(10));
-        writeOutput("   LUCLI_LOCALE=<code>     # e.g., LUCLI_LOCALE=fr lucli ..." & chr(10));
+        writeOutput("   lucli lang set <code>    ## e.g., lucli lang set es" & chr(10));
+        writeOutput("   LUCLI_LOCALE=<code>     ## e.g., LUCLI_LOCALE=fr lucli ..." & chr(10));
     }
     
     /**
@@ -152,7 +152,7 @@ component {
             writeOutput(chr(10));
             writeOutput("Option 1 - Environment Variable (recommended):" & chr(10));
             writeOutput("   export LUCLI_LOCALE=" & langCode & chr(10));
-            writeOutput("   lucli server start  # Will use " & langNames[langCode] & chr(10));
+            writeOutput("   lucli server start  ## Will use " & langNames[langCode] & chr(10));
             writeOutput(chr(10));
             
             writeOutput("Option 2 - Per-command:" & chr(10));
@@ -191,11 +191,11 @@ component {
         writeOutput("  help, --help, -h  Show this help message" & chr(10));
         writeOutput(chr(10));
         writeOutput("EXAMPLES:" & chr(10));
-        writeOutput("  lucli lang              # Show current and available languages" & chr(10));
-        writeOutput("  lucli lang list         # List available languages" & chr(10));
-        writeOutput("  lucli lang current      # Show current language" & chr(10));
-        writeOutput("  lucli lang set es       # Get instructions to set Spanish" & chr(10));
-        writeOutput("  lucli lang set fr       # Get instructions to set French" & chr(10));
+        writeOutput("  lucli lang              ## Show current and available languages" & chr(10));
+        writeOutput("  lucli lang list         ## List available languages" & chr(10));
+        writeOutput("  lucli lang current      ## Show current language" & chr(10));
+        writeOutput("  lucli lang set es       ## Get instructions to set Spanish" & chr(10));
+        writeOutput("  lucli lang set fr       ## Get instructions to set French" & chr(10));
         writeOutput(chr(10));
         writeOutput("SUPPORTED LANGUAGES:" & chr(10));
         writeOutput("  🇺🇸 en - English" & chr(10));
