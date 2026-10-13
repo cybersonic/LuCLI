@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Security: Maven dependency CVE remediation (`#156`):** Upgraded direct `jackson-databind` to `2.18.11` (aligned `jackson-core`/`jackson-annotations`), JLine to `3.30.15`, and forced transitive `tomcat-embed-core` to `9.0.121` and `commons-lang3` to `3.18.0` via `dependencyManagement`. Skipped Lucee-rebundled OSGi log4j artifacts (not safe to override in-tree).
 - **Fix: Bundled `lang` Module Compiles Again (`#146`):** Escaped literal `#` as `##` in help/example strings in `src/main/resources/modules/lang/Module.cfc` so CFML no longer treats shell-style comments as expression delimiters (`Invalid identifier` at compile time).
 
 ## 0.7.0
