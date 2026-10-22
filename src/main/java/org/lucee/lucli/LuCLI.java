@@ -363,8 +363,14 @@ public class LuCLI implements Callable<Integer> {
             return executeViaRunCommand(arg, args);
         }
 
-        // Check if it's a module name (and not an existing file)
-        if (!file.exists() && ModuleCommand.moduleExists(arg)) {
+        // Check if it's a module name. Module names are restricted to letters,
+        // numbers, hyphens, and underscores (no dots), so they can never collide
+        // with the script/CFML file extensions handled above. Checking
+        // moduleExists() independently of file existence matters for aliased
+        // binaries (e.g. `wheels`): the prepended binary name is a bare word, and
+        // a same-named directory in the cwd (a Wheels checkout, say) must not
+        // short-circuit module routing and produce "Unknown command ... 'wheels'".
+        if (ModuleCommand.moduleExists(arg)) {
             debug("LuCLI", "Routing to module: " + arg);
             return executeViaModulesCommand(arg, args);
         }
