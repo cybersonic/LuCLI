@@ -273,8 +273,8 @@ public class ConfigEditor {
         title("JVM");
 
         String currentMax = config.jvm != null ? nullToEmpty(config.jvm.maxMemory) : "";
-        description("Max heap size (e.g. 512m, 2g).");
-        System.out.print("Max memory [" + currentMax + "]: ");
+        description("Max heap size (e.g. 512m, 2g). Leave blank to keep current; omit in lucee.json to use JVM ergonomics.");
+        System.out.print("Max memory [" + (currentMax.isEmpty() ? "unset" : currentMax) + "]: ");
         String maxMemInput = scanner.nextLine().trim();
         if (!maxMemInput.isEmpty()) {
             if (!maxMemInput.matches("^[1-9]\\d*(m|g)$")) {
@@ -288,8 +288,8 @@ public class ConfigEditor {
         }
 
         String currentMin = config.jvm != null ? nullToEmpty(config.jvm.minMemory) : "";
-        description("Initial heap size (e.g. 128m, 512m).");
-        System.out.print("Min memory [" + currentMin + "]: ");
+        description("Initial heap size (e.g. 128m, 512m). Leave blank to keep current; omit in lucee.json to leave -Xms unset.");
+        System.out.print("Min memory [" + (currentMin.isEmpty() ? "unset" : currentMin) + "]: ");
         String minMemInput = scanner.nextLine().trim();
         if (!minMemInput.isEmpty()) {
             if (!minMemInput.matches("^[1-9]\\d*(m|g)$")) {

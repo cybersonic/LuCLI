@@ -115,15 +115,13 @@
       "properties": {
         "maxMemory": {
           "type": "string",
-          "description": "Maximum heap size for the JVM (e.g. '512m', '2g'). Must match ^[1-9]\\d*(m|g)$ (e.g. '256m', '1g').",
-          "pattern": "^[1-9]\\d*(m|g)$",
-          "default": "512m"
+          "description": "Maximum heap size for the JVM (e.g. '512m', '2g'). Must match ^[1-9]\\d*(m|g)$ (e.g. '256m', '1g'). When omitted, -Xmx is not set and JVM ergonomics (e.g. MaxRAMPercentage) apply.",
+          "pattern": "^[1-9]\\d*(m|g)$"
         },
         "minMemory": {
           "type": "string",
-          "description": "Initial heap size for the JVM (e.g. '128m'). Must match ^[1-9]\\d*(m|g)$ (e.g. '128m', '512m').",
-          "pattern": "^[1-9]\\d*(m|g)$",
-          "default": "128m"
+          "description": "Initial heap size for the JVM (e.g. '128m'). Must match ^[1-9]\\d*(m|g)$ (e.g. '128m', '512m'). When omitted, -Xms is not set.",
+          "pattern": "^[1-9]\\d*(m|g)$"
         },
         "additionalArgs": {
           "type": "array",

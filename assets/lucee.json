@@ -17,8 +17,6 @@
     }
   },
   "jvm" : {
-    "maxMemory" : "512m",
-    "minMemory" : "128m",
     "additionalArgs" : [ ]
   },
   "urlRewrite" : {

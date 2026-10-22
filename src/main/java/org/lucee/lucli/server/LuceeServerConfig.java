@@ -246,9 +246,32 @@ public class LuceeServerConfig {
     }
     
     public static class JvmConfig {
-        public String maxMemory = "512m";
-        public String minMemory = "128m";
+        /**
+         * Maximum heap size passed as {@code -Xmx} (e.g. {@code 512m}, {@code 2g}).
+         * When null/blank, LuCLI does not set {@code -Xmx} so the JVM can use ergonomics
+         * (including {@code -XX:MaxRAMPercentage} via {@link #additionalArgs}).
+         */
+        public String maxMemory;
+        /**
+         * Initial heap size passed as {@code -Xms} (e.g. {@code 128m}).
+         * When null/blank, LuCLI does not set {@code -Xms}.
+         */
+        public String minMemory;
         public String[] additionalArgs = new String[0];
+
+        /**
+         * @return true when {@link #maxMemory} is set to a non-blank value
+         */
+        public boolean hasMaxMemory() {
+            return maxMemory != null && !maxMemory.isBlank();
+        }
+
+        /**
+         * @return true when {@link #minMemory} is set to a non-blank value
+         */
+        public boolean hasMinMemory() {
+            return minMemory != null && !minMemory.isBlank();
+        }
     }
     
     /**

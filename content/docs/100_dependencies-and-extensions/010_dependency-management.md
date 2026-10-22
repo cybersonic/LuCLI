@@ -257,8 +257,8 @@ This section expands on the basic configuration reference and documents every av
 
 | Key                 | Type     | Default | Description |
 |---------------------|----------|---------|-------------|
-| `jvm.maxMemory`     | string   | `"512m"` | Maximum heap size, passed as `-Xmx` (e.g. `"1024m"`, `"2g"`). |
-| `jvm.minMemory`     | string   | `"128m"` | Initial heap size, passed as `-Xms`. |
+| `jvm.maxMemory`     | string   | unset | Maximum heap size, passed as `-Xmx` (e.g. `"1024m"`, `"2g"`). When omitted, `-Xmx` is not set so JVM ergonomics / `-XX:MaxRAMPercentage` can apply. |
+| `jvm.minMemory`     | string   | unset | Initial heap size, passed as `-Xms`. When omitted, `-Xms` is not set. |
 | `jvm.additionalArgs`| string[] | `[]`    | Extra JVM arguments appended to `CATALINA_OPTS` (e.g. GC tuning flags, `-D` system properties, or `-javaagent:` if you do not use `agents`). |
 
 ### `urlRewrite` settings

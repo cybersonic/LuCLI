@@ -70,6 +70,69 @@ public class LuceeServerManagerAgentsTest {
     }
 
     @Test
+    void buildCatalinaOpts_unsetMemory_omitsXmsAndXmx() throws Exception {
+        LuceeServerConfig.ServerConfig config = baseConfig();
+        config.jvm.maxMemory = null;
+        config.jvm.minMemory = null;
+
+        List<String> opts = invokeBuildCatalinaOpts(config, null);
+
+        assertTrue(opts.stream().noneMatch(opt -> opt.startsWith("-Xms")),
+                "Unset minMemory should not emit -Xms");
+        assertTrue(opts.stream().noneMatch(opt -> opt.startsWith("-Xmx")),
+                "Unset maxMemory should not emit -Xmx");
+        assertTrue(opts.contains("-Dfoo=bar"),
+                "additionalArgs should still be included when memory is unset");
+    }
+
+    @Test
+    void buildCatalinaOpts_blankMemory_omitsXmsAndXmx() throws Exception {
+        LuceeServerConfig.ServerConfig config = baseConfig();
+        config.jvm.maxMemory = "   ";
+        config.jvm.minMemory = "";
+
+        List<String> opts = invokeBuildCatalinaOpts(config, null);
+
+        assertTrue(opts.stream().noneMatch(opt -> opt.startsWith("-Xms")),
+                "Blank minMemory should not emit -Xms");
+        assertTrue(opts.stream().noneMatch(opt -> opt.startsWith("-Xmx")),
+                "Blank maxMemory should not emit -Xmx");
+    }
+
+    @Test
+    void buildCatalinaOpts_onlyMaxMemory_emitsXmxOnly() throws Exception {
+        LuceeServerConfig.ServerConfig config = baseConfig();
+        config.jvm.maxMemory = "4g";
+        config.jvm.minMemory = null;
+
+        List<String> opts = invokeBuildCatalinaOpts(config, null);
+
+        assertTrue(opts.stream().noneMatch(opt -> opt.startsWith("-Xms")),
+                "Unset minMemory should not emit -Xms");
+        assertTrue(opts.contains("-Xmx4g"), "Set maxMemory should emit -Xmx");
+    }
+
+    @Test
+    void buildCatalinaOpts_onlyMinMemory_emitsXmsOnly() throws Exception {
+        LuceeServerConfig.ServerConfig config = baseConfig();
+        config.jvm.maxMemory = null;
+        config.jvm.minMemory = "256m";
+
+        List<String> opts = invokeBuildCatalinaOpts(config, null);
+
+        assertTrue(opts.contains("-Xms256m"), "Set minMemory should emit -Xms");
+        assertTrue(opts.stream().noneMatch(opt -> opt.startsWith("-Xmx")),
+                "Unset maxMemory should not emit -Xmx");
+    }
+
+    @Test
+    void jvmConfig_defaultsAreUnset() {
+        LuceeServerConfig.JvmConfig jvm = new LuceeServerConfig.JvmConfig();
+        assertNull(jvm.maxMemory, "Default maxMemory should be unset so -Xmx is omitted");
+        assertNull(jvm.minMemory, "Default minMemory should be unset so -Xms is omitted");
+    }
+
+    @Test
     void buildCatalinaOpts_enabledAgent_includedBeforeAdditionalArgs() throws Exception {
         LuceeServerConfig.ServerConfig config = baseConfig();
 
