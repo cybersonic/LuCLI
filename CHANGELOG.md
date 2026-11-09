@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Security: Vite example dependency CVE remediation:** Bump `examples/lifecycle-events` devDependency `vite` from `^8.1.5` to `^8.3.6` (fixes GHSA-587h-7wmj-h5pm, GHSA-698v-4r3x-3vcv, GHSA-9jrq-w75r-8gcw, GHSA-r825-w8mm-5pxw, GHSA-rq7h-c2jc-7f22 / CVE-2026-112942–112946). Affected version was 8.1.5; fixed in 8.1.6+ on the 8.1 line and current patched 8.3.6.
 - **Security: Maven dependency CVE remediation (`#156`):** Upgraded direct `jackson-databind` to `2.18.11` (aligned `jackson-core`/`jackson-annotations`), JLine to `3.30.15`, and forced transitive `tomcat-embed-core` to `9.0.121` and `commons-lang3` to `3.18.0` via `dependencyManagement`. Skipped Lucee-rebundled OSGi log4j artifacts (not safe to override in-tree).
 - **Fix: Bundled `lang` Module Compiles Again (`#146`):** Escaped literal `#` as `##` in help/example strings in `src/main/resources/modules/lang/Module.cfc` so CFML no longer treats shell-style comments as expression delimiters (`Invalid identifier` at compile time).
 
