@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+- **Security: Lucee Log4j rebundle CVE remediation:** Forced transitive `org.lucee:log4j-core` and `org.lucee:log4j-api` from `2.20.0` to `2.26.0` via `dependencyManagement` (same OSGi GAV; addresses CVE-2026-34480, CVE-2026-34477, CVE-2026-34479, CVE-2025-68161 on Core). Left `commons-lang:commons-lang:2.6` unchanged (no safe 2.x upgrade; `commons-lang3` already at `3.18.0`). Log4j API `CVE-2026-49844` remains open until an `org.lucee` `2.26.1+` rebundle exists (Apache GAV override is not OSGi-safe).
 - **Security: Maven dependency CVE remediation (`#156`):** Upgraded direct `jackson-databind` to `2.18.11` (aligned `jackson-core`/`jackson-annotations`), JLine to `3.30.15`, and forced transitive `tomcat-embed-core` to `9.0.121` and `commons-lang3` to `3.18.0` via `dependencyManagement`. Skipped Lucee-rebundled OSGi log4j artifacts (not safe to override in-tree).
 - **Fix: Bundled `lang` Module Compiles Again (`#146`):** Escaped literal `#` as `##` in help/example strings in `src/main/resources/modules/lang/Module.cfc` so CFML no longer treats shell-style comments as expression delimiters (`Invalid identifier` at compile time).
 

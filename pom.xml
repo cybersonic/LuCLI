@@ -25,6 +25,8 @@
     <jackson.version>2.18.11</jackson.version>
     <tomcat.embed.version>9.0.121</tomcat.embed.version>
     <commons.lang3.version>3.18.0</commons.lang3.version>
+    <!-- Lucee OSGi-rebundled Log4j (same classes as Apache; keep org.lucee GAV) -->
+    <lucee.log4j.version>2.26.0</lucee.log4j.version>
     <lucee.version>7.0.4.34</lucee.version>
     <!-- <lucee.classifier></lucee.classifier> -->
     <lucee.classifier>zero</lucee.classifier>
@@ -228,6 +230,19 @@
         <groupId>org.apache.commons</groupId>
         <artifactId>commons-lang3</artifactId>
         <version>${commons.lang3.version}</version>
+      </dependency>
+      <!-- Lucee pulls org.lucee:log4j-*:2.20.0; force rebundle 2.26.0 (Apache-equivalent class content). -->
+      <!-- Core 2.26.0 is clean on OSV. API 2.26.0 still carries CVE-2026-49844 (fixed in 2.26.1); -->
+      <!-- org.lucee has no 2.26.1 rebundle yet, and swapping to Apache GAV breaks OSGi symbolic names. -->
+      <dependency>
+        <groupId>org.lucee</groupId>
+        <artifactId>log4j-core</artifactId>
+        <version>${lucee.log4j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.lucee</groupId>
+        <artifactId>log4j-api</artifactId>
+        <version>${lucee.log4j.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
